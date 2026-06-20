@@ -1,0 +1,18 @@
+packages:
+  - "."
+
+minimumReleaseAge: 1440
+minimumReleaseAgeStrict: false
+trustPolicy: no-downgrade
+trustPolicyExclude:
+  - "semver@6.3.1"
+  - "undici-types@6.21.0"
+
+allowBuilds:
+  "@prisma/engines": true
+  better-sqlite3: true
+  esbuild: true
+  prisma: true
+  sharp: true
+  unrs-resolver: true
+  workerd: true
