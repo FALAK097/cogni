@@ -11,11 +11,10 @@ export const env = createEnv({
     CLOUDFLARE_ACCOUNT_ID: z.string().min(1).optional(),
     CLOUDFLARE_API_TOKEN: z.string().min(1).optional(),
     D1_DATABASE_ID: z.string().min(1).optional(),
-    D1_SHADOW_DATABASE_ID: z.string().min(1).optional(),
     R2_BUCKET_NAME: z.string().min(1).optional(),
     VECTORIZE_INDEX: z.string().min(1).optional(),
     OPENAI_API_KEY: z.string().min(1).optional(),
-    GOOGLE_GENERATIVE_AI_API_KEY: z.string().min(1).optional(),
+    GEMINI_API_KEY: z.string().min(1).optional(),
     VERCEL_TOKEN: z.string().min(1).optional(),
     VERCEL_CONNECT_SECRET: z.string().min(1).optional(),
   },
@@ -28,22 +27,17 @@ export function getD1Config() {
   const accountId = env.CLOUDFLARE_ACCOUNT_ID;
   const apiToken = env.CLOUDFLARE_API_TOKEN;
   const databaseId = env.D1_DATABASE_ID;
-  const configured = [accountId, apiToken, databaseId].filter(Boolean).length;
-
-  if (configured === 0) {
+  if (!accountId && !apiToken && !databaseId) {
     return null;
   }
 
   if (!accountId || !apiToken || !databaseId) {
-    throw new Error(
-      "D1 configuration is incomplete. Set CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN, and D1_DATABASE_ID together.",
-    );
+    return null;
   }
 
   return {
     accountId,
     apiToken,
     databaseId,
-    shadowDatabaseId: env.D1_SHADOW_DATABASE_ID,
   };
 }

@@ -19,7 +19,6 @@ export function getDb() {
         CLOUDFLARE_ACCOUNT_ID: d1.accountId,
         CLOUDFLARE_D1_TOKEN: d1.apiToken,
         CLOUDFLARE_DATABASE_ID: d1.databaseId,
-        CLOUDFLARE_SHADOW_DATABASE_ID: d1.shadowDatabaseId,
       })
     : new PrismaBetterSqlite3({ url: env.DATABASE_URL });
 

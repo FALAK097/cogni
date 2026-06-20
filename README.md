@@ -74,7 +74,6 @@ Optional Cloudflare D1 mode:
 CLOUDFLARE_ACCOUNT_ID=""
 CLOUDFLARE_API_TOKEN=""
 D1_DATABASE_ID=""
-D1_SHADOW_DATABASE_ID=""
 ```
 
 All three runtime values—account ID, API token, and database ID—must be set
@@ -86,7 +85,7 @@ Reserved for later phases:
 R2_BUCKET_NAME=""
 VECTORIZE_INDEX=""
 OPENAI_API_KEY=""
-GOOGLE_GENERATIVE_AI_API_KEY=""
+GEMINI_API_KEY=""
 VERCEL_TOKEN=""
 VERCEL_CONNECT_SECRET=""
 ```
