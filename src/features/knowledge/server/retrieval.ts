@@ -5,9 +5,19 @@ import { queryVectorize } from "@/lib/cloudflare/vectorize";
 import { getDb } from "@/lib/db/client";
 import { searchCloudflareIndex } from "@/lib/search/cloudflare-search";
 
-export async function retrieveKnowledgeContext(workspaceId: string, query: string, limit = 4) {
+export async function retrieveKnowledgeContext(
+  workspaceId: string,
+  query: string,
+  limit = 4,
+  documentIds?: string[] | null,
+) {
   const normalized = query.trim();
   if (!normalized) return [];
+
+  const documentFilter =
+    documentIds && documentIds.length > 0
+      ? { workspaceId, status: "READY" as const, id: { in: documentIds } }
+      : { workspaceId, status: "READY" as const };
 
   const embedding = await embedText(normalized);
   if (embedding) {
@@ -22,7 +32,7 @@ export async function retrieveKnowledgeContext(workspaceId: string, query: strin
       const chunks = await getDb().documentChunk.findMany({
         where: {
           id: { in: chunkIds },
-          document: { workspaceId, status: "READY" },
+          document: documentFilter,
         },
         include: {
           document: {
@@ -47,7 +57,7 @@ export async function retrieveKnowledgeContext(workspaceId: string, query: strin
     const chunks = await getDb().documentChunk.findMany({
       where: {
         id: { in: chunkIds },
-        document: { workspaceId, status: "READY" },
+        document: documentFilter,
       },
       include: {
         document: {
@@ -67,10 +77,7 @@ export async function retrieveKnowledgeContext(workspaceId: string, query: strin
 
   const chunks = await getDb().documentChunk.findMany({
     where: {
-      document: {
-        workspaceId,
-        status: "READY",
-      },
+      document: documentFilter,
       content: {
         contains: normalized.slice(0, 120),
       },
@@ -97,10 +104,7 @@ export async function retrieveKnowledgeContext(workspaceId: string, query: strin
 
   const fallback = await getDb().documentChunk.findMany({
     where: {
-      document: {
-        workspaceId,
-        status: "READY",
-      },
+      document: documentFilter,
     },
     include: {
       document: {

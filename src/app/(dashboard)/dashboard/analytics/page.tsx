@@ -11,32 +11,50 @@ const trackedStatuses = ["OPEN", "ASSIGNED", "ESCALATED", "CLOSED"] as const;
 export default async function AnalyticsPage() {
   const { db, workspace } = await requireDashboardContext();
 
-  const [statusCounts, messageCount, contactCount, documentCount, aiMessageCount, escalationCount] =
-    await Promise.all([
-      db.conversation.groupBy({
-        by: ["status"],
-        where: { workspaceId: workspace.id },
-        _count: { _all: true },
-      }),
-      db.message.count({
-        where: { conversation: { workspaceId: workspace.id } },
-      }),
-      db.contact.count({
-        where: { workspaceId: workspace.id },
-      }),
-      db.document.count({
-        where: { workspaceId: workspace.id },
-      }),
-      db.message.count({
-        where: {
-          conversation: { workspaceId: workspace.id },
-          authorType: "AI",
-        },
-      }),
-      db.conversation.count({
-        where: { workspaceId: workspace.id, status: "ESCALATED" },
-      }),
-    ]);
+  const [
+    statusCounts,
+    messageCount,
+    contactCount,
+    documentCount,
+    aiMessageCount,
+    escalationCount,
+    echoSessions,
+    echoLeads,
+    feedbackUp,
+    feedbackDown,
+  ] = await Promise.all([
+    db.conversation.groupBy({
+      by: ["status"],
+      where: { workspaceId: workspace.id },
+      _count: { _all: true },
+    }),
+    db.message.count({
+      where: { conversation: { workspaceId: workspace.id } },
+    }),
+    db.contact.count({
+      where: { workspaceId: workspace.id },
+    }),
+    db.document.count({
+      where: { workspaceId: workspace.id },
+    }),
+    db.message.count({
+      where: {
+        conversation: { workspaceId: workspace.id },
+        authorType: "AI",
+      },
+    }),
+    db.conversation.count({
+      where: { workspaceId: workspace.id, status: "ESCALATED" },
+    }),
+    db.visitorSession.count({ where: { widget: { workspaceId: workspace.id } } }),
+    db.lead.count({ where: { workspaceId: workspace.id, source: "ECHO_WIDGET" } }),
+    db.messageFeedback.count({
+      where: { feedback: "up", visitorSession: { widget: { workspaceId: workspace.id } } },
+    }),
+    db.messageFeedback.count({
+      where: { feedback: "down", visitorSession: { widget: { workspaceId: workspace.id } } },
+    }),
+  ]);
 
   const statusMap = new Map(statusCounts.map((item) => [item.status, item._count._all]));
 
@@ -50,6 +68,10 @@ export default async function AnalyticsPage() {
     { label: "Documents", value: documentCount },
     { label: "AI messages", value: aiMessageCount },
     { label: "Escalations", value: escalationCount },
+    { label: "Echo sessions", value: echoSessions },
+    { label: "Echo leads", value: echoLeads },
+    { label: "Echo feedback (up)", value: feedbackUp },
+    { label: "Echo feedback (down)", value: feedbackDown },
   ];
 
   return (

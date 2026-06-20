@@ -59,7 +59,7 @@ export async function addUrlSourceAction(
     return { error: "Could not process that URL." };
   }
 
-  revalidatePath("/dashboard/knowledge");
+  revalidatePath("/knowledge-base");
   return { savedAt: Date.now() };
 }
 
@@ -116,7 +116,7 @@ export async function uploadDocumentAction(formData: FormData) {
     // Status updated inside processDocument.
   }
 
-  revalidatePath("/dashboard/knowledge");
+  revalidatePath("/knowledge-base");
 }
 
 export async function deleteDocumentAction(formData: FormData) {
@@ -127,5 +127,5 @@ export async function deleteDocumentAction(formData: FormData) {
   await db.document.deleteMany({
     where: { id: documentId, workspaceId: workspace.id },
   });
-  revalidatePath("/dashboard/knowledge");
+  revalidatePath("/knowledge-base");
 }

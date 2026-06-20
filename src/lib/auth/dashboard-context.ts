@@ -33,7 +33,8 @@ export const requireDashboardContext = cache(async function requireDashboardCont
   const activeWorkspaceId = cookieStore.get("active_workspace_id")?.value;
   const memberships = await listUserWorkspaces(session.user.id);
   const pathname = (await headers()).get("x-pathname") ?? "";
-  const onOnboardingRoute = pathname.startsWith("/dashboard/onboarding");
+  const onOnboardingRoute =
+    pathname.startsWith("/dashboard/onboarding") || pathname.startsWith("/onboarding");
 
   if (!onOnboardingRoute && memberships.length > 1 && !activeWorkspaceId) {
     redirect("/dashboard/onboarding");

@@ -14,6 +14,8 @@ type WidgetAgentConfig = {
   workspaceId: string;
   latestUserMessage: string;
   memoryContext?: string;
+  campaignContext?: string;
+  documentIds?: string[] | null;
 };
 
 export async function streamWidgetAgent({
@@ -32,7 +34,12 @@ export async function streamWidgetAgent({
     sources: { documentId: string; title: string }[];
   }) => Promise<void>;
 }) {
-  const sources = await retrieveKnowledgeContext(config.workspaceId, config.latestUserMessage);
+  const sources = await retrieveKnowledgeContext(
+    config.workspaceId,
+    config.latestUserMessage,
+    4,
+    config.documentIds,
+  );
   const sourceBlock =
     sources.length > 0
       ? sources
@@ -50,6 +57,7 @@ export async function streamWidgetAgent({
     system: [
       `You are ${config.displayName}, the AI support assistant for ${config.workspaceName}.`,
       config.instructions,
+      config.campaignContext ? `Campaign context:\n${config.campaignContext}` : "",
       "Use retrieved knowledge when it is relevant. Cite sources inline like [Source: Title].",
       "If knowledge is insufficient, say you do not know and offer human help.",
       "Be concise and helpful.",

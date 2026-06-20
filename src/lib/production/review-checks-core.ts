@@ -292,6 +292,8 @@ function runReadinessChecks(): ReviewCheck[] {
   ).length;
 
   const hasWidgetLoader = pathExists("src/app/widget.js/route.ts");
+  const hasWidgetBundle =
+    pathExists("public/widget.bundle.js") || pathExists("scripts/build-widget.js");
 
   const productionEnvReady =
     envName !== "production" ||
@@ -335,7 +337,9 @@ function runReadinessChecks(): ReviewCheck[] {
       "readiness",
       "One-line widget loader route exists",
       hasWidgetLoader,
-      hasWidgetLoader ? "/widget.js route is available." : "Add the public widget loader route.",
+      hasWidgetLoader && hasWidgetBundle
+        ? "/widget.js serves bundle; build:widget configured."
+        : "Add widget bundle route and build:widget script.",
     ),
     check(
       "readiness.production-auth",

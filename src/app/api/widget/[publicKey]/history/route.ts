@@ -1,0 +1,44 @@
+import { getVisitorConversationMessages } from "@/features/conversations/server/conversation-service";
+import {
+  assertPublicWidgetAccess,
+  getVisitorSessionByDbId,
+} from "@/features/widget/server/widget-public";
+import {
+  getRequestOrigin,
+  toEchoHistoryMessages,
+  withWidgetCors,
+} from "@/features/widget/server/echo-utils";
+import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
+import { getDb } from "@/lib/db/client";
+
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ publicKey: string }> },
+) {
+  const { publicKey } = await params;
+  const db = getDb();
+  const access = await assertPublicWidgetAccess(db, publicKey, request);
+  if ("error" in access) return access.error;
+
+  const sessionId = new URL(request.url).searchParams.get("sessionId");
+  if (!sessionId) {
+    return Response.json({ error: "sessionId is required." }, { status: 400 });
+  }
+
+  const session = await getVisitorSessionByDbId(db, sessionId, access.widget.id);
+  if (!session) {
+    return Response.json({ error: "Session not found." }, { status: 404 });
+  }
+
+  const messages = await getVisitorConversationMessages({
+    db,
+    visitorSessionId: session.id,
+  });
+
+  const origin = getRequestOrigin(request);
+  return withWidgetCors(
+    Response.json({ messages: toEchoHistoryMessages(messages) }),
+    origin,
+    validateEmbedOrigin(origin, access.allowedDomains),
+  );
+}

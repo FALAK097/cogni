@@ -95,6 +95,8 @@ model Workspace {
   workflowRuns  WorkflowRun[]
   integrationActions IntegrationAction[]
   widget        Widget?
+  campaigns     Campaign[]
+  leads         Lead[]
 
   @@map("workspace")
 }
@@ -130,6 +132,7 @@ model Contact {
   conversations   Conversation[]
   visitorSessions VisitorSession[]
   notes           ContactNote[]
+  leads           Lead[]
 
   @@unique([workspaceId, email])
   @@unique([workspaceId, externalId])
@@ -192,6 +195,7 @@ model Message {
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   authorUser     User?        @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
   attachments    Attachment[]
+  feedback       MessageFeedback[] @relation("MessageFeedback")
 
   @@index([conversationId, createdAt])
   @@index([authorUserId])
@@ -199,33 +203,57 @@ model Message {
 }
 
 model Widget {
-  id                String             @id @default(cuid())
-  publicKey         String             @unique @default(cuid())
-  displayName       String             @default("Support")
-  welcomeMessage    String             @default("Hi! How can we help?")
-  inputPlaceholder  String             @default("Ask a question…")
-  primaryColor      String             @default("#14805e")
-  backgroundColor   String             @default("#ffffff")
-  textColor         String             @default("#171717")
-  position          String             @default("RIGHT")
-  launcherSize      String             @default("MEDIUM")
-  panelWidth        Int                @default(380)
-  panelHeight       Int                @default(640)
-  borderRadius      Int                @default(20)
-  logoUrl           String?
-  instructions      String             @default("Answer clearly and only use information you know is reliable. If you are unsure, say so.")
-  escalationKeywords String            @default("human,agent,person,representative,support team")
-  modelProvider     String             @default("OPENAI")
-  modelName         String             @default("gpt-5-mini")
-  isEnabled         Boolean            @default(true)
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  workspaceId       String             @unique
-  workspace         Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  authorizedDomains AuthorizedDomain[]
-  visitorSessions   VisitorSession[]
-  conversations     Conversation[]
+  id                           String             @id @default(cuid())
+  publicKey                    String             @unique @default(cuid())
+  displayName                  String             @default("Support")
+  welcomeMessage               String             @default("Hi! How can we help?")
+  inputPlaceholder             String             @default("Ask a question…")
+  primaryColor                 String             @default("#14805e")
+  backgroundColor              String             @default("#ffffff")
+  textColor                    String             @default("#171717")
+  position                     String             @default("bottom-right")
+  launcherSize                 String             @default("md")
+  panelWidth                   Int                @default(380)
+  panelHeight                  Int                @default(640)
+  borderRadius                 Int                @default(20)
+  borderRadiusStyle            String             @default("default")
+  logoUrl                      String?
+  instructions                 String             @default("Answer clearly and only use information you know is reliable. If you are unsure, say so.")
+  escalationKeywords           String             @default("human,agent,person,representative,support team")
+  modelProvider                String             @default("OPENAI")
+  modelName                    String             @default("gpt-5-mini")
+  isEnabled                    Boolean            @default(true)
+  theme                        String             @default("light")
+  userBubbleColor              String             @default("#14805e")
+  userBubbleTextColor          String             @default("#ffffff")
+  botBubbleColor               String             @default("#f2f2f8")
+  botBubbleTextColor           String             @default("#171717")
+  headerGradientFrom           String             @default("#14805e")
+  headerGradientTo             String             @default("#0f6b4e")
+  shadowSize                   String             @default("md")
+  suggestions                  String             @default("[\"What services do you offer?\",\"How can I get started?\",\"Tell me more about pricing\"]")
+  hideSuggestionsOnInteract    Boolean            @default(true)
+  previewMessages              String             @default("[\"Hi there! 👋\",\"Need help with anything?\"]")
+  autoShowPreviewDelay         Int                @default(3000)
+  showBranding                 Boolean            @default(true)
+  privacyPolicyUrl             String             @default("/privacy-policy")
+  enableLeadCapture            Boolean            @default(false)
+  leadCaptureKeywords          String             @default("[\"contact\",\"contact me\",\"call me\",\"reach me\",\"get in touch\"]")
+  leadCaptureMinutesThreshold  Int                @default(5)
+  leadCaptureMessageThreshold  Int                @default(4)
+  enableBrochure               Boolean            @default(false)
+  brochureSuggestionText       String             @default("Receive Brochure")
+  selectedCampaignId           String?
+  createdAt                    DateTime           @default(now())
+  updatedAt                    DateTime           @updatedAt
+  workspaceId                  String             @unique
+  workspace                    Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  selectedCampaign             Campaign?          @relation(fields: [selectedCampaignId], references: [id], onDelete: SetNull)
+  authorizedDomains            AuthorizedDomain[]
+  visitorSessions              VisitorSession[]
+  conversations                Conversation[]
 
+  @@index([selectedCampaignId])
   @@map("widget")
 }
 
@@ -242,23 +270,134 @@ model AuthorizedDomain {
 }
 
 model VisitorSession {
-  id            String         @id @default(cuid())
-  token         String         @unique
-  hostname      String
-  externalId    String?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  lastSeenAt    DateTime       @default(now())
-  expiresAt     DateTime
-  widgetId      String
-  contactId     String?
-  widget        Widget         @relation(fields: [widgetId], references: [id], onDelete: Cascade)
-  contact       Contact?       @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  conversations Conversation[]
+  id                String              @id @default(cuid())
+  token             String              @unique
+  browserSessionId  String?             @unique
+  visitorId         String?
+  hostname          String
+  externalId        String?
+  pageUrl           String?
+  referrer          String?
+  browser           String?
+  deviceType        String?
+  os                String?
+  country           String?
+  city              String?
+  timezone          String?
+  language          String?
+  screenSize        String?
+  ipData            String?
+  status            String              @default("active")
+  messageCount      Int                 @default(0)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  lastSeenAt        DateTime            @default(now())
+  expiresAt         DateTime
+  widgetId          String
+  contactId         String?
+  widget            Widget              @relation(fields: [widgetId], references: [id], onDelete: Cascade)
+  contact           Contact?            @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  conversations     Conversation[]
+  messageFeedback   MessageFeedback[]
+  leadCapture       WidgetLeadCapture?
 
   @@index([widgetId, lastSeenAt])
+  @@index([widgetId, visitorId])
   @@index([contactId])
+  @@index([browserSessionId])
   @@map("visitor_session")
+}
+
+model Campaign {
+  id           String             @id @default(cuid())
+  workspaceId  String
+  name         String
+  description  String?
+  instructions String?
+  isActive     Boolean            @default(true)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  workspace    Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  documents    CampaignDocument[]
+  leads        Lead[]
+  widgets      Widget[]
+
+  @@index([workspaceId])
+  @@map("campaign")
+}
+
+model CampaignDocument {
+  id         String   @id @default(cuid())
+  campaignId String
+  documentId String
+  createdAt  DateTime @default(now())
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, documentId])
+  @@index([documentId])
+  @@map("campaign_document")
+}
+
+model Lead {
+  id               String              @id @default(cuid())
+  workspaceId      String
+  campaignId       String?
+  contactId        String?
+  name             String
+  email            String?
+  phone            String?
+  source           String              @default("ECHO_WIDGET")
+  status           String              @default("new")
+  capturedFromChat Boolean             @default(false)
+  chatSessionId    String?
+  chatSummary      String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  workspace        Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  campaign         Campaign?           @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  contact          Contact?            @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  leadCapture      WidgetLeadCapture?
+
+  @@index([workspaceId, email])
+  @@index([workspaceId, phone])
+  @@index([campaignId])
+  @@map("lead")
+}
+
+model MessageFeedback {
+  id               String         @id @default(cuid())
+  messageId        String
+  visitorSessionId String
+  feedback         String
+  reason           String?
+  createdAt        DateTime       @default(now())
+  message          Message        @relation("MessageFeedback", fields: [messageId], references: [id], onDelete: Cascade)
+  visitorSession   VisitorSession @relation(fields: [visitorSessionId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, visitorSessionId])
+  @@index([visitorSessionId])
+  @@map("message_feedback")
+}
+
+model WidgetLeadCapture {
+  id                    String         @id @default(cuid())
+  visitorSessionId      String         @unique
+  leadId                String?        @unique
+  triggerType           String
+  triggerValue          String?
+  formShownAt           DateTime       @default(now())
+  formSubmittedAt       DateTime?
+  abandoned             Boolean        @default(false)
+  messageCountAtCapture Int            @default(0)
+  conversationSummary   String?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  visitorSession        VisitorSession @relation(fields: [visitorSessionId], references: [id], onDelete: Cascade)
+  lead                  Lead?          @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  @@index([leadId])
+  @@map("widget_lead_capture")
 }
 
 model Attachment {
@@ -291,7 +430,8 @@ model Document {
   updatedAt    DateTime        @updatedAt
   workspaceId  String
   workspace    Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  chunks       DocumentChunk[]
+  chunks            DocumentChunk[]
+  campaignDocuments CampaignDocument[]
 
   @@index([workspaceId, status, updatedAt])
   @@map("document")
