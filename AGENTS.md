@@ -435,7 +435,8 @@ Schema changes:
 1. Edit `prisma/schema.prisma`.
 2. Run `pnpm db:migrate -- --name <name>` against local SQLite.
 3. Review generated SQL.
-4. Run `pnpm db:deploy` to apply pending SQL locally or to configured D1.
+4. Run `pnpm db:deploy` to apply pending SQL for the configured Prisma
+   database.
 5. Run `pnpm db:generate`.
 6. Verify Better Auth sign-in and workspace creation.
 
@@ -458,7 +459,8 @@ pnpm dev
 ```
 
 `pnpm dev` starts Next.js. Local SQLite is the default; complete D1 environment
-variables switch runtime to Cloudflare.
+variables switch runtime to Cloudflare, but D1 deployment automation is not
+part of the bootstrap.
 
 Google OAuth redirect URI for local development:
 

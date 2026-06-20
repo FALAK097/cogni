@@ -132,11 +132,12 @@ adapter with `provider: "sqlite"`.
 ### Cloudflare D1
 
 Set complete D1 environment variables. Runtime automatically switches to
-`@prisma/adapter-d1`. `pnpm db:deploy` applies unapplied Prisma SQL migrations
-to D1.
+`@prisma/adapter-d1`.
 
-Prisma D1 support is currently preview. Schema provider and Better Auth adapter
-remain SQLite because D1 is SQLite-compatible.
+Prisma D1 support is currently preview. The bootstrap no longer hides migration
+steps behind a custom runner, so use the local SQLite flow for now and wire D1
+deployment automation later if you need it. Better Auth keeps the Prisma
+adapter on `provider: "sqlite"` because D1 is SQLite-compatible.
 
 ## Commands
 
