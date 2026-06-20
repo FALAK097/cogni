@@ -22,22 +22,3 @@ export const env = createEnv({
   emptyStringAsUndefined: true,
   skipValidation: Boolean(process.env.SKIP_ENV_VALIDATION),
 });
-
-export function getD1Config() {
-  const accountId = env.CLOUDFLARE_ACCOUNT_ID;
-  const apiToken = env.CLOUDFLARE_API_TOKEN;
-  const databaseId = env.D1_DATABASE_ID;
-  if (!accountId && !apiToken && !databaseId) {
-    return null;
-  }
-
-  if (!accountId || !apiToken || !databaseId) {
-    return null;
-  }
-
-  return {
-    accountId,
-    apiToken,
-    databaseId,
-  };
-}

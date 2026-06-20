@@ -83,7 +83,7 @@ Reserved for later phases:
 
 ```env
 R2_BUCKET_NAME="widget"
-VECTORIZE_INDEX=""
+VECTORIZE_INDEX="widget-knowledge"
 OPENAI_API_KEY=""
 GEMINI_API_KEY=""
 VERCEL_TOKEN=""
