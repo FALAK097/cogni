@@ -3,6 +3,7 @@ import { z } from "zod";
 
 export const env = createEnv({
   server: {
+    ENV: z.enum(["development", "production"]).optional(),
     DATABASE_URL: z.string().min(1),
     BETTER_AUTH_SECRET: z.string().min(32),
     BETTER_AUTH_URL: z.url(),
@@ -15,8 +16,6 @@ export const env = createEnv({
     VECTORIZE_INDEX: z.string().min(1).optional(),
     OPENAI_API_KEY: z.string().min(1).optional(),
     GEMINI_API_KEY: z.string().min(1).optional(),
-    VERCEL_TOKEN: z.string().min(1).optional(),
-    VERCEL_CONNECT_SECRET: z.string().min(1).optional(),
   },
   experimental__runtimeEnv: process.env,
   emptyStringAsUndefined: true,

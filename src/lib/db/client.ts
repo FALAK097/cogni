@@ -16,8 +16,10 @@ export function getDb() {
   const accountId = env.CLOUDFLARE_ACCOUNT_ID;
   const apiToken = env.CLOUDFLARE_API_TOKEN;
   const databaseId = env.D1_DATABASE_ID;
+  const useD1 =
+    env.ENV === "production" && Boolean(accountId) && Boolean(apiToken) && Boolean(databaseId);
   const adapter =
-    accountId && apiToken && databaseId
+    useD1 && accountId && apiToken && databaseId
       ? new PrismaD1({
           CLOUDFLARE_ACCOUNT_ID: accountId,
           CLOUDFLARE_D1_TOKEN: apiToken,

@@ -408,8 +408,6 @@ R2_BUCKET_NAME=widget
 VECTORIZE_INDEX=widget-knowledge
 OPENAI_API_KEY=
 GEMINI_API_KEY=
-VERCEL_TOKEN=
-VERCEL_CONNECT_SECRET=
 ```
 
 OpenAI and Gemini keys are accepted now but remain optional until the agent
@@ -457,9 +455,8 @@ cp .env.example .env.local
 pnpm dev
 ```
 
-`pnpm dev` starts Next.js. Local SQLite is the default; complete D1 environment
-variables switch runtime to Cloudflare, but D1 deployment automation is not
-part of the bootstrap.
+`pnpm dev` starts Next.js. Local SQLite is the default. D1 is used only when
+`ENV=production` and the complete Cloudflare D1 environment is present.
 
 Google OAuth redirect URI for local development:
 

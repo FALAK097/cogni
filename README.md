@@ -44,8 +44,8 @@ cp .env.example .env.local
 pnpm dev
 ```
 
-`pnpm dev` starts Next.js. With D1 variables blank, widget uses local SQLite at
-`prisma/dev.db`. Run the local Prisma migration once before first use.
+`pnpm dev` starts Next.js. Local development uses SQLite at `prisma/dev.db`.
+Run the local Prisma migration once before first use.
 
 No source or configuration file must be edited after cloning. Add environment
 variables, then run the app.
@@ -55,6 +55,7 @@ variables, then run the app.
 Required:
 
 ```env
+ENV="development"
 DATABASE_URL="file:./prisma/dev.db"
 BETTER_AUTH_SECRET="at-least-32-random-characters"
 BETTER_AUTH_URL="http://localhost:3000"
@@ -86,8 +87,6 @@ R2_BUCKET_NAME="widget"
 VECTORIZE_INDEX="widget-knowledge"
 OPENAI_API_KEY=""
 GEMINI_API_KEY=""
-VERCEL_TOKEN=""
-VERCEL_CONNECT_SECRET=""
 ```
 
 OpenAI and Gemini keys may be added now. They remain optional until AI runtime
@@ -130,13 +129,11 @@ adapter with `provider: "sqlite"`.
 
 ### Cloudflare D1
 
-Set complete D1 environment variables. Runtime automatically switches to
-`@prisma/adapter-d1`.
+Set `ENV="production"` together with the complete D1 variables. Runtime then
+switches to `@prisma/adapter-d1`.
 
-Prisma D1 support is currently preview. The bootstrap no longer hides migration
-steps behind a custom runner, so use the local SQLite flow for now and wire D1
-deployment automation later if you need it. Better Auth keeps the Prisma
-adapter on `provider: "sqlite"` because D1 is SQLite-compatible.
+Prisma D1 support is currently preview. Better Auth keeps the Prisma adapter
+on `provider: "sqlite"` because D1 is SQLite-compatible.
 
 ## Commands
 
