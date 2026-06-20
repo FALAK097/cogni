@@ -18,6 +18,9 @@ import {
   ColorPickerFormat,
   ColorPickerHue,
   ColorPickerSelection,
+  ColorPickerAlpha,
+  ColorPickerEyeDropper,
+  ColorPickerOutput,
 } from "@/components/ui/color-picker";
 import {
   DropdownMenu,
@@ -126,7 +129,11 @@ export function WidgetStudio({
                         </button>
                       }
                     />
-                    <DropdownMenuContent className="w-64 p-3" align="start" sideOffset={6}>
+                    <DropdownMenuContent
+                      className="w-64 p-3 gap-3 flex flex-col"
+                      align="start"
+                      sideOffset={6}
+                    >
                       <ColorPicker
                         value={colorValue}
                         onChange={(rgba: any) => {
@@ -136,7 +143,10 @@ export function WidgetStudio({
                       >
                         <ColorPickerSelection className="h-32 rounded-lg" />
                         <ColorPickerHue />
+                        <ColorPickerAlpha />
                         <div className="flex items-center gap-2">
+                          <ColorPickerEyeDropper />
+                          <ColorPickerOutput />
                           <ColorPickerFormat className="flex-1" />
                         </div>
                       </ColorPicker>

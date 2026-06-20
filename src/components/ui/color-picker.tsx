@@ -64,7 +64,7 @@ export const ColorPicker = ({
   className,
   ...props
 }: ColorPickerProps) => {
-  const selectedColor = Color(value);
+  const selectedColor = Color(value || defaultValue);
   const defaultColor = Color(defaultValue);
 
   const [hue, setHue] = useState(selectedColor.hue() || defaultColor.hue() || 0);
@@ -77,37 +77,44 @@ export const ColorPicker = ({
   const [alpha, setAlpha] = useState(selectedColor.alpha() * 100 || defaultColor.alpha() * 100);
   const [mode, setMode] = useState("hex");
 
+  // Keep track of the last processed value to prevent infinite loop
+  const lastValueRef = useRef<string | null>(null);
+
   // Update color when controlled value changes
   useEffect(() => {
     if (value) {
-      const color = Color(value);
-      const h = color.hue();
-      const s = color.saturationl();
-      const l = color.lightness();
-      const a = color.alpha() * 100;
+      try {
+        const color = Color(value);
+        const hex = color.hex();
 
-      // Only update state if the color has actually changed to avoid infinite loop
-      if (
-        Math.abs(h - hue) > 0.01 ||
-        Math.abs(s - saturation) > 0.01 ||
-        Math.abs(l - lightness) > 0.01 ||
-        Math.abs(a - alpha) > 0.01
-      ) {
-        setHue(h);
-        setSaturation(s);
-        setLightness(l);
-        setAlpha(a);
+        // If it's the same color value we last processed/emitted, skip updating
+        if (lastValueRef.current === hex) {
+          return;
+        }
+
+        lastValueRef.current = hex;
+        setHue(color.hue());
+        setSaturation(color.saturationl());
+        setLightness(color.lightness());
+        setAlpha(color.alpha() * 100);
+      } catch (e) {
+        console.error("Failed to parse color value:", e);
       }
     }
-  }, [value, hue, saturation, lightness, alpha]);
+  }, [value]);
 
   // Notify parent of changes
   useEffect(() => {
     if (onChange) {
       const color = Color.hsl(hue, saturation, lightness).alpha(alpha / 100);
-      const rgba = color.rgb().array();
+      const hex = color.hex();
 
-      onChange([rgba[0], rgba[1], rgba[2], alpha / 100]);
+      // Only call onChange if the new color is different from what we already recorded
+      if (lastValueRef.current !== hex) {
+        lastValueRef.current = hex;
+        const rgba = color.rgb().array();
+        onChange([rgba[0], rgba[1], rgba[2], alpha / 100]);
+      }
     }
   }, [hue, saturation, lightness, alpha, onChange]);
 
