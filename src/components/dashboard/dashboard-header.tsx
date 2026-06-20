@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -151,7 +152,7 @@ export function DashboardHeader({
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
+              <DropdownMenuItem render={<Link href="/dashboard/settings" />}>
                 <HugeiconsIcon icon={CheckmarkBadgeIcon} strokeWidth={2} />
                 Account
               </DropdownMenuItem>

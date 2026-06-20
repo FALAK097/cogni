@@ -1,12 +1,22 @@
 import "server-only";
 
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 
 import { ensureDefaultWorkspace } from "@/lib/auth/provision-workspace";
 import { getAuth } from "@/lib/auth/server";
 import { getDb } from "@/lib/db/client";
+
+export async function listUserWorkspaces(userId: string) {
+  return getDb().membership.findMany({
+    where: { userId },
+    orderBy: [{ role: "asc" }, { createdAt: "asc" }],
+    include: {
+      workspace: true,
+    },
+  });
+}
 
 export const requireDashboardContext = cache(async function requireDashboardContext() {
   const session = await getAuth().api.getSession({
@@ -18,20 +28,36 @@ export const requireDashboardContext = cache(async function requireDashboardCont
   }
 
   const db = getDb();
-  const workspace = await ensureDefaultWorkspace(db, session.user);
-  const membership = await db.membership.findUniqueOrThrow({
-    where: {
-      userId_workspaceId: {
-        userId: session.user.id,
-        workspaceId: workspace.id,
-      },
-    },
-  });
+  await ensureDefaultWorkspace(db, session.user);
+  const cookieStore = await cookies();
+  const activeWorkspaceId = cookieStore.get("active_workspace_id")?.value;
+  const memberships = await listUserWorkspaces(session.user.id);
+  const pathname = (await headers()).get("x-pathname") ?? "";
+  const onOnboardingRoute = pathname.startsWith("/dashboard/onboarding");
+
+  if (!onOnboardingRoute && memberships.length > 1 && !activeWorkspaceId) {
+    redirect("/dashboard/onboarding");
+  }
+
+  if (
+    !onOnboardingRoute &&
+    memberships.length === 1 &&
+    cookieStore.get("onboarding_complete")?.value !== "1"
+  ) {
+    redirect("/dashboard/onboarding");
+  }
+
+  const membership =
+    memberships.find((entry) => entry.workspaceId === activeWorkspaceId) ?? memberships[0];
+
+  if (!membership) {
+    redirect("/");
+  }
 
   return {
     db,
     membership,
     session,
-    workspace,
+    workspace: membership.workspace,
   };
 });

@@ -32,4 +32,6 @@ jobs:
       - run: pnpm lint:github
       - run: pnpm typecheck
       - run: pnpm fmt:check
+      - run: pnpm test
+      - run: pnpm review
       - run: pnpm build

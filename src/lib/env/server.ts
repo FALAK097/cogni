@@ -16,6 +16,8 @@ export const env = createEnv({
     R2_ACCESS_KEY_ID: z.string().min(1).optional(),
     R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
     VECTORIZE_INDEX: z.string().min(1).optional(),
+    CLOUDFLARE_SEARCH_INDEX: z.string().min(1).optional(),
+    SENTRY_DSN: z.string().min(1).optional(),
     OPENAI_API_KEY: z.string().min(1).optional(),
     GEMINI_API_KEY: z.string().min(1).optional(),
   },

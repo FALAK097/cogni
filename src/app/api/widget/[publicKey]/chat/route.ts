@@ -4,8 +4,15 @@ import {
   recordAiMessage,
   recordVisitorMessage,
 } from "@/features/conversations/server/conversation-service";
+import { handoffReply, matchesEscalationKeywords } from "@/features/conversations/server/handoff";
 import type { WidgetModelProvider } from "@/features/widget/domain";
-import { streamWidgetAgent } from "@/features/widget/server/widget-agent";
+import { streamHandoffMessage, streamWidgetAgent } from "@/features/widget/server/widget-agent";
+import { buildAgentMemoryContext } from "@/lib/ai/memory";
+import { captureException } from "@/lib/errors/capture";
+import { emitDomainEvent } from "@/lib/events/domain-events";
+import { logError, logInfo } from "@/lib/logging/logger";
+import { notifyWorkspaceMembers } from "@/lib/notifications/create-notification";
+import { checkRateLimit } from "@/lib/rate-limit/memory";
 import { getDb } from "@/lib/db/client";
 
 export const maxDuration = 60;
@@ -91,6 +98,19 @@ export async function POST(
     return Response.json({ error: "Widget session is required." }, { status: 401 });
   }
 
+  const rateLimit = checkRateLimit({
+    key: `widget-chat:${token}`,
+    limit: 20,
+    windowMs: 60_000,
+  });
+
+  if (!rateLimit.allowed) {
+    return Response.json(
+      { error: "Too many messages. Wait a moment before trying again." },
+      { status: 429 },
+    );
+  }
+
   const { publicKey } = await params;
   const db = getDb();
   const visitorSession = await db.visitorSession.findFirst({
@@ -130,40 +150,78 @@ export async function POST(
     return Response.json({ error: "Enter a message up to 4,000 characters." }, { status: 400 });
   }
 
-  const recentVisitorMessages = await db.message.count({
-    where: {
-      authorType: "VISITOR",
-      createdAt: {
-        gt: new Date(Date.now() - 60_000),
-      },
-      conversation: {
-        visitorSessionId: visitorSession.id,
-      },
-    },
-  });
-
-  if (recentVisitorMessages >= 10) {
-    return Response.json(
-      { error: "Too many messages. Wait a moment before trying again." },
-      { status: 429 },
-    );
-  }
-
   const conversation = await recordVisitorMessage({
     db,
     visitorSession,
     text: latestText,
   });
   const widget = visitorSession.widget;
+  const activeConversation = await db.conversation.findUnique({
+    where: { id: conversation.id },
+    select: { aiPaused: true, status: true },
+  });
+
+  const shouldEscalate = matchesEscalationKeywords(latestText, widget.escalationKeywords);
+
+  if (shouldEscalate) {
+    await db.conversation.update({
+      where: { id: conversation.id },
+      data: {
+        status: "ESCALATED",
+        aiPaused: true,
+      },
+    });
+
+    await notifyWorkspaceMembers({
+      db,
+      workspaceId: widget.workspace.id,
+      type: "conversation.escalated",
+      title: "Conversation escalated",
+      body: `${latestText.slice(0, 120)}`,
+    });
+
+    await emitDomainEvent({
+      db,
+      workspaceId: widget.workspace.id,
+      type: "escalation.triggered",
+      entityId: conversation.id,
+    });
+  }
+
+  if (activeConversation?.aiPaused || shouldEscalate) {
+    const result = await streamHandoffMessage({
+      config: {
+        modelProvider: widget.modelProvider as WidgetModelProvider,
+        modelName: widget.modelName,
+      },
+      text: handoffReply,
+      onFinish: async ({ text }) => {
+        await recordAiMessage({ db, conversationId: conversation.id, text });
+      },
+    });
+
+    return result.toUIMessageStreamResponse();
+  }
 
   try {
+    const memoryContext = await buildAgentMemoryContext({
+      db,
+      workspaceId: widget.workspace.id,
+      conversationId: conversation.id,
+      contactId: conversation.contactId,
+    });
+
     const result = await streamWidgetAgent({
       config: {
         displayName: widget.displayName,
         instructions: widget.instructions,
+        escalationKeywords: widget.escalationKeywords,
         modelProvider: widget.modelProvider as WidgetModelProvider,
         modelName: widget.modelName,
         workspaceName: widget.workspace.name,
+        workspaceId: widget.workspace.id,
+        latestUserMessage: latestText,
+        memoryContext,
       },
       messages,
       onFinish: async ({ text, inputTokens, outputTokens }) => {
@@ -175,7 +233,7 @@ export async function POST(
           text,
         });
 
-        console.info("widget.ai.response.completed", {
+        logInfo("widget.ai.response.completed", {
           workspaceId: widget.workspace.id,
           widgetId: widget.id,
           conversationId: conversation.id,
@@ -184,7 +242,7 @@ export async function POST(
         });
       },
       onError: (error) => {
-        console.error("widget.ai.response.failed", {
+        logError("widget.ai.response.failed", {
           workspaceId: widget.workspace.id,
           widgetId: widget.id,
           conversationId: conversation.id,
@@ -195,7 +253,12 @@ export async function POST(
 
     return result.toUIMessageStreamResponse();
   } catch (error) {
-    console.error("widget.ai.request.failed", {
+    captureException(error, {
+      workspaceId: widget.workspace.id,
+      widgetId: widget.id,
+      conversationId: conversation.id,
+    });
+    logError("widget.ai.request.failed", {
       workspaceId: widget.workspace.id,
       widgetId: widget.id,
       conversationId: conversation.id,

@@ -30,8 +30,7 @@ export function ConversationList({ conversations }: { conversations: Conversatio
         </span>
         <h2 className="mt-5 text-lg font-semibold">No conversations here</h2>
         <p className="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
-          Start a conversation manually now. Messages from the website widget will join this inbox
-          in the next product slice.
+          Start a conversation manually or wait for visitors to message you from the website widget.
         </p>
         <Link href="/dashboard/inbox/new" className={cn(buttonVariants({ size: "sm" }), "mt-6")}>
           <HugeiconsIcon icon={Add01Icon} />
@@ -67,6 +66,11 @@ export function ConversationList({ conversations }: { conversations: Conversatio
               <span className="mt-0.5 block truncate text-sm text-muted-foreground">
                 {latestMessage?.body ?? "No messages yet"}
               </span>
+              {conversation.assignedMembership ? (
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  Assigned to {conversation.assignedMembership.user.name}
+                </span>
+              ) : null}
             </span>
             <span className="flex items-center gap-3 self-start text-xs text-muted-foreground sm:self-center">
               <time dateTime={conversation.lastMessageAt.toISOString()}>

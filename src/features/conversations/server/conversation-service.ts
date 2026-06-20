@@ -91,6 +91,36 @@ export async function recordVisitorMessage({
   return conversation;
 }
 
+export async function getVisitorConversationMessages({
+  db,
+  visitorSessionId,
+}: {
+  db: PrismaClient;
+  visitorSessionId: string;
+}) {
+  const conversation = await db.conversation.findFirst({
+    where: {
+      visitorSessionId,
+      status: { not: "CLOSED" },
+    },
+    orderBy: { updatedAt: "desc" },
+    include: {
+      messages: {
+        where: {
+          visibility: "PUBLIC",
+          authorType: { in: ["VISITOR", "AI", "TEAM"] },
+        },
+        orderBy: { createdAt: "asc" },
+        include: {
+          attachments: true,
+        },
+      },
+    },
+  });
+
+  return conversation?.messages ?? [];
+}
+
 export async function recordAiMessage({
   db,
   conversationId,

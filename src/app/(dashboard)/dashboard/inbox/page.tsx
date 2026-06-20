@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { Add01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
 import { buttonVariants } from "@/components/ui/button-variants";
 import { ConversationList } from "@/features/inbox/components/conversation-list";
+import { InboxSearch } from "@/features/inbox/components/inbox-search";
 import {
   conversationStatuses,
   isConversationStatus,
@@ -21,25 +23,34 @@ export const metadata: Metadata = {
 export default async function InboxPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; q?: string }>;
 }) {
-  const [{ status: requestedStatus }, { workspace }] = await Promise.all([
+  const [{ status: requestedStatus, q }, { workspace }] = await Promise.all([
     searchParams,
     requireDashboardContext(),
   ]);
-  const { counts, conversations } = await getInboxSummary(workspace.id);
   const status = requestedStatus && isConversationStatus(requestedStatus) ? requestedStatus : null;
-  const visibleConversations = status
-    ? conversations.filter((conversation) => conversation.status === status)
-    : conversations;
+  const { counts, conversations } = await getInboxSummary(workspace.id, q, status ?? undefined);
   const tabs = [
-    { label: "All", value: null, count: conversations.length },
+    {
+      label: "All",
+      value: null,
+      count: counts.open + counts.assigned + counts.escalated + counts.closed,
+    },
     ...conversationStatuses.map((value) => ({
       label: statusLabels[value],
       value,
       count: counts[value.toLowerCase() as Lowercase<typeof value>],
     })),
   ];
+
+  function tabHref(tabStatus: string | null) {
+    const params = new URLSearchParams();
+    if (tabStatus) params.set("status", tabStatus);
+    if (q) params.set("q", q);
+    const query = params.toString();
+    return query ? `/dashboard/inbox?${query}` : "/dashboard/inbox";
+  }
 
   return (
     <main className="mx-auto max-w-7xl space-y-6 p-4 md:p-6 lg:p-8">
@@ -54,10 +65,14 @@ export default async function InboxPage({
         </Link>
       </section>
 
+      <Suspense fallback={null}>
+        <InboxSearch defaultValue={q ?? ""} />
+      </Suspense>
+
       <div className="flex gap-1 overflow-x-auto border-b" aria-label="Conversation status">
         {tabs.map((tab) => {
           const active = status === tab.value;
-          const href = tab.value ? `/dashboard/inbox?status=${tab.value}` : "/dashboard/inbox";
+          const href = tabHref(tab.value);
 
           return (
             <Link
@@ -77,7 +92,7 @@ export default async function InboxPage({
       </div>
 
       <div className="overflow-hidden">
-        <ConversationList conversations={visibleConversations} />
+        <ConversationList conversations={conversations} />
       </div>
     </main>
   );

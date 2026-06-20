@@ -2,6 +2,18 @@ export type WidgetPosition = "LEFT" | "RIGHT";
 export type WidgetLauncherSize = "SMALL" | "MEDIUM" | "LARGE";
 export type WidgetModelProvider = "OPENAI" | "GOOGLE";
 
+export type WidgetChatMessage = {
+  id: string;
+  role: "user" | "assistant";
+  parts: { type: "text"; text: string }[];
+};
+
+export type WidgetSessionBootstrap = {
+  token: string;
+  messages: WidgetChatMessage[];
+  expiresAt: string;
+};
+
 export type WidgetSettings = {
   publicKey: string;
   displayName: string;

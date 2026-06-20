@@ -23,23 +23,38 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
+import { WorkspaceSwitcher } from "@/components/dashboard/workspace-switcher";
 
 const items = [
   { label: "Widget", href: "/dashboard/widget", icon: WebDesign01Icon },
+  { label: "Agent", href: "/dashboard/agent", icon: SparklesIcon },
   { label: "Inbox", href: "/dashboard/inbox", icon: MessageMultiple01Icon },
-  { label: "Contacts", href: "/dashboard/contacts", icon: UserGroupIcon, disabled: true },
-  { label: "Knowledge", href: "/dashboard/knowledge", icon: Knowledge01Icon, disabled: true },
-  { label: "Integrations", href: "/dashboard/integrations", icon: Plug01Icon, disabled: true },
-  { label: "Settings", href: "/dashboard/settings", icon: Settings02Icon, disabled: true },
+  { label: "Contacts", href: "/dashboard/contacts", icon: UserGroupIcon },
+  { label: "Knowledge", href: "/dashboard/knowledge", icon: Knowledge01Icon },
+  { label: "Integrations", href: "/dashboard/integrations", icon: Plug01Icon },
+  { label: "Workflows", href: "/dashboard/workflows", icon: SparklesIcon },
+  { label: "Monitoring", href: "/dashboard/monitoring", icon: SparklesIcon },
+  { label: "Readiness", href: "/dashboard/readiness", icon: SparklesIcon },
+  { label: "Analytics", href: "/dashboard/analytics", icon: Knowledge01Icon },
+  { label: "Search", href: "/dashboard/search", icon: Knowledge01Icon },
+  { label: "Settings", href: "/dashboard/settings", icon: Settings02Icon },
 ];
 
 export function AppSidebar({
   workspace,
+  workspaces,
+  activeWorkspaceId,
   ...props
 }: React.ComponentProps<typeof Sidebar> & {
   workspace: {
     name: string;
   };
+  workspaces: {
+    workspaceId: string;
+    name: string;
+    role: string;
+  }[];
+  activeWorkspaceId: string;
 }) {
   const pathname = usePathname();
 
@@ -55,6 +70,7 @@ export function AppSidebar({
             <span className="truncate text-xs text-muted-foreground">{workspace.name}</span>
           </div>
         </div>
+        <WorkspaceSwitcher workspaces={workspaces} activeWorkspaceId={activeWorkspaceId} />
       </SidebarHeader>
 
       <SidebarContent className="py-4">
@@ -63,21 +79,6 @@ export function AppSidebar({
             const active =
               pathname === item.href ||
               (item.href !== "/dashboard" && pathname.startsWith(item.href));
-
-            if (item.disabled) {
-              return (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton
-                    disabled
-                    tooltip={item.label}
-                    className="flex items-center gap-3 text-muted-foreground/45 cursor-not-allowed hover:bg-transparent"
-                  >
-                    <HugeiconsIcon icon={item.icon} className="size-4.5" />
-                    <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              );
-            }
 
             return (
               <SidebarMenuItem key={item.href}>

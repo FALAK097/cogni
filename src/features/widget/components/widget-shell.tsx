@@ -1,12 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Chat01Icon, Cancel01Icon, SentIcon, SparklesIcon } from "@hugeicons/core-free-icons";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Attachment01Icon,
+  Chat01Icon,
+  Cancel01Icon,
+  SentIcon,
+  SparklesIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
+import { DefaultChatTransport, type UIMessage } from "ai";
 
-import type { WidgetSettings } from "@/features/widget/domain";
+import type { WidgetChatMessage, WidgetSettings } from "@/features/widget/domain";
+import { readSessionToken, writeSessionToken } from "@/features/widget/session-storage";
 
 const launcherPixels = {
   SMALL: 48,
@@ -14,19 +21,32 @@ const launcherPixels = {
   LARGE: 64,
 } as const;
 
-export function WidgetShell({
+function WidgetChatPanel({
   settings,
   sessionToken,
-  embedded = false,
+  sessionHostname,
+  preview,
+  initialMessages,
+  embedded,
   parentOrigin,
+  launcherSize,
+  open,
+  updateOpen,
 }: {
   settings: WidgetSettings;
   sessionToken: string;
-  embedded?: boolean;
+  sessionHostname: string;
+  preview: boolean;
+  initialMessages: WidgetChatMessage[];
+  embedded: boolean;
   parentOrigin?: string;
+  launcherSize: number;
+  open: boolean;
+  updateOpen: (nextOpen: boolean) => void;
 }) {
-  const [open, setOpen] = useState(!embedded);
   const [input, setInput] = useState("");
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
@@ -37,39 +57,37 @@ export function WidgetShell({
       }),
     [sessionToken, settings.publicKey],
   );
-  const { messages, sendMessage, status, error } = useChat({ transport });
-  const launcherSize = launcherPixels[settings.launcherSize];
+  const { messages, sendMessage, setMessages, status, error } = useChat({
+    transport,
+    messages: initialMessages as UIMessage[],
+  });
 
-  const updateOpen = useCallback(
-    (nextOpen: boolean) => {
-      setOpen(nextOpen);
+  const refreshMessages = useCallback(async () => {
+    const response = await fetch(`/api/widget/${settings.publicKey}/session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        token: sessionToken,
+        hostname: sessionHostname,
+        preview,
+      }),
+    });
 
-      if (embedded && parentOrigin) {
-        window.parent.postMessage(
-          {
-            type: "widget:resize",
-            open: nextOpen,
-            position: settings.position,
-            width: nextOpen ? settings.panelWidth : launcherSize,
-            height: nextOpen ? settings.panelHeight : launcherSize,
-          },
-          parentOrigin,
-        );
-        window.parent.postMessage(
-          { type: "widget:event", event: nextOpen ? "open" : "close" },
-          parentOrigin,
-        );
-      }
-    },
-    [
-      embedded,
-      launcherSize,
-      parentOrigin,
-      settings.panelHeight,
-      settings.panelWidth,
-      settings.position,
-    ],
-  );
+    if (!response.ok) return;
+
+    const payload = (await response.json()) as { messages: WidgetChatMessage[] };
+    setMessages(payload.messages as UIMessage[]);
+  }, [preview, sessionHostname, sessionToken, setMessages, settings.publicKey]);
+
+  useEffect(() => {
+    if (!open || status !== "ready") return;
+
+    const interval = window.setInterval(() => {
+      void refreshMessages();
+    }, 8000);
+
+    return () => window.clearInterval(interval);
+  }, [open, refreshMessages, status]);
 
   useEffect(() => {
     if (!embedded || !parentOrigin) return;
@@ -220,6 +238,11 @@ export function WidgetShell({
             We could not send that message. Try again.
           </p>
         ) : null}
+        {uploadError ? (
+          <p role="alert" className="text-xs text-red-600">
+            {uploadError}
+          </p>
+        ) : null}
       </div>
 
       <form
@@ -233,6 +256,44 @@ export function WidgetShell({
         }}
       >
         <div className="flex items-end gap-2 rounded-2xl border px-3 py-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            accept="image/*,.pdf,.txt,.docx"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.currentTarget.value = "";
+              if (!file) return;
+
+              void (async () => {
+                setUploadError(null);
+                const formData = new FormData();
+                formData.append("file", file);
+                const response = await fetch(`/api/widget/${settings.publicKey}/upload`, {
+                  method: "POST",
+                  headers: { Authorization: `Bearer ${sessionToken}` },
+                  body: formData,
+                });
+
+                if (!response.ok) {
+                  setUploadError("Could not upload that file.");
+                  return;
+                }
+
+                await refreshMessages();
+              })();
+            }}
+          />
+          <button
+            type="button"
+            aria-label="Upload file"
+            disabled={status !== "ready"}
+            onClick={() => fileInputRef.current?.click()}
+            className="flex size-8 shrink-0 items-center justify-center rounded-full opacity-60 hover:opacity-100 disabled:opacity-30"
+          >
+            <HugeiconsIcon icon={Attachment01Icon} className="size-4" />
+          </button>
           <textarea
             value={input}
             onChange={(event) => setInput(event.currentTarget.value)}
@@ -260,5 +321,164 @@ export function WidgetShell({
         <p className="mt-2 text-center text-[10px] opacity-45">Powered by widget</p>
       </form>
     </section>
+  );
+}
+
+export function WidgetShell({
+  settings,
+  sessionHostname,
+  preview = false,
+  embedded = false,
+  parentOrigin,
+}: {
+  settings: WidgetSettings;
+  sessionHostname: string;
+  preview?: boolean;
+  embedded?: boolean;
+  parentOrigin?: string;
+}) {
+  const [open, setOpen] = useState(!embedded);
+  const [session, setSession] = useState<{
+    token: string;
+    messages: WidgetChatMessage[];
+  } | null>(null);
+  const [sessionError, setSessionError] = useState(false);
+  const launcherSize = launcherPixels[settings.launcherSize];
+
+  const updateOpen = useCallback(
+    (nextOpen: boolean) => {
+      setOpen(nextOpen);
+
+      if (embedded && parentOrigin) {
+        window.parent.postMessage(
+          {
+            type: "widget:resize",
+            open: nextOpen,
+            position: settings.position,
+            width: nextOpen ? settings.panelWidth : launcherSize,
+            height: nextOpen ? settings.panelHeight : launcherSize,
+          },
+          parentOrigin,
+        );
+        window.parent.postMessage(
+          { type: "widget:event", event: nextOpen ? "open" : "close" },
+          parentOrigin,
+        );
+      }
+    },
+    [
+      embedded,
+      launcherSize,
+      parentOrigin,
+      settings.panelHeight,
+      settings.panelWidth,
+      settings.position,
+    ],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function bootstrapSession() {
+      setSessionError(false);
+
+      try {
+        const storedToken = readSessionToken(settings.publicKey);
+        const response = await fetch(`/api/widget/${settings.publicKey}/session`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...(storedToken ? { token: storedToken } : {}),
+            hostname: sessionHostname,
+            preview,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Session bootstrap failed.");
+        }
+
+        const payload = (await response.json()) as {
+          token: string;
+          messages: WidgetChatMessage[];
+        };
+
+        if (cancelled) return;
+
+        writeSessionToken(settings.publicKey, payload.token);
+        setSession({
+          token: payload.token,
+          messages: payload.messages,
+        });
+      } catch {
+        if (!cancelled) {
+          setSessionError(true);
+        }
+      }
+    }
+
+    void bootstrapSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [preview, sessionHostname, settings.publicKey]);
+
+  if (sessionError) {
+    return (
+      <main className="flex min-h-svh items-center justify-center p-6 text-center text-sm text-muted-foreground">
+        The assistant could not start right now. Refresh the page to try again.
+      </main>
+    );
+  }
+
+  if (!session) {
+    if (embedded) {
+      return (
+        <button
+          type="button"
+          aria-label={`Open ${settings.displayName}`}
+          aria-busy="true"
+          disabled
+          className="flex items-center justify-center rounded-full text-white opacity-80 shadow-lg"
+          style={{
+            width: launcherSize,
+            height: launcherSize,
+            backgroundColor: settings.primaryColor,
+          }}
+        >
+          <HugeiconsIcon icon={Chat01Icon} className="size-6 animate-pulse" />
+        </button>
+      );
+    }
+
+    return (
+      <div
+        className="flex items-center justify-center border text-sm text-muted-foreground"
+        style={{
+          width: settings.panelWidth,
+          height: settings.panelHeight,
+          borderRadius: settings.borderRadius,
+        }}
+      >
+        Loading assistant…
+      </div>
+    );
+  }
+
+  return (
+    <WidgetChatPanel
+      key={session.token}
+      settings={settings}
+      sessionToken={session.token}
+      sessionHostname={sessionHostname}
+      preview={preview}
+      initialMessages={session.messages}
+      embedded={embedded}
+      parentOrigin={parentOrigin}
+      launcherSize={launcherSize}
+      open={open}
+      updateOpen={updateOpen}
+    />
   );
 }

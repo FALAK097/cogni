@@ -19,6 +19,8 @@ model User {
   accounts         Account[]
   memberships      Membership[]
   authoredMessages Message[]
+  contactNotes     ContactNote[]
+  notifications    Notification[]
 
   @@unique([email])
   @@map("user")
@@ -77,12 +79,21 @@ model Workspace {
   name          String
   slug          String         @unique
   logo          String?
+  brandColor    String         @default("#14805e")
   timezone      String         @default("UTC")
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   memberships   Membership[]
   contacts      Contact[]
   conversations Conversation[]
+  attachments   Attachment[]
+  documents     Document[]
+  invites       WorkspaceInvite[]
+  integrations  Integration[]
+  notifications Notification[]
+  events        DomainEvent[]
+  workflowRuns  WorkflowRun[]
+  integrationActions IntegrationAction[]
   widget        Widget?
 
   @@map("workspace")
@@ -110,6 +121,7 @@ model Contact {
   email           String?
   externalId      String?
   avatarUrl       String?
+  tags            String           @default("[]")
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   lastSeenAt      DateTime?
@@ -117,6 +129,7 @@ model Contact {
   workspace       Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   conversations   Conversation[]
   visitorSessions VisitorSession[]
+  notes           ContactNote[]
 
   @@unique([workspaceId, email])
   @@unique([workspaceId, externalId])
@@ -124,11 +137,26 @@ model Contact {
   @@map("contact")
 }
 
+model ContactNote {
+  id           String   @id @default(cuid())
+  body         String
+  createdAt    DateTime @default(now())
+  contactId    String
+  authorUserId String
+  contact      Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  authorUser   User     @relation(fields: [authorUserId], references: [id], onDelete: Cascade)
+
+  @@index([contactId, createdAt])
+  @@index([authorUserId])
+  @@map("contact_note")
+}
+
 model Conversation {
   id                   String          @id @default(cuid())
   subject              String
   status               String          @default("OPEN")
   channel              String          @default("MANUAL")
+  aiPaused             Boolean         @default(false)
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
   lastMessageAt        DateTime        @default(now())
@@ -157,11 +185,13 @@ model Message {
   body           String
   authorType     String
   visibility     String       @default("PUBLIC")
+  readAt         DateTime?
   createdAt      DateTime     @default(now())
   conversationId String
   authorUserId   String?
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   authorUser     User?        @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
+  attachments    Attachment[]
 
   @@index([conversationId, createdAt])
   @@index([authorUserId])
@@ -184,6 +214,7 @@ model Widget {
   borderRadius      Int                @default(20)
   logoUrl           String?
   instructions      String             @default("Answer clearly and only use information you know is reliable. If you are unsure, say so.")
+  escalationKeywords String            @default("human,agent,person,representative,support team")
   modelProvider     String             @default("OPENAI")
   modelName         String             @default("gpt-5-mini")
   isEnabled         Boolean            @default(true)
@@ -228,4 +259,150 @@ model VisitorSession {
   @@index([widgetId, lastSeenAt])
   @@index([contactId])
   @@map("visitor_session")
+}
+
+model Attachment {
+  id          String   @id @default(cuid())
+  filename    String
+  mimeType    String
+  size        Int
+  storageKey  String   @unique
+  createdAt   DateTime @default(now())
+  workspaceId String
+  messageId   String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  message     Message   @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([messageId])
+  @@map("attachment")
+}
+
+model Document {
+  id           String          @id @default(cuid())
+  title        String
+  sourceType   String
+  sourceUrl    String?
+  storageKey   String?
+  mimeType     String?
+  status       String          @default("PROCESSING")
+  errorMessage String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  workspaceId  String
+  workspace    Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  chunks       DocumentChunk[]
+
+  @@index([workspaceId, status, updatedAt])
+  @@map("document")
+}
+
+model DocumentChunk {
+  id         String   @id @default(cuid())
+  content    String
+  position   Int
+  createdAt  DateTime @default(now())
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId, position])
+  @@map("document_chunk")
+}
+
+model WorkspaceInvite {
+  id          String    @id @default(cuid())
+  email       String
+  role        String    @default("MEMBER")
+  token       String    @unique
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, email])
+  @@index([token])
+  @@map("workspace_invite")
+}
+
+model Integration {
+  id          String   @id @default(cuid())
+  provider    String
+  status      String   @default("DISCONNECTED")
+  displayName String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, provider])
+  @@map("integration")
+}
+
+model Notification {
+  id          String    @id @default(cuid())
+  type        String
+  title       String
+  body        String
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+  workspaceId String
+  userId      String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+  @@index([workspaceId, createdAt])
+  @@map("notification")
+}
+
+model DomainEvent {
+  id          String   @id @default(cuid())
+  type        String
+  entityId    String?
+  payload     String   @default("{}")
+  createdAt   DateTime @default(now())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, type, createdAt])
+  @@map("domain_event")
+}
+
+model WorkflowRun {
+  id             String    @id @default(cuid())
+  name           String
+  status         String    @default("RUNNING")
+  idempotencyKey String?   @unique
+  input          String    @default("{}")
+  output         String?
+  errorMessage   String?
+  attempts       Int       @default(0)
+  maxAttempts    Int       @default(3)
+  startedAt      DateTime  @default(now())
+  finishedAt     DateTime?
+  workspaceId    String
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, status, startedAt])
+  @@map("workflow_run")
+}
+
+model IntegrationAction {
+  id             String    @id @default(cuid())
+  provider       String
+  actionType     String
+  status         String    @default("PENDING")
+  idempotencyKey String    @unique
+  payload        String    @default("{}")
+  result         String?
+  errorMessage   String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  workspaceId    String
+  requestedById  String?
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, status, createdAt])
+  @@map("integration_action")
 }

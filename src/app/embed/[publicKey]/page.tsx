@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 
 import { WidgetShell } from "@/features/widget/components/widget-shell";
 import {
-  createVisitorSession,
   getPublicWidget,
   isHostnameAuthorized,
   toWidgetSettings,
@@ -68,8 +67,6 @@ export default async function EmbedPage({
     );
   }
 
-  const visitorSession = await createVisitorSession(db, widget.id, hostname);
-
   if (!parentOrigin) {
     notFound();
   }
@@ -78,7 +75,8 @@ export default async function EmbedPage({
     <main className="flex h-svh w-full items-end justify-end overflow-hidden bg-transparent">
       <WidgetShell
         settings={toWidgetSettings(widget)}
-        sessionToken={visitorSession.token}
+        sessionHostname={hostname}
+        preview={query.preview === "1"}
         embedded
         parentOrigin={parentOrigin}
       />

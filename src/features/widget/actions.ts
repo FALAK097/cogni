@@ -18,6 +18,11 @@ export type WidgetActionState = {
   savedAt?: number;
 };
 
+export type WidgetAgentActionState = {
+  error?: string;
+  savedAt?: number;
+};
+
 const hexColor = z.string().regex(/^#[0-9a-f]{6}$/i, "Use a six-digit hex color.");
 const widgetSettingsSchema = z.object({
   displayName: z.string().trim().min(1).max(60),
@@ -33,6 +38,7 @@ const widgetSettingsSchema = z.object({
   borderRadius: z.coerce.number().int().min(0).max(32),
   logoUrl: z.union([z.literal(""), z.url()]),
   instructions: z.string().trim().min(1).max(4_000),
+  escalationKeywords: z.string().trim().min(1).max(500).optional(),
   modelProvider: z.enum(["OPENAI", "GOOGLE"]),
   modelName: z.string().trim().min(1).max(80),
   isEnabled: z.boolean(),
@@ -61,6 +67,7 @@ export async function saveWidgetSettingsAction(
     borderRadius: formData.get("borderRadius"),
     logoUrl: formData.get("logoUrl"),
     instructions: formData.get("instructions"),
+    escalationKeywords: formData.get("escalationKeywords"),
     modelProvider: formData.get("modelProvider"),
     modelName: formData.get("modelName"),
     isEnabled: formBoolean(formData.get("isEnabled")),
@@ -106,6 +113,7 @@ export async function saveWidgetSettingsAction(
       borderRadius: parsed.data.borderRadius,
       logoUrl: parsed.data.logoUrl || null,
       instructions: parsed.data.instructions,
+      escalationKeywords: parsed.data.escalationKeywords ?? widget.escalationKeywords,
       modelProvider: provider,
       modelName: parsed.data.modelName,
       isEnabled: parsed.data.isEnabled,
@@ -122,6 +130,40 @@ export async function saveWidgetSettingsAction(
     authorizedDomainCount: domains.length,
   });
 
+  revalidatePath("/dashboard/widget");
+  return { savedAt: Date.now() };
+}
+
+const widgetAgentSettingsSchema = z.object({
+  instructions: z.string().trim().min(1).max(4_000),
+  escalationKeywords: z.string().trim().min(1).max(500),
+});
+
+export async function saveWidgetAgentSettingsAction(
+  _previousState: WidgetAgentActionState,
+  formData: FormData,
+): Promise<WidgetAgentActionState> {
+  const parsed = widgetAgentSettingsSchema.safeParse({
+    instructions: formData.get("instructions"),
+    escalationKeywords: formData.get("escalationKeywords"),
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Check the agent settings." };
+  }
+
+  const { db, workspace } = await requireDashboardContext();
+  const widget = await ensureWorkspaceWidget(db, workspace.id);
+
+  await db.widget.update({
+    where: { id: widget.id },
+    data: {
+      instructions: parsed.data.instructions,
+      escalationKeywords: parsed.data.escalationKeywords,
+    },
+  });
+
+  revalidatePath("/dashboard/agent");
   revalidatePath("/dashboard/widget");
   return { savedAt: Date.now() };
 }

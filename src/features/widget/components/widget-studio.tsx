@@ -34,11 +34,9 @@ const inputClassName =
 
 export function WidgetStudio({
   initialSettings,
-  previewSessionToken,
   appUrl,
 }: {
   initialSettings: WidgetSettings;
-  previewSessionToken: string;
   appUrl: string;
 }) {
   const [settings, setSettings] = useState(initialSettings);
@@ -322,7 +320,11 @@ export function WidgetStudio({
               <p className="mb-2 text-sm font-medium">Install snippet</p>
               <div className="flex items-center gap-2 rounded-xl border bg-muted/30 p-3">
                 <code className="min-w-0 flex-1 overflow-x-auto font-mono text-xs">
-                  {installCode}
+                  {'<script src="'}
+                  {appUrl}
+                  {'/widget.js" data-widget-key="'}
+                  {settings.publicKey}
+                  {'" async></script>'}
                 </code>
                 <Button
                   type="button"
@@ -366,7 +368,7 @@ export function WidgetStudio({
             <h2 className="text-lg font-semibold text-foreground">Live preview</h2>
           </div>
           <div className="flex min-h-[42rem] items-end justify-center overflow-auto rounded-3xl border bg-background/40 p-4">
-            <WidgetShell settings={settings} sessionToken={previewSessionToken} />
+            <WidgetShell settings={settings} sessionHostname="dashboard-preview" preview />
           </div>
         </div>
       </aside>

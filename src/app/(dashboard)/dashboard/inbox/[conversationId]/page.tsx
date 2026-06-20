@@ -11,12 +11,16 @@ import { HugeiconsIcon } from "@hugeicons/react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { AssignmentControl } from "@/features/inbox/components/assignment-control";
+import { ConversationControls } from "@/features/inbox/components/conversation-controls";
+import { InboxLiveRefresh } from "@/features/inbox/components/inbox-live-refresh";
 import { ReplyComposer } from "@/features/inbox/components/reply-composer";
 import { StatusBadge } from "@/features/inbox/components/status-badge";
 import { updateConversationStatusAction } from "@/features/inbox/actions";
 import { isConversationStatus } from "@/features/inbox/constants";
 import { formatMessageTime } from "@/features/inbox/format";
 import { getConversation } from "@/features/inbox/queries";
+import { getWorkspaceMembers } from "@/features/workspaces/queries";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { cn } from "@/lib/utils";
 
@@ -42,7 +46,10 @@ export default async function ConversationPage({
     params,
     requireDashboardContext(),
   ]);
-  const conversation = await getConversation(workspace.id, conversationId);
+  const [conversation, members] = await Promise.all([
+    getConversation(workspace.id, conversationId),
+    getWorkspaceMembers(workspace.id),
+  ]);
 
   if (!conversation) {
     notFound();
@@ -53,6 +60,7 @@ export default async function ConversationPage({
 
   return (
     <main className="mx-auto max-w-7xl p-4 md:p-6 lg:p-8">
+      <InboxLiveRefresh />
       <Link
         href="/dashboard/inbox"
         className="mb-5 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
@@ -71,44 +79,81 @@ export default async function ConversationPage({
               </div>
               <p className="mt-1 text-sm text-muted-foreground">{conversation.contact.name}</p>
             </div>
-            <form action={updateConversationStatusAction}>
-              <input type="hidden" name="conversationId" value={conversation.id} />
-              <input type="hidden" name="status" value={closed ? "OPEN" : "CLOSED"} />
-              <Button type="submit" variant="outline" size="sm">
-                <HugeiconsIcon icon={CheckmarkCircle02Icon} />
-                {closed ? "Reopen" : "Close"}
-              </Button>
-            </form>
+            <div className="flex flex-wrap items-center gap-2">
+              <ConversationControls
+                conversationId={conversation.id}
+                aiPaused={conversation.aiPaused}
+              />
+              {status !== "ESCALATED" && !closed ? (
+                <form action={updateConversationStatusAction}>
+                  <input type="hidden" name="conversationId" value={conversation.id} />
+                  <input type="hidden" name="status" value="ESCALATED" />
+                  <Button type="submit" variant="outline" size="sm">
+                    Escalate
+                  </Button>
+                </form>
+              ) : null}
+              <form action={updateConversationStatusAction}>
+                <input type="hidden" name="conversationId" value={conversation.id} />
+                <input type="hidden" name="status" value={closed ? "OPEN" : "CLOSED"} />
+                <Button type="submit" variant="outline" size="sm">
+                  <HugeiconsIcon icon={CheckmarkCircle02Icon} />
+                  {closed ? "Reopen" : "Close"}
+                </Button>
+              </form>
+            </div>
           </header>
 
           <div className="flex-1 space-y-6 overflow-y-auto bg-muted/20 px-4 py-6 sm:px-6">
             {conversation.messages.map((message) => {
-              const fromTeam = message.authorType === "TEAM" || message.authorType === "AI";
+              const isInternal = message.visibility === "INTERNAL";
+              const fromTeam =
+                message.authorType === "TEAM" || message.authorType === "AI" || isInternal;
               const authorName = fromTeam
-                ? (message.authorUser?.name ?? "Support")
+                ? (message.authorUser?.name ??
+                  (message.authorType === "AI" ? "AI assistant" : "Support"))
                 : conversation.contact.name;
 
               return (
                 <article
                   key={message.id}
-                  className={cn("flex gap-3", fromTeam && "flex-row-reverse")}
+                  className={cn("flex gap-3", fromTeam && !isInternal && "flex-row-reverse")}
                 >
                   <Avatar size="sm" className="mt-1">
                     <AvatarFallback>{initials(authorName)}</AvatarFallback>
                   </Avatar>
-                  <div className={cn("max-w-[82%]", fromTeam && "text-right")}>
+                  <div className={cn("max-w-[82%]", fromTeam && !isInternal && "text-right")}>
                     <div
                       className={cn(
                         "inline-block rounded-2xl px-4 py-3 text-left text-sm leading-6",
-                        fromTeam
-                          ? "rounded-tr-md bg-primary text-primary-foreground"
-                          : "rounded-tl-md border bg-background",
+                        isInternal
+                          ? "border border-dashed border-amber-500/40 bg-amber-500/10"
+                          : fromTeam
+                            ? "rounded-tr-md bg-primary text-primary-foreground"
+                            : "rounded-tl-md border bg-background",
                       )}
                     >
                       {message.body}
+                      {message.attachments.length > 0 ? (
+                        <ul className="mt-3 space-y-1 border-t border-current/10 pt-3 text-xs">
+                          {message.attachments.map((attachment) => (
+                            <li key={attachment.id}>
+                              <a
+                                href={`/api/files/${attachment.storageKey.split("/").map(encodeURIComponent).join("/")}`}
+                                className="underline underline-offset-2"
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                {attachment.filename}
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
                     </div>
                     <p className="mt-1.5 text-xs text-muted-foreground">
-                      {authorName} ·{" "}
+                      {authorName}
+                      {isInternal ? " · Internal note" : ""} ·{" "}
                       <time dateTime={message.createdAt.toISOString()}>
                         {formatMessageTime(message.createdAt)}
                       </time>
@@ -137,12 +182,31 @@ export default async function ConversationPage({
               <AvatarFallback>{initials(conversation.contact.name)}</AvatarFallback>
             </Avatar>
             <div className="min-w-0">
-              <p className="truncate font-medium">{conversation.contact.name}</p>
+              <Link
+                href={`/dashboard/contacts/${conversation.contact.id}`}
+                className="truncate font-medium hover:underline"
+              >
+                {conversation.contact.name}
+              </Link>
               <p className="truncate text-xs text-muted-foreground">
                 {conversation.contact.email ?? "No email"}
               </p>
             </div>
           </div>
+
+          <div className="mt-7">
+            <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+              Assignee
+            </p>
+            <div className="mt-3">
+              <AssignmentControl
+                conversationId={conversation.id}
+                members={members}
+                assignedMembershipId={conversation.assignedMembershipId}
+              />
+            </div>
+          </div>
+
           <dl className="mt-7 space-y-4 text-sm">
             <div className="flex items-center gap-3">
               <HugeiconsIcon icon={Mail01Icon} className="size-4 text-muted-foreground" />

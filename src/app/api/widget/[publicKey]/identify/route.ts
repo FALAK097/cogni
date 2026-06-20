@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { getDb } from "@/lib/db/client";
+import { checkRateLimit } from "@/lib/rate-limit/memory";
 
 const identifySchema = z.object({
   id: z.string().trim().min(1).max(200).optional(),
@@ -47,6 +48,19 @@ export async function POST(
 
   if (!visitorSession) {
     return Response.json({ error: "Widget session is invalid or expired." }, { status: 401 });
+  }
+
+  const rateLimit = checkRateLimit({
+    key: `widget-identify:${token}`,
+    limit: 20,
+    windowMs: 60_000,
+  });
+
+  if (!rateLimit.allowed) {
+    return Response.json(
+      { error: "Too many identify requests. Try again shortly." },
+      { status: 429 },
+    );
   }
 
   const contact = await db.contact.findFirst({

@@ -83,3 +83,39 @@ export async function createVisitorSession(db: PrismaClient, widgetId: string, h
     },
   });
 }
+
+export async function resolveVisitorSession({
+  db,
+  widgetId,
+  hostname,
+  token,
+}: {
+  db: PrismaClient;
+  widgetId: string;
+  hostname: string;
+  token?: string | null;
+}) {
+  const now = new Date();
+
+  if (token) {
+    const existing = await db.visitorSession.findFirst({
+      where: {
+        token,
+        widgetId,
+        expiresAt: { gt: now },
+      },
+    });
+
+    if (existing) {
+      return db.visitorSession.update({
+        where: { id: existing.id },
+        data: {
+          lastSeenAt: now,
+          expiresAt: new Date(Date.now() + visitorSessionDurationMs),
+        },
+      });
+    }
+  }
+
+  return createVisitorSession(db, widgetId, hostname);
+}

@@ -1,9 +1,40 @@
 import "server-only";
 
+import type { Prisma } from "@/generated/prisma/client";
 import { getDb } from "@/lib/db/client";
 
-export async function getInboxSummary(workspaceId: string) {
+function conversationWhere(
+  workspaceId: string,
+  query?: string,
+  status?: string,
+): Prisma.ConversationWhereInput {
+  const normalizedQuery = query?.trim();
+
+  return {
+    workspaceId,
+    ...(status ? { status } : {}),
+    ...(normalizedQuery
+      ? {
+          OR: [
+            { subject: { contains: normalizedQuery } },
+            { contact: { name: { contains: normalizedQuery } } },
+            { contact: { email: { contains: normalizedQuery } } },
+            {
+              messages: {
+                some: {
+                  body: { contains: normalizedQuery },
+                },
+              },
+            },
+          ],
+        }
+      : {}),
+  };
+}
+
+export async function getInboxSummary(workspaceId: string, query?: string, status?: string) {
   const db = getDb();
+  const where = conversationWhere(workspaceId, query, status);
 
   const [openCount, assignedCount, escalatedCount, closedCount, contactCount, conversations] =
     await Promise.all([
@@ -13,7 +44,7 @@ export async function getInboxSummary(workspaceId: string) {
       db.conversation.count({ where: { workspaceId, status: "CLOSED" } }),
       db.contact.count({ where: { workspaceId } }),
       db.conversation.findMany({
-        where: { workspaceId },
+        where,
         orderBy: { lastMessageAt: "desc" },
         include: {
           contact: true,
@@ -53,7 +84,10 @@ export async function getConversation(workspaceId: string, conversationId: strin
       },
       messages: {
         orderBy: { createdAt: "asc" },
-        include: { authorUser: true },
+        include: {
+          authorUser: true,
+          attachments: true,
+        },
       },
     },
   });

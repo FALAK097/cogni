@@ -1,11 +1,7 @@
 import type { Metadata } from "next";
 
 import { WidgetStudio } from "@/features/widget/components/widget-studio";
-import {
-  createVisitorSession,
-  ensureWorkspaceWidget,
-  toWidgetSettings,
-} from "@/features/widget/server/widget-service";
+import { ensureWorkspaceWidget, toWidgetSettings } from "@/features/widget/server/widget-service";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { env } from "@/lib/env/server";
 
@@ -16,7 +12,6 @@ export const metadata: Metadata = {
 export default async function WidgetPage() {
   const { db, workspace } = await requireDashboardContext();
   const widget = await ensureWorkspaceWidget(db, workspace.id);
-  const previewSession = await createVisitorSession(db, widget.id, "dashboard-preview");
 
   return (
     <main className="mx-auto max-w-[96rem] space-y-7 p-4 md:p-6 lg:p-8">
@@ -30,7 +25,6 @@ export default async function WidgetPage() {
       </section>
       <WidgetStudio
         initialSettings={toWidgetSettings(widget)}
-        previewSessionToken={previewSession.token}
         appUrl={(env.BETTER_AUTH_URL ?? "http://localhost:3000").replace(/\/$/, "")}
       />
     </main>

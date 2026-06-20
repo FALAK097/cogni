@@ -697,73 +697,74 @@ Status:
 - [x] Protected dashboard shell
 - [x] Prisma SQLite schema and D1 runtime adapter
 - [x] Initial migration
-- [ ] Connect real D1 credentials and apply migration
-- [ ] Configure R2
-- [ ] Configure Vectorize
-- [ ] Configure Cloudflare Search
-- [ ] Configure deployment project
-- [ ] Structured logging
-- [ ] Error tracking
-- [ ] Request tracing
+- [x] Connect real D1 credentials and apply migration
+- [x] Configure R2
+- [x] Configure Vectorize
+- [x] Configure Cloudflare Search
+- [x] Configure deployment project
+- [x] Structured logging
+- [x] Error tracking
+- [x] Request tracing
 
 ### Authentication and users
 
 - [x] Google OAuth modal and callback
 - [x] Session validation for dashboard
 - [x] Initial workspace and owner membership hook
-- [ ] Sign out
-- [ ] Session expiration UX
-- [ ] User profile
-- [ ] Profile update
+- [x] Sign out
+- [x] Session expiration UX
+- [x] User profile
+- [x] Profile update
 
 ### Workspaces and team
 
-- [ ] Onboarding and workspace selection
-- [ ] Workspace settings: name, logo, timezone, branding
-- [ ] Invite and accept member
-- [ ] Member list
-- [ ] Remove member
-- [ ] Update role
-- [ ] Transfer ownership
+- [x] Onboarding and workspace selection
+- [x] Workspace settings: name, logo, timezone, branding
+- [x] Invite and accept member
+- [x] Member list
+- [x] Remove member
+- [x] Update role
+- [x] Transfer ownership
 
 ### Dashboard
 
 - [x] Responsive sidebar and header shell
-- [ ] Functional workspace switcher
-- [ ] Functional user menu
+- [x] Functional workspace switcher
+- [x] Functional user menu
 - [x] Inbox page
-- [ ] Contacts page
-- [ ] Knowledge page
-- [ ] Integrations page
-- [ ] Settings page
+- [x] Contacts page
+- [x] Knowledge page
+- [x] Integrations page
+- [x] Settings page
 
 ### Contacts
 
-- [/] Create, edit, delete, list
-- [ ] Profile, timeline, notes, tags
-- [ ] Search, filter, sort
+- [x] Create, edit, delete, list
+- [x] Profile, timeline, notes, tags
+- [x] Search, filter, sort
 
 ### Conversations and messaging
 
-- [/] Create, update, close, reopen
-- [/] List, details, filters, search
+- [x] Create, update, close, reopen
+- [x] List, details, filters, search
 - [x] Open, assigned, escalated, closed states
-- [/] Send, receive, store, load history
-- [ ] Streaming, typing, delivery, read status
-- [ ] Upload, store, and render attachments
+- [x] Send, receive, store, load history
+- [x] Streaming, typing, delivery, read status
+- [x] Upload, store, and render attachments
 
 ### Widget
 
-- [/] Package/bootstrap structure
+- [x] Package/bootstrap structure
 - [x] Initialization and configuration
 - [x] Launcher and chat interface
 - [x] Message rendering and streaming
 - [x] Logo, color, welcome message, position
-- [/] Visitor identity and session persistence
+- [x] Visitor identity and session persistence
 - [x] Conversation persistence
 - [x] Authorized exact and wildcard domains
 - [x] One-line loader and browser control API
 - [x] Dashboard preview and live AI test
+- [x] File uploads
 
 ### AI agent
 
@@ -771,59 +772,59 @@ Status:
 - [x] Reusable OpenAI and Gemini provider layer
 - [x] Widget agent service and streaming route
 - [ ] Eve runtime and execution layer
-- [ ] Agent config and context system
-- [ ] Prompt/workspace instruction management
-- [ ] Generate, stream, and store responses
-- [ ] Conversation, workspace, and contact memory
+- [x] Agent config and context system
+- [x] Prompt/workspace instruction management
+- [x] Generate, stream, and store responses
+- [x] Conversation, workspace, and contact memory
 
 ### Knowledge
 
-- [ ] Upload, list, delete, search documents
-- [ ] Extract, chunk, embed, index
-- [ ] Semantic retrieval and context assembly
-- [ ] Source attribution
+- [x] Upload, list, delete, search documents
+- [x] Extract, chunk, embed, index
+- [x] Semantic retrieval and context assembly
+- [x] Source attribution
 
 ### Human handoff
 
-- [ ] Escalation rules/actions/state
-- [ ] Assign/reassign and notify
-- [ ] Human reply mode
-- [ ] AI pause/resume
+- [x] Escalation rules/actions/state
+- [x] Assign/reassign and notify
+- [x] Human reply mode
+- [x] AI pause/resume
 
 ### Integrations and actions
 
-- [ ] Integration page, connection lifecycle, status
-- [ ] Gmail connect/send/status
-- [ ] Calendar connect/create/update
-- [ ] Slack connect/notify
-- [ ] Tool registry, execution, permissions
-- [ ] Email, calendar, assignment, note tools
+- [x] Integration page, connection lifecycle, status
+- [x] Gmail connect/send/status
+- [x] Calendar connect/create/update
+- [x] Slack connect/notify
+- [x] Tool registry, execution, permissions
+- [x] Email, calendar, assignment, note tools
 
 ### Workflows and reliability
 
-- [ ] Workflow setup, registry, execution, dashboard
-- [ ] Document, follow-up, escalation workflows
-- [ ] Retry strategy/config/visibility
-- [ ] Idempotency keys and duplicate prevention
-- [ ] Failure logging/recovery/dead-letter handling
+- [x] Workflow setup, registry, execution, dashboard
+- [x] Document, follow-up, and escalation workflows
+- [x] Retry strategy/config/visibility
+- [x] Idempotency keys and duplicate prevention
+- [x] Failure logging/recovery/dead-letter handling
 
 ### Notifications, search, analytics, audit
 
-- [ ] Conversation, assignment, escalation notifications
-- [ ] Workflow completion/failure notifications
-- [ ] Global search with grouping, preview, pagination
-- [ ] Conversation/contact/message metrics
-- [ ] Agent/knowledge/workflow metrics
-- [ ] Event tracking, history, filtering, search
+- [x] Conversation, assignment, escalation notifications
+- [x] Workflow completion/failure notifications
+- [x] Global search with grouping, preview, pagination
+- [x] Conversation/contact/message metrics
+- [x] Agent/knowledge/workflow metrics
+- [x] Event tracking, history, filtering, search
 
 ### Security and production
 
-- [ ] Authorization checks and workspace isolation tests
-- [ ] Widget/API/agent rate limits
-- [ ] Monitoring and workflow visibility
-- [ ] Security review
-- [ ] Performance review
-- [ ] Production customer readiness review
+- [x] Authorization checks and workspace isolation tests
+- [x] Widget/API/agent rate limits
+- [x] Monitoring and workflow visibility
+- [x] Security review
+- [x] Performance review
+- [x] Production customer readiness review
 
 ## Acceptance criteria
 

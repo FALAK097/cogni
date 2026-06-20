@@ -5,6 +5,7 @@
 /src/generated/prisma
 /prisma/dev.db
 /prisma/dev.db-journal
+/.uploads
 /.tmp
 /.pnp
 .pnp.*
