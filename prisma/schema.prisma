@@ -8,16 +8,17 @@ datasource db {
 }
 
 model User {
-  id            String       @id
-  name          String
-  email         String
-  emailVerified Boolean      @default(false)
-  image         String?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  sessions      Session[]
-  accounts      Account[]
-  memberships   Membership[]
+  id               String       @id
+  name             String
+  email            String
+  emailVerified    Boolean      @default(false)
+  image            String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  sessions         Session[]
+  accounts         Account[]
+  memberships      Membership[]
+  authoredMessages Message[]
 
   @@unique([email])
   @@map("user")
@@ -72,29 +73,159 @@ model Verification {
 }
 
 model Workspace {
-  id          String       @id @default(cuid())
-  name        String
-  slug        String       @unique
-  logo        String?
-  timezone    String       @default("UTC")
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  memberships Membership[]
+  id            String         @id @default(cuid())
+  name          String
+  slug          String         @unique
+  logo          String?
+  timezone      String         @default("UTC")
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  memberships   Membership[]
+  contacts      Contact[]
+  conversations Conversation[]
+  widget        Widget?
 
   @@map("workspace")
 }
 
 model Membership {
-  id          String    @id @default(cuid())
-  role        String    @default("MEMBER")
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  userId      String
-  workspaceId String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id                    String         @id @default(cuid())
+  role                  String         @default("MEMBER")
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  userId                String
+  workspaceId           String
+  user                  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace             Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  assignedConversations Conversation[] @relation("ConversationAssignee")
 
   @@unique([userId, workspaceId])
   @@index([workspaceId])
   @@map("membership")
+}
+
+model Contact {
+  id              String           @id @default(cuid())
+  name            String
+  email           String?
+  externalId      String?
+  avatarUrl       String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  lastSeenAt      DateTime?
+  workspaceId     String
+  workspace       Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  conversations   Conversation[]
+  visitorSessions VisitorSession[]
+
+  @@unique([workspaceId, email])
+  @@unique([workspaceId, externalId])
+  @@index([workspaceId, updatedAt])
+  @@map("contact")
+}
+
+model Conversation {
+  id                   String          @id @default(cuid())
+  subject              String
+  status               String          @default("OPEN")
+  channel              String          @default("MANUAL")
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  lastMessageAt        DateTime        @default(now())
+  workspaceId          String
+  contactId            String
+  assignedMembershipId String?
+  workspace            Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  contact              Contact         @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  assignedMembership   Membership?     @relation("ConversationAssignee", fields: [assignedMembershipId], references: [id], onDelete: SetNull)
+  messages             Message[]
+  widgetId             String?
+  visitorSessionId     String?
+  widget               Widget?         @relation(fields: [widgetId], references: [id], onDelete: SetNull)
+  visitorSession       VisitorSession? @relation(fields: [visitorSessionId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, status, lastMessageAt])
+  @@index([workspaceId, contactId])
+  @@index([assignedMembershipId])
+  @@index([widgetId])
+  @@index([visitorSessionId])
+  @@map("conversation")
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  body           String
+  authorType     String
+  visibility     String       @default("PUBLIC")
+  createdAt      DateTime     @default(now())
+  conversationId String
+  authorUserId   String?
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  authorUser     User?        @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId, createdAt])
+  @@index([authorUserId])
+  @@map("message")
+}
+
+model Widget {
+  id                String             @id @default(cuid())
+  publicKey         String             @unique @default(cuid())
+  displayName       String             @default("Support")
+  welcomeMessage    String             @default("Hi! How can we help?")
+  inputPlaceholder  String             @default("Ask a question…")
+  primaryColor      String             @default("#14805e")
+  backgroundColor   String             @default("#ffffff")
+  textColor         String             @default("#171717")
+  position          String             @default("RIGHT")
+  launcherSize      String             @default("MEDIUM")
+  panelWidth        Int                @default(380)
+  panelHeight       Int                @default(640)
+  borderRadius      Int                @default(20)
+  logoUrl           String?
+  instructions      String             @default("Answer clearly and only use information you know is reliable. If you are unsure, say so.")
+  modelProvider     String             @default("OPENAI")
+  modelName         String             @default("gpt-5-mini")
+  isEnabled         Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  workspaceId       String             @unique
+  workspace         Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  authorizedDomains AuthorizedDomain[]
+  visitorSessions   VisitorSession[]
+  conversations     Conversation[]
+
+  @@map("widget")
+}
+
+model AuthorizedDomain {
+  id        String   @id @default(cuid())
+  hostname  String
+  createdAt DateTime @default(now())
+  widgetId  String
+  widget    Widget   @relation(fields: [widgetId], references: [id], onDelete: Cascade)
+
+  @@unique([widgetId, hostname])
+  @@index([hostname])
+  @@map("authorized_domain")
+}
+
+model VisitorSession {
+  id            String         @id @default(cuid())
+  token         String         @unique
+  hostname      String
+  externalId    String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  lastSeenAt    DateTime       @default(now())
+  expiresAt     DateTime
+  widgetId      String
+  contactId     String?
+  widget        Widget         @relation(fields: [widgetId], references: [id], onDelete: Cascade)
+  contact       Contact?       @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  conversations Conversation[]
+
+  @@index([widgetId, lastSeenAt])
+  @@index([contactId])
+  @@map("visitor_session")
 }

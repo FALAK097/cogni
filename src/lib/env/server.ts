@@ -3,7 +3,7 @@ import { z } from "zod";
 
 export const env = createEnv({
   server: {
-    ENV: z.enum(["development", "production"]).optional(),
+    ENV: z.enum(["development", "production"]),
     DATABASE_URL: z.string().min(1),
     BETTER_AUTH_SECRET: z.string().min(32),
     BETTER_AUTH_URL: z.url(),
@@ -13,6 +13,8 @@ export const env = createEnv({
     CLOUDFLARE_API_TOKEN: z.string().min(1).optional(),
     D1_DATABASE_ID: z.string().min(1).optional(),
     R2_BUCKET_NAME: z.string().min(1).optional(),
+    R2_ACCESS_KEY_ID: z.string().min(1).optional(),
+    R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
     VECTORIZE_INDEX: z.string().min(1).optional(),
     OPENAI_API_KEY: z.string().min(1).optional(),
     GEMINI_API_KEY: z.string().min(1).optional(),

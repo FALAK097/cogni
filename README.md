@@ -4,10 +4,10 @@ widget is an AI-first customer support platform with an embedded chat widget,
 shared team inbox, knowledge-grounded answers, human handoff, integrations, and
 durable workflows.
 
-Current repository is production-oriented foundation: landing page, Google-only
-authentication, protected dashboard shell, multi-tenant workspace bootstrap,
-Prisma SQLite/D1 data layer, typed environment validation, CI, and engineering
-quality gates.
+Current repository includes the production foundation and the first widget
+vertical slice: workspace-scoped configuration, authorized domains, one-line
+installation, live preview, visitor identity, streamed AI responses, persisted
+conversations, and the shared inbox.
 
 Full product specification, architecture decisions, roadmap, acceptance
 criteria, and backlog live in [`AGENTS.md`](AGENTS.md).
@@ -23,9 +23,10 @@ criteria, and backlog live in [`AGENTS.md`](AGENTS.md).
 - Vercel deployment; Cloudflare D1, R2, Search, and Vectorize
 - Oxlint, Oxfmt, Husky, lint-staged, GitHub Actions
 
-Vercel AI SDK, OpenAI, Gemini, Eve, Vercel Workflow, R2, and Vectorize are
-planned for their roadmap phases. Their environment variable names are already
-reserved, but unused packages are intentionally not installed.
+Vercel AI SDK v6 with OpenAI and Gemini is active. Vercel Workflow, R2, and
+Vectorize are next for durable knowledge ingestion. Chat SDK adapters will add
+Slack, WhatsApp, Microsoft Teams, and Google Chat through the same conversation
+service. Eve remains deferred until it provides a concrete advantage.
 
 ## Requirements
 
@@ -80,17 +81,19 @@ D1_DATABASE_ID=""
 All three runtime values—account ID, API token, and database ID—must be set
 together.
 
-Reserved for later phases:
+Knowledge storage and model providers:
 
 ```env
-R2_BUCKET_NAME="widget"
-VECTORIZE_INDEX="widget-knowledge"
+R2_BUCKET_NAME="widget-development"
+R2_ACCESS_KEY_ID=""
+R2_SECRET_ACCESS_KEY=""
+VECTORIZE_INDEX="widget-knowledge-development"
 OPENAI_API_KEY=""
 GEMINI_API_KEY=""
 ```
 
-OpenAI and Gemini keys may be added now. They remain optional until AI runtime
-implementation begins.
+Use different D1, R2, and Vectorize resources for development, preview, and
+production through Vercel environment scopes.
 
 ## Google OAuth
 
@@ -192,5 +195,14 @@ Implemented:
 - Initial Prisma migration
 - Typed environment variables
 - CI and git hooks
+- Workspace-scoped contacts, conversations, and messages
+- Shared inbox list and conversation detail
+- Manual conversation creation and human replies
+- Conversation status filtering and close/reopen actions
+- Widget studio with branding, sizing, model, prompt, and domain controls
+- One-line browser loader with show/hide/toggle/identify events
+- Live OpenAI/Gemini preview and streamed visitor chat
+- Visitor sessions and widget conversations persisted in Prisma
 
-Next roadmap slice: workspace management and functional inbox foundation.
+Next roadmap slice: URL crawling and file ingestion into R2 and Vectorize with
+durable Workflow jobs and source-grounded answers.

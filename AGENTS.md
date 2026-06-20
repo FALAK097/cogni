@@ -52,8 +52,10 @@ justifies it.
 
 ```text
 Customer website
-  -> Embedded widget
+  -> One-line loader
+  -> Isolated embedded widget
   -> Next.js application
+       -> Channel adapter
        -> Conversation service
        -> Shared inbox
        -> Knowledge retrieval
@@ -66,6 +68,11 @@ Customer website
 Application servers remain stateless. Persistent state belongs in D1, R2,
 Vectorize, or workflow state. No feature may depend on in-memory state across
 requests.
+
+Every channel normalizes identity, thread, and message data into the same
+contact, visitor session, conversation, and message services. The website
+widget is the first channel. Chat SDK adapters for Slack, WhatsApp, Microsoft
+Teams, and Google Chat must reuse those services.
 
 ## Approved technology stack
 
@@ -115,18 +122,30 @@ Every product query must be scoped to a workspace.
 ### AI
 
 - Vercel AI SDK for every model interaction
+- `src/lib/ai` owns provider construction and shared model infrastructure
+- Feature agent services own prompts, retrieval context, and lifecycle hooks
+- Route handlers validate transport input and delegate to feature services
 - OpenAI and Gemini providers initially
-- Eve as intended agent orchestration layer
+- AI Elements may be used for dashboard AI surfaces; the embedded widget stays
+  lightweight
+- Eve is deferred until it provides a measured advantage over AI SDK agents and
+  Workflow
 - AI Gateway may be introduced when routing, failover, or centralized usage
   tracking becomes necessary
 
 Do not call provider SDKs directly unless AI SDK cannot support a requirement.
-Do not add AI runtime packages before the AI phase starts.
+Do not construct model providers or prompts directly inside route handlers.
 
 ### Workflows and integrations
 
 - Vercel Workflow for durable execution, retries, delays, schedules, and human
   approval
+- Workflow owns website crawling, file extraction, chunking, embedding, and
+  re-indexing
+- Vercel Queues are reserved for independent fan-out or traffic buffering that
+  does not need workflow state
+- Vercel Chat SDK is the adapter layer for Slack, WhatsApp, Microsoft Teams,
+  Google Chat, and later messaging channels
 - Vercel Connect for supported third-party OAuth and connection management
 
 External side effects must run through workflows. UI requests and AI tools may
@@ -193,6 +212,9 @@ src/lib/ai/
 ```
 
 Create folders only when code needs them. Do not add empty architecture.
+Transport code belongs at route or adapter boundaries. Conversation persistence
+belongs in `src/features/conversations/server`. Widget orchestration belongs in
+`src/features/widget/server`. Provider creation belongs in `src/lib/ai`.
 
 ## Domain rules
 
@@ -234,6 +256,13 @@ V1 widget supports:
 - Conversation persistence
 - Logo, brand color, welcome message, and left/right position
 - One customer installation script
+- Authorized exact and wildcard domains
+- Browser API: show, hide, toggle, identify, on, off, and destroy
+- Dashboard studio with live visual preview and live AI testing
+
+The one-line loader mounts an iframe so host-page CSS and JavaScript cannot
+break the universal widget. A future React package may provide headless/native
+rendering, but it must use the same public protocol and conversation services.
 
 ### AI agent
 
@@ -401,17 +430,20 @@ CLOUDFLARE_API_TOKEN=
 D1_DATABASE_ID=
 ```
 
-Planned phases:
+Cloudflare knowledge resources and AI providers:
 
 ```env
-R2_BUCKET_NAME=widget
-VECTORIZE_INDEX=widget-knowledge
+R2_BUCKET_NAME=widget-development
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+VECTORIZE_INDEX=widget-knowledge-development
 OPENAI_API_KEY=
 GEMINI_API_KEY=
 ```
 
-OpenAI and Gemini keys are accepted now but remain optional until the agent
-phase.
+Development, preview, and production must use separate D1 databases, R2
+buckets, and Vectorize indexes through environment-scoped values. Never point
+local development at production knowledge resources.
 
 ## Database and authentication invariants
 
@@ -557,36 +589,35 @@ Goal: deployable development foundation.
 Exit: developers can install, validate, build, deploy, authenticate, and access
 an isolated workspace.
 
-### Phase 1: workspace and inbox
+### Phase 1: widget and messaging
 
-- Workspace onboarding, settings, members, roles
-- Sidebar, header, user menu, workspace switcher
-- Conversation list and detail
-- Message view
-- Contact list and detail
-
-Exit: user creates account/workspace and accesses functional dashboard/inbox.
-
-### Phase 2: widget and messaging
-
-- Widget SDK, bootstrap script, launcher, chat UI
-- Branding and position
+- Widget configuration and authorized domains
+- One-line loader and browser runtime
+- Launcher, chat UI, branding, sizing, and placement
+- Dashboard preview and AI testing
 - Visitor identity and session restoration
-- Send, receive, store, and stream messages
-- Conversation open/assigned/closed lifecycle
-- Attachments, typing, delivery/read status
+- Persisted messages and channel-neutral conversation service
 
-Exit: customer installs widget; visitor messages appear in inbox end-to-end.
+Exit: a customer installs one script and holds a persisted AI conversation.
 
-### Phase 3: AI agent
+### Phase 2: knowledge and grounded answers
 
-- Vercel AI SDK and Eve integration
-- Agent config and prompt management
-- Conversation/workspace/contact context
-- Stream and persist AI responses
-- Tool registry and permissions foundation
+- URL source and same-domain crawl
+- PDF, DOCX, and TXT upload to R2
+- Durable extraction, chunking, and embedding workflows
+- Vectorize indexing with workspace metadata filters
+- Retrieval and source citations in widget answers
 
-Exit: agent holds contextual conversations.
+Exit: widget answers from workspace knowledge and cites sources.
+
+### Phase 3: workspace and inbox
+
+- Workspace settings, members, and roles
+- Conversation list, detail, filters, and assignment
+- Human replies, close/reopen, and contact profiles
+- User menu and workspace switcher
+
+Exit: the team operates customer conversations from a functional inbox.
 
 ### Phase 4: knowledge and retrieval
 
@@ -700,7 +731,7 @@ Status:
 - [x] Responsive sidebar and header shell
 - [ ] Functional workspace switcher
 - [ ] Functional user menu
-- [ ] Inbox page
+- [x] Inbox page
 - [ ] Contacts page
 - [ ] Knowledge page
 - [ ] Integrations page
@@ -708,32 +739,37 @@ Status:
 
 ### Contacts
 
-- [ ] Create, edit, delete, list
+- [/] Create, edit, delete, list
 - [ ] Profile, timeline, notes, tags
 - [ ] Search, filter, sort
 
 ### Conversations and messaging
 
-- [ ] Create, update, close, reopen
-- [ ] List, details, filters, search
-- [ ] Open, assigned, escalated, closed states
-- [ ] Send, receive, store, load history
+- [/] Create, update, close, reopen
+- [/] List, details, filters, search
+- [x] Open, assigned, escalated, closed states
+- [/] Send, receive, store, load history
 - [ ] Streaming, typing, delivery, read status
 - [ ] Upload, store, and render attachments
 
 ### Widget
 
-- [ ] Package/bootstrap structure
-- [ ] Initialization and configuration
-- [ ] Launcher and chat interface
-- [ ] Message rendering and streaming
-- [ ] Logo, color, welcome message, position
-- [ ] Visitor identity and session persistence
-- [ ] Conversation persistence
+- [/] Package/bootstrap structure
+- [x] Initialization and configuration
+- [x] Launcher and chat interface
+- [x] Message rendering and streaming
+- [x] Logo, color, welcome message, position
+- [/] Visitor identity and session persistence
+- [x] Conversation persistence
+- [x] Authorized exact and wildcard domains
+- [x] One-line loader and browser control API
+- [x] Dashboard preview and live AI test
 
 ### AI agent
 
-- [ ] Install AI SDK providers when phase starts
+- [x] Install AI SDK providers
+- [x] Reusable OpenAI and Gemini provider layer
+- [x] Widget agent service and streaming route
 - [ ] Eve runtime and execution layer
 - [ ] Agent config and context system
 - [ ] Prompt/workspace instruction management
