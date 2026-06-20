@@ -1,6 +1,6 @@
 import {
   assertPublicWidgetAccess,
-  getVisitorSessionByDbId,
+  requireAuthorizedVisitorSession,
 } from "@/features/widget/server/widget-public";
 import { getRequestOrigin, withWidgetCors } from "@/features/widget/server/echo-utils";
 import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
@@ -14,6 +14,8 @@ export async function POST(
   const db = getDb();
   const access = await assertPublicWidgetAccess(db, publicKey, request);
   if ("error" in access) return access.error;
+  const authorized = await requireAuthorizedVisitorSession(db, publicKey, request);
+  if ("error" in authorized) return authorized.error;
 
   const body = (await request.json()) as {
     messageId?: string;
@@ -26,16 +28,26 @@ export async function POST(
     return Response.json({ error: "Invalid feedback payload." }, { status: 400 });
   }
 
-  const session = await getVisitorSessionByDbId(db, body.sessionId, access.widget.id);
-  if (!session) {
+  if (body.sessionId !== authorized.session.id) {
     return Response.json({ error: "Session not found." }, { status: 404 });
+  }
+
+  const message = await db.message.findFirst({
+    where: {
+      id: body.messageId,
+      conversation: { visitorSessionId: authorized.session.id },
+    },
+    select: { id: true },
+  });
+  if (!message) {
+    return Response.json({ error: "Message not found." }, { status: 404 });
   }
 
   await db.messageFeedback.upsert({
     where: {
       messageId_visitorSessionId: {
         messageId: body.messageId,
-        visitorSessionId: session.id,
+        visitorSessionId: authorized.session.id,
       },
     },
     update: {
@@ -44,7 +56,7 @@ export async function POST(
     },
     create: {
       messageId: body.messageId,
-      visitorSessionId: session.id,
+      visitorSessionId: authorized.session.id,
       feedback: body.feedback,
       reason: body.reason ?? null,
     },

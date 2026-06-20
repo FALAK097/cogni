@@ -6,7 +6,6 @@ import { api, requireData } from "@/lib/api/client";
 import { useActiveWorkspaceId } from "@/hooks/use-auth";
 import { getAllIntegrations } from "@/lib/integrations/registry";
 import { queryKeys } from "@/lib/query-keys";
-import { useIntegrationsStore } from "@/lib/stores/integrations-store";
 
 export function useIntegrations() {
   const activeWorkspaceId = useActiveWorkspaceId();
@@ -20,9 +19,7 @@ export function useIntegrations() {
         return { integrations: getAllIntegrations(), workspaceIntegrations: [] };
       }
 
-      const { data, error } = await api.GET("/api/integrations/workspace/{workspace_id}", {
-        params: { path: { workspace_id: activeWorkspaceId } },
-      });
+      const { data, error } = await api.GET("/api/dashboard/integrations");
       const workspaceIntegrations = requireData(
         data,
         error,
@@ -45,7 +42,6 @@ export function useIntegrations() {
 export function useConnectIntegration() {
   const queryClient = useQueryClient();
   const activeWorkspaceId = useActiveWorkspaceId();
-  const connectIntegration = useIntegrationsStore((state) => state.connectIntegration);
 
   return useMutation({
     mutationFn: async ({
@@ -56,17 +52,12 @@ export function useConnectIntegration() {
       metadata?: Record<string, unknown>;
     }) => {
       if (!activeWorkspaceId) throw new Error("No active workspace");
-      const { data, error } = await api.POST(
-        "/api/integrations/workspace/{workspace_id}/{slug}/connect",
-        {
-          params: { path: { workspace_id: activeWorkspaceId, slug } },
-          body: { slug },
-        },
-      );
+      const { data, error } = await api.POST("/api/dashboard/integrations", {
+        body: { slug },
+      });
       return requireData(data, error, "Failed to connect integration");
     },
-    onSuccess: (_data, variables) => {
-      connectIntegration(variables.slug);
+    onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.integrations.all });
     },
   });
@@ -79,12 +70,9 @@ export function useDisconnectIntegration() {
   return useMutation({
     mutationFn: async (slug: string) => {
       if (!activeWorkspaceId) throw new Error("No active workspace");
-      const { data, error } = await api.DELETE(
-        "/api/integrations/workspace/{workspace_id}/{slug}/connect",
-        {
-          params: { path: { workspace_id: activeWorkspaceId, slug } },
-        },
-      );
+      const { data, error } = await api.DELETE("/api/dashboard/integrations", {
+        params: { query: { slug } },
+      });
       return requireData(data, error, "Failed to disconnect integration");
     },
     onSuccess: () => {

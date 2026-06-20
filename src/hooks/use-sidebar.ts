@@ -1,4 +1,3 @@
-import { produce } from "immer";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
@@ -33,11 +32,9 @@ export const useSidebar = create<SidebarState>()(
         return state.isOpen || (state.settings.isHoverOpen && state.isHover);
       },
       setSettings: (settings) => {
-        set(
-          produce((state: SidebarState) => {
-            state.settings = { ...state.settings, ...settings };
-          }),
-        );
+        set((state) => ({
+          settings: { ...state.settings, ...settings },
+        }));
       },
     }),
     {

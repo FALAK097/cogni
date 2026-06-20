@@ -4,7 +4,7 @@ import { SITE_NAME } from "@/lib/constants";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 
 export const metadata = {
-  title: `Echo Widget | ${SITE_NAME}`,
+  title: `Widget | ${SITE_NAME}`,
   description: "Customize your AI chat widget",
 };
 
@@ -13,14 +13,16 @@ export default async function EchoPage({
 }: {
   searchParams: Promise<{ subtab?: string }>;
 }) {
-  const { workspace } = await requireDashboardContext();
-  const { subtab } = await searchParams;
+  const [{ workspace }, { subtab }] = await Promise.all([requireDashboardContext(), searchParams]);
 
   return (
     <ContentLayout className="max-w-full">
       <div className="mx-auto max-w-7xl pb-16">
-        <EchoCustomizer workspaceId={workspace.id} initialSubtab={subtab} key={workspace.id} />
+        <Suspense>
+          <EchoCustomizer workspaceId={workspace.id} initialSubtab={subtab} key={workspace.id} />
+        </Suspense>
       </div>
     </ContentLayout>
   );
 }
+import { Suspense } from "react";

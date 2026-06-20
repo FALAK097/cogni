@@ -1,7 +1,7 @@
 import { recordVisitorMessage } from "@/features/conversations/server/conversation-service";
 import { getDb } from "@/lib/db/client";
 import { checkRateLimit } from "@/lib/rate-limit/memory";
-import { isAllowedUpload, saveObject, uploadPublicPath } from "@/lib/storage/index";
+import { deleteObject, isAllowedUpload, saveObject, uploadPublicPath } from "@/lib/storage/index";
 
 function bearerToken(request: Request) {
   const authorization = request.headers.get("authorization");
@@ -69,31 +69,6 @@ export async function POST(
     return Response.json({ error: "This file type or size is not allowed." }, { status: 400 });
   }
 
-  const conversation = await recordVisitorMessage({
-    db,
-    visitorSession: {
-      ...visitorSession,
-      widget: {
-        id: visitorSession.widget.id,
-        workspace: { id: visitorSession.widget.workspaceId },
-      },
-    },
-    text: `Uploaded ${file.name}`,
-  });
-
-  const message = await db.message.findFirst({
-    where: {
-      conversationId: conversation.id,
-      authorType: "VISITOR",
-    },
-    orderBy: { createdAt: "desc" },
-    select: { id: true },
-  });
-
-  if (!message) {
-    return Response.json({ error: "Could not attach the file." }, { status: 500 });
-  }
-
   const saved = await saveObject({
     workspaceId: visitorSession.widget.workspaceId,
     filename: file.name,
@@ -101,16 +76,47 @@ export async function POST(
     bytes,
   });
 
-  const attachment = await db.attachment.create({
-    data: {
-      workspaceId: visitorSession.widget.workspaceId,
-      messageId: message.id,
-      filename: saved.filename,
-      mimeType: saved.mimeType,
-      size: saved.size,
-      storageKey: saved.storageKey,
-    },
-  });
+  let attachment;
+  try {
+    const conversation = await recordVisitorMessage({
+      db,
+      visitorSession: {
+        ...visitorSession,
+        widget: {
+          id: visitorSession.widget.id,
+          workspace: { id: visitorSession.widget.workspaceId },
+        },
+      },
+      text: `Uploaded ${file.name}`,
+    });
+
+    const message = await db.message.findFirst({
+      where: {
+        conversationId: conversation.id,
+        authorType: "VISITOR",
+      },
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    });
+
+    if (!message) {
+      throw new Error("Could not create the attachment message.");
+    }
+
+    attachment = await db.attachment.create({
+      data: {
+        workspaceId: visitorSession.widget.workspaceId,
+        messageId: message.id,
+        filename: saved.filename,
+        mimeType: saved.mimeType,
+        size: saved.size,
+        storageKey: saved.storageKey,
+      },
+    });
+  } catch {
+    await deleteObject(saved.storageKey);
+    return Response.json({ error: "Could not attach the file." }, { status: 500 });
+  }
 
   return Response.json({
     attachment: {

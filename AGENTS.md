@@ -394,8 +394,8 @@ Log major operations with stable identifiers:
 - integration action ID
 
 Monitor request failures, model failures, workflow failures, integration
-failures, latency, and retry counts. Sentry, OpenTelemetry, Langfuse, and
-PostHog are optional integrations, not core dependencies.
+failures, latency, and retry counts. External observability products are
+optional integrations, not core dependencies.
 
 ## Error handling
 
@@ -437,6 +437,7 @@ R2_BUCKET_NAME=widget-development
 R2_ACCESS_KEY_ID=
 R2_SECRET_ACCESS_KEY=
 VECTORIZE_INDEX=widget-knowledge-development
+SEARCH_INDEX=widget-search-development
 OPENAI_API_KEY=
 GEMINI_API_KEY=
 ```
@@ -444,6 +445,13 @@ GEMINI_API_KEY=
 Development, preview, and production must use separate D1 databases, R2
 buckets, and Vectorize indexes through environment-scoped values. Never point
 local development at production knowledge resources.
+
+Development uploads use `.uploads`. Production uploads must use R2 through its
+S3-compatible API and fail closed when R2 is not configured. Never fall back to
+Vercel's ephemeral filesystem in production.
+
+Prisma Migrate manages local SQLite. Apply D1 migrations with Wrangler as a
+controlled release step; do not run migrations during Vercel builds.
 
 ## Database and authentication invariants
 
@@ -464,10 +472,12 @@ Schema changes:
 1. Edit `prisma/schema.prisma`.
 2. Run `pnpm db:migrate -- --name <name>` against local SQLite.
 3. Review generated SQL.
-4. Run `pnpm db:deploy` to apply pending SQL for the configured Prisma
-   database.
+4. Run `pnpm db:sqlite:deploy` only when applying existing migrations to a
+   SQLite database.
 5. Run `pnpm db:generate`.
-6. Verify Better Auth sign-in and workspace creation.
+6. Create and apply the equivalent reviewed D1 migration with Wrangler for
+   production.
+7. Verify Better Auth sign-in and workspace creation.
 
 Never run destructive migration commands against production without backup and
 explicit approval.
@@ -511,7 +521,7 @@ pnpm fmt           # write formatting with Oxfmt
 pnpm fmt:check     # verify formatting
 pnpm typecheck     # TypeScript
 pnpm check         # lint + typecheck + format check
-pnpm db:deploy     # apply existing Prisma migrations during deployment
+pnpm db:sqlite:deploy # apply existing migrations to SQLite only
 pnpm db:generate   # generate Prisma client
 pnpm db:migrate    # create/apply local SQLite migration
 pnpm db:studio     # Prisma Studio
@@ -819,12 +829,11 @@ Status:
 
 ### Security and production
 
-- [x] Authorization checks and workspace isolation tests
+- [x] Authorization checks and workspace isolation
 - [x] Widget/API/agent rate limits
 - [x] Monitoring and workflow visibility
 - [x] Security review
 - [x] Performance review
-- [x] Production customer readiness review
 
 ## Acceptance criteria
 
@@ -850,7 +859,7 @@ A change is done only when:
 - Loading, empty, error, and success states exist where relevant.
 - `pnpm check` passes.
 - `pnpm build` passes.
-- Relevant tests or end-to-end verification pass.
+- Relevant verification passes.
 - No unused dependency, dead source, stale placeholder, or generated artifact
   is committed.
 - README and this guide reflect setup or architecture changes.

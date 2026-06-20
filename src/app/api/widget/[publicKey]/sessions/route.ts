@@ -1,4 +1,7 @@
-import { assertPublicWidgetAccess } from "@/features/widget/server/widget-public";
+import {
+  assertPublicWidgetAccess,
+  requireAuthorizedVisitorSession,
+} from "@/features/widget/server/widget-public";
 import { getRequestOrigin, withWidgetCors } from "@/features/widget/server/echo-utils";
 import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
 import { getDb } from "@/lib/db/client";
@@ -11,16 +14,13 @@ export async function GET(
   const db = getDb();
   const access = await assertPublicWidgetAccess(db, publicKey, request);
   if ("error" in access) return access.error;
-
-  const visitorId = new URL(request.url).searchParams.get("visitorId");
-  if (!visitorId) {
-    return Response.json({ error: "visitorId is required." }, { status: 400 });
-  }
+  const authorized = await requireAuthorizedVisitorSession(db, publicKey, request);
+  if ("error" in authorized) return authorized.error;
 
   const sessions = await db.visitorSession.findMany({
     where: {
       widgetId: access.widget.id,
-      visitorId,
+      visitorId: authorized.session.visitorId,
     },
     orderBy: { lastSeenAt: "desc" },
     take: 20,

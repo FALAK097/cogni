@@ -68,10 +68,10 @@ export default async function AnalyticsPage() {
     { label: "Documents", value: documentCount },
     { label: "AI messages", value: aiMessageCount },
     { label: "Escalations", value: escalationCount },
-    { label: "Echo sessions", value: echoSessions },
-    { label: "Echo leads", value: echoLeads },
-    { label: "Echo feedback (up)", value: feedbackUp },
-    { label: "Echo feedback (down)", value: feedbackDown },
+    { label: "Widget sessions", value: echoSessions },
+    { label: "Widget leads", value: echoLeads },
+    { label: "Widget feedback (up)", value: feedbackUp },
+    { label: "Widget feedback (down)", value: feedbackDown },
   ];
 
   return (

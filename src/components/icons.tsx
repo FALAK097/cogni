@@ -192,32 +192,32 @@ export const icons = createIcon(HugeIconsList.GridIcon, "icons");
 
 // Global Icons registry object supporting camelCase and PascalCase mappings
 export const Icons = {
-  GET: (props: SVGProps<SVGSVGElement>) => (
+  GET: () => (
     <span className="inline-flex items-center justify-center px-1.5 py-0.5 text-[9px] font-extrabold tracking-wider rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 mr-1.5 select-none font-mono">
       GET
     </span>
   ),
-  POST: (props: SVGProps<SVGSVGElement>) => (
+  POST: () => (
     <span className="inline-flex items-center justify-center px-1.5 py-0.5 text-[9px] font-extrabold tracking-wider rounded bg-blue-500/10 text-blue-500 border border-blue-500/20 mr-1.5 select-none font-mono">
       POST
     </span>
   ),
-  PUT: (props: SVGProps<SVGSVGElement>) => (
+  PUT: () => (
     <span className="inline-flex items-center justify-center px-1.5 py-0.5 text-[9px] font-extrabold tracking-wider rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 mr-1.5 select-none font-mono">
       PUT
     </span>
   ),
-  PATCH: (props: SVGProps<SVGSVGElement>) => (
+  PATCH: () => (
     <span className="inline-flex items-center justify-center px-1.5 py-0.5 text-[9px] font-extrabold tracking-wider rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 mr-1.5 select-none font-mono">
       PATCH
     </span>
   ),
-  DELETE: (props: SVGProps<SVGSVGElement>) => (
+  DELETE: () => (
     <span className="inline-flex items-center justify-center px-1.5 py-0.5 text-[9px] font-extrabold tracking-wider rounded bg-rose-500/10 text-rose-500 border border-rose-500/20 mr-1.5 select-none font-mono">
       DEL
     </span>
   ),
-  DEL: (props: SVGProps<SVGSVGElement>) => (
+  DEL: () => (
     <span className="inline-flex items-center justify-center px-1.5 py-0.5 text-[9px] font-extrabold tracking-wider rounded bg-rose-500/10 text-rose-500 border border-rose-500/20 mr-1.5 select-none font-mono">
       DEL
     </span>
@@ -228,7 +228,6 @@ export const Icons = {
       focusable="false"
       data-prefix="fab"
       data-icon="facebook"
-      role="img"
       xmlns="http://www.w3.org/2000/svg"
       fill="currentColor"
       viewBox="0 0 16 16"
@@ -243,7 +242,6 @@ export const Icons = {
       focusable="false"
       data-prefix="fab"
       data-icon="github"
-      role="img"
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 496 512"
       {...props}
@@ -260,7 +258,6 @@ export const Icons = {
       focusable="false"
       data-prefix="fab"
       data-icon="gmail"
-      role="img"
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 24 24"
       fill="currentColor"

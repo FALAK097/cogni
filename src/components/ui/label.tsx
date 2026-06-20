@@ -4,8 +4,11 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
+/* oxlint-disable jsx-a11y/label-has-associated-control -- Callers provide htmlFor or wrap controls. */
 function Label({ className, ...props }: React.ComponentProps<"label">) {
   return (
+    // Association is supplied by each caller through htmlFor or by wrapping the control.
+    // react-doctor-disable-next-line react-doctor/label-has-associated-control
     <label
       data-slot="label"
       className={cn(
@@ -16,5 +19,6 @@ function Label({ className, ...props }: React.ComponentProps<"label">) {
     />
   );
 }
+/* oxlint-enable jsx-a11y/label-has-associated-control */
 
 export { Label };

@@ -2,7 +2,7 @@
 
 import { CheckCircle2 } from "@/components/icons";
 import { IntegrationIcon } from "@/components/integrations/integration-icon";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button-variants";
 import type { IntegrationManifest } from "@/lib/integrations/types";
 import { cn } from "@/lib/utils";
 
@@ -22,21 +22,16 @@ export function IntegrationCard({ integration, isConnected, onClick }: Integrati
   };
 
   return (
-    <div
+    <button
+      type="button"
+      disabled={isComingSoon}
       className={cn(
-        "group relative flex h-full flex-col rounded-xl border border-border/70 bg-card p-4 sm:p-5 text-left transition-all duration-200",
+        "group relative flex h-full w-full flex-col rounded-xl border border-border/70 bg-card p-4 sm:p-5 text-left transition-all duration-200",
         isComingSoon
           ? "opacity-75"
           : "cursor-pointer hover:border-primary/40 hover:shadow-[0_4px_20px_-8px_rgba(0,0,0,0.08)] hover:-translate-y-0.5",
       )}
-      role={isComingSoon ? undefined : "button"}
-      tabIndex={isComingSoon ? undefined : 0}
       onClick={handleClick}
-      onKeyDown={(e) => {
-        if (!isComingSoon && (e.key === "Enter" || e.key === " ")) {
-          onClick();
-        }
-      }}
       aria-label={
         isComingSoon
           ? `${integration.name} coming soon`
@@ -88,23 +83,25 @@ export function IntegrationCard({ integration, isConnected, onClick }: Integrati
             Coming Soon
           </span>
         ) : isConnected ? (
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full text-foreground/80 border-border/70 hover:bg-muted hover:text-foreground hover:border-border font-medium"
+          <span
+            className={cn(
+              buttonVariants({ variant: "outline", size: "sm" }),
+              "w-full text-foreground/80 border-border/70 group-hover:bg-muted group-hover:text-foreground group-hover:border-border font-medium",
+            )}
           >
             Manage
-          </Button>
+          </span>
         ) : (
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full text-primary border-border/70 hover:bg-primary/5 hover:text-primary hover:border-primary/40 font-medium"
+          <span
+            className={cn(
+              buttonVariants({ variant: "outline", size: "sm" }),
+              "w-full text-primary border-border/70 group-hover:bg-primary/5 group-hover:text-primary group-hover:border-primary/40 font-medium",
+            )}
           >
             Connect
-          </Button>
+          </span>
         )}
       </div>
-    </div>
+    </button>
   );
 }

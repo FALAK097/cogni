@@ -1,7 +1,7 @@
 import { getVisitorConversationMessages } from "@/features/conversations/server/conversation-service";
 import {
   assertPublicWidgetAccess,
-  getVisitorSessionByDbId,
+  requireAuthorizedVisitorSession,
 } from "@/features/widget/server/widget-public";
 import {
   getRequestOrigin,
@@ -19,13 +19,22 @@ export async function GET(
   const db = getDb();
   const access = await assertPublicWidgetAccess(db, publicKey, request);
   if ("error" in access) return access.error;
+  const authorized = await requireAuthorizedVisitorSession(db, publicKey, request);
+  if ("error" in authorized) return authorized.error;
 
   const sessionId = new URL(request.url).searchParams.get("sessionId");
   if (!sessionId) {
     return Response.json({ error: "sessionId is required." }, { status: 400 });
   }
 
-  const session = await getVisitorSessionByDbId(db, sessionId, access.widget.id);
+  const session = await db.visitorSession.findFirst({
+    where: {
+      id: sessionId,
+      widgetId: access.widget.id,
+      visitorId: authorized.session.visitorId,
+      expiresAt: { gt: new Date() },
+    },
+  });
   if (!session) {
     return Response.json({ error: "Session not found." }, { status: 404 });
   }

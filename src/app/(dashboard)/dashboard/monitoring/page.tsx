@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { env } from "@/lib/env/server";
@@ -36,7 +35,6 @@ export default async function MonitoringPage() {
     { label: "R2 storage", ready: isR2Configured() },
     { label: "Vectorize", ready: isVectorizeConfigured() },
     { label: "Cloudflare Search", ready: isCloudflareSearchConfigured() },
-    { label: "Error tracking", ready: Boolean(env.SENTRY_DSN) },
     { label: "OpenAI embeddings", ready: Boolean(env.OPENAI_API_KEY) },
   ];
 
@@ -46,15 +44,7 @@ export default async function MonitoringPage() {
         <p className="text-sm text-muted-foreground">Operations</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">Monitoring</h1>
         <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          Workspace health, infrastructure readiness, and recent domain events. Owners can run the
-          full launch gate at{" "}
-          <Link
-            href="/dashboard/readiness"
-            className="text-primary underline-offset-2 hover:underline"
-          >
-            Production readiness
-          </Link>
-          .
+          Workspace health, infrastructure configuration, and recent domain events.
         </p>
       </section>
 

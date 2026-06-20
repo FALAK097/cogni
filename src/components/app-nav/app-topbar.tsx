@@ -2,11 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect } from "react";
 
-import { CallUsageIndicator } from "@/components/app-nav/call-usage-indicator";
 import { UserNav } from "@/components/app-nav/user-nav";
-import { FeedbackForm } from "@/components/feedback/feedback-form";
 import { ChevronRight, Home, MoreHorizontal, PanelLeft } from "@/components/icons";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -28,7 +26,6 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAgent, useCampaign, useKnowledgeBases } from "@/hooks/query";
 import { useSidebar } from "@/hooks/use-sidebar";
-import { useStore } from "@/hooks/use-store";
 import { getDashboardHref } from "@/lib/deployment-urls";
 import { cn } from "@/lib/utils";
 
@@ -47,7 +44,7 @@ const LABELS: Record<string, string> = {
   conversations: "Conversations",
 
   dashboard: "Dashboard",
-  echo: "Echo Widget",
+  echo: "Widget",
   integrations: "Integrations",
   leads: "Leads",
   settings: "Settings",
@@ -118,31 +115,21 @@ function useBreadcrumbLabels(segments: string[], editCampaignId = "") {
   const agentQuery = useAgent(agentId || "");
   const knowledgeBasesQuery = useKnowledgeBases();
 
-  return useMemo(() => {
-    const labels = new Map<string, string>();
-    const campaignName = getName(campaignQuery.data);
-    const agentName = getName(agentQuery.data);
-    const knowledgeBase = (
-      knowledgeBasesQuery.data as
-        | { knowledgeBases?: Array<{ id: string; name?: string }> }
-        | undefined
-    )?.knowledgeBases?.find((item: { id: string; name?: string }) => item.id === knowledgeBaseId);
+  const labels = new Map<string, string>();
+  const campaignName = getName(campaignQuery.data);
+  const agentName = getName(agentQuery.data);
+  const knowledgeBase = (
+    knowledgeBasesQuery.data as
+      | { knowledgeBases?: Array<{ id: string; name?: string }> }
+      | undefined
+  )?.knowledgeBases?.find((item: { id: string; name?: string }) => item.id === knowledgeBaseId);
 
-    if (campaignId && campaignName) labels.set(campaignId, campaignName);
-    if (isCampaignCreateRoute) labels.set("new", campaignName || "New Campaign");
-    if (agentId && agentName) labels.set(agentId, agentName);
-    if (knowledgeBaseId) labels.set(knowledgeBaseId, knowledgeBase?.name ?? "Knowledge Base");
+  if (campaignId && campaignName) labels.set(campaignId, campaignName);
+  if (isCampaignCreateRoute) labels.set("new", campaignName || "New Campaign");
+  if (agentId && agentName) labels.set(agentId, agentName);
+  if (knowledgeBaseId) labels.set(knowledgeBaseId, knowledgeBase?.name ?? "Knowledge Base");
 
-    return labels;
-  }, [
-    agentId,
-    agentQuery.data,
-    campaignId,
-    campaignQuery.data,
-    isCampaignCreateRoute,
-    knowledgeBaseId,
-    knowledgeBasesQuery.data,
-  ]);
+  return labels;
 }
 
 function getVisibleCrumbs(crumbs: Crumb[]) {
@@ -176,50 +163,26 @@ function getBreadcrumbHref(routeSegments: string[], index: number) {
 function Breadcrumbs() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const segments = useMemo(() => pathname.split("/").filter(Boolean), [pathname]);
+  const segments = pathname.split("/").filter(Boolean);
   const isCampaignCreateRoute = segments[0] === "campaigns" && segments[1] === "new";
   const editCampaignId = isCampaignCreateRoute ? (searchParams.get("edit") ?? "") : "";
   const labels = useBreadcrumbLabels(segments, editCampaignId);
-  const [campaignDraftLabel, setCampaignDraftLabel] = useState("");
 
-  useEffect(() => {
-    if (!isCampaignCreateRoute) {
-      setCampaignDraftLabel("");
-      return;
-    }
+  const routeSegments = segments.length > 0 ? segments : ["dashboard"];
+  const routeCrumbs = routeSegments.map((segment, index) => {
+    const isCurrent = index === routeSegments.length - 1;
+    const liveCampaignLabel =
+      isCampaignCreateRoute && isCurrent ? labels.get("new") || "New Campaign" : null;
 
-    const handleCampaignDraftName = (event: Event) => {
-      const detail = (event as CustomEvent<{ label?: string }>).detail;
-      setCampaignDraftLabel(detail?.label?.trim() ?? "");
+    return {
+      href: getBreadcrumbHref(routeSegments, index),
+      label:
+        liveCampaignLabel ?? labels.get(segment) ?? getFallbackLabel(segment, index, routeSegments),
+      current: isCurrent,
     };
+  });
 
-    window.addEventListener("outcaller:campaign-draft-name", handleCampaignDraftName);
-    return () => {
-      window.removeEventListener("outcaller:campaign-draft-name", handleCampaignDraftName);
-    };
-  }, [isCampaignCreateRoute]);
-
-  const crumbs = useMemo<Crumb[]>(() => {
-    const routeSegments = segments.length > 0 ? segments : ["dashboard"];
-    const routeCrumbs = routeSegments.map((segment, index) => {
-      const isCurrent = index === routeSegments.length - 1;
-      const liveCampaignLabel =
-        isCampaignCreateRoute && isCurrent
-          ? campaignDraftLabel || labels.get("new") || "New Campaign"
-          : null;
-
-      return {
-        href: getBreadcrumbHref(routeSegments, index),
-        label:
-          liveCampaignLabel ??
-          labels.get(segment) ??
-          getFallbackLabel(segment, index, routeSegments),
-        current: isCurrent,
-      };
-    });
-
-    return [{ href: getDashboardHref(), label: "Home" }, ...routeCrumbs];
-  }, [campaignDraftLabel, isCampaignCreateRoute, labels, segments]);
+  const crumbs: Crumb[] = [{ href: getDashboardHref(), label: "Home" }, ...routeCrumbs];
   const isCompact = crumbs.length > 2;
   const { visible, hidden } = getVisibleCrumbs(crumbs);
 
@@ -305,10 +268,8 @@ function Breadcrumbs() {
 }
 
 export function AppTopbar({ userData }: AppTopbarProps) {
-  const sidebar = useStore(useSidebar, (state) => state) as {
-    toggleOpen: (force?: boolean) => void;
-    settings: { disabled?: boolean };
-  } | null;
+  const toggleOpen = useSidebar((state) => state.toggleOpen);
+  const sidebarDisabled = useSidebar((state) => state.settings.disabled);
   const normalizedUserData = {
     avatar: userData?.avatar ?? "",
     name: userData?.name ?? "Unknown",
@@ -323,18 +284,18 @@ export function AppTopbar({ userData }: AppTopbarProps) {
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "b") {
         event.preventDefault();
-        sidebar?.toggleOpen();
+        toggleOpen();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [sidebar]);
+  }, [toggleOpen]);
 
   return (
     <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-4 border-b border-border bg-card px-4 sm:px-8 print:hidden">
       <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden sm:gap-4">
-        {!sidebar?.settings.disabled && (
+        {!sidebarDisabled && (
           <>
             <TooltipProvider>
               <Tooltip>
@@ -345,7 +306,7 @@ export function AppTopbar({ userData }: AppTopbarProps) {
                       variant="ghost"
                       size="icon"
                       className="size-9 shrink-0"
-                      onClick={() => sidebar?.toggleOpen()}
+                      onClick={() => toggleOpen()}
                       aria-label={`Toggle sidebar (${shortcutLabel})`}
                     >
                       <PanelLeft className="size-5" />
@@ -363,8 +324,6 @@ export function AppTopbar({ userData }: AppTopbarProps) {
         <Breadcrumbs />
       </div>
       <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-        <CallUsageIndicator />
-        <FeedbackForm triggerVariant="navbar" />
         <ModeToggle />
         <UserNav
           userData={normalizedUserData}

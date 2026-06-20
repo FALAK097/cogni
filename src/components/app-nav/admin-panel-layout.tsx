@@ -5,7 +5,6 @@ import type { ReactNode } from "react";
 import { AppTopbar } from "@/components/app-nav/app-topbar";
 import { Sidebar } from "@/components/app-nav/sidebar";
 import { useSidebar } from "@/hooks/use-sidebar";
-import { useStore } from "@/hooks/use-store";
 import { cn } from "@/lib/utils";
 
 type AdminPanelLayoutProps = {
@@ -18,11 +17,8 @@ type AdminPanelLayoutProps = {
 };
 
 export default function AdminPanelLayout({ children, userData }: AdminPanelLayoutProps) {
-  const sidebar = useStore(useSidebar, (x) => x) as
-    | { getOpenState: () => boolean; settings: { disabled: boolean } }
-    | undefined;
-  if (!sidebar) return null;
-  const { getOpenState, settings } = sidebar;
+  const getOpenState = useSidebar((state) => state.getOpenState);
+  const settings = useSidebar((state) => state.settings);
 
   return (
     <>

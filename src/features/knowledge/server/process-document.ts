@@ -3,7 +3,7 @@ import "server-only";
 import type { PrismaClient } from "@/generated/prisma/client";
 
 import { extractDocumentText, indexDocumentContent } from "@/features/knowledge/server/extract";
-import { captureException } from "@/lib/errors/capture";
+import { logError } from "@/lib/logging/logger";
 import { completeWorkflowRun, failWorkflowRun, startWorkflowRun } from "@/lib/workflows/runner";
 
 export async function processDocument({
@@ -66,7 +66,12 @@ export async function processDocument({
       runId: run.id,
       errorMessage: message,
     });
-    captureException(error, { workspaceId, documentId, workflowRunId: run.id });
+    logError("knowledge.document.processing_failed", {
+      workspaceId,
+      documentId,
+      workflowRunId: run.id,
+      error: message,
+    });
     throw error;
   }
 }

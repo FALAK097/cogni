@@ -68,17 +68,6 @@ function mapPath(path: string) {
   if (path.startsWith("/api/knowledge-base/sources/website")) {
     return "/api/dashboard/knowledge-base/sources/website";
   }
-  if (path.startsWith("/api/integrations/workspace/{workspace_id}")) {
-    return path.replace(
-      "/api/integrations/workspace/{workspace_id}",
-      "/api/dashboard/integrations",
-    );
-  }
-  if (path.startsWith("/api/integrations/workspace/{workspace_id}/{slug}/connect")) {
-    return path
-      .replace("/api/integrations/workspace/{workspace_id}", "/api/dashboard/integrations")
-      .replace("/{slug}/connect", "");
-  }
   if (path === "/api/conversations") return "/api/dashboard/conversations";
   if (path.startsWith("/api/conversations/{conversation_id}")) {
     return path.replace("/api/conversations/{conversation_id}", "/api/dashboard/conversations");

@@ -1,7 +1,7 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { Check, Copy, Loader2, Moon, Save, Sun, Trash2 } from "@/components/icons";
 
 import { EchoLiveWidgetPreview } from "@/components/echo/echo-live-widget-preview";
@@ -37,20 +37,20 @@ export function EchoCustomizer({
   const activeWorkspaceId = workspaceId || "";
   const { toast } = useToast();
   const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState(
-    initialSubtab && VALID_TABS.includes(initialSubtab) ? initialSubtab : "general",
-  );
-  const [isSaving, setIsSaving] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [domainInput, setDomainInput] = useState("");
-  const [inboundNumber] = useState("");
-  const [config, setConfig] = useState<any>({
+  const [ui, setUi] = useState({
+    activeTab: initialSubtab && VALID_TABS.includes(initialSubtab) ? initialSubtab : "general",
+    isSaving: false,
+    copied: false,
+    domainInput: "",
+  });
+  const { activeTab, isSaving, copied, domainInput } = ui;
+  const inboundNumber = "";
+  const [configOverrides, setConfigOverrides] = useState<Record<string, unknown>>({});
+  const defaultConfig = {
     workspaceId: activeWorkspaceId || "your-workspace-id",
     position: "bottom-right",
     theme: "light",
-    agentName: "Echo - OutCallerAI",
+    agentName: "Support",
     welcomeMessage: "Hi! How can I help you today?",
     logoUrl: "",
     primaryColor: "#14805e",
@@ -82,47 +82,32 @@ export function EchoCustomizer({
     brochureSuggestionText: "Receive Brochure",
     allowedDomains: [],
     enableVoiceCall: false,
-  });
+  };
 
   // Load data from hooks
   const { data: echoConfigData, isLoading } = useEchoConfig(activeWorkspaceId);
   const { data: campaignsData } = useCampaigns();
   const saveEchoConfigMutation = useSaveEchoConfig();
+  const config: any = {
+    ...defaultConfig,
+    ...(echoConfigData && typeof echoConfigData === "object" ? echoConfigData : {}),
+    ...configOverrides,
+    workspaceId: activeWorkspaceId || "your-workspace-id",
+  };
 
   const campaigns =
     (campaignsData as { campaigns?: Array<{ id: string; name: string }> } | undefined)?.campaigns ??
     [];
 
-  // Sync sub-tab from URL query params
-  useEffect(() => {
-    const subTab = searchParams.get("subtab");
-    if (subTab && VALID_TABS.includes(subTab)) {
-      setActiveTab(subTab);
-    }
-  }, [searchParams]);
-
   const handleSubTabChange = (value: string) => {
-    setActiveTab(value);
-    const params = new URLSearchParams(searchParams);
-    params.set("subtab", value);
-    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+    setUi((current) => ({ ...current, activeTab: value }));
+    const url = new URL(window.location.href);
+    url.searchParams.set("subtab", value);
+    router.push(`${url.pathname}?${url.searchParams.toString()}`, { scroll: false });
   };
 
-  // Load config from hook data - merge with defaults
-  useEffect(() => {
-    if (!activeWorkspaceId || isLoading) return;
-
-    if (echoConfigData) {
-      setConfig((prev: any) => ({
-        ...prev,
-        ...echoConfigData,
-        workspaceId: activeWorkspaceId,
-      }));
-    }
-  }, [activeWorkspaceId, echoConfigData, isLoading]);
-
   const updateConfig = (key: string, value: any) => {
-    setConfig((prev: any) => ({ ...prev, [key]: value }));
+    setConfigOverrides((current) => ({ ...current, [key]: value }));
   };
 
   const handleArrayChange = (key: string, value: string) => {
@@ -140,7 +125,7 @@ export function EchoCustomizer({
       return;
     }
 
-    setIsSaving(true);
+    setUi((current) => ({ ...current, isSaving: true }));
     saveEchoConfigMutation.mutate(
       {
         workspaceId: activeWorkspaceId,
@@ -158,7 +143,7 @@ export function EchoCustomizer({
             title: "Configuration saved",
             description: "Your widget configuration has been saved successfully.",
           });
-          setIsSaving(false);
+          setUi((current) => ({ ...current, isSaving: false }));
         },
         onError: (error) => {
           toast({
@@ -166,7 +151,7 @@ export function EchoCustomizer({
             description: error.message || "Failed to save configuration. Please try again.",
             variant: "destructive",
           });
-          setIsSaving(false);
+          setUi((current) => ({ ...current, isSaving: false }));
         },
       },
     );
@@ -204,7 +189,7 @@ export function EchoCustomizer({
     }
 
     updateConfig("allowedDomains", [...existingDomains, sanitized]);
-    setDomainInput("");
+    setUi((current) => ({ ...current, domainInput: "" }));
     toast({
       title: "Domain added",
       description: `${sanitized} has been added to allowed domains`,
@@ -227,12 +212,12 @@ export function EchoCustomizer({
 
   const copyScript = () => {
     navigator.clipboard.writeText(generateScript());
-    setCopied(true);
+    setUi((current) => ({ ...current, copied: true }));
     toast({
       title: "Copied to clipboard",
       description: "Embed code has been copied to your clipboard.",
     });
-    setTimeout(() => setCopied(false), 2000);
+    setTimeout(() => setUi((current) => ({ ...current, copied: false })), 2000);
   };
 
   return (
@@ -603,7 +588,7 @@ export function EchoCustomizer({
                       value={(config.suggestions || []).join("\n")}
                       onChange={(e) => handleArrayChange("suggestions", e.target.value)}
                       placeholder={
-                        "What is OutCallerAI?\nHow do I create an AI Caller?\nIs there a free plan?"
+                        "What services do you offer?\nHow can I get started?\nHow can I contact support?"
                       }
                       rows={4}
                     />
@@ -614,7 +599,7 @@ export function EchoCustomizer({
                       id="previewMessages"
                       value={(config.previewMessages || []).join("\n")}
                       onChange={(e) => handleArrayChange("previewMessages", e.target.value)}
-                      placeholder="Hi! I am OutCallerAI..."
+                      placeholder="Hi! How can I help?"
                       rows={4}
                     />
                   </div>
@@ -640,7 +625,7 @@ export function EchoCustomizer({
                   <div className="space-y-0.5">
                     <Label htmlFor="showBranding">Show Branding</Label>
                     <p className="text-xs text-muted-foreground">
-                      Display &quot;Powered by OutCallerAI&quot; link in the widget
+                      Display &quot;Powered by widget&quot; link in the widget
                     </p>
                   </div>
                   <Switch
@@ -673,7 +658,7 @@ export function EchoCustomizer({
                     <p className="text-sm text-muted-foreground">
                       Add each website domain where the widget is embedded (for example{" "}
                       <code className="px-1 py-0.5 bg-muted rounded text-xs">acme.com</code>
-                      ). Subdomains are included automatically. The OutCaller dashboard is always
+                      ). Subdomains are included automatically. The widget dashboard is always
                       allowed for preview.
                     </p>
                   </div>
@@ -687,7 +672,12 @@ export function EchoCustomizer({
                         id="domainInput"
                         placeholder="example.com"
                         value={domainInput}
-                        onChange={(e) => setDomainInput(e.target.value)}
+                        onChange={(event) =>
+                          setUi((current) => ({
+                            ...current,
+                            domainInput: event.target.value,
+                          }))
+                        }
                         onKeyDown={(e) => {
                           if (e.key === "Enter") {
                             e.preventDefault();

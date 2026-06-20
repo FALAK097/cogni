@@ -85,7 +85,7 @@ export function createWidget() {
 		<div class="oc-body"></div>
 		<div class="oc-footer">
 			<div class="oc-privacy">
-				By chatting, you agree to our <a href="${escapeHtml(config.privacyPolicyUrl || "https://outcallerai.com/privacy-policy")}" target="_blank" rel="noopener noreferrer">privacy policy</a>.
+				By chatting, you agree to our <a href="${escapeHtml(config.privacyPolicyUrl || "/privacy-policy")}" target="_blank" rel="noopener noreferrer">privacy policy</a>.
 			</div>
 			<div class="oc-input-container">
 				<input type="file" class="oc-file-input" accept="image/*,.pdf,.txt,.docx" hidden />
@@ -351,7 +351,7 @@ export function addUserMessage(text, timestamp = null, isRestored = false) {
   scrollToBottom();
 
   if (!isRestored) {
-    saveMessage("user", text);
+    state.conversationHistory.push({ role: "user", content: text });
   }
 }
 
@@ -530,7 +530,6 @@ async function callEchoChat(userMessage) {
       : null;
 
     const historyToSend = state.conversationHistory.slice(-20);
-    state.conversationHistory.push({ role: "user", content: userMessage });
 
     const response = await callEchoChatAPI(userMessage, historyToSend, leadInfo);
 
@@ -592,7 +591,7 @@ async function callEchoChat(userMessage) {
       addSuggestedQuestions();
     }
 
-    // Save the complete message and add feedback buttons
+    // Resolve the message persisted by the chat route and add feedback controls.
     if (fullResponse) {
       const messageId = await saveMessage("assistant", fullResponse);
       if (messageId) {

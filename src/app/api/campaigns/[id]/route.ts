@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import {
   deleteCampaign,
   getCampaignById,
+  InvalidCampaignDocumentsError,
   updateCampaign,
 } from "@/features/campaigns/server/campaign-service";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
@@ -42,7 +43,15 @@ export async function PUT(request: Request, context: RouteContext) {
     documentIds?: string[];
   };
 
-  const campaign = await updateCampaign(db, workspace.id, id, body);
+  let campaign;
+  try {
+    campaign = await updateCampaign(db, workspace.id, id, body);
+  } catch (error) {
+    if (error instanceof InvalidCampaignDocumentsError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    throw error;
+  }
   if (!campaign) {
     return NextResponse.json({ error: "Campaign not found." }, { status: 404 });
   }

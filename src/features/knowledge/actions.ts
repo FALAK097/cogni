@@ -6,7 +6,7 @@ import { z } from "zod";
 import { processDocument } from "@/features/knowledge/server/process-document";
 import { emitDomainEvent } from "@/lib/events/domain-events";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
-import { saveObject } from "@/lib/storage/index";
+import { deleteObject, isAllowedKnowledgeUpload, saveObject } from "@/lib/storage/index";
 
 export type KnowledgeActionState = {
   error?: string;
@@ -74,6 +74,9 @@ export async function uploadDocumentAction(formData: FormData) {
   const { db, workspace } = await requireDashboardContext();
   const bytes = Buffer.from(await file.arrayBuffer());
   const mimeType = file.type || "application/octet-stream";
+  if (!isAllowedKnowledgeUpload(mimeType, bytes.length)) {
+    return;
+  }
   const sourceType =
     mimeType === "application/pdf"
       ? "PDF"
@@ -124,6 +127,15 @@ export async function deleteDocumentAction(formData: FormData) {
   if (typeof documentId !== "string") return;
 
   const { db, workspace } = await requireDashboardContext();
+  const document = await db.document.findFirst({
+    where: { id: documentId, workspaceId: workspace.id },
+    select: { storageKey: true },
+  });
+  if (!document) return;
+
+  if (document.storageKey) {
+    await deleteObject(document.storageKey);
+  }
   await db.document.deleteMany({
     where: { id: documentId, workspaceId: workspace.id },
   });

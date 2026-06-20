@@ -1,10 +1,15 @@
 import "server-only";
 
-import { getR2Object, isR2Configured, putR2Object } from "@/lib/cloudflare/r2";
+import { deleteR2Object, getR2Object, isR2Configured, putR2Object } from "@/lib/cloudflare/r2";
+import { env } from "@/lib/env/server";
 import {
+  createStorageKey,
+  deleteUpload,
   isAllowedUpload,
+  isAllowedKnowledgeUpload,
   readUpload as readLocalUpload,
   saveUpload as saveLocalUpload,
+  uploadPublicPath,
 } from "@/lib/storage/local";
 
 export async function saveObject({
@@ -22,29 +27,50 @@ export async function saveObject({
     throw new Error("Upload type or size is not allowed.");
   }
 
-  const local = await saveLocalUpload({ workspaceId, filename, mimeType, bytes });
+  if (env.ENV === "production") {
+    if (!isR2Configured()) {
+      throw new Error("R2 must be configured in production.");
+    }
 
-  if (isR2Configured()) {
+    const storageKey = createStorageKey(workspaceId, filename);
     await putR2Object({
-      key: local.storageKey,
+      key: storageKey,
       body: bytes,
       contentType: mimeType,
     });
+
+    return {
+      storageKey,
+      filename,
+      mimeType,
+      size: bytes.length,
+    };
   }
 
-  return local;
+  return saveLocalUpload({ workspaceId, filename, mimeType, bytes });
 }
 
 export async function readObject(storageKey: string) {
-  if (isR2Configured()) {
-    try {
-      return await getR2Object(storageKey);
-    } catch {
-      return readLocalUpload(storageKey);
+  if (env.ENV === "production") {
+    if (!isR2Configured()) {
+      throw new Error("R2 must be configured in production.");
     }
+    return getR2Object(storageKey);
   }
 
   return readLocalUpload(storageKey);
 }
 
-export { isAllowedUpload, uploadPublicPath } from "@/lib/storage/local";
+export async function deleteObject(storageKey: string) {
+  if (env.ENV === "production") {
+    if (!isR2Configured()) {
+      throw new Error("R2 must be configured in production.");
+    }
+    await deleteR2Object(storageKey);
+    return;
+  }
+
+  await deleteUpload(storageKey);
+}
+
+export { isAllowedUpload, isAllowedKnowledgeUpload, uploadPublicPath };

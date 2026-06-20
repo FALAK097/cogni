@@ -58,7 +58,7 @@ export function getStaticMenuList(
         },
         {
           href: "/echo",
-          label: "Echo Widget",
+          label: "Widget",
           icon: MessageCircle,
           submenus: [],
         },

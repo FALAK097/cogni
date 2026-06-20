@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import React from "react";
 
 interface CountryFlagProps {
@@ -21,11 +22,13 @@ export const CountryFlag = ({ countryCode, className = "", size = "md" }: Countr
     <div
       className={`inline-block overflow-hidden rounded-sm border border-border/50 align-middle ${sizeClasses[size]} ${className}`}
     >
-      <img
+      <Image
         src={`https://flagcdn.com/w80/${countryCode.toLowerCase()}.png`}
         alt={`${countryCode} flag`}
+        width={80}
+        height={60}
+        unoptimized
         className="w-full h-full object-cover"
-        loading="lazy"
       />
     </div>
   );

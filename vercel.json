@@ -1,4 +1,0 @@
-{
-  "buildCommand": "pnpm db:deploy && pnpm build",
-  "installCommand": "pnpm install"
-}

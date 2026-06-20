@@ -20,6 +20,14 @@ export async function recordVisitorMessage({
   visitorSession: VisitorSessionContext;
   text: string;
 }) {
+  await db.visitorSession.update({
+    where: { id: visitorSession.id },
+    data: {
+      lastSeenAt: new Date(),
+      messageCount: { increment: 1 },
+    },
+  });
+
   let conversation = await db.conversation.findFirst({
     where: {
       visitorSessionId: visitorSession.id,

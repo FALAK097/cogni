@@ -58,6 +58,26 @@ export function bearerToken(request: Request) {
   return authorization?.startsWith("Bearer ") ? authorization.slice(7) : null;
 }
 
+export async function requireAuthorizedVisitorSession(
+  db: PrismaClient,
+  publicKey: string,
+  request: Request,
+) {
+  const token = bearerToken(request);
+  if (!token) {
+    return { error: Response.json({ error: "Widget session is required." }, { status: 401 }) };
+  }
+
+  const session = await getAuthorizedVisitorSession(db, publicKey, token);
+  if (!session) {
+    return {
+      error: Response.json({ error: "Widget session is invalid or expired." }, { status: 401 }),
+    };
+  }
+
+  return { session };
+}
+
 export async function getAuthorizedVisitorSession(
   db: PrismaClient,
   publicKey: string,

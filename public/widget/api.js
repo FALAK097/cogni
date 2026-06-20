@@ -14,7 +14,11 @@ function widgetKeyPath(suffix) {
 }
 
 async function requestJson(path, options = {}) {
-  const response = await fetch(buildPublicApiUrl(path), options);
+  const headers = new Headers(options.headers);
+  if (state.sessionToken) {
+    headers.set("Authorization", `Bearer ${state.sessionToken}`);
+  }
+  const response = await fetch(buildPublicApiUrl(path), { ...options, headers });
   if (!response.ok) {
     throw new Error(`Request failed: ${response.status}`);
   }
@@ -23,7 +27,11 @@ async function requestJson(path, options = {}) {
 }
 
 async function requestOk(path, options = {}) {
-  const response = await fetch(buildPublicApiUrl(path), options);
+  const headers = new Headers(options.headers);
+  if (state.sessionToken) {
+    headers.set("Authorization", `Bearer ${state.sessionToken}`);
+  }
+  const response = await fetch(buildPublicApiUrl(path), { ...options, headers });
   return response.ok;
 }
 

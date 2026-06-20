@@ -1,6 +1,7 @@
 import {
   listWorkspaceCampaigns,
   createCampaign,
+  InvalidCampaignDocumentsError,
 } from "@/features/campaigns/server/campaign-service";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 
@@ -33,12 +34,19 @@ export async function POST(request: Request) {
     return Response.json({ error: "Campaign name is required." }, { status: 400 });
   }
 
-  const campaign = await createCampaign(db, workspace.id, {
-    name: body.name.trim(),
-    description: body.description ?? null,
-    instructions: body.instructions ?? null,
-    documentIds: body.documentIds,
-  });
+  try {
+    const campaign = await createCampaign(db, workspace.id, {
+      name: body.name.trim(),
+      description: body.description ?? null,
+      instructions: body.instructions ?? null,
+      documentIds: body.documentIds,
+    });
 
-  return Response.json({ campaign }, { status: 201 });
+    return Response.json({ campaign }, { status: 201 });
+  } catch (error) {
+    if (error instanceof InvalidCampaignDocumentsError) {
+      return Response.json({ error: error.message }, { status: 400 });
+    }
+    throw error;
+  }
 }

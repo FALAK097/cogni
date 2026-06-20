@@ -11,7 +11,7 @@ export function ThemeLogo({ className }: ThemeLogoProps) {
     <>
       <Image
         src="/assets/images/Outcaller_logo.png"
-        alt="OutCallerAI Logo"
+        alt="widget logo"
         width={32}
         height={32}
         className={className}

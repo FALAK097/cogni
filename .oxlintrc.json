@@ -4,16 +4,5 @@
   "categories": {
     "correctness": "error"
   },
-  "ignorePatterns": [
-    ".next/**",
-    "src/generated/**",
-    "public/widget.bundle.js",
-    "public/widget.bundle.js.map",
-    "src/components/icons.tsx",
-    "src/components/ui/country-flag.tsx",
-    "src/components/integrations/integration-card.tsx",
-    "src/components/ui/label.tsx",
-    "src/components/campaign/campaign-list.tsx",
-    "src/components/app-nav/sidebar.tsx"
-  ]
+  "ignorePatterns": [".next/**", "src/generated/**"]
 }

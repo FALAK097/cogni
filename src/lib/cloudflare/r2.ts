@@ -1,5 +1,12 @@
 import "server-only";
 
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
+
 import { env } from "@/lib/env/server";
 
 export function isR2Configured() {
@@ -19,6 +26,25 @@ export function getR2Endpoint() {
   return `https://${env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`;
 }
 
+let client: S3Client | undefined;
+
+function getR2Client() {
+  if (!isR2Configured() || !env.R2_ACCESS_KEY_ID || !env.R2_SECRET_ACCESS_KEY) {
+    throw new Error("R2 is not configured.");
+  }
+
+  client ??= new S3Client({
+    region: "auto",
+    endpoint: getR2Endpoint(),
+    credentials: {
+      accessKeyId: env.R2_ACCESS_KEY_ID,
+      secretAccessKey: env.R2_SECRET_ACCESS_KEY,
+    },
+  });
+
+  return client;
+}
+
 export async function putR2Object({
   key,
   body,
@@ -28,26 +54,11 @@ export async function putR2Object({
   body: Buffer;
   contentType: string;
 }) {
-  if (
-    !isR2Configured() ||
-    !env.R2_BUCKET_NAME ||
-    !env.R2_ACCESS_KEY_ID ||
-    !env.R2_SECRET_ACCESS_KEY
-  ) {
+  if (!env.R2_BUCKET_NAME) {
     throw new Error("R2 is not configured.");
   }
 
-  const { S3Client, PutObjectCommand } = await import("@aws-sdk/client-s3");
-  const client = new S3Client({
-    region: "auto",
-    endpoint: getR2Endpoint(),
-    credentials: {
-      accessKeyId: env.R2_ACCESS_KEY_ID,
-      secretAccessKey: env.R2_SECRET_ACCESS_KEY,
-    },
-  });
-
-  await client.send(
+  await getR2Client().send(
     new PutObjectCommand({
       Bucket: env.R2_BUCKET_NAME,
       Key: key,
@@ -58,26 +69,11 @@ export async function putR2Object({
 }
 
 export async function getR2Object(key: string) {
-  if (
-    !isR2Configured() ||
-    !env.R2_BUCKET_NAME ||
-    !env.R2_ACCESS_KEY_ID ||
-    !env.R2_SECRET_ACCESS_KEY
-  ) {
+  if (!env.R2_BUCKET_NAME) {
     throw new Error("R2 is not configured.");
   }
 
-  const { S3Client, GetObjectCommand } = await import("@aws-sdk/client-s3");
-  const client = new S3Client({
-    region: "auto",
-    endpoint: getR2Endpoint(),
-    credentials: {
-      accessKeyId: env.R2_ACCESS_KEY_ID,
-      secretAccessKey: env.R2_SECRET_ACCESS_KEY,
-    },
-  });
-
-  const response = await client.send(
+  const response = await getR2Client().send(
     new GetObjectCommand({
       Bucket: env.R2_BUCKET_NAME,
       Key: key,
@@ -89,4 +85,17 @@ export async function getR2Object(key: string) {
   }
 
   return Buffer.from(await response.Body.transformToByteArray());
+}
+
+export async function deleteR2Object(key: string) {
+  if (!env.R2_BUCKET_NAME) {
+    throw new Error("R2 is not configured.");
+  }
+
+  await getR2Client().send(
+    new DeleteObjectCommand({
+      Bucket: env.R2_BUCKET_NAME,
+      Key: key,
+    }),
+  );
 }

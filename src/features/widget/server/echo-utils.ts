@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getVisitorConversationMessages } from "@/features/conversations/server/conversation-service";
-import { uploadPublicPath } from "@/lib/storage/local";
+import { uploadPublicPath } from "@/lib/storage/index";
 
 export type EchoHistoryMessage = {
   id: string;
@@ -31,7 +31,35 @@ export function toEchoHistoryMessages(
   });
 }
 
-export function echoHistoryToUiMessages(history: { role: string; content: string }[]) {
+export function echoHistoryToUiMessages(value: unknown) {
+  if (!Array.isArray(value) || value.length === 0 || value.length > 50) {
+    return null;
+  }
+
+  let totalCharacters = 0;
+  const history: { role: "user" | "assistant"; content: string }[] = [];
+
+  for (const candidate of value) {
+    if (
+      typeof candidate !== "object" ||
+      candidate === null ||
+      !("role" in candidate) ||
+      (candidate.role !== "user" && candidate.role !== "assistant") ||
+      !("content" in candidate) ||
+      typeof candidate.content !== "string"
+    ) {
+      return null;
+    }
+
+    const content = candidate.content.trim();
+    totalCharacters += content.length;
+    if (!content || content.length > 4_000 || totalCharacters > 50_000) {
+      return null;
+    }
+
+    history.push({ role: candidate.role, content });
+  }
+
   return history.map((message, index) => ({
     id: `echo-${index}`,
     role: message.role === "user" ? ("user" as const) : ("assistant" as const),

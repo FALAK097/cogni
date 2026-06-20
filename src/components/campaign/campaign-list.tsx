@@ -62,11 +62,20 @@ const truncateText = (value: string | null | undefined, limit: number) => {
 
 export function CampaignList() {
   const router = useRouter();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
-  const [deletingCampaign, setDeletingCampaign] = useState<CampaignItem | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [isCloning, setIsCloning] = useState(false);
+  const [ui, setUi] = useState<{
+    searchQuery: string;
+    selectedCampaignId: string | null;
+    deletingCampaign: CampaignItem | null;
+    isDeleting: boolean;
+    isCloning: boolean;
+  }>({
+    searchQuery: "",
+    selectedCampaignId: null,
+    deletingCampaign: null,
+    isDeleting: false,
+    isCloning: false,
+  });
+  const { searchQuery, selectedCampaignId, deletingCampaign, isDeleting, isCloning } = ui;
   const campaignsQuery = useCampaigns();
   const deleteCampaignMutation = useDeleteCampaign();
   const cloneCampaignMutation = useCloneCampaign();
@@ -77,29 +86,26 @@ export function CampaignList() {
   const handleDelete = async () => {
     if (!deletingCampaign) return;
     try {
-      setIsDeleting(true);
+      setUi((current) => ({ ...current, isDeleting: true }));
       await deleteCampaignMutation.mutateAsync(deletingCampaign.id);
       toast({ title: "Success", description: "Campaign deleted" });
     } catch {
       toast({ title: "Error", description: "Failed to delete campaign", variant: "destructive" });
-    } finally {
-      setIsDeleting(false);
-      setDeletingCampaign(null);
     }
+    setUi((current) => ({ ...current, isDeleting: false, deletingCampaign: null }));
   };
 
   const handleClone = async () => {
     if (!selectedCampaignId) return;
     try {
-      setIsCloning(true);
+      setUi((current) => ({ ...current, isCloning: true }));
       await cloneCampaignMutation.mutateAsync(selectedCampaignId);
       toast({ title: "Success", description: "Campaign cloned" });
-      setSelectedCampaignId(null);
+      setUi((current) => ({ ...current, selectedCampaignId: null }));
     } catch {
       toast({ title: "Error", description: "Failed to clone campaign", variant: "destructive" });
-    } finally {
-      setIsCloning(false);
     }
+    setUi((current) => ({ ...current, isCloning: false }));
   };
 
   const filteredCampaigns = campaigns.filter((uc) =>
@@ -117,6 +123,7 @@ export function CampaignList() {
               <tr className="border-b">
                 {[1, 2, 3, 4, 5, 6].map((i) => (
                   <th key={i} className="p-4 text-left">
+                    <span className="sr-only">Loading column {i}</span>
                     <div className="h-4 w-[100px] animate-pulse bg-muted/60 rounded-md" />
                   </th>
                 ))}
@@ -126,7 +133,7 @@ export function CampaignList() {
               {[1, 2, 3, 4].map((i) => (
                 <tr key={i} className="border-b">
                   {[1, 2, 3, 4, 5, 6].map((j) => (
-                    <td key={j} className="p-4">
+                    <td key={j} className="p-4" aria-label={`Loading row ${i}, column ${j}`}>
                       <div className="h-4 w-[100px] animate-pulse bg-muted/60 rounded-md" />
                     </td>
                   ))}
@@ -164,7 +171,9 @@ export function CampaignList() {
           <Input
             placeholder="Search campaigns..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(event) =>
+              setUi((current) => ({ ...current, searchQuery: event.target.value }))
+            }
             className="pl-9"
           />
         </div>
@@ -209,7 +218,12 @@ export function CampaignList() {
                 <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
                   <Checkbox
                     checked={selectedCampaignId === uc.id}
-                    onCheckedChange={(checked) => setSelectedCampaignId(checked ? uc.id : null)}
+                    onCheckedChange={(checked) =>
+                      setUi((current) => ({
+                        ...current,
+                        selectedCampaignId: checked ? uc.id : null,
+                      }))
+                    }
                     aria-label={`Select ${uc.name}`}
                   />
                 </TableCell>
@@ -245,10 +259,7 @@ export function CampaignList() {
                 </TableCell>
                 <TableCell className="text-center">{uc._count?.leads ?? 0}</TableCell>
                 <TableCell className="text-right">
-                  <div
-                    className="flex items-center justify-end gap-1.5"
-                    onClick={(e) => e.stopPropagation()}
-                  >
+                  <div className="flex items-center justify-end gap-1.5">
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger
@@ -257,7 +268,10 @@ export function CampaignList() {
                               variant="ghost"
                               size="icon"
                               className="text-muted-foreground hover:text-foreground"
-                              onClick={() => router.push(`/campaigns/new?edit=${uc.id}`)}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                router.push(`/campaigns/new?edit=${uc.id}`);
+                              }}
                             >
                               <Icons.pencil className="h-4 w-4" />
                               <span className="sr-only">Edit campaign</span>
@@ -273,7 +287,10 @@ export function CampaignList() {
                               variant="ghost"
                               size="icon"
                               className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                              onClick={() => setDeletingCampaign(uc)}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setUi((current) => ({ ...current, deletingCampaign: uc }));
+                              }}
                             >
                               <Icons.trash className="h-4 w-4" />
                               <span className="sr-only">Delete campaign</span>
@@ -291,7 +308,12 @@ export function CampaignList() {
         </Table>
       </div>
 
-      <AlertDialog open={!!deletingCampaign} onOpenChange={(v) => !v && setDeletingCampaign(null)}>
+      <AlertDialog
+        open={!!deletingCampaign}
+        onOpenChange={(open) =>
+          !open && setUi((current) => ({ ...current, deletingCampaign: null }))
+        }
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Campaign</AlertDialogTitle>

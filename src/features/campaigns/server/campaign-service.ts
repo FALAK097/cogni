@@ -2,6 +2,35 @@ import "server-only";
 
 import type { PrismaClient } from "@/generated/prisma/client";
 
+export class InvalidCampaignDocumentsError extends Error {
+  constructor() {
+    super("One or more selected documents are unavailable.");
+    this.name = "InvalidCampaignDocumentsError";
+  }
+}
+
+async function validateWorkspaceDocumentIds(
+  db: Pick<PrismaClient, "document">,
+  workspaceId: string,
+  documentIds: string[],
+) {
+  const uniqueIds = [...new Set(documentIds)];
+  if (uniqueIds.length === 0) return uniqueIds;
+
+  const count = await db.document.count({
+    where: {
+      id: { in: uniqueIds },
+      workspaceId,
+    },
+  });
+
+  if (count !== uniqueIds.length) {
+    throw new InvalidCampaignDocumentsError();
+  }
+
+  return uniqueIds;
+}
+
 export async function listWorkspaceCampaigns(db: PrismaClient, workspaceId: string) {
   return db.campaign.findMany({
     where: { workspaceId, isActive: true },
@@ -84,6 +113,11 @@ export async function createCampaign(
   },
 ) {
   return db.$transaction(async (tx) => {
+    const documentIds = await validateWorkspaceDocumentIds(
+      tx,
+      workspaceId,
+      input.documentIds ?? [],
+    );
     const campaign = await tx.campaign.create({
       data: {
         workspaceId,
@@ -93,9 +127,9 @@ export async function createCampaign(
       },
     });
 
-    if (input.documentIds?.length) {
+    if (documentIds.length > 0) {
       await tx.campaignDocument.createMany({
-        data: input.documentIds.map((documentId) => ({
+        data: documentIds.map((documentId) => ({
           campaignId: campaign.id,
           documentId,
         })),
@@ -124,6 +158,11 @@ export async function updateCampaign(
     });
     if (!existing) return null;
 
+    const documentIds =
+      input.documentIds === undefined
+        ? undefined
+        : await validateWorkspaceDocumentIds(tx, workspaceId, input.documentIds);
+
     const campaign = await tx.campaign.update({
       where: { id: campaignId },
       data: {
@@ -134,11 +173,11 @@ export async function updateCampaign(
       },
     });
 
-    if (input.documentIds) {
+    if (documentIds) {
       await tx.campaignDocument.deleteMany({ where: { campaignId } });
-      if (input.documentIds.length > 0) {
+      if (documentIds.length > 0) {
         await tx.campaignDocument.createMany({
-          data: input.documentIds.map((documentId) => ({
+          data: documentIds.map((documentId) => ({
             campaignId,
             documentId,
           })),

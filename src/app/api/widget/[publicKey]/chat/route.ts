@@ -24,7 +24,6 @@ import {
 import { streamWidgetAgent } from "@/features/widget/server/widget-agent";
 import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
 import { buildAgentMemoryContext } from "@/lib/ai/memory";
-import { captureException } from "@/lib/errors/capture";
 import { emitDomainEvent } from "@/lib/events/domain-events";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { notifyWorkspaceMembers } from "@/lib/notifications/create-notification";
@@ -48,7 +47,6 @@ export async function POST(
     sessionId?: string;
     message?: string;
     history?: { role: string; content: string }[];
-    messages?: unknown;
     leadInfo?: { name?: string; email?: string; phone?: string } | null;
   };
 
@@ -86,11 +84,12 @@ export async function POST(
     return Response.json({ error: "Enter a message up to 4,000 characters." }, { status: 400 });
   }
 
-  const historyMessages = body.history
-    ? echoHistoryToUiMessages(body.history)
-    : Array.isArray(body.messages)
-      ? (body.messages as import("ai").UIMessage[])
-      : echoHistoryToUiMessages([{ role: "user", content: latestText }]);
+  const historyMessages = echoHistoryToUiMessages(
+    body.history ?? [{ role: "user", content: latestText }],
+  );
+  if (!historyMessages) {
+    return Response.json({ error: "A valid message history is required." }, { status: 400 });
+  }
 
   const conversation = await recordVisitorMessage({
     db,
@@ -226,10 +225,11 @@ export async function POST(
       corsAllowed,
     );
   } catch (error) {
-    captureException(error, {
+    logError("widget.chat.failed", {
       workspaceId: widget.workspace.id,
       widgetId: widget.id,
       conversationId: conversation.id,
+      error: error instanceof Error ? error.message : "Unknown error",
     });
     return Response.json({ error: "The assistant is unavailable right now." }, { status: 503 });
   }

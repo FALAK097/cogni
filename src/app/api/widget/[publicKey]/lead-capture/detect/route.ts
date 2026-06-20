@@ -2,7 +2,7 @@ import { parseJsonArray } from "@/features/widget/domain";
 import { detectLeadCaptureTrigger } from "@/features/leads/server/lead-service";
 import {
   assertPublicWidgetAccess,
-  getVisitorSessionByDbId,
+  requireAuthorizedVisitorSession,
 } from "@/features/widget/server/widget-public";
 import { getRequestOrigin, withWidgetCors } from "@/features/widget/server/echo-utils";
 import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
@@ -16,6 +16,8 @@ export async function POST(
   const db = getDb();
   const access = await assertPublicWidgetAccess(db, publicKey, request);
   if ("error" in access) return access.error;
+  const authorized = await requireAuthorizedVisitorSession(db, publicKey, request);
+  if ("error" in authorized) return authorized.error;
 
   const body = (await request.json()) as {
     sessionId?: string;
@@ -28,21 +30,20 @@ export async function POST(
     return Response.json({ error: "sessionId is required." }, { status: 400 });
   }
 
-  const session = await getVisitorSessionByDbId(db, body.sessionId, access.widget.id);
-  if (!session) {
+  if (body.sessionId !== authorized.session.id) {
     return Response.json({ error: "Session not found." }, { status: 404 });
   }
 
   const result = await detectLeadCaptureTrigger({
     db,
-    visitorSessionId: session.id,
+    visitorSessionId: authorized.session.id,
     enableLeadCapture: access.widget.enableLeadCapture,
     leadCaptureKeywords: parseJsonArray(access.widget.leadCaptureKeywords),
     leadCaptureMinutesThreshold: access.widget.leadCaptureMinutesThreshold,
     leadCaptureMessageThreshold: access.widget.leadCaptureMessageThreshold,
     currentMessage: body.currentMessage,
-    messageCount: body.messageCount ?? session.messageCount,
-    sessionStartedAt: session.createdAt,
+    messageCount: body.messageCount ?? authorized.session.messageCount,
+    sessionStartedAt: authorized.session.createdAt,
   });
 
   const origin = getRequestOrigin(request);

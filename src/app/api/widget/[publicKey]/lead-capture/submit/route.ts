@@ -1,7 +1,7 @@
 import { submitEchoLeadCapture } from "@/features/leads/server/lead-service";
 import {
   assertPublicWidgetAccess,
-  getVisitorSessionByDbId,
+  requireAuthorizedVisitorSession,
 } from "@/features/widget/server/widget-public";
 import { getRequestOrigin, withWidgetCors } from "@/features/widget/server/echo-utils";
 import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
@@ -15,6 +15,8 @@ export async function POST(
   const db = getDb();
   const access = await assertPublicWidgetAccess(db, publicKey, request);
   if ("error" in access) return access.error;
+  const authorized = await requireAuthorizedVisitorSession(db, publicKey, request);
+  if ("error" in authorized) return authorized.error;
 
   const body = (await request.json()) as {
     sessionId?: string;
@@ -31,14 +33,13 @@ export async function POST(
     return Response.json({ error: "Invalid lead capture payload." }, { status: 400 });
   }
 
-  const session = await getVisitorSessionByDbId(db, body.sessionId, access.widget.id);
-  if (!session) {
+  if (body.sessionId !== authorized.session.id) {
     return Response.json({ error: "Session not found." }, { status: 404 });
   }
 
   await submitEchoLeadCapture({
     db,
-    visitorSessionId: session.id,
+    visitorSessionId: authorized.session.id,
     workspaceId: access.widget.workspaceId,
     campaignId: access.widget.selectedCampaignId,
     name: body.name.trim(),
@@ -47,7 +48,7 @@ export async function POST(
     conversationSummary: body.conversationSummary ?? null,
     triggerType: body.triggerType ?? "manual",
     triggerValue: body.triggerValue ?? null,
-    messageCount: body.messageCount ?? session.messageCount,
+    messageCount: body.messageCount ?? authorized.session.messageCount,
   });
 
   const origin = getRequestOrigin(request);

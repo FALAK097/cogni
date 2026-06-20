@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Add01Icon, ArrowRight01Icon, InboxIcon } from "@hugeicons/core-free-icons";
+import { ArrowRight01Icon, InboxIcon, WebDesign01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -28,13 +28,13 @@ export function ConversationList({ conversations }: { conversations: Conversatio
         <span className="flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
           <HugeiconsIcon icon={InboxIcon} className="size-5" />
         </span>
-        <h2 className="mt-5 text-lg font-semibold">No conversations here</h2>
+        <h2 className="mt-5 text-lg font-semibold">No conversations yet</h2>
         <p className="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
-          Start a conversation manually or wait for visitors to message you from the website widget.
+          Conversations appear here when visitors message you through the website widget.
         </p>
-        <Link href="/dashboard/inbox/new" className={cn(buttonVariants({ size: "sm" }), "mt-6")}>
-          <HugeiconsIcon icon={Add01Icon} />
-          New conversation
+        <Link href="/dashboard/widget" className={cn(buttonVariants({ size: "sm" }), "mt-6")}>
+          <HugeiconsIcon icon={WebDesign01Icon} />
+          Configure widget
         </Link>
       </div>
     );

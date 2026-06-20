@@ -20,7 +20,6 @@ declare global {
       init: (config: EchoWidgetPreviewConfig) => Promise<void>;
       destroy: () => void;
     };
-    OutCallerWidget?: Window["Widget"];
   }
 }
 
@@ -95,7 +94,7 @@ export function EchoLiveWidgetPreview({
           configSnapshotRef.current = snapshot;
           mountedRef.current = true;
         } catch (error) {
-          console.error("Echo preview widget failed to load", error);
+          console.error("Widget preview failed to load", error);
         }
       })();
     }, REMOUNT_DEBOUNCE_MS);
@@ -109,8 +108,6 @@ export function EchoLiveWidgetPreview({
   useEffect(() => {
     return () => {
       window.Widget?.destroy?.();
-      mountedRef.current = false;
-      configSnapshotRef.current = "";
     };
   }, []);
 

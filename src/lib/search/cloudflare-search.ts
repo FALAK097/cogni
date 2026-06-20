@@ -3,9 +3,7 @@ import "server-only";
 import { env } from "@/lib/env/server";
 
 export function isCloudflareSearchConfigured() {
-  return Boolean(
-    env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_API_TOKEN && env.CLOUDFLARE_SEARCH_INDEX,
-  );
+  return Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_API_TOKEN && env.SEARCH_INDEX);
 }
 
 export async function searchCloudflareIndex({
@@ -19,13 +17,13 @@ export async function searchCloudflareIndex({
     !isCloudflareSearchConfigured() ||
     !env.CLOUDFLARE_ACCOUNT_ID ||
     !env.CLOUDFLARE_API_TOKEN ||
-    !env.CLOUDFLARE_SEARCH_INDEX
+    !env.SEARCH_INDEX
   ) {
     return [];
   }
 
   const response = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/ai/search/indexes/${env.CLOUDFLARE_SEARCH_INDEX}/query`,
+    `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/ai/search/indexes/${env.SEARCH_INDEX}/query`,
     {
       method: "POST",
       headers: {

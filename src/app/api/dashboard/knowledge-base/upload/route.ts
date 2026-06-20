@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { processDocument } from "@/features/knowledge/server/process-document";
 import { emitDomainEvent } from "@/lib/events/domain-events";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
-import { saveObject } from "@/lib/storage/index";
+import { isAllowedKnowledgeUpload, saveObject } from "@/lib/storage/index";
 
 export async function POST(request: Request) {
   const { db, workspace } = await requireDashboardContext();
@@ -17,6 +17,12 @@ export async function POST(request: Request) {
 
   const bytes = Buffer.from(await file.arrayBuffer());
   const mimeType = file.type || "application/octet-stream";
+  if (!isAllowedKnowledgeUpload(mimeType, bytes.length)) {
+    return NextResponse.json(
+      { error: "Upload a PDF, DOCX, or text file up to 10 MB." },
+      { status: 400 },
+    );
+  }
   const sourceType =
     mimeType === "application/pdf"
       ? "PDF"

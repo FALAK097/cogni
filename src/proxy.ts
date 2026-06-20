@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 
 import { requestIdHeaderName } from "@/lib/tracing/constants";
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const headerName = requestIdHeaderName();
   const requestId = request.headers.get(headerName) ?? crypto.randomUUID();
   const requestHeaders = new Headers(request.headers);

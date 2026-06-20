@@ -1,43 +1,38 @@
 "use client";
 import Link from "next/link";
-import { useCallback, useEffect } from "react";
+import { useEffect } from "react";
 
 import { Menu } from "@/components/app-nav/menu";
 import { WorkspaceSwitcher } from "@/components/app-nav/workspace-switcher";
 import { ThemeLogo } from "@/components/theme-logo";
 import { useSidebar } from "@/hooks/use-sidebar";
-import { useStore } from "@/hooks/use-store";
 import { SITE_NAME } from "@/lib/constants";
 import { getDashboardHref } from "@/lib/deployment-urls";
 import { cn } from "@/lib/utils";
 
 export function Sidebar() {
-  const sidebar = useStore(useSidebar, (x) => x) as {
-    isOpen: boolean;
-    toggleOpen: (force?: boolean) => void;
-    getOpenState: () => boolean;
-    setIsHover: (v: boolean) => void;
-    settings: { disabled?: boolean };
-  } | null;
-
-  const handleResize = useCallback(() => {
-    if (window.innerWidth < 1024 && sidebar?.getOpenState()) {
-      sidebar?.toggleOpen(false);
-    }
-  }, [sidebar]);
+  const toggleOpen = useSidebar((state) => state.toggleOpen);
+  const getOpenState = useSidebar((state) => state.getOpenState);
+  const setIsHover = useSidebar((state) => state.setIsHover);
+  const settings = useSidebar((state) => state.settings);
 
   useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 1024 && getOpenState()) {
+        toggleOpen(false);
+      }
+    };
+
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [handleResize]);
-
-  if (!sidebar) return null;
-  const { toggleOpen, getOpenState, setIsHover, settings } = sidebar;
+  }, [getOpenState, toggleOpen]);
   const appName = SITE_NAME;
 
   return (
     <>
-      <div
+      <button
+        type="button"
+        aria-label="Close navigation"
         className="fixed inset-0 z-30 bg-black/80 lg:hidden"
         onClick={() => toggleOpen(false)}
         style={{

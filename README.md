@@ -88,12 +88,24 @@ R2_BUCKET_NAME="widget-development"
 R2_ACCESS_KEY_ID=""
 R2_SECRET_ACCESS_KEY=""
 VECTORIZE_INDEX="widget-knowledge-development"
+SEARCH_INDEX="widget-search-development"
 OPENAI_API_KEY=""
 GEMINI_API_KEY=""
 ```
 
 Use different D1, R2, and Vectorize resources for development, preview, and
 production through Vercel environment scopes.
+
+Local development stores uploads in `.uploads`. Production requires R2 and
+never falls back to Vercel's ephemeral filesystem. The application uses
+Cloudflare R2's S3-compatible API, so the R2 access key and secret are required.
+
+Prisma Migrate manages local SQLite. Apply reviewed D1 migrations with Wrangler
+during a controlled release, not during a Vercel build:
+
+```bash
+pnpm dlx wrangler d1 migrations apply <database-name> --remote
+```
 
 ## Google OAuth
 
@@ -144,7 +156,7 @@ on `provider: "sqlite"` because D1 is SQLite-compatible.
 pnpm dev           # start Next.js
 pnpm build         # production build
 pnpm start         # run production build
-pnpm db:deploy     # apply existing Prisma migrations during deployment
+pnpm db:sqlite:deploy # apply existing migrations to SQLite only
 pnpm db:migrate    # create/apply local Prisma migration during development
 pnpm db:generate   # generate Prisma client
 pnpm db:studio     # open Prisma Studio
