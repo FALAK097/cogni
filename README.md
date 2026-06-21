@@ -1,59 +1,37 @@
 # widget
 
-widget is an AI-first customer support platform with an embedded chat widget,
-shared team inbox, knowledge-grounded answers, human handoff, integrations, and
-durable workflows.
-
-Current repository includes the production foundation and the first widget
-vertical slice: workspace-scoped configuration, authorized domains, one-line
-installation, live preview, visitor identity, streamed AI responses, persisted
-conversations, and the shared inbox.
-
-Full product specification, architecture decisions, roadmap, acceptance
-criteria, and backlog live in [`AGENTS.md`](AGENTS.md).
+widget is an AI-first customer support platform with an embedded chat widget, shared team inbox, knowledge-grounded answers, human handoff, integrations, and durable workflows.
 
 ## Stack
 
 - Next.js 16 App Router, React 19, TypeScript
 - Tailwind CSS v4, shadcn/ui with Base UI, Hugeicons
 - Better Auth with Google OAuth
-- Prisma ORM using SQLite locally and Cloudflare D1 in hosted environments
-- T3 Env with Zod validation
-- TanStack Query and next-themes
-- Vercel deployment; Cloudflare D1, R2, Search, and Vectorize
-- Oxlint, Oxfmt, Husky, lint-staged, GitHub Actions
+- Prisma ORM using SQLite locally and Cloudflare D1 in production
+- TanStack Query, next-themes, Vercel AI SDK
 
-Vercel AI SDK v6 with OpenAI and Gemini is active. Vercel Workflow, R2, and
-Vectorize are next for durable knowledge ingestion. Chat SDK adapters will add
-Slack, WhatsApp, Microsoft Teams, and Google Chat through the same conversation
-service. Eve remains deferred until it provides a concrete advantage.
+## Quick Start
 
-## Requirements
+1. Install dependencies:
 
-- Node.js 24
-- pnpm 11
-- Google OAuth application
-- Optional: Cloudflare account and D1 database
+   ```bash
+   pnpm install
+   ```
 
-This repository declares Node 24 in `.nvmrc` and `.node-version`.
+2. Configure environment variables by copying `.env.example` to `.env.local`:
 
-## Quick start
+   ```bash
+   cp .env.example .env.local
+   ```
 
-```bash
-pnpm install
-cp .env.example .env.local
-pnpm dev
-```
+3. Run the development server:
+   ```bash
+   pnpm dev
+   ```
 
-`pnpm dev` starts Next.js. Local development uses SQLite at `prisma/dev.db`.
-Run the local Prisma migration once before first use.
+## Environment Variables
 
-No source or configuration file must be edited after cloning. Add environment
-variables, then run the app.
-
-## Environment
-
-Required:
+Copy `.env.example` to `.env.local` and fill in the values:
 
 ```env
 ENV="development"
@@ -62,28 +40,11 @@ BETTER_AUTH_SECRET="at-least-32-random-characters"
 BETTER_AUTH_URL="http://localhost:3000"
 GOOGLE_CLIENT_ID=""
 GOOGLE_CLIENT_SECRET=""
-```
 
-Generate a local auth secret:
-
-```bash
-openssl rand -base64 32
-```
-
-Optional Cloudflare D1 mode:
-
-```env
+# Cloudflare integration keys (optional for local SQLite development)
 CLOUDFLARE_ACCOUNT_ID=""
 CLOUDFLARE_API_TOKEN=""
 D1_DATABASE_ID=""
-```
-
-All three runtime values—account ID, API token, and database ID—must be set
-together.
-
-Knowledge storage and model providers:
-
-```env
 R2_BUCKET_NAME="widget-development"
 R2_ACCESS_KEY_ID=""
 R2_SECRET_ACCESS_KEY=""
@@ -93,133 +54,16 @@ OPENAI_API_KEY=""
 GEMINI_API_KEY=""
 ```
 
-Use different D1, R2, and Vectorize resources for development, preview, and
-production through Vercel environment scopes.
-
-Local development stores uploads in `.uploads`. Production requires R2 and
-never falls back to Vercel's ephemeral filesystem. The application uses
-Cloudflare R2's S3-compatible API, so the R2 access key and secret are required.
-
-Prisma Migrate manages local SQLite. Apply each reviewed SQL file to D1 in
-timestamp order during a controlled release, not during a Vercel build:
-
-```bash
-pnpm dlx wrangler d1 execute <database-name> \
-  --remote \
-  --file prisma/migrations/<timestamp_name>/migration.sql
-```
-
-The repository uses Prisma's nested migration layout, so Wrangler's flat
-`d1 migrations apply` discovery is intentionally not used.
-
-## Google OAuth
-
-Authorized local redirect URI:
-
-```text
-http://localhost:3000/api/auth/callback/google
-```
-
-Production:
-
-```text
-https://your-domain.com/api/auth/callback/google
-```
-
-Authentication is Google-only. widget intentionally has no password, login,
-registration, forgot-password, or reset-password pages.
-
-First successful sign-in creates one workspace and an OWNER membership.
-Provisioning is idempotent and repaired when an authenticated dashboard request
-finds a user without a workspace.
-
-## Database modes
-
-### Local SQLite
-
-Default mode. Leave all D1 variables blank.
-
-```bash
-pnpm db:migrate
-pnpm dev
-```
-
-Prisma uses `@prisma/adapter-better-sqlite3`. Better Auth uses its Prisma
-adapter with `provider: "sqlite"`.
-
-### Cloudflare D1
-
-Set `ENV="production"` together with the complete D1 variables. Runtime then
-switches to `@prisma/adapter-d1`.
-
-Prisma D1 support is currently preview. Better Auth keeps the Prisma adapter
-on `provider: "sqlite"` because D1 is SQLite-compatible.
-
 ## Commands
 
 ```bash
-pnpm dev           # start Next.js
-pnpm build         # production build
-pnpm start         # run production build
-pnpm db:sqlite:deploy # apply existing migrations to SQLite only
-pnpm db:migrate    # create/apply local Prisma migration during development
-pnpm db:generate   # generate Prisma client
-pnpm db:studio     # open Prisma Studio
-pnpm lint          # Oxlint
-pnpm lint:fix      # safe Oxlint fixes
-pnpm fmt           # write formatting with Oxfmt
-pnpm fmt:check     # verify formatting
-pnpm typecheck     # TypeScript compiler
-pnpm check         # lint + typecheck + format check
+pnpm dev             # Start development server
+pnpm build           # Build the production bundle
+pnpm start           # Run the built application
+pnpm check           # Run formatting + types + linting checks
+pnpm lint            # Run Oxlint checks
+pnpm fmt             # Format code using Oxfmt
+pnpm typecheck       # Verify TypeScript types
+pnpm db:migrate      # Generate and apply Prisma migrations
+pnpm db:studio       # Open Prisma database console
 ```
-
-## Repository map
-
-```text
-src/app/                    routes, layouts, API handlers
-src/components/             shared UI and product shell
-src/lib/auth/               Better Auth and workspace provisioning
-src/lib/db/                 lazy Prisma client and DB mode selection
-src/lib/env/                T3 Env schema
-src/providers/              client providers
-prisma/                     schema and migrations
-AGENTS.md                   complete engineering and product source of truth
-```
-
-## Quality and CI
-
-```bash
-pnpm check
-pnpm build
-```
-
-GitHub Actions runs frozen install, Oxlint with annotations, TypeScript, Oxfmt,
-and production build. Pre-commit runs Oxlint and Oxfmt on staged files.
-
-ESLint and Prettier are intentionally not used.
-
-## Current scope
-
-Implemented:
-
-- Responsive landing page
-- Google OAuth modal and auth route
-- Protected dashboard
-- Real user/workspace display
-- Local SQLite and Cloudflare D1 runtime selection
-- Better Auth/Prisma SQLite compatibility
-- Automatic, idempotent default workspace provisioning
-- Initial Prisma migration
-- Typed environment variables
-- CI and git hooks
-- Workspace-scoped contacts, conversations, and messages
-- Shared inbox list and conversation detail
-- Manual conversation creation and human replies
-- Conversation status filtering and close/reopen actions
-- Widget studio with branding, sizing, model, prompt, and domain controls
-- One-line browser loader with show/hide/toggle/identify events
-- Live OpenAI/Gemini preview and streamed visitor chat
-- Visitor sessions and widget conversations persisted in Prisma
-
-Next roadmap slice: URL crawling and file ingestion into R2 and Vectorize with
-durable Workflow jobs and source-grounded answers.
