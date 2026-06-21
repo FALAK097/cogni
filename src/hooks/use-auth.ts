@@ -52,10 +52,13 @@ export function useSwitchWorkspace() {
 
   return useMutation({
     mutationFn: async (workspaceId: string) => {
-      const { data, error } = await api.POST("/api/workspaces/{workspace_id}/switch", {
-        params: { path: { workspace_id: workspaceId } },
-        body: { workspaceId },
-      });
+      const { data, error } = await api.POST<{ ok: boolean }>(
+        "/api/workspaces/{workspace_id}/switch",
+        {
+          params: { path: { workspace_id: workspaceId } },
+          body: { workspaceId },
+        },
+      );
       return requireData(data, error, "Failed to switch workspace");
     },
     onSuccess: () => {

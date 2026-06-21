@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 
 import { UserNav } from "@/components/app-nav/user-nav";
@@ -24,7 +24,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useAgent, useCampaign, useKnowledgeBases } from "@/hooks/query";
+import { useKnowledgeBases } from "@/hooks/query";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { getDashboardHref } from "@/lib/deployment-urls";
 import { cn } from "@/lib/utils";
@@ -40,11 +40,10 @@ type AppTopbarProps = {
 const LABELS: Record<string, string> = {
   analytics: "Analytics",
   "knowledge-base": "Knowledge Base",
-  campaigns: "Campaigns",
   conversations: "Conversations",
 
   dashboard: "Dashboard",
-  echo: "Widget",
+  widget: "Widget",
   integrations: "Integrations",
   leads: "Leads",
   settings: "Settings",
@@ -57,19 +56,6 @@ type Crumb = {
   href: string;
   label: string;
   current?: boolean;
-};
-
-type NamedEntity = {
-  id?: string | null;
-  name?: string | null;
-  title?: string | null;
-  contactName?: string | null;
-  firstName?: string | null;
-  lastName?: string | null;
-  campaign?: NamedEntity | null;
-  agent?: NamedEntity | null;
-  lead?: NamedEntity | null;
-  data?: NamedEntity | null;
 };
 
 function formatSegment(segment: string) {
@@ -86,47 +72,21 @@ function formatSegment(segment: string) {
 
 function getFallbackLabel(segment: string, index: number, routeSegments: string[]) {
   const previous = routeSegments[index - 1];
-  if (previous === "campaigns") return "Campaign";
   if (previous === "agents") return "Agent";
   return formatSegment(segment);
 }
 
-function getName(entity: unknown): string | null {
-  if (!entity || typeof entity !== "object") return null;
-  const value = entity as NamedEntity;
-  const nestedName: string | null =
-    getName(value.campaign) || getName(value.agent) || getName(value.lead) || getName(value.data);
-  const fullName = [value.firstName, value.lastName].filter(Boolean).join(" ").trim();
-  return value.name || value.title || value.contactName || fullName || nestedName || null;
-}
-
-function useBreadcrumbLabels(segments: string[], editCampaignId = "") {
-  const campaignIndex = segments.indexOf("campaigns");
-  const agentsIndex = segments.indexOf("agents");
+function useBreadcrumbLabels(segments: string[]) {
   const knowledgeBaseIndex = segments.indexOf("knowledge-base");
-  const routeCampaignId = campaignIndex >= 0 ? (segments[campaignIndex + 1] ?? "") : "";
-  const isCampaignCreateRoute = routeCampaignId === "new";
-  const campaignId = isCampaignCreateRoute ? editCampaignId : routeCampaignId;
   const knowledgeBaseId = knowledgeBaseIndex >= 0 ? (segments[knowledgeBaseIndex + 1] ?? "") : "";
-  const campaignAgentId = agentsIndex >= 0 ? (segments[agentsIndex + 1] ?? "") : "";
-  const agentId = campaignAgentId || "";
 
-  const campaignQuery = useCampaign(campaignId || "");
-  const agentQuery = useAgent(agentId || "");
   const knowledgeBasesQuery = useKnowledgeBases();
 
   const labels = new Map<string, string>();
-  const campaignName = getName(campaignQuery.data);
-  const agentName = getName(agentQuery.data);
-  const knowledgeBase = (
-    knowledgeBasesQuery.data as
-      | { knowledgeBases?: Array<{ id: string; name?: string }> }
-      | undefined
-  )?.knowledgeBases?.find((item: { id: string; name?: string }) => item.id === knowledgeBaseId);
+  const knowledgeBase = knowledgeBasesQuery.data?.knowledgeBases?.find(
+    (item) => item.id === knowledgeBaseId,
+  );
 
-  if (campaignId && campaignName) labels.set(campaignId, campaignName);
-  if (isCampaignCreateRoute) labels.set("new", campaignName || "New Campaign");
-  if (agentId && agentName) labels.set(agentId, agentName);
   if (knowledgeBaseId) labels.set(knowledgeBaseId, knowledgeBase?.name ?? "Knowledge Base");
 
   return labels;
@@ -141,43 +101,21 @@ function getVisibleCrumbs(crumbs: Crumb[]) {
 }
 
 function getBreadcrumbHref(routeSegments: string[], index: number) {
-  const segment = routeSegments[index];
-  const previous = routeSegments[index - 1];
-
-  if (segment === "agents" && previous === routeSegments[1] && routeSegments[0] === "campaigns") {
-    return `/${routeSegments.slice(0, index).join("/")}`;
-  }
-
-  if (segment === "leads") {
-    if (routeSegments[0] === "campaigns") {
-      if (previous === routeSegments[3] && routeSegments[2] === "agents") {
-        return `/${routeSegments.slice(0, index).join("/")}`;
-      }
-      return `/${routeSegments.slice(0, 2).join("/")}`;
-    }
-  }
-
   return `/${routeSegments.slice(0, index + 1).join("/")}`;
 }
 
 function Breadcrumbs() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const segments = pathname.split("/").filter(Boolean);
-  const isCampaignCreateRoute = segments[0] === "campaigns" && segments[1] === "new";
-  const editCampaignId = isCampaignCreateRoute ? (searchParams.get("edit") ?? "") : "";
-  const labels = useBreadcrumbLabels(segments, editCampaignId);
+  const labels = useBreadcrumbLabels(segments);
 
   const routeSegments = segments.length > 0 ? segments : ["dashboard"];
   const routeCrumbs = routeSegments.map((segment, index) => {
     const isCurrent = index === routeSegments.length - 1;
-    const liveCampaignLabel =
-      isCampaignCreateRoute && isCurrent ? labels.get("new") || "New Campaign" : null;
 
     return {
       href: getBreadcrumbHref(routeSegments, index),
-      label:
-        liveCampaignLabel ?? labels.get(segment) ?? getFallbackLabel(segment, index, routeSegments),
+      label: labels.get(segment) ?? getFallbackLabel(segment, index, routeSegments),
       current: isCurrent,
     };
   });

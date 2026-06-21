@@ -1,5 +1,5 @@
 import { parseJsonArray } from "@/features/widget/domain";
-import { getRequestOrigin, withWidgetCors } from "@/features/widget/server/echo-utils";
+import { getRequestOrigin, withWidgetCors } from "@/features/widget/server/widget-utils";
 import { getPublicWidget, validateEmbedOrigin } from "@/features/widget/server/widget-service";
 import { getDb } from "@/lib/db/client";
 
@@ -16,10 +16,11 @@ export async function GET(
   }
 
   const origin = getRequestOrigin(request);
-  const allowed = validateEmbedOrigin(
-    origin,
-    widget.authorizedDomains.map((domain) => domain.hostname),
-  );
+  const allowedDomains = JSON.parse(widget.authorizedDomains || "[]") as string[];
+  const allowed = validateEmbedOrigin(origin, allowedDomains);
+  if (!allowed) {
+    return Response.json({ error: "This domain is not authorized." }, { status: 403 });
+  }
 
   const config = {
     workspaceId: widget.workspaceId,
@@ -52,8 +53,7 @@ export async function GET(
     leadCaptureMessageThreshold: widget.leadCaptureMessageThreshold,
     enableBrochure: widget.enableBrochure,
     brochureSuggestionText: widget.brochureSuggestionText,
-    allowedDomains: widget.authorizedDomains.map((domain) => domain.hostname),
-    selectedCampaignId: widget.selectedCampaignId,
+    allowedDomains,
   };
 
   return withWidgetCors(Response.json(config), origin, allowed);
@@ -67,12 +67,8 @@ export async function OPTIONS(
   const db = getDb();
   const widget = await getPublicWidget(db, publicKey);
   const origin = getRequestOrigin(request);
-  const allowed = widget
-    ? validateEmbedOrigin(
-        origin,
-        widget.authorizedDomains.map((domain) => domain.hostname),
-      )
-    : false;
+  const allowedDomains = widget ? (JSON.parse(widget.authorizedDomains || "[]") as string[]) : [];
+  const allowed = widget ? validateEmbedOrigin(origin, allowedDomains) : false;
 
   return withWidgetCors(new Response(null, { status: 204 }), origin, allowed);
 }

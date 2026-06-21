@@ -1,5 +1,5 @@
 import { assertPublicWidgetAccess } from "@/features/widget/server/widget-public";
-import { getRequestOrigin, withWidgetCors } from "@/features/widget/server/echo-utils";
+import { getRequestOrigin, withWidgetCors } from "@/features/widget/server/widget-utils";
 import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
 import { getDb } from "@/lib/db/client";
 

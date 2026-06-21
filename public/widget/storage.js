@@ -1,5 +1,5 @@
 /**
- * OutCaller Widget - Storage
+ * Widget - Storage
  * localStorage operations for session, visitor, feedback, and lead data
  */
 
@@ -40,6 +40,21 @@ export function storeSessionId(id, workspaceId) {
   }
 }
 
+export function getStoredSessionToken(workspaceId) {
+  const scopedKey = getWorkspaceStorageKey(STORAGE_KEYS.TOKEN, workspaceId);
+  return scopedKey ? localStorage.getItem(scopedKey) : null;
+}
+
+export function storeSessionToken(token, workspaceId) {
+  const scopedKey = getWorkspaceStorageKey(STORAGE_KEYS.TOKEN, workspaceId);
+  if (!scopedKey) return;
+  if (token) {
+    localStorage.setItem(scopedKey, token);
+  } else {
+    localStorage.removeItem(scopedKey);
+  }
+}
+
 function getWorkspaceStorageKey(baseKey, workspaceId) {
   if (typeof workspaceId !== "string" || !workspaceId.trim()) return null;
   return `${baseKey}:${workspaceId.trim()}`;
@@ -66,7 +81,7 @@ export function saveFeedbackToStorage(messageId, feedback) {
     stored[messageId] = feedback;
     localStorage.setItem(STORAGE_KEYS.FEEDBACK, JSON.stringify(stored));
   } catch (error) {
-    console.error("OutCaller Widget: Failed to save feedback to storage", error);
+    console.error("Widget: Failed to save feedback to storage", error);
   }
 }
 
@@ -84,7 +99,7 @@ export function getStoredLeadInfo() {
       }
     }
   } catch (error) {
-    console.error("OutCaller Widget: Failed to get stored lead info", error);
+    console.error("Widget: Failed to get stored lead info", error);
   }
   return null;
 }
@@ -96,6 +111,6 @@ export function saveLeadToStorage(leadInfo) {
   try {
     localStorage.setItem(STORAGE_KEYS.LEAD, JSON.stringify(leadInfo));
   } catch (error) {
-    console.error("OutCaller Widget: Failed to save lead to storage", error);
+    console.error("Widget: Failed to save lead to storage", error);
   }
 }

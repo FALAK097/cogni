@@ -1,5 +1,5 @@
 /**
- * widget Echo - Main Entry Point
+ * widget - Main Entry Point
  */
 
 import { closeLeadForm } from "./widget/lead-capture.js";

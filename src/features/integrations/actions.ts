@@ -32,7 +32,7 @@ async function updateIntegrationStatus(providerValue: FormDataEntryValue | null,
     },
   });
 
-  revalidatePath("/dashboard/integrations");
+  revalidatePath("/integrations");
 }
 
 export async function connectIntegrationAction(formData: FormData) {

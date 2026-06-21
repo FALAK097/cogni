@@ -1,6 +1,5 @@
-"use client";
-
-import Image from "next/image";
+import { MessageCircle } from "@/components/icons";
+import { cn } from "@/lib/utils";
 
 interface ThemeLogoProps {
   className?: string;
@@ -8,15 +7,14 @@ interface ThemeLogoProps {
 
 export function ThemeLogo({ className }: ThemeLogoProps) {
   return (
-    <>
-      <Image
-        src="/assets/images/Outcaller_logo.png"
-        alt="widget logo"
-        width={32}
-        height={32}
-        className={className}
-        priority={true}
-      />
-    </>
+    <span
+      aria-label="Widget"
+      className={cn(
+        "inline-flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground",
+        className,
+      )}
+    >
+      <MessageCircle className="size-4" aria-hidden="true" />
+    </span>
   );
 }

@@ -1,10 +1,19 @@
+import { z } from "zod";
+import type { MessageJson } from "@/features/conversations/server/conversation-service";
 import {
   assertPublicWidgetAccess,
   requireAuthorizedVisitorSession,
 } from "@/features/widget/server/widget-public";
-import { getRequestOrigin, withWidgetCors } from "@/features/widget/server/echo-utils";
+import { getRequestOrigin, withWidgetCors } from "@/features/widget/server/widget-utils";
 import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
 import { getDb } from "@/lib/db/client";
+
+const feedbackSchema = z.object({
+  messageId: z.string().min(1),
+  sessionId: z.string().min(1),
+  feedback: z.enum(["positive", "negative"]),
+  reason: z.string().trim().max(500).nullable().default(null),
+});
 
 export async function POST(
   request: Request,
@@ -17,48 +26,45 @@ export async function POST(
   const authorized = await requireAuthorizedVisitorSession(db, publicKey, request);
   if ("error" in authorized) return authorized.error;
 
-  const body = (await request.json()) as {
-    messageId?: string;
-    sessionId?: string;
-    feedback?: string;
-    reason?: string | null;
-  };
-
-  if (!body.messageId || !body.sessionId || !body.feedback) {
+  const parsed = feedbackSchema.safeParse(await request.json());
+  if (!parsed.success) {
     return Response.json({ error: "Invalid feedback payload." }, { status: 400 });
   }
+  const body = parsed.data;
 
   if (body.sessionId !== authorized.session.id) {
     return Response.json({ error: "Session not found." }, { status: 404 });
   }
 
-  const message = await db.message.findFirst({
+  const conversation = await db.conversation.findFirst({
     where: {
-      id: body.messageId,
-      conversation: { visitorSessionId: authorized.session.id },
+      visitorSessionId: authorized.session.id,
+      status: { not: "CLOSED" },
     },
-    select: { id: true },
   });
-  if (!message) {
+
+  if (!conversation) {
+    return Response.json({ error: "Active conversation not found." }, { status: 404 });
+  }
+
+  const list = JSON.parse(conversation.messages || "[]") as MessageJson[];
+  const msgIndex = list.findIndex((m) => m.id === body.messageId);
+
+  if (msgIndex === -1) {
     return Response.json({ error: "Message not found." }, { status: 404 });
   }
 
-  await db.messageFeedback.upsert({
-    where: {
-      messageId_visitorSessionId: {
-        messageId: body.messageId,
-        visitorSessionId: authorized.session.id,
-      },
-    },
-    update: {
-      feedback: body.feedback,
-      reason: body.reason ?? null,
-    },
-    create: {
-      messageId: body.messageId,
-      visitorSessionId: authorized.session.id,
-      feedback: body.feedback,
-      reason: body.reason ?? null,
+  list[msgIndex] = {
+    ...list[msgIndex],
+    feedback: body.feedback,
+    feedbackReason: body.reason,
+    feedbackAt: new Date().toISOString(),
+  };
+
+  await db.conversation.update({
+    where: { id: conversation.id },
+    data: {
+      messages: JSON.stringify(list),
     },
   });
 

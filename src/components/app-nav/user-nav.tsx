@@ -1,8 +1,8 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { ReactElement } from "react";
 import { useState } from "react";
-import { Book, ExternalLink, LogOut, ScrollText } from "@/components/icons";
+import { Book, ExternalLink, LogOut } from "@/components/icons";
 
 import { AvatarDialog } from "@/components/avatar-dialog";
 import { ModeToggle } from "@/components/mode-toggle";
@@ -21,17 +21,18 @@ import { getDocsHref } from "@/lib/deployment-urls";
 
 type UserNavProps = {
   userData: { avatar?: string; name: string; email?: string };
-  trigger?: ReactNode;
+  trigger?: ReactElement;
   isSidebarOpen?: boolean;
 };
 
 export function UserNav({ userData, trigger, isSidebarOpen }: UserNavProps) {
   const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
-  const [currentAvatar, setCurrentAvatar] = useState(userData.avatar);
+  const [avatarOverride, setAvatarOverride] = useState<string | null>(null);
   const logout = useLogout();
+  const currentAvatar = avatarOverride ?? userData.avatar;
 
   const handleAvatarUpdate = (newAvatar: string) => {
-    setCurrentAvatar(newAvatar);
+    setAvatarOverride(newAvatar);
   };
 
   const handleSignOut = () => {
@@ -44,14 +45,14 @@ export function UserNav({ userData, trigger, isSidebarOpen }: UserNavProps) {
         <DropdownMenuTrigger
           // Use `render` so the trigger does not wrap our <Button> (avoids nested <button> hydration errors).
           render={
-            (trigger ?? (
+            trigger ?? (
               <Button variant="outline" className="relative w-8 h-8 rounded-full">
                 <Avatar className="w-8 h-8">
                   <AvatarImage src={userData.avatar} alt={userData.name} />
                   <AvatarFallback>{userData.name.substring(0, 2).toUpperCase()}</AvatarFallback>
                 </Avatar>
               </Button>
-            )) as any
+            )
           }
         />
 
@@ -84,14 +85,6 @@ export function UserNav({ userData, trigger, isSidebarOpen }: UserNavProps) {
           >
             <Book className="mr-3 w-4 h-4 text-muted-foreground" />
             Documentation
-            <ExternalLink className="ml-auto w-3 h-3" />
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className="cursor-pointer"
-            onClick={() => window.open("/changelog", "_blank")}
-          >
-            <ScrollText className="mr-3 w-4 h-4 text-muted-foreground" />
-            Changelog
             <ExternalLink className="ml-auto w-3 h-3" />
           </DropdownMenuItem>
           <DropdownMenuSeparator />

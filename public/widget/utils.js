@@ -1,5 +1,5 @@
 /**
- * OutCaller Widget - Utility Functions
+ * Widget - Utility Functions
  * Common helper functions used across the widget
  */
 
@@ -131,6 +131,7 @@ export function getBrowserMetadata() {
   else if (/Tablet|iPad/i.test(ua)) deviceType = "tablet";
 
   return {
+    hostname: window.location.hostname,
     pageUrl: window.location.href,
     referrer: document.referrer || "direct",
     browser,
@@ -139,17 +140,6 @@ export function getBrowserMetadata() {
     language: navigator.language || null,
     screenSize: `${window.screen.width}x${window.screen.height}`,
   };
-}
-
-export async function fetchPublicIp() {
-  try {
-    const response = await fetch("https://api.ipify.org?format=json", { cache: "no-store" });
-    if (!response.ok) return null;
-    const data = await response.json();
-    return typeof data?.ip === "string" && data.ip.trim() ? data.ip.trim() : null;
-  } catch {
-    return null;
-  }
 }
 
 /**

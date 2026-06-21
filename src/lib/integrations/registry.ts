@@ -16,7 +16,7 @@ export const INTEGRATION_MANIFESTS: IntegrationManifest[] = [
     permissions: ["send_email"],
     content: {
       whatItDoes: ["Send email from approved agent actions."],
-      campaigns: ["Draft and send follow-up emails."],
+      useCases: ["Draft and send follow-up emails."],
       setupGuideUrl: getDocsHref("/integrations/gmail"),
     },
     docsUrl: getDocsHref("/integrations/gmail"),
@@ -35,7 +35,7 @@ export const INTEGRATION_MANIFESTS: IntegrationManifest[] = [
     permissions: ["create_events"],
     content: {
       whatItDoes: ["Create and update calendar events."],
-      campaigns: ["Schedule meetings from conversations."],
+      useCases: ["Schedule meetings from conversations."],
       setupGuideUrl: getDocsHref("/integrations/google-calendar"),
     },
     docsUrl: getDocsHref("/integrations/google-calendar"),
@@ -54,7 +54,7 @@ export const INTEGRATION_MANIFESTS: IntegrationManifest[] = [
     permissions: ["send_messages"],
     content: {
       whatItDoes: ["Notify your team in Slack."],
-      campaigns: ["Escalation and assignment alerts."],
+      useCases: ["Escalation and assignment alerts."],
       setupGuideUrl: getDocsHref("/integrations/slack"),
     },
     docsUrl: getDocsHref("/integrations/slack"),

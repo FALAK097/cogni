@@ -26,7 +26,7 @@ export type WidgetAgentActionState = {
 
 const hexColor = z.string().regex(/^#[0-9a-f]{6}$/i, "Use a six-digit hex color.");
 
-const echoWidgetSettingsSchema = z.object({
+const widgetWidgetSettingsSchema = z.object({
   displayName: z.string().trim().min(1).max(60),
   welcomeMessage: z.string().trim().min(1).max(240),
   inputPlaceholder: z.string().trim().min(1).max(80),
@@ -54,7 +54,6 @@ const echoWidgetSettingsSchema = z.object({
   leadCaptureKeywords: z.string().optional(),
   privacyPolicyUrl: z.string().trim().min(1).max(500).optional(),
   brochureSuggestionText: z.string().trim().min(1).max(120).optional(),
-  selectedCampaignId: z.string().optional(),
   enableLeadCapture: z.boolean().optional(),
   enableBrochure: z.boolean().optional(),
   showBranding: z.boolean().optional(),
@@ -78,11 +77,11 @@ function linesToArray(value: FormDataEntryValue | null) {
   ];
 }
 
-export async function saveEchoWidgetSettingsAction(
+export async function saveWidgetWidgetSettingsAction(
   _previousState: WidgetActionState,
   formData: FormData,
 ): Promise<WidgetActionState> {
-  const parsed = echoWidgetSettingsSchema.safeParse({
+  const parsed = widgetWidgetSettingsSchema.safeParse({
     displayName: formData.get("displayName"),
     welcomeMessage: formData.get("welcomeMessage"),
     inputPlaceholder: formData.get("inputPlaceholder"),
@@ -105,7 +104,6 @@ export async function saveEchoWidgetSettingsAction(
     leadCaptureKeywords: formData.get("leadCaptureKeywords"),
     privacyPolicyUrl: formData.get("privacyPolicyUrl"),
     brochureSuggestionText: formData.get("brochureSuggestionText"),
-    selectedCampaignId: formData.get("selectedCampaignId"),
     enableLeadCapture: formBoolean(formData.get("enableLeadCapture")),
     enableBrochure: formBoolean(formData.get("enableBrochure")),
     showBranding: formBoolean(formData.get("showBranding")),
@@ -155,7 +153,6 @@ export async function saveEchoWidgetSettingsAction(
       leadCaptureKeywords: stringifyJsonArray(linesToArray(formData.get("leadCaptureKeywords"))),
       privacyPolicyUrl: parsed.data.privacyPolicyUrl ?? widget.privacyPolicyUrl,
       brochureSuggestionText: parsed.data.brochureSuggestionText ?? widget.brochureSuggestionText,
-      selectedCampaignId: parsed.data.selectedCampaignId || null,
       enableLeadCapture: parsed.data.enableLeadCapture ?? widget.enableLeadCapture,
       enableBrochure: parsed.data.enableBrochure ?? widget.enableBrochure,
       showBranding: parsed.data.showBranding ?? widget.showBranding,
@@ -163,10 +160,7 @@ export async function saveEchoWidgetSettingsAction(
         parsed.data.leadCaptureMinutesThreshold ?? widget.leadCaptureMinutesThreshold,
       leadCaptureMessageThreshold:
         parsed.data.leadCaptureMessageThreshold ?? widget.leadCaptureMessageThreshold,
-      authorizedDomains: {
-        deleteMany: {},
-        create: domains.map((hostname) => ({ hostname })),
-      },
+      authorizedDomains: JSON.stringify(domains),
     },
   });
 
@@ -178,7 +172,7 @@ export async function saveWidgetSettingsAction(
   previousState: WidgetActionState,
   formData: FormData,
 ): Promise<WidgetActionState> {
-  return saveEchoWidgetSettingsAction(previousState, formData);
+  return saveWidgetWidgetSettingsAction(previousState, formData);
 }
 
 const widgetAgentSettingsSchema = z.object({

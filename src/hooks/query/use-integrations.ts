@@ -7,6 +7,16 @@ import { useActiveWorkspaceId } from "@/hooks/use-auth";
 import { getAllIntegrations } from "@/lib/integrations/registry";
 import { queryKeys } from "@/lib/query-keys";
 
+export interface WorkspaceIntegration {
+  id: string;
+  integrationSlug: string;
+  slug: string;
+  provider: string;
+  status: string;
+  connectedAt: string;
+  metadata: Record<string, unknown>;
+}
+
 export function useIntegrations() {
   const activeWorkspaceId = useActiveWorkspaceId();
 
@@ -19,12 +29,12 @@ export function useIntegrations() {
         return { integrations: getAllIntegrations(), workspaceIntegrations: [] };
       }
 
-      const { data, error } = await api.GET("/api/dashboard/integrations");
+      const { data, error } = await api.GET<WorkspaceIntegration[]>("/api/dashboard/integrations");
       const workspaceIntegrations = requireData(
         data,
         error,
         "Failed to fetch workspace integrations",
-      ) as Array<{ slug?: string; integrationSlug?: string; status?: string }>;
+      );
 
       return {
         integrations: getAllIntegrations(),
@@ -52,7 +62,7 @@ export function useConnectIntegration() {
       metadata?: Record<string, unknown>;
     }) => {
       if (!activeWorkspaceId) throw new Error("No active workspace");
-      const { data, error } = await api.POST("/api/dashboard/integrations", {
+      const { data, error } = await api.POST<{ ok: boolean }>("/api/dashboard/integrations", {
         body: { slug },
       });
       return requireData(data, error, "Failed to connect integration");
@@ -70,7 +80,7 @@ export function useDisconnectIntegration() {
   return useMutation({
     mutationFn: async (slug: string) => {
       if (!activeWorkspaceId) throw new Error("No active workspace");
-      const { data, error } = await api.DELETE("/api/dashboard/integrations", {
+      const { data, error } = await api.DELETE<{ ok: boolean }>("/api/dashboard/integrations", {
         params: { query: { slug } },
       });
       return requireData(data, error, "Failed to disconnect integration");

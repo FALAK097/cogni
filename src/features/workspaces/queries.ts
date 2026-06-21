@@ -3,7 +3,7 @@ import "server-only";
 import { getDb } from "@/lib/db/client";
 
 export async function getWorkspaceMembers(workspaceId: string) {
-  return getDb().membership.findMany({
+  return getDb().workspaceMember.findMany({
     where: { workspaceId },
     orderBy: { createdAt: "asc" },
     include: {

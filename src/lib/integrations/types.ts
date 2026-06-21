@@ -44,7 +44,7 @@ export type IntegrationManifest = {
   permissions: string[];
   content: {
     whatItDoes: string[];
-    campaigns: string[];
+    useCases: string[];
     setupGuideUrl?: string;
   };
   isComingSoon?: boolean;

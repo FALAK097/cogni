@@ -43,7 +43,7 @@ export async function notifyWorkspaceMembers({
   body: string;
   excludeUserId?: string;
 }) {
-  const members = await db.membership.findMany({
+  const members = await db.workspaceMember.findMany({
     where: {
       workspaceId,
       ...(excludeUserId ? { userId: { not: excludeUserId } } : {}),

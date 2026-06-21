@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ChevronDownIcon, ChevronRightIcon } from "@/components/icons";
 
 import { Button } from "@/components/ui/button";
@@ -44,17 +44,12 @@ export function CollapseMenuButton({
     submenu.active === undefined ? submenu.href === pathname : submenu.active,
   );
   const isMenuActive = active || isSubmenuActive;
-  const [isCollapsed, setIsCollapsed] = useState(isMenuActive);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
-
-  useEffect(() => {
-    if (isMenuActive) {
-      setIsCollapsed(true);
-    }
-  }, [isMenuActive]);
+  const isExpanded = isMenuActive || isCollapsed;
 
   return isOpen ? (
-    <Collapsible open={isCollapsed} onOpenChange={setIsCollapsed} className="mb-1 w-full">
+    <Collapsible open={isExpanded} onOpenChange={setIsCollapsed} className="mb-1 w-full">
       <div
         className={cn(
           "relative mb-1 flex h-10 overflow-hidden rounded-xl transition-colors hover:bg-muted dark:hover:bg-muted/50",
@@ -105,9 +100,9 @@ export function CollapseMenuButton({
                 "relative h-full w-10 rounded-none bg-transparent px-0 transition-colors hover:bg-transparent aria-expanded:bg-transparent dark:hover:bg-transparent",
                 isMenuActive && "hover:text-secondary-foreground",
               )}
-              aria-label={`${isCollapsed ? "Collapse" : "Expand"} ${label} submenu`}
+              aria-label={`${isExpanded ? "Collapse" : "Expand"} ${label} submenu`}
             >
-              {isCollapsed ? (
+              {isExpanded ? (
                 <ChevronDownIcon
                   className={cn("h-[18px] w-[18px]", isMenuActive && "text-primary")}
                 />
@@ -149,7 +144,7 @@ export function CollapseMenuButton({
             );
           })}
           {isLoading && (
-            <p className="px-3 py-2 text-sm text-muted-foreground">Loading campaigns...</p>
+            <p className="px-3 py-2 text-sm text-muted-foreground">Loading navigation...</p>
           )}
         </div>
       </CollapsibleContent>
@@ -228,12 +223,12 @@ export function CollapseMenuButton({
           {label}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {submenus.map(({ href, label, active }, index) => {
+        {submenus.map(({ href, label, active }) => {
           const isSubmenuItemActive = (active === undefined && pathname === href) || active;
 
           return (
             <DropdownMenuItem
-              key={index}
+              key={href}
               onClick={() => setDropdownOpen(false)}
               render={
                 <Link

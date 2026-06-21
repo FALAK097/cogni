@@ -1,5 +1,5 @@
 /**
- * OutCaller Widget - Feedback
+ * Widget - Feedback
  * Feedback UI components and handlers
  */
 

@@ -1,5 +1,5 @@
 /**
- * OutCaller Widget - Documents/Brochure
+ * Widget - Documents/Brochure
  * Document search and display functionality
  */
 
@@ -136,7 +136,7 @@ export async function searchAndDisplayDocuments(searchQuery = null) {
     };
     saveMessage("assistant", "Here are the documents I found for you:", docMetadata);
   } catch (error) {
-    console.error("OutCaller Widget: Document fetch failed", error);
+    console.error("Widget: Document fetch failed", error);
 
     // Remove loading message if still there
     const loadingEl = document.getElementById("oc-documents-loading");

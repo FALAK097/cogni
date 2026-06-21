@@ -1,5 +1,5 @@
 /**
- * OutCaller Widget - UI
+ * Widget - UI
  * DOM creation, messages, and core UI functionality
  */
 
@@ -7,7 +7,7 @@ import {
   initSessionAPI,
   saveMessage,
   fetchConfig,
-  callEchoChatAPI,
+  callWidgetChatAPI,
   fetchSessionHistory,
   uploadFile,
 } from "./api.js";
@@ -21,12 +21,13 @@ import {
 } from "./documents.js";
 import { createFeedbackButtons, attachFeedbackListeners } from "./feedback.js";
 import { detectLeadCapture } from "./lead-capture.js";
-import { showRecentChatsView, refreshRecentChats } from "./recent-chats.js";
 import { state, resetChatState } from "./state.js";
 import {
   getOrCreateVisitorId,
   getStoredSessionId,
+  getStoredSessionToken,
   storeSessionId,
+  storeSessionToken,
   getStoredLeadInfo,
 } from "./storage.js";
 import { injectStyles } from "./styles.js";
@@ -37,7 +38,6 @@ import {
   formatBotMessage,
   getCurrentTime,
   generateUUID,
-  fetchPublicIp,
 } from "./utils.js";
 
 /**
@@ -47,7 +47,7 @@ export function createWidget() {
   const config = state.config;
 
   state.container = document.createElement("div");
-  state.container.id = "outcaller-widget-container";
+  state.container.id = "widget-container";
 
   // Chat Window
   state.windowEl = document.createElement("div");
@@ -75,10 +75,6 @@ export function createWidget() {
 				<button class="oc-menu-item" data-action="end_chat">
 					${ICONS.x}
 					<span>End chat</span>
-				</button>
-				<button class="oc-menu-item" data-action="recent_chats">
-					${ICONS.history}
-					<span>View recent chats</span>
 				</button>
 			</div>
 		</div>
@@ -199,9 +195,6 @@ function handleMenuAction(action) {
     case "end_chat":
       toggleChat();
       break;
-    case "recent_chats":
-      showRecentChatsView();
-      break;
   }
 }
 
@@ -263,21 +256,31 @@ export async function initSession() {
     return;
   }
 
+  if (state.preview) {
+    state.sessionId = generateUUID();
+    state.visitorId = null;
+    state.sessionStartTime = Date.now();
+    state.leadCaptureEnabled = false;
+    state.brochureEnabled = config.enableBrochure || false;
+    state.brochureSuggestionText = config.brochureSuggestionText || "Receive Brochure";
+    addBotMessage(config.welcomeMessage);
+    return;
+  }
+
   state.visitorId = getOrCreateVisitorId();
   state.sessionId = getStoredSessionId(scopeKey) || generateUUID();
+  state.sessionToken = getStoredSessionToken(scopeKey);
   storeSessionId(state.sessionId, scopeKey);
   state.sessionStartTime = Date.now();
 
   state.savedLeadInfo = getStoredLeadInfo();
 
   try {
-    if (!state.publicIp) {
-      state.publicIp = await fetchPublicIp();
-    }
-    const data = await initSessionAPI(state.publicKey, state.sessionId, state.visitorId);
+    const data = await initSessionAPI(state.publicKey, state.sessionId, state.visitorId, false);
 
     state.sessionDbId = data.sessionId;
-    state.sessionToken = data.token || state.sessionToken;
+    state.sessionToken = data.token || null;
+    storeSessionToken(state.sessionToken, scopeKey);
 
     if (data.workspaceId) {
       state.config.workspaceId = data.workspaceId;
@@ -513,13 +516,13 @@ export async function sendMessage() {
   }
 
   showTypingIndicator();
-  await callEchoChat(text);
+  await callWidgetChat(text, generateUUID());
 }
 
 /**
- * Call Echo chat API
+ * Call Widget chat API
  */
-async function callEchoChat(userMessage) {
+async function callWidgetChat(userMessage, interactionId) {
   try {
     const leadInfo = state.savedLeadInfo
       ? {
@@ -531,7 +534,7 @@ async function callEchoChat(userMessage) {
 
     const historyToSend = state.conversationHistory.slice(-20);
 
-    const response = await callEchoChatAPI(userMessage, historyToSend, leadInfo);
+    const response = await callWidgetChatAPI(userMessage, historyToSend, leadInfo, interactionId);
 
     removeTypingIndicator();
 
@@ -610,13 +613,10 @@ async function callEchoChat(userMessage) {
     const sendBtn = state.windowEl.querySelector(".oc-send-btn");
     if (sendBtn) sendBtn.disabled = false;
 
-    // Refresh recent chats if the view is open
-    refreshRecentChats();
-
     // Check if we should trigger lead capture
     await detectLeadCapture();
   } catch (error) {
-    console.error("OutCaller Widget: Echo chat stream error", error);
+    console.error("Widget: chat stream error", error);
     removeTypingIndicator();
     addBotMessage("Sorry, I'm having trouble responding right now. Please try again.");
 
@@ -672,10 +672,10 @@ export function hidePreviewMessages() {
  */
 export function destroyWidget() {
   hidePreviewMessages();
-  const container = document.getElementById("outcaller-widget-container");
+  const container = document.getElementById("widget-container");
   if (container) container.remove();
 
-  const styles = document.getElementById("outcaller-widget-styles");
+  const styles = document.getElementById("widget-styles");
   if (styles) styles.remove();
 
   state.isInitialized = false;
@@ -687,6 +687,8 @@ export function destroyWidget() {
   state.messagesContainer = null;
   state.input = null;
   state.sessionDbId = null;
+  state.sessionToken = null;
+  state.preview = false;
   state.leadCaptureFormShown = false;
   state.leadCaptureEnabled = false;
   state.leadCaptureStep = 0;
@@ -707,6 +709,8 @@ export async function resetChat() {
   state.sessionId = generateUUID();
   storeSessionId(state.sessionId, state.config.workspaceId);
   state.sessionDbId = null;
+  state.sessionToken = null;
+  storeSessionToken(null, state.publicKey || state.config.workspaceId);
 
   await initSession();
 }
@@ -723,6 +727,7 @@ export async function init(userConfig = {}) {
   if (userConfig.publicKey) {
     state.publicKey = userConfig.publicKey;
   }
+  state.preview = userConfig.preview === true;
 
   if (userConfig.publicKey && Object.keys(userConfig).length <= 2 && !userConfig.agentName) {
     const fetchedConfig = await fetchConfig(userConfig.publicKey);

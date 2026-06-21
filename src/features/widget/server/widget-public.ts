@@ -4,17 +4,16 @@ import type { PrismaClient } from "@/generated/prisma/client";
 
 import {
   getPublicWidget,
-  isHostnameAuthorized,
-  toEchoPublicConfig,
+  toWidgetPublicConfig,
   validateEmbedOrigin,
 } from "@/features/widget/server/widget-service";
-import { getRequestOrigin } from "@/features/widget/server/echo-utils";
+import { getRequestOrigin } from "@/features/widget/server/widget-utils";
 
 export async function assertPublicWidgetAccess(
   db: PrismaClient,
   publicKey: string,
   request: Request,
-  options?: { preview?: boolean; hostname?: string },
+  options?: { preview?: boolean },
 ) {
   const widget = await getPublicWidget(db, publicKey);
   if (!widget || !widget.isEnabled) {
@@ -22,35 +21,18 @@ export async function assertPublicWidgetAccess(
   }
 
   const origin = getRequestOrigin(request);
-  const allowedDomains = widget.authorizedDomains.map((domain) => domain.hostname);
+  const allowedDomains = JSON.parse(widget.authorizedDomains || "[]") as string[];
 
   if (!options?.preview && !validateEmbedOrigin(origin, allowedDomains)) {
-    const hostname = options?.hostname?.toLowerCase().replace(/\.$/, "");
-    if (!hostname || !isHostnameAuthorized(hostname, widget.authorizedDomains)) {
-      return { error: Response.json({ error: "This domain is not authorized." }, { status: 403 }) };
-    }
+    return { error: Response.json({ error: "This domain is not authorized." }, { status: 403 }) };
   }
 
   return {
     widget,
-    config: toEchoPublicConfig(widget),
+    config: toWidgetPublicConfig(widget),
     origin,
     allowedDomains,
   };
-}
-
-export async function getVisitorSessionByDbId(
-  db: PrismaClient,
-  sessionDbId: string,
-  widgetId: string,
-) {
-  return db.visitorSession.findFirst({
-    where: {
-      id: sessionDbId,
-      widgetId,
-      expiresAt: { gt: new Date() },
-    },
-  });
 }
 
 export function bearerToken(request: Request) {
@@ -95,7 +77,6 @@ export async function getAuthorizedVisitorSession(
     include: {
       widget: {
         include: {
-          authorizedDomains: true,
           workspace: {
             select: { id: true, name: true },
           },

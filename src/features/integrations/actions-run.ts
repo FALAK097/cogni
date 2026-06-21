@@ -1,8 +1,9 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-
+import type { MessageJson } from "@/features/conversations/server/conversation-service";
 import { executeIntegrationAction } from "@/features/integrations/server/execute-action";
 import { getIntegrationTool } from "@/features/integrations/server/tool-registry";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
@@ -66,12 +67,12 @@ export async function runIntegrationToolAction(
     await db.conversation.update({
       where: { id: conversation.id },
       data: {
-        assignedMembershipId: membershipId,
+        assignedMemberId: membershipId,
         status: "ASSIGNED",
       },
     });
 
-    revalidatePath(`/dashboard/inbox/${conversation.id}`);
+    revalidatePath("/conversations");
     return { savedAt: Date.now() };
   }
 
@@ -81,17 +82,29 @@ export async function runIntegrationToolAction(
       return { error: "Enter a note before saving." };
     }
 
-    await db.message.create({
-      data: {
-        conversationId: conversation.id,
-        body: message,
-        authorType: "TEAM",
-        authorUserId: session.user.id,
-        visibility: "INTERNAL",
-      },
+    const conv = await db.conversation.findUnique({
+      where: { id: conversation.id },
+      select: { messages: true },
     });
 
-    revalidatePath(`/dashboard/inbox/${conversation.id}`);
+    if (conv) {
+      const messagesList = JSON.parse(conv.messages || "[]") as MessageJson[];
+      const newMessage: MessageJson = {
+        id: randomUUID(),
+        body: message,
+        authorType: "TEAM",
+        visibility: "INTERNAL",
+        createdAt: new Date().toISOString(),
+      };
+      await db.conversation.update({
+        where: { id: conversation.id },
+        data: {
+          messages: JSON.stringify([...messagesList, newMessage]),
+        },
+      });
+    }
+
+    revalidatePath("/conversations");
     return { savedAt: Date.now() };
   }
 
@@ -109,7 +122,7 @@ export async function runIntegrationToolAction(
     },
   });
 
-  revalidatePath("/dashboard/integrations");
-  revalidatePath(`/dashboard/inbox/${conversation.id}`);
+  revalidatePath("/integrations");
+  revalidatePath("/conversations");
   return { savedAt: Date.now() };
 }

@@ -1,13 +1,15 @@
 import * as HugeIconsList from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import type { SVGProps, ComponentType } from "react";
+import type { SVGProps, ComponentType, ComponentProps } from "react";
 
 const DEFAULT_ICON_STROKE_WIDTH = 0.8;
 
 export type Hugeicon = ComponentType<SVGProps<SVGSVGElement> & { size?: number }>;
 
 // Create a wrapper component for Hugeicons that mimics standard React SVG component behavior
-const createIcon = (icon: any, displayName: string) => {
+type HugeiconsIconData = ComponentProps<typeof HugeiconsIcon>["icon"];
+
+const createIcon = (icon: HugeiconsIconData, displayName: string) => {
   const IconComponent = ({
     className,
     size,

@@ -17,8 +17,11 @@ type AdminPanelLayoutProps = {
 };
 
 export default function AdminPanelLayout({ children, userData }: AdminPanelLayoutProps) {
-  const getOpenState = useSidebar((state) => state.getOpenState);
+  const isOpen = useSidebar((state) => state.isOpen);
+  const isHover = useSidebar((state) => state.isHover);
   const settings = useSidebar((state) => state.settings);
+
+  const openState = isOpen || (settings.isHoverOpen && isHover);
 
   return (
     <>
@@ -26,7 +29,7 @@ export default function AdminPanelLayout({ children, userData }: AdminPanelLayou
       <main
         className={cn(
           "min-h-screen bg-zinc-50 dark:bg-zinc-900 transition-[margin-left] ease-in-out duration-300",
-          !settings.disabled && (!getOpenState() ? "lg:ml-[90px]" : "lg:ml-56"),
+          !settings.disabled && (!openState ? "lg:ml-[90px]" : "lg:ml-56"),
           "print:ml-0 print:w-full print:overflow-visible",
         )}
       >

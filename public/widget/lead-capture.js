@@ -1,5 +1,5 @@
 /**
- * OutCaller Widget - Lead Capture
+ * Widget - Lead Capture
  * Conversational lead capture functionality
  */
 
@@ -55,7 +55,7 @@ export async function detectLeadCapture(currentMessage = null) {
     }
     return false;
   } catch (error) {
-    console.error("OutCaller Widget: Lead capture detection failed", error);
+    console.error("Widget: Lead capture detection failed", error);
     return false;
   }
 }
@@ -351,7 +351,7 @@ async function submitLeadCapture() {
       });
     }
   } catch (error) {
-    console.error("OutCaller Widget: Lead submission failed", error);
+    console.error("Widget: Lead submission failed", error);
     import("./ui.js").then(({ addBotMessage }) => {
       addBotMessage("Sorry, there was an error. Please try again later.");
     });

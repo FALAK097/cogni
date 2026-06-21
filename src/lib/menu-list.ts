@@ -4,16 +4,16 @@ import {
   MessageCircle,
   MessageSquare,
   Plug,
-  Users,
+  UserCheck,
 } from "@/components/icons";
 import { getDashboardHref } from "@/lib/deployment-urls";
+
 export type MenuItem = {
   href: string;
   label: string;
   icon: typeof LayoutGrid;
   submenus: { href: string; label: string; active?: boolean }[];
   active?: boolean;
-  isLoading?: boolean;
 };
 
 export type MenuGroup = {
@@ -23,17 +23,8 @@ export type MenuGroup = {
 
 export type MenuList = MenuGroup[];
 
-type BuildMenuListOptions = {
-  campaignSubmenus?: MenuItem["submenus"];
-  campaignsLoading?: boolean;
-};
-
-export function getStaticMenuList(
-  _orgType: string | null = null,
-  options: BuildMenuListOptions = {},
-): MenuList {
-  const campaignSubmenus = options.campaignSubmenus ?? [];
-  const baseMenus: MenuList = [
+export function getStaticMenuList(): MenuList {
+  return [
     {
       groupLabel: "",
       menus: [
@@ -44,20 +35,19 @@ export function getStaticMenuList(
           submenus: [],
         },
         {
-          href: "/campaigns",
-          label: "Campaigns",
-          icon: Users,
-          submenus: campaignSubmenus,
-          isLoading: options.campaignsLoading,
-        },
-        {
           href: "/conversations",
           label: "Conversations",
           icon: MessageSquare,
           submenus: [],
         },
         {
-          href: "/echo",
+          href: "/leads",
+          label: "Leads",
+          icon: UserCheck,
+          submenus: [],
+        },
+        {
+          href: "/widget",
           label: "Widget",
           icon: MessageCircle,
           submenus: [],
@@ -77,9 +67,8 @@ export function getStaticMenuList(
       ],
     },
   ];
-  return baseMenus;
 }
 
-export function buildMenuList(options: BuildMenuListOptions = {}): MenuList {
-  return getStaticMenuList(null, options);
+export function buildMenuList(): MenuList {
+  return getStaticMenuList();
 }

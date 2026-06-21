@@ -6,21 +6,14 @@ export const queryKeys = {
   workspaces: {
     all: ["workspaces"] as const,
     list: () => [...queryKeys.workspaces.all, "list"] as const,
-    campaigns: (id: string) => [...queryKeys.workspaces.all, "campaigns", id] as const,
   },
   leads: {
     all: ["leads"] as const,
     list: (workspaceId: string) => [...queryKeys.leads.all, "list", workspaceId] as const,
   },
-  campaigns: {
-    all: ["campaigns"] as const,
-    list: () => [...queryKeys.campaigns.all, "list"] as const,
-    detail: (id: string) => [...queryKeys.campaigns.all, "detail", id] as const,
-    leads: (id: string) => [...queryKeys.campaigns.all, "leads", id] as const,
-  },
   analytics: {
     all: ["analytics"] as const,
-    echo: () => [...queryKeys.analytics.all, "echo"] as const,
+    widget: () => [...queryKeys.analytics.all, "widget"] as const,
   },
   documents: {
     all: ["documents"] as const,
@@ -44,11 +37,11 @@ export const queryKeys = {
         knowledgeBaseId ?? "default",
       ] as const,
   },
-  echo: {
-    all: ["echo"] as const,
-    sessions: () => [...queryKeys.echo.all, "sessions"] as const,
-    session: (id: string) => [...queryKeys.echo.all, "session", id] as const,
-    config: (workspaceId: string) => [...queryKeys.echo.all, "config", workspaceId] as const,
+  widget: {
+    all: ["widget"] as const,
+    sessions: () => [...queryKeys.widget.all, "sessions"] as const,
+    session: (id: string) => [...queryKeys.widget.all, "session", id] as const,
+    config: (workspaceId: string) => [...queryKeys.widget.all, "config", workspaceId] as const,
   },
   integrations: {
     all: ["integrations"] as const,

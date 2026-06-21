@@ -87,7 +87,7 @@ export async function inviteMemberAction(
   }
 
   const { db, workspace } = context;
-  const existingMembership = await db.membership.findFirst({
+  const existingMembership = await db.workspaceMember.findFirst({
     where: {
       workspaceId: workspace.id,
       user: {
@@ -128,7 +128,7 @@ export async function updateMemberRoleAction(formData: FormData) {
   }
 
   const { db, membership, workspace } = context;
-  const targetMembership = await db.membership.findFirst({
+  const targetMembership = await db.workspaceMember.findFirst({
     where: {
       id: parsed.data.membershipId,
       workspaceId: workspace.id,
@@ -148,7 +148,7 @@ export async function updateMemberRoleAction(formData: FormData) {
   }
 
   if (targetMembership.role === "OWNER" && parsed.data.role !== "OWNER") {
-    const ownerCount = await db.membership.count({
+    const ownerCount = await db.workspaceMember.count({
       where: {
         workspaceId: workspace.id,
         role: "OWNER",
@@ -160,7 +160,7 @@ export async function updateMemberRoleAction(formData: FormData) {
     }
   }
 
-  await db.membership.update({
+  await db.workspaceMember.update({
     where: { id: targetMembership.id },
     data: { role: parsed.data.role },
   });
@@ -189,7 +189,7 @@ export async function removeMemberAction(formData: FormData) {
     return;
   }
 
-  const targetMembership = await db.membership.findFirst({
+  const targetMembership = await db.workspaceMember.findFirst({
     where: {
       id: parsed.data.membershipId,
       workspaceId: workspace.id,
@@ -205,7 +205,7 @@ export async function removeMemberAction(formData: FormData) {
   }
 
   if (targetMembership.role === "OWNER") {
-    const ownerCount = await db.membership.count({
+    const ownerCount = await db.workspaceMember.count({
       where: {
         workspaceId: workspace.id,
         role: "OWNER",
@@ -217,7 +217,7 @@ export async function removeMemberAction(formData: FormData) {
     }
   }
 
-  await db.membership.delete({
+  await db.workspaceMember.delete({
     where: { id: targetMembership.id },
   });
 
@@ -266,7 +266,7 @@ export async function acceptInviteAction(
   }
 
   await db.$transaction([
-    db.membership.upsert({
+    db.workspaceMember.upsert({
       where: {
         userId_workspaceId: {
           userId: session.user.id,
@@ -311,7 +311,7 @@ export async function transferOwnershipAction(formData: FormData) {
   }
 
   const { db, membership, workspace } = context;
-  const target = await db.membership.findFirst({
+  const target = await db.workspaceMember.findFirst({
     where: {
       id: parsed.data.membershipId,
       workspaceId: workspace.id,
@@ -324,11 +324,11 @@ export async function transferOwnershipAction(formData: FormData) {
   }
 
   await db.$transaction([
-    db.membership.update({
+    db.workspaceMember.update({
       where: { id: membership.id },
       data: { role: "MEMBER" },
     }),
-    db.membership.update({
+    db.workspaceMember.update({
       where: { id: target.id },
       data: { role: "OWNER" },
     }),
@@ -348,7 +348,7 @@ export async function switchWorkspaceAction(formData: FormData) {
   }
 
   const { db, session } = await requireDashboardContext();
-  const membership = await db.membership.findFirst({
+  const membership = await db.workspaceMember.findFirst({
     where: {
       userId: session.user.id,
       workspaceId: parsed.data.workspaceId,

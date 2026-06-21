@@ -11,21 +11,24 @@ import { getDashboardHref } from "@/lib/deployment-urls";
 import { cn } from "@/lib/utils";
 
 export function Sidebar() {
+  const isOpen = useSidebar((state) => state.isOpen);
+  const isHover = useSidebar((state) => state.isHover);
   const toggleOpen = useSidebar((state) => state.toggleOpen);
-  const getOpenState = useSidebar((state) => state.getOpenState);
   const setIsHover = useSidebar((state) => state.setIsHover);
   const settings = useSidebar((state) => state.settings);
 
+  const openState = isOpen || (settings.isHoverOpen && isHover);
+
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth < 1024 && getOpenState()) {
+      if (window.innerWidth < 1024 && openState) {
         toggleOpen(false);
       }
     };
 
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [getOpenState, toggleOpen]);
+  }, [openState, toggleOpen]);
   const appName = SITE_NAME;
 
   return (
@@ -36,14 +39,14 @@ export function Sidebar() {
         className="fixed inset-0 z-30 bg-black/80 lg:hidden"
         onClick={() => toggleOpen(false)}
         style={{
-          opacity: getOpenState() ? 1 : 0,
-          pointerEvents: getOpenState() ? "auto" : "none",
+          opacity: openState ? 1 : 0,
+          pointerEvents: openState ? "auto" : "none",
         }}
       />
       <aside
         className={cn(
           "fixed top-0 bg-card left-0 z-40 h-screen transition-[transform,width] ease-in-out duration-300 print:hidden",
-          !getOpenState() ? "w-[90px] translate-x-[-90px] lg:translate-x-0" : "w-56 translate-x-0",
+          !openState ? "w-[90px] translate-x-[-90px] lg:translate-x-0" : "w-56 translate-x-0",
           settings.disabled && "hidden",
         )}
       >
@@ -59,18 +62,14 @@ export function Sidebar() {
                 href={getDashboardHref()}
                 className={cn(
                   "flex items-center gap-2.5",
-                  getOpenState() ? "px-2.5" : "w-full justify-center",
+                  openState ? "px-2.5" : "w-full justify-center",
                 )}
               >
-                <ThemeLogo
-                  className={cn("flex-shrink-0", getOpenState() ? "w-6 h-6" : "w-8 h-8")}
-                />
+                <ThemeLogo className={cn("flex-shrink-0", openState ? "w-6 h-6" : "w-8 h-8")} />
                 <h1
                   className={cn(
                     "font-bold text-lg whitespace-nowrap transition-[transform,opacity,display] ease-in-out duration-300",
-                    !getOpenState()
-                      ? "-translate-x-96 opacity-0 hidden"
-                      : "translate-x-0 opacity-100",
+                    !openState ? "-translate-x-96 opacity-0 hidden" : "translate-x-0 opacity-100",
                   )}
                 >
                   <span className="text-base font-bold transition-all sm:text-lg">{appName}</span>
@@ -81,7 +80,7 @@ export function Sidebar() {
 
           {/* Workspace Switcher */}
           <div className="flex-none px-3 pb-1">
-            <WorkspaceSwitcher isOpen={getOpenState()} />
+            <WorkspaceSwitcher isOpen={openState} />
           </div>
 
           <div
@@ -97,7 +96,7 @@ export function Sidebar() {
 							display: none;
 						}
 					`}</style>
-            <Menu isOpen={getOpenState()} />
+            <Menu isOpen={openState} />
           </div>
 
           <div className="flex-none h-3" />

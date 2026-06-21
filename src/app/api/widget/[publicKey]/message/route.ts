@@ -2,9 +2,10 @@ import {
   assertPublicWidgetAccess,
   requireAuthorizedVisitorSession,
 } from "@/features/widget/server/widget-public";
-import { getRequestOrigin, withWidgetCors } from "@/features/widget/server/echo-utils";
+import { getRequestOrigin, withWidgetCors } from "@/features/widget/server/widget-utils";
 import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
 import { getDb } from "@/lib/db/client";
+import type { MessageJson } from "@/features/conversations/server/conversation-service";
 
 export async function POST(
   request: Request,
@@ -31,22 +32,31 @@ export async function POST(
     return Response.json({ error: "Invalid message payload." }, { status: 400 });
   }
 
-  const message = await db.message.findFirst({
+  const conversation = await db.conversation.findFirst({
     where: {
-      conversation: { visitorSessionId: authorized.session.id },
-      authorType: "AI",
-      body: body.content.trim(),
+      visitorSessionId: authorized.session.id,
+      channel: "WIDGET",
     },
-    orderBy: { createdAt: "desc" },
-    select: { id: true },
+    orderBy: { updatedAt: "desc" },
   });
-  if (!message) {
+
+  if (!conversation) {
+    return Response.json({ error: "Message not found." }, { status: 404 });
+  }
+
+  const messagesList = JSON.parse(conversation.messages || "[]") as MessageJson[];
+  const contentToMatch = body.content.trim();
+  const matchedMessage = [...messagesList]
+    .reverse()
+    .find((m) => m.authorType === "AI" && m.body === contentToMatch);
+
+  if (!matchedMessage) {
     return Response.json({ error: "Message not found." }, { status: 404 });
   }
 
   const origin = getRequestOrigin(request);
   return withWidgetCors(
-    Response.json({ message }),
+    Response.json({ message: { id: matchedMessage.id } }),
     origin,
     validateEmbedOrigin(origin, access.allowedDomains),
   );

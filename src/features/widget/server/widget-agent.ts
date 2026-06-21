@@ -14,7 +14,6 @@ type WidgetAgentConfig = {
   workspaceId: string;
   latestUserMessage: string;
   memoryContext?: string;
-  campaignContext?: string;
   documentIds?: string[] | null;
 };
 
@@ -29,8 +28,8 @@ export async function streamWidgetAgent({
   onError: (error: unknown) => void;
   onFinish: (result: {
     text: string;
-    inputTokens: number | undefined;
-    outputTokens: number | undefined;
+    inputTokens: number | null;
+    outputTokens: number | null;
     sources: { documentId: string; title: string }[];
   }) => Promise<void>;
 }) {
@@ -57,7 +56,6 @@ export async function streamWidgetAgent({
     system: [
       `You are ${config.displayName}, the AI support assistant for ${config.workspaceName}.`,
       config.instructions,
-      config.campaignContext ? `Campaign context:\n${config.campaignContext}` : "",
       "Use retrieved knowledge when it is relevant. Cite sources inline like [Source: Title].",
       "If knowledge is insufficient, say you do not know and offer human help.",
       "Be concise and helpful.",
@@ -76,8 +74,8 @@ export async function streamWidgetAgent({
 
       await onFinish({
         text: finalText,
-        inputTokens: totalUsage.inputTokens,
-        outputTokens: totalUsage.outputTokens,
+        inputTokens: totalUsage.inputTokens ?? null,
+        outputTokens: totalUsage.outputTokens ?? null,
         sources: sources.map((source) => ({
           documentId: source.documentId,
           title: source.title,

@@ -38,7 +38,7 @@ try {
   console.log(`✅ Widget bundle created: public/widget.bundle.js (${fileSizeKB} KB)`);
   console.log("\n📋 Client usage:");
   console.log(
-    '   <script src="https://your-domain.com/widget.bundle.js" data-workspace-id="WORKSPACE_ID"></script>',
+    '   <script src="https://your-domain.com/widget.bundle.js" data-widget-key="PUBLIC_KEY" async></script>',
   );
 } catch (error) {
   console.error("❌ Build failed:", error.message);

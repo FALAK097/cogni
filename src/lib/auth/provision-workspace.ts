@@ -12,7 +12,7 @@ function workspaceSlug(name: string, userId: string) {
 }
 
 export async function ensureDefaultWorkspace(db: PrismaClient, user: { id: string; name: string }) {
-  const existingMembership = await db.membership.findFirst({
+  const existingMembership = await db.workspaceMember.findFirst({
     where: { userId: user.id },
     include: { workspace: true },
   });
@@ -31,7 +31,7 @@ export async function ensureDefaultWorkspace(db: PrismaClient, user: { id: strin
     },
   });
 
-  await db.membership.upsert({
+  await db.workspaceMember.upsert({
     where: {
       userId_workspaceId: {
         userId: user.id,

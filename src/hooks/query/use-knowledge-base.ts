@@ -37,13 +37,24 @@ export type KnowledgeBaseEnvelope = {
   operation?: { status?: string; message?: string } | null;
 };
 
+export interface KnowledgeBasesResponse {
+  knowledgeBases: KnowledgeBase[];
+  count: number;
+}
+
+export interface KnowledgeBaseSourcesResponse {
+  knowledgeBase: KnowledgeBase;
+  sources: KnowledgeBaseSource[];
+  count: number;
+}
+
 export function useKnowledgeBases() {
   const workspaceId = useActiveWorkspaceId() ?? "";
 
-  return useQuery({
+  return useQuery<KnowledgeBasesResponse>({
     queryKey: queryKeys.knowledgeBase.list(workspaceId),
     queryFn: async () => {
-      const { data, error } = await api.GET("/api/knowledge-base", {
+      const { data, error } = await api.GET<KnowledgeBasesResponse>("/api/knowledge-base", {
         params: { query: { workspaceId } },
       });
       return requireData(data, error, "Failed to fetch knowledge bases");
@@ -58,17 +69,20 @@ export function useKnowledgeBaseSources(
 ) {
   const workspaceId = useActiveWorkspaceId() ?? "";
 
-  return useQuery({
+  return useQuery<KnowledgeBaseSourcesResponse>({
     queryKey: queryKeys.knowledgeBase.sources(workspaceId, knowledgeBaseId),
     queryFn: async () => {
-      const { data, error } = await api.GET("/api/knowledge-base/sources", {
-        params: {
-          query: {
-            workspaceId,
-            knowledgeBaseId: knowledgeBaseId ?? "default",
+      const { data, error } = await api.GET<KnowledgeBaseSourcesResponse>(
+        "/api/knowledge-base/sources",
+        {
+          params: {
+            query: {
+              workspaceId,
+              knowledgeBaseId: knowledgeBaseId ?? "default",
+            },
           },
         },
-      });
+      );
       return requireData(data, error, "Failed to fetch knowledge sources");
     },
     enabled: Boolean(workspaceId) && (options?.enabled ?? true),
@@ -80,7 +94,10 @@ export function useCreateKnowledgeBase() {
 
   return useMutation({
     mutationFn: async (body: { name: string }) => {
-      const { data, error } = await api.POST("/api/knowledge-base", { body });
+      const { data, error } = await api.POST<{ knowledgeBase: KnowledgeBase }>(
+        "/api/knowledge-base",
+        { body },
+      );
       return requireData(data, error, "Failed to create knowledge base");
     },
     onSuccess: () => {
@@ -116,7 +133,10 @@ export function useCreateRagSource() {
 
   return useMutation({
     mutationFn: async (body: { url: string | string[]; knowledgeBaseId?: string }) => {
-      const { data, error } = await api.POST("/api/knowledge-base/sources/website", { body });
+      const { data, error } = await api.POST<{ source: KnowledgeBaseSource }>(
+        "/api/knowledge-base/sources/website",
+        { body },
+      );
       return requireData(data, error, "Failed to add website source");
     },
     onSuccess: () => {
@@ -138,9 +158,12 @@ export function useDeleteKnowledgeBaseSource() {
 
   return useMutation({
     mutationFn: async (sourceId: string) => {
-      const { data, error } = await api.DELETE("/api/knowledge-base/sources/{source_id}", {
-        params: { path: { source_id: sourceId } },
-      });
+      const { data, error } = await api.DELETE<{ ok: boolean }>(
+        "/api/knowledge-base/sources/{source_id}",
+        {
+          params: { path: { source_id: sourceId } },
+        },
+      );
       return requireData(data, error, "Failed to delete source");
     },
     onSuccess: () => {

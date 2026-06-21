@@ -33,29 +33,20 @@ function withQuery(url: string, query?: ApiParams["query"]) {
 function mapPath(path: string) {
   if (path === "/api/auth/me") return "/api/dashboard/me";
   if (path === "/api/auth/logout") return "/api/auth/sign-out";
-  if (path.startsWith("/api/workspaces/{workspace_id}/echo-config")) {
-    return path.replace("/api/workspaces/{workspace_id}/echo-config", "/api/dashboard/widget");
-  }
-  if (path === "/api/workspaces/{workspace_id}/campaigns") {
-    return "/api/campaigns";
-  }
-  if (path.startsWith("/api/workspaces/{workspace_id}/campaigns/{campaign_id}")) {
-    return path.replace(
-      "/api/workspaces/{workspace_id}/campaigns/{campaign_id}",
-      "/api/campaigns/{campaign_id}",
-    );
+  if (path.startsWith("/api/workspaces/{workspace_id}/widget-config")) {
+    return path.replace("/api/workspaces/{workspace_id}/widget-config", "/api/dashboard/widget");
   }
   if (path === "/api/workspaces") return "/api/dashboard/workspaces";
   if (path.startsWith("/api/workspaces/{workspace_id}/switch")) {
     return "/api/dashboard/workspaces/switch";
   }
-  if (path.startsWith("/api/echo/sessions/{session_id}")) {
+  if (path.startsWith("/api/widget/sessions/{session_id}")) {
     return path.replace(
-      "/api/echo/sessions/{session_id}",
-      "/api/dashboard/echo/sessions/{session_id}",
+      "/api/widget/sessions/{session_id}",
+      "/api/dashboard/widget/sessions/{session_id}",
     );
   }
-  if (path === "/api/echo/sessions") return "/api/dashboard/echo/sessions";
+  if (path === "/api/widget/sessions") return "/api/dashboard/widget/sessions";
   if (path === "/api/knowledge-base") {
     return "/api/dashboard/knowledge-base";
   }

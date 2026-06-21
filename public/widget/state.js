@@ -1,5 +1,5 @@
 /**
- * OutCaller Widget - Shared State
+ * Widget - Shared State
  * Centralized mutable state for the widget
  */
 
@@ -11,6 +11,7 @@ export const state = {
   baseUrl: "",
   publicKey: "",
   sessionToken: null,
+  preview: false,
   isOpen: false,
   isInitialized: false,
   hasInteracted: false,
@@ -20,7 +21,6 @@ export const state = {
   sessionId: null,
   visitorId: null,
   sessionDbId: null,
-  publicIp: null,
   sessionStartTime: null,
   conversationHistory: [],
 
@@ -43,8 +43,6 @@ export const state = {
   brochureEnabled: false,
   brochureSuggestionText: "Receive Brochure",
 
-  // Recent chats state
-  isRecentChatsOpen: false,
   pollIntervalId: null,
 };
 

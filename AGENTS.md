@@ -450,7 +450,7 @@ Development uploads use `.uploads`. Production uploads must use R2 through its
 S3-compatible API and fail closed when R2 is not configured. Never fall back to
 Vercel's ephemeral filesystem in production.
 
-Prisma Migrate manages local SQLite. Apply D1 migrations with Wrangler as a
+Prisma Migrate manages local SQLite. Apply reviewed D1 SQL files with Wrangler as a
 controlled release step; do not run migrations during Vercel builds.
 
 ## Database and authentication invariants
@@ -475,8 +475,8 @@ Schema changes:
 4. Run `pnpm db:sqlite:deploy` only when applying existing migrations to a
    SQLite database.
 5. Run `pnpm db:generate`.
-6. Create and apply the equivalent reviewed D1 migration with Wrangler for
-   production.
+6. Apply the reviewed Prisma migration SQL to production D1 with
+   `wrangler d1 execute`.
 7. Verify Better Auth sign-in and workspace creation.
 
 Never run destructive migration commands against production without backup and

@@ -5,9 +5,9 @@ import {
 } from "@/features/widget/server/widget-public";
 import {
   getRequestOrigin,
-  toEchoHistoryMessages,
+  toWidgetHistoryMessages,
   withWidgetCors,
-} from "@/features/widget/server/echo-utils";
+} from "@/features/widget/server/widget-utils";
 import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
 import { getDb } from "@/lib/db/client";
 
@@ -30,8 +30,10 @@ export async function GET(
   const session = await db.visitorSession.findFirst({
     where: {
       id: sessionId,
+      token: authorized.session.token,
       widgetId: access.widget.id,
-      visitorId: authorized.session.visitorId,
+      messageCount: { gt: 0 },
+      conversations: { some: { channel: "WIDGET" } },
       expiresAt: { gt: new Date() },
     },
   });
@@ -46,7 +48,12 @@ export async function GET(
 
   const origin = getRequestOrigin(request);
   return withWidgetCors(
-    Response.json({ messages: toEchoHistoryMessages(messages) }),
+    Response.json({
+      sessionId: session.id,
+      browserSessionId: session.browserSessionId,
+      token: session.token,
+      messages: toWidgetHistoryMessages(messages),
+    }),
     origin,
     validateEmbedOrigin(origin, access.allowedDomains),
   );

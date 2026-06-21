@@ -1,9 +1,9 @@
-import { submitEchoLeadCapture } from "@/features/leads/server/lead-service";
+import { submitWidgetLeadCapture } from "@/features/leads/server/lead-service";
 import {
   assertPublicWidgetAccess,
   requireAuthorizedVisitorSession,
 } from "@/features/widget/server/widget-public";
-import { getRequestOrigin, withWidgetCors } from "@/features/widget/server/echo-utils";
+import { getRequestOrigin, withWidgetCors } from "@/features/widget/server/widget-utils";
 import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
 import { getDb } from "@/lib/db/client";
 
@@ -37,11 +37,10 @@ export async function POST(
     return Response.json({ error: "Session not found." }, { status: 404 });
   }
 
-  await submitEchoLeadCapture({
+  await submitWidgetLeadCapture({
     db,
     visitorSessionId: authorized.session.id,
     workspaceId: access.widget.workspaceId,
-    campaignId: access.widget.selectedCampaignId,
     name: body.name.trim(),
     email: body.email?.trim() || null,
     phone: body.phone?.trim() || null,

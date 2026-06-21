@@ -28,7 +28,7 @@ export const INTEGRATION_CATEGORIES: CategoryDefinition[] = [
   {
     id: "EMAIL",
     label: "Email",
-    description: "Send emails, run campaigns, and manage email workflows.",
+    description: "Send emails and manage email workflows.",
     order: 6,
   },
   {

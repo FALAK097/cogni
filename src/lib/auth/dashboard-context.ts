@@ -9,7 +9,7 @@ import { getAuth } from "@/lib/auth/server";
 import { getDb } from "@/lib/db/client";
 
 export async function listUserWorkspaces(userId: string) {
-  return getDb().membership.findMany({
+  return getDb().workspaceMember.findMany({
     where: { userId },
     orderBy: [{ role: "asc" }, { createdAt: "asc" }],
     include: {
@@ -36,16 +36,8 @@ export const requireDashboardContext = cache(async function requireDashboardCont
   const onOnboardingRoute =
     pathname.startsWith("/dashboard/onboarding") || pathname.startsWith("/onboarding");
 
-  if (!onOnboardingRoute && memberships.length > 1 && !activeWorkspaceId) {
-    redirect("/dashboard/onboarding");
-  }
-
-  if (
-    !onOnboardingRoute &&
-    memberships.length === 1 &&
-    cookieStore.get("onboarding_complete")?.value !== "1"
-  ) {
-    redirect("/dashboard/onboarding");
+  if (onOnboardingRoute) {
+    redirect("/dashboard");
   }
 
   const membership =

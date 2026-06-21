@@ -119,22 +119,10 @@ async function saveWidgetConfig(body: Record<string, unknown>) {
         typeof body.brochureSuggestionText === "string"
           ? body.brochureSuggestionText
           : current.brochureSuggestionText,
-      selectedCampaignId:
-        body.selectedCampaignId === null || typeof body.selectedCampaignId === "string"
-          ? (body.selectedCampaignId as string | null)
-          : current.selectedCampaignId,
       isEnabled: typeof body.isEnabled === "boolean" ? body.isEnabled : current.isEnabled,
       instructions:
         typeof body.instructions === "string" ? body.instructions : current.instructions,
-      authorizedDomains: {
-        deleteMany: {},
-        create: domains.map((hostname) => ({ hostname })),
-      },
-    },
-    include: {
-      authorizedDomains: {
-        orderBy: { hostname: "asc" },
-      },
+      authorizedDomains: JSON.stringify(domains),
     },
   });
 

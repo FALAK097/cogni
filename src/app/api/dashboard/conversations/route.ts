@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getInboxSummary } from "@/features/inbox/queries";
+import { getInboxSummary, type ParsedConversation } from "@/features/conversations/server/queries";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 
 export async function GET(request: Request) {
@@ -16,16 +16,16 @@ export async function GET(request: Request) {
   const slice = summary.conversations.slice(start, start + limit);
 
   return NextResponse.json({
-    conversations: slice.map((conversation) => ({
+    conversations: slice.map((conversation: ParsedConversation) => ({
       id: conversation.id,
-      channel: conversation.channel === "WIDGET" ? "echo" : "echo",
+      channel: conversation.channel === "WIDGET" ? "widget" : "widget",
       contactName: conversation.contact.name,
       contactEmail: conversation.contact.email,
       status: conversation.status,
       subject: conversation.subject,
       summary: conversation.messages[0]?.body ?? conversation.subject,
       lastMessageAt: conversation.lastMessageAt.toISOString(),
-      assignee: conversation.assignedMembership?.user.name ?? null,
+      assignee: conversation.assignedMember?.user.name ?? null,
     })),
     counts: summary.counts,
     pagination: {

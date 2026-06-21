@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { MessageJson } from "@/features/conversations/server/conversation-service";
 import type { PrismaClient } from "@/generated/prisma/client";
 
 export async function buildAgentMemoryContext({
@@ -13,19 +14,14 @@ export async function buildAgentMemoryContext({
   conversationId: string;
   contactId: string;
 }) {
-  const [contact, recentMessages] = await Promise.all([
+  const [contact, conversation] = await Promise.all([
     db.contact.findFirst({
       where: { id: contactId, workspaceId },
       select: { name: true, email: true, tags: true },
     }),
-    db.message.findMany({
-      where: {
-        conversationId,
-        visibility: "PUBLIC",
-      },
-      orderBy: { createdAt: "desc" },
-      take: 8,
-      select: { authorType: true, body: true },
+    db.conversation.findUnique({
+      where: { id: conversationId },
+      select: { messages: true },
     }),
   ]);
 
@@ -37,8 +33,19 @@ export async function buildAgentMemoryContext({
     }
   })();
 
+  const messagesList = (() => {
+    try {
+      return JSON.parse(conversation?.messages || "[]") as MessageJson[];
+    } catch {
+      return [];
+    }
+  })();
+
+  // Filter public messages and take the last 8
+  const publicMessages = messagesList.filter((m) => m.visibility === "PUBLIC" || !m.visibility);
+  const recentMessages = publicMessages.slice(-8);
+
   const history = recentMessages
-    .reverse()
     .map((message) => `${message.authorType}: ${message.body.slice(0, 240)}`)
     .join("\n");
 

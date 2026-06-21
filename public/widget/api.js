@@ -1,11 +1,16 @@
 /**
- * widget Echo - API
+ * widget - API
  * Backend API calls for session, messages, and other data
  */
 
 import { state } from "./state.js";
-import { saveFeedbackToStorage } from "./storage.js";
-import { getBrowserMetadata } from "./utils.js";
+import {
+  saveFeedbackToStorage,
+  saveLeadToStorage,
+  storeSessionId,
+  storeSessionToken,
+} from "./storage.js";
+import { generateUUID, getBrowserMetadata } from "./utils.js";
 
 const buildPublicApiUrl = (path) => `${state.baseUrl}${path}`;
 
@@ -44,7 +49,7 @@ export async function fetchConfig(_publicKey) {
   }
 }
 
-export async function initSessionAPI(_publicKey, sessionId, visitorId) {
+export async function initSessionAPI(_publicKey, sessionId, visitorId, preview = false) {
   const metadata = getBrowserMetadata();
   return requestJson(widgetKeyPath("/session"), {
     method: "POST",
@@ -52,12 +57,20 @@ export async function initSessionAPI(_publicKey, sessionId, visitorId) {
     body: JSON.stringify({
       sessionId,
       visitorId,
-      metadata: {
-        ...metadata,
-        clientIp: state.publicIp || null,
-      },
+      preview,
+      metadata,
     }),
   });
+}
+
+async function refreshSessionCredentials() {
+  const data = await initSessionAPI(state.publicKey, state.sessionId, state.visitorId, false);
+  state.sessionDbId = data.sessionId;
+  state.sessionId = data.browserSessionId || state.sessionId;
+  state.sessionToken = data.token || null;
+  const scopeKey = state.publicKey || state.config.workspaceId;
+  storeSessionId(state.sessionId, scopeKey);
+  storeSessionToken(state.sessionToken, scopeKey);
 }
 
 export async function saveMessage(role, content, metadata = {}) {
@@ -113,22 +126,6 @@ export async function submitFeedback(messageId, feedback, reason = null) {
   }
 }
 
-export async function fetchRecentSessions() {
-  if (!state.publicKey || !state.visitorId) {
-    return [];
-  }
-
-  try {
-    const data = await requestJson(
-      `${widgetKeyPath("/sessions")}?visitorId=${encodeURIComponent(state.visitorId)}`,
-    );
-    return data.sessions || [];
-  } catch (error) {
-    console.error("widget: Error fetching recent sessions", error);
-    return [];
-  }
-}
-
 export async function fetchSessionHistory(sessionDbId) {
   return requestJson(`${widgetKeyPath("/history")}?sessionId=${encodeURIComponent(sessionDbId)}`);
 }
@@ -171,30 +168,56 @@ export async function searchDocuments(searchQuery = null) {
   });
 }
 
-export async function uploadFile(file) {
-  if (!state.sessionToken) {
-    throw new Error("Session required");
+export async function uploadFile(file, canRetry = true, interactionId = generateUUID()) {
+  if (state.preview) {
+    throw new Error("Uploads are disabled in dashboard preview");
   }
 
   const formData = new FormData();
   formData.append("file", file);
+  formData.append("sessionId", state.sessionId);
+  formData.append("visitorId", state.visitorId);
+  formData.append("interactionId", interactionId);
+  formData.append("metadata", JSON.stringify(getBrowserMetadata()));
 
   const response = await fetch(buildPublicApiUrl(widgetKeyPath("/upload")), {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${state.sessionToken}`,
-    },
+    headers: state.sessionToken
+      ? {
+          Authorization: `Bearer ${state.sessionToken}`,
+        }
+      : {},
     body: formData,
   });
 
   if (!response.ok) {
+    if (response.status === 401 && canRetry) {
+      await refreshSessionCredentials();
+      return uploadFile(file, false, interactionId);
+    }
     throw new Error(`Upload failed: ${response.status}`);
   }
 
-  return response.json();
+  const data = await response.json();
+  if (data.sessionId && data.token) {
+    state.sessionDbId = data.sessionId;
+    state.sessionToken = data.token;
+    storeSessionToken(data.token, state.publicKey || state.config.workspaceId);
+  }
+  return data;
 }
 
 export async function identifyVisitor(customer = {}) {
+  state.savedLeadInfo = {
+    name: typeof customer.name === "string" ? customer.name : "",
+    email: typeof customer.email === "string" ? customer.email : "",
+    phone: typeof customer.phone === "string" ? customer.phone : "",
+  };
+  saveLeadToStorage(state.savedLeadInfo);
+  if (!state.sessionToken) {
+    return { ok: true, pending: true };
+  }
+
   return requestJson(widgetKeyPath("/identify"), {
     method: "POST",
     headers: {
@@ -205,7 +228,14 @@ export async function identifyVisitor(customer = {}) {
   });
 }
 
-export async function callEchoChatAPI(userMessage, historyToSend, leadInfo = null) {
+export async function callWidgetChatAPI(
+  userMessage,
+  historyToSend,
+  leadInfo = null,
+  interactionId,
+  canRetry = true,
+) {
+  const metadata = getBrowserMetadata();
   const response = await fetch(buildPublicApiUrl(widgetKeyPath("/chat")), {
     method: "POST",
     headers: {
@@ -214,14 +244,30 @@ export async function callEchoChatAPI(userMessage, historyToSend, leadInfo = nul
     },
     body: JSON.stringify({
       sessionId: state.sessionId,
+      interactionId,
+      visitorId: state.visitorId,
       message: userMessage,
       history: historyToSend,
       leadInfo,
+      preview: state.preview,
+      metadata,
     }),
   });
 
   if (!response.ok) {
+    if (response.status === 401 && canRetry && !state.preview) {
+      await refreshSessionCredentials();
+      return callWidgetChatAPI(userMessage, historyToSend, leadInfo, interactionId, false);
+    }
     throw new Error(`Chat API error: ${response.status}`);
+  }
+
+  const sessionId = response.headers.get("X-Widget-Session-Id");
+  const sessionToken = response.headers.get("X-Widget-Session-Token");
+  if (sessionId && sessionToken) {
+    state.sessionDbId = sessionId;
+    state.sessionToken = sessionToken;
+    storeSessionToken(sessionToken, state.publicKey || state.config.workspaceId);
   }
 
   return response;

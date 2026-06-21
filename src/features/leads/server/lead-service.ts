@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { PrismaClient } from "@/generated/prisma/client";
+import { widgetLeadWhere } from "@/features/widget/server/widget-data-filters";
 
 export async function listWorkspaceLeads(
   db: PrismaClient,
@@ -10,29 +11,28 @@ export async function listWorkspaceLeads(
   const page = Math.max(1, options.page ?? 1);
   const limit = Math.min(50, Math.max(1, options.limit ?? 20));
   const skip = (page - 1) * limit;
+  const where = widgetLeadWhere(workspaceId);
 
   const [items, total] = await Promise.all([
     db.lead.findMany({
-      where: { workspaceId },
+      where,
       orderBy: { createdAt: "desc" },
       skip,
       take: limit,
       include: {
-        campaign: { select: { id: true, name: true } },
         contact: { select: { id: true, name: true, email: true } },
       },
     }),
-    db.lead.count({ where: { workspaceId } }),
+    db.lead.count({ where }),
   ]);
 
   return { items, total, page, limit };
 }
 
-export async function submitEchoLeadCapture({
+export async function submitWidgetLeadCapture({
   db,
   visitorSessionId,
   workspaceId,
-  campaignId,
   name,
   email,
   phone,
@@ -44,7 +44,6 @@ export async function submitEchoLeadCapture({
   db: PrismaClient;
   visitorSessionId: string;
   workspaceId: string;
-  campaignId: string | null;
   name: string;
   email?: string | null;
   phone?: string | null;
@@ -96,12 +95,11 @@ export async function submitEchoLeadCapture({
       lead = await tx.lead.create({
         data: {
           workspaceId,
-          campaignId,
           contactId: contact.id,
           name: name || contact.name,
           email: email ?? contact.email,
           phone: phone ?? null,
-          source: "ECHO_WIDGET",
+          source: "WIDGET",
           status: "new",
           capturedFromChat: true,
           chatSessionId: session.browserSessionId,
@@ -112,8 +110,8 @@ export async function submitEchoLeadCapture({
       lead = await tx.lead.update({
         where: { id: lead.id },
         data: {
-          campaignId: campaignId ?? lead.campaignId,
           contactId: contact.id,
+          source: "WIDGET",
           name: name || lead.name,
           email: email ?? lead.email,
           phone: phone ?? lead.phone,

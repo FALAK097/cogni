@@ -100,12 +100,17 @@ Local development stores uploads in `.uploads`. Production requires R2 and
 never falls back to Vercel's ephemeral filesystem. The application uses
 Cloudflare R2's S3-compatible API, so the R2 access key and secret are required.
 
-Prisma Migrate manages local SQLite. Apply reviewed D1 migrations with Wrangler
-during a controlled release, not during a Vercel build:
+Prisma Migrate manages local SQLite. Apply each reviewed SQL file to D1 in
+timestamp order during a controlled release, not during a Vercel build:
 
 ```bash
-pnpm dlx wrangler d1 migrations apply <database-name> --remote
+pnpm dlx wrangler d1 execute <database-name> \
+  --remote \
+  --file prisma/migrations/<timestamp_name>/migration.sql
 ```
+
+The repository uses Prisma's nested migration layout, so Wrangler's flat
+`d1 migrations apply` discovery is intentionally not used.
 
 ## Google OAuth
 

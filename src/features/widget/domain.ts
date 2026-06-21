@@ -2,22 +2,10 @@ export type WidgetPosition = "bottom-left" | "bottom-right";
 export type WidgetLauncherSize = "sm" | "md" | "lg";
 export type WidgetModelProvider = "OPENAI" | "GOOGLE";
 export type WidgetTheme = "light" | "dark";
-export type WidgetBorderRadiusStyle = "default" | "rounded" | "sharp";
-export type WidgetShadowSize = "sm" | "md" | "lg";
+export type WidgetBorderRadiusStyle = "none" | "default" | "full";
+export type WidgetShadowSize = "none" | "md" | "lg";
 
-export type WidgetChatMessage = {
-  id: string;
-  role: "user" | "assistant";
-  parts: { type: "text"; text: string }[];
-};
-
-export type WidgetSessionBootstrap = {
-  token: string;
-  messages: WidgetChatMessage[];
-  expiresAt: string;
-};
-
-export type EchoWidgetConfig = {
+export type WidgetWidgetConfig = {
   publicKey: string;
   workspaceId: string;
   displayName: string;
@@ -59,12 +47,11 @@ export type EchoWidgetConfig = {
   leadCaptureMessageThreshold: number;
   enableBrochure: boolean;
   brochureSuggestionText: string;
-  selectedCampaignId: string | null;
 };
 
-export type WidgetSettings = EchoWidgetConfig;
+export type WidgetSettings = WidgetWidgetConfig;
 
-export type EchoPublicConfig = {
+export type WidgetPublicConfig = {
   workspaceId: string;
   publicKey: string;
   position: WidgetPosition;
@@ -96,7 +83,6 @@ export type EchoPublicConfig = {
   enableBrochure: boolean;
   brochureSuggestionText: string;
   allowedDomains: string[];
-  selectedCampaignId: string | null;
 };
 
 export const widgetModelOptions: Record<WidgetModelProvider, { label: string; value: string }[]> = {

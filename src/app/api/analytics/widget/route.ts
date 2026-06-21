@@ -1,4 +1,9 @@
+import type { MessageJson } from "@/features/conversations/server/conversation-service";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
+import {
+  engagedVisitorSessionWhere,
+  widgetLeadWhere,
+} from "@/features/widget/server/widget-data-filters";
 
 export async function GET(request: Request) {
   const { db, workspace } = await requireDashboardContext();
@@ -15,26 +20,66 @@ export async function GET(request: Request) {
           },
         }
       : {};
+  const activeSince = new Date(Date.now() - 30 * 60 * 1000);
 
-  const [totalSessions, activeSessions, totalLeads, feedbackUp, feedbackDown, sessions] =
-    await Promise.all([
-      db.visitorSession.count({ where: { widget: { workspaceId: workspace.id }, ...dateFilter } }),
-      db.visitorSession.count({
-        where: { widget: { workspaceId: workspace.id }, status: "active", ...dateFilter },
-      }),
-      db.lead.count({ where: { workspaceId: workspace.id, ...dateFilter } }),
-      db.messageFeedback.count({
-        where: { feedback: "up", visitorSession: { widget: { workspaceId: workspace.id } } },
-      }),
-      db.messageFeedback.count({
-        where: { feedback: "down", visitorSession: { widget: { workspaceId: workspace.id } } },
-      }),
-      db.visitorSession.findMany({
-        where: { widget: { workspaceId: workspace.id }, ...dateFilter },
-        select: { country: true, deviceType: true },
-        take: 500,
-      }),
-    ]);
+  const [totalSessions, activeSessions, totalLeads, sessions, widgetConvos] = await Promise.all([
+    db.visitorSession.count({
+      where: {
+        widget: { workspaceId: workspace.id },
+        ...engagedVisitorSessionWhere,
+        ...dateFilter,
+      },
+    }),
+    db.visitorSession.count({
+      where: {
+        widget: { workspaceId: workspace.id },
+        status: "active",
+        lastSeenAt: { gte: activeSince },
+        ...engagedVisitorSessionWhere,
+        ...dateFilter,
+      },
+    }),
+    db.lead.count({ where: { ...widgetLeadWhere(workspace.id), ...dateFilter } }),
+    db.visitorSession.findMany({
+      where: {
+        widget: { workspaceId: workspace.id },
+        ...engagedVisitorSessionWhere,
+        ...dateFilter,
+      },
+      select: { country: true, deviceType: true },
+      take: 500,
+    }),
+    db.conversation.findMany({
+      where: {
+        workspaceId: workspace.id,
+        channel: "WIDGET",
+        visitorSession: {
+          is: {
+            hostname: { not: "dashboard-preview" },
+            messageCount: { gt: 0 },
+          },
+        },
+        ...(dateFilter.createdAt ? { createdAt: dateFilter.createdAt } : {}),
+      },
+      select: {
+        messages: true,
+      },
+    }),
+  ]);
+
+  let feedbackUp = 0;
+  let feedbackDown = 0;
+  for (const convo of widgetConvos) {
+    try {
+      const messagesList = JSON.parse(convo.messages || "[]") as MessageJson[];
+      for (const m of messagesList) {
+        if (m.feedback === "positive") feedbackUp++;
+        if (m.feedback === "negative") feedbackDown++;
+      }
+    } catch {
+      // ignore
+    }
+  }
 
   const countries: Record<string, number> = {};
   const devices: Record<string, number> = {};

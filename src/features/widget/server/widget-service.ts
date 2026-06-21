@@ -1,15 +1,13 @@
 import "server-only";
 
-import { randomUUID } from "node:crypto";
-
 import type { PrismaClient } from "@/generated/prisma/client";
 import {
   hostnameMatches,
   normalizeLauncherSize,
   normalizePosition,
   parseJsonArray,
-  type EchoPublicConfig,
-  type EchoWidgetConfig,
+  type WidgetPublicConfig,
+  type WidgetWidgetConfig,
   type WidgetBorderRadiusStyle,
   type WidgetLauncherSize,
   type WidgetModelProvider,
@@ -18,8 +16,6 @@ import {
   type WidgetShadowSize,
   type WidgetTheme,
 } from "@/features/widget/domain";
-
-const visitorSessionDurationMs = 1000 * 60 * 60 * 24 * 90;
 
 type WidgetRecord = Awaited<ReturnType<typeof ensureWorkspaceWidget>>;
 
@@ -30,19 +26,14 @@ export async function ensureWorkspaceWidget(db: PrismaClient, workspaceId: strin
     create: {
       workspaceId,
     },
-    include: {
-      authorizedDomains: {
-        orderBy: { hostname: "asc" },
-      },
-    },
   });
 }
 
 export function toWidgetSettings(widget: WidgetRecord): WidgetSettings {
-  return toEchoWidgetConfig(widget);
+  return toWidgetWidgetConfig(widget);
 }
 
-export function toEchoWidgetConfig(widget: WidgetRecord): EchoWidgetConfig {
+export function toWidgetWidgetConfig(widget: WidgetRecord): WidgetWidgetConfig {
   return {
     publicKey: widget.publicKey,
     workspaceId: widget.workspaceId,
@@ -64,7 +55,7 @@ export function toEchoWidgetConfig(widget: WidgetRecord): EchoWidgetConfig {
     modelProvider: widget.modelProvider as WidgetModelProvider,
     modelName: widget.modelName,
     isEnabled: widget.isEnabled,
-    authorizedDomains: widget.authorizedDomains.map((domain) => domain.hostname),
+    authorizedDomains: JSON.parse(widget.authorizedDomains || "[]") as string[],
     theme: widget.theme as WidgetTheme,
     userBubbleColor: widget.userBubbleColor,
     userBubbleTextColor: widget.userBubbleTextColor,
@@ -85,17 +76,13 @@ export function toEchoWidgetConfig(widget: WidgetRecord): EchoWidgetConfig {
     leadCaptureMessageThreshold: widget.leadCaptureMessageThreshold,
     enableBrochure: widget.enableBrochure,
     brochureSuggestionText: widget.brochureSuggestionText,
-    selectedCampaignId: widget.selectedCampaignId,
   };
 }
 
-export function toEchoPublicConfig(
+export function toWidgetPublicConfig(
   widget: NonNullable<Awaited<ReturnType<typeof getPublicWidget>>>,
-): EchoPublicConfig {
-  const settings = toEchoWidgetConfig({
-    ...widget,
-    authorizedDomains: widget.authorizedDomains,
-  } as WidgetRecord);
+): WidgetPublicConfig {
+  const settings = toWidgetWidgetConfig(widget as WidgetRecord);
 
   return {
     workspaceId: widget.workspaceId,
@@ -129,7 +116,6 @@ export function toEchoPublicConfig(
     enableBrochure: settings.enableBrochure,
     brochureSuggestionText: settings.brochureSuggestionText,
     allowedDomains: settings.authorizedDomains,
-    selectedCampaignId: settings.selectedCampaignId,
   };
 }
 
@@ -137,7 +123,6 @@ export async function getPublicWidget(db: PrismaClient, publicKey: string) {
   return db.widget.findUnique({
     where: { publicKey },
     include: {
-      authorizedDomains: true,
       workspace: {
         select: {
           id: true,
@@ -148,14 +133,8 @@ export async function getPublicWidget(db: PrismaClient, publicKey: string) {
   });
 }
 
-export function isHostnameAuthorized(hostname: string, authorizedDomains: { hostname: string }[]) {
-  const normalizedHostname = hostname.toLowerCase().replace(/\.$/, "");
-  return authorizedDomains.some((domain) => hostnameMatches(normalizedHostname, domain.hostname));
-}
-
 export function validateEmbedOrigin(origin: string | null, allowedDomains: string[]) {
-  if (!origin) return true;
-  if (allowedDomains.length === 0) return true;
+  if (!origin || allowedDomains.length === 0) return false;
 
   try {
     const hostname = new URL(origin).hostname.toLowerCase();
@@ -163,136 +142,6 @@ export function validateEmbedOrigin(origin: string | null, allowedDomains: strin
   } catch {
     return false;
   }
-}
-
-export async function createVisitorSession(
-  db: PrismaClient,
-  widgetId: string,
-  hostname: string,
-  metadata?: {
-    visitorId?: string;
-    browserSessionId?: string;
-    pageUrl?: string;
-    referrer?: string;
-    browser?: string;
-    deviceType?: string;
-    os?: string;
-    country?: string;
-    city?: string;
-    timezone?: string;
-    language?: string;
-    screenSize?: string;
-    ipData?: string;
-  },
-) {
-  return db.visitorSession.create({
-    data: {
-      widgetId,
-      hostname,
-      token: randomUUID(),
-      browserSessionId: metadata?.browserSessionId ?? randomUUID(),
-      visitorId: metadata?.visitorId,
-      pageUrl: metadata?.pageUrl,
-      referrer: metadata?.referrer,
-      browser: metadata?.browser,
-      deviceType: metadata?.deviceType,
-      os: metadata?.os,
-      country: metadata?.country,
-      city: metadata?.city,
-      timezone: metadata?.timezone,
-      language: metadata?.language,
-      screenSize: metadata?.screenSize,
-      ipData: metadata?.ipData,
-      expiresAt: new Date(Date.now() + visitorSessionDurationMs),
-    },
-  });
-}
-
-export async function resolveVisitorSession({
-  db,
-  widgetId,
-  hostname,
-  token,
-  metadata,
-}: {
-  db: PrismaClient;
-  widgetId: string;
-  hostname: string;
-  token?: string | null;
-  metadata?: {
-    visitorId?: string;
-    browserSessionId?: string;
-    pageUrl?: string;
-    referrer?: string;
-    browser?: string;
-    deviceType?: string;
-    os?: string;
-    country?: string;
-    city?: string;
-    timezone?: string;
-    language?: string;
-    screenSize?: string;
-    ipData?: string;
-  };
-}) {
-  const now = new Date();
-
-  if (metadata?.browserSessionId) {
-    const byBrowserSession = await db.visitorSession.findFirst({
-      where: {
-        browserSessionId: metadata.browserSessionId,
-        widgetId,
-        expiresAt: { gt: now },
-      },
-    });
-
-    if (byBrowserSession) {
-      return db.visitorSession.update({
-        where: { id: byBrowserSession.id },
-        data: {
-          lastSeenAt: now,
-          expiresAt: new Date(Date.now() + visitorSessionDurationMs),
-          visitorId: metadata.visitorId ?? byBrowserSession.visitorId,
-          pageUrl: metadata.pageUrl ?? byBrowserSession.pageUrl,
-          referrer: metadata.referrer ?? byBrowserSession.referrer,
-          browser: metadata.browser ?? byBrowserSession.browser,
-          deviceType: metadata.deviceType ?? byBrowserSession.deviceType,
-          os: metadata.os ?? byBrowserSession.os,
-          country: metadata.country ?? byBrowserSession.country,
-          city: metadata.city ?? byBrowserSession.city,
-          timezone: metadata.timezone ?? byBrowserSession.timezone,
-          language: metadata.language ?? byBrowserSession.language,
-          screenSize: metadata.screenSize ?? byBrowserSession.screenSize,
-          ipData: metadata.ipData ?? byBrowserSession.ipData,
-        },
-      });
-    }
-  }
-
-  if (token) {
-    const existing = await db.visitorSession.findFirst({
-      where: {
-        token,
-        widgetId,
-        expiresAt: { gt: now },
-      },
-    });
-
-    if (existing) {
-      return db.visitorSession.update({
-        where: { id: existing.id },
-        data: {
-          lastSeenAt: now,
-          expiresAt: new Date(Date.now() + visitorSessionDurationMs),
-          visitorId: metadata?.visitorId ?? existing.visitorId,
-          pageUrl: metadata?.pageUrl ?? existing.pageUrl,
-          referrer: metadata?.referrer ?? existing.referrer,
-        },
-      });
-    }
-  }
-
-  return createVisitorSession(db, widgetId, hostname, metadata);
 }
 
 export function mapLauncherSizeToPixels(size: WidgetLauncherSize | WidgetPosition | string) {
