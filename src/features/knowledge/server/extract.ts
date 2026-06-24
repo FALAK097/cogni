@@ -1,28 +1,27 @@
 import "server-only";
 
 import { readObject } from "@/lib/storage/index";
-import { chunkText, stripHtml } from "@/features/knowledge/server/chunk";
+import { chunkText } from "@/features/knowledge/server/chunk";
 import { embedText } from "@/lib/ai/embeddings";
 import { upsertVectorizeVectors } from "@/lib/cloudflare/vectorize";
+import { parseFile, scrapeUrl } from "@/lib/firecrawl/client";
 
 export async function extractDocumentText({
   sourceType,
   sourceUrl,
   storageKey,
   mimeType,
+  title,
 }: {
   sourceType: string;
   sourceUrl?: string | null;
   storageKey?: string | null;
   mimeType?: string | null;
+  title?: string | null;
 }) {
-  if (sourceType === "URL" && sourceUrl) {
-    const response = await fetch(sourceUrl, { signal: AbortSignal.timeout(15_000) });
-    if (!response.ok) {
-      throw new Error("Could not fetch the URL.");
-    }
-    const html = await response.text();
-    return stripHtml(html);
+  if ((sourceType === "URL" || sourceType === "SCRAPE") && sourceUrl) {
+    const scraped = await scrapeUrl(sourceUrl);
+    return scraped.markdown;
   }
 
   if (!storageKey) {
@@ -30,27 +29,13 @@ export async function extractDocumentText({
   }
 
   const bytes = await readObject(storageKey);
-  const text = bytes.toString("utf8");
 
-  if (sourceType === "TXT" || mimeType === "text/plain") {
-    return text;
-  }
-
-  if (sourceType === "PDF") {
-    const { PDFParse } = await import("pdf-parse");
-    const parser = new PDFParse({ data: bytes });
-    const parsed = await parser.getText();
-    await parser.destroy();
-    return parsed.text.trim();
-  }
-
-  if (sourceType === "DOCX") {
-    const mammoth = await import("mammoth");
-    const parsed = await mammoth.extractRawText({ buffer: bytes });
-    return parsed.value.trim();
-  }
-
-  throw new Error("Unsupported document type.");
+  const parsed = await parseFile({
+    bytes,
+    filename: title?.trim() || storageKey.split("/").at(-1) || "knowledge-source",
+    mimeType: mimeType || "application/octet-stream",
+  });
+  return parsed.markdown;
 }
 
 export async function indexDocumentContent(

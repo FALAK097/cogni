@@ -19,6 +19,8 @@ export const env = createEnv({
     SEARCH_INDEX: z.string().min(1).optional(),
     OPENAI_API_KEY: z.string().min(1).optional(),
     GEMINI_API_KEY: z.string().min(1).optional(),
+    FIRECRAWL_API_KEY: z.string().min(1).optional(),
+    COMPOSIO_API_KEY: z.string().min(1).optional(),
   },
   experimental__runtimeEnv: process.env,
   emptyStringAsUndefined: true,

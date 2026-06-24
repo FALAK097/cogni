@@ -39,6 +39,7 @@ export async function processDocument({
       sourceUrl: document.sourceUrl,
       storageKey: document.storageKey,
       mimeType: document.mimeType,
+      title: document.title,
     });
 
     await indexDocumentContent(db, document.id, text, workspaceId);

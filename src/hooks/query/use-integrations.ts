@@ -62,9 +62,12 @@ export function useConnectIntegration() {
       metadata?: Record<string, unknown>;
     }) => {
       if (!activeWorkspaceId) throw new Error("No active workspace");
-      const { data, error } = await api.POST<{ ok: boolean }>("/api/dashboard/integrations", {
-        body: { slug },
-      });
+      const { data, error } = await api.POST<{ ok: boolean; redirectUrl?: string }>(
+        "/api/dashboard/integrations",
+        {
+          body: { slug },
+        },
+      );
       return requireData(data, error, "Failed to connect integration");
     },
     onSuccess: () => {

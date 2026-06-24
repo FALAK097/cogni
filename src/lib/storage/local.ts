@@ -11,16 +11,32 @@ const allowedMimeTypes = new Set([
   "image/png",
   "image/gif",
   "image/webp",
+  "image/tiff",
   "application/pdf",
+  "application/msword",
+  "application/rtf",
+  "application/vnd.oasis.opendocument.text",
   "text/plain",
+  "text/csv",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ]);
 
 const maxUploadBytes = 10 * 1024 * 1024;
 const knowledgeMimeTypes = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/tiff",
   "application/pdf",
+  "application/msword",
+  "application/rtf",
+  "application/vnd.oasis.opendocument.text",
   "text/plain",
+  "text/csv",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ]);
 
 export function createStorageKey(workspaceId: string, filename: string) {

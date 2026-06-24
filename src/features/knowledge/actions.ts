@@ -77,12 +77,6 @@ export async function uploadDocumentAction(formData: FormData) {
   if (!isAllowedKnowledgeUpload(mimeType, bytes.length)) {
     return;
   }
-  const sourceType =
-    mimeType === "application/pdf"
-      ? "PDF"
-      : mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        ? "DOCX"
-        : "TXT";
 
   const saved = await saveObject({
     workspaceId: workspace.id,
@@ -95,7 +89,7 @@ export async function uploadDocumentAction(formData: FormData) {
     data: {
       workspaceId: workspace.id,
       title: title.trim(),
-      sourceType,
+      sourceType: "FILE",
       storageKey: saved.storageKey,
       mimeType,
       status: "PROCESSING",

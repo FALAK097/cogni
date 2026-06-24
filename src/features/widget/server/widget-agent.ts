@@ -1,8 +1,10 @@
-import { streamText } from "ai";
+import { stepCountIs, streamText } from "ai";
 
 import type { WidgetModelProvider } from "@/features/widget/domain";
+import { getComposioToolsForWorkspace } from "@/features/integrations/server/composio";
 import { retrieveKnowledgeContext } from "@/features/knowledge/server/retrieval";
 import { getWidgetModel } from "@/lib/ai/providers";
+import { getDb } from "@/lib/db/client";
 
 type WidgetAgentConfig = {
   displayName: string;
@@ -50,6 +52,10 @@ export async function streamWidgetAgent({
       : "No knowledge sources matched this question.";
 
   const { convertToModelMessages } = await import("ai");
+  const tools = await getComposioToolsForWorkspace({
+    db: getDb(),
+    workspaceId: config.workspaceId,
+  });
 
   return streamText({
     model: getWidgetModel(config.modelProvider, config.modelName),
@@ -58,6 +64,8 @@ export async function streamWidgetAgent({
       config.instructions,
       "Use retrieved knowledge when it is relevant. Cite sources inline like [Source: Title].",
       "If knowledge is insufficient, say you do not know and offer human help.",
+      "Use connected workspace tools only when the user clearly asks for an action and provides the required details.",
+      "Do not invent recipients, calendar times, channel names, or message bodies for tool calls.",
       "Be concise and helpful.",
       config.memoryContext ? `\nConversation memory:\n${config.memoryContext}` : "",
       `\nRetrieved knowledge:\n${sourceBlock}`,
@@ -65,6 +73,8 @@ export async function streamWidgetAgent({
       .filter(Boolean)
       .join("\n"),
     messages: await convertToModelMessages(messages),
+    tools,
+    stopWhen: stepCountIs(6),
     onFinish: async ({ text, totalUsage }) => {
       const citationSuffix =
         sources.length > 0

@@ -1,7 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
-
 import { IntegrationCategorySection } from "@/components/integrations/integration-category-section";
 import { useToast } from "@/components/ui/use-toast";
 import { useConnectIntegration, useDisconnectIntegration, useIntegrations } from "@/hooks/query";
@@ -14,15 +12,12 @@ export function WidgetIntegrationsPage() {
   const connectMutation = useConnectIntegration();
   const disconnectMutation = useDisconnectIntegration();
 
-  const connectedSlugs = useMemo(() => {
-    const entries = integrationsQuery.data?.workspaceIntegrations ?? [];
-    return new Set(
-      entries
-        .filter((entry) => entry.status === "CONNECTED")
-        .map((entry) => entry.slug ?? entry.integrationSlug)
-        .filter(Boolean) as string[],
-    );
-  }, [integrationsQuery.data?.workspaceIntegrations]);
+  const connectedSlugs = new Set<string>();
+  for (const entry of integrationsQuery.data?.workspaceIntegrations ?? []) {
+    if (entry.status !== "CONNECTED") continue;
+    const slug = entry.slug ?? entry.integrationSlug;
+    if (slug) connectedSlugs.add(slug);
+  }
 
   async function handleSelect(slug: string) {
     const connected = connectedSlugs.has(slug);
@@ -31,8 +26,12 @@ export function WidgetIntegrationsPage() {
         await disconnectMutation.mutateAsync(slug);
         toast({ title: "Disconnected", description: `${slug} disconnected.` });
       } else {
-        await connectMutation.mutateAsync({ slug });
+        const result = await connectMutation.mutateAsync({ slug });
         toast({ title: "Connected", description: `${slug} connected.` });
+        if (result.redirectUrl) {
+          window.location.assign(result.redirectUrl);
+          return;
+        }
       }
       await integrationsQuery.refetch();
     } catch (error) {

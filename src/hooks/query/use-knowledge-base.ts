@@ -132,8 +132,16 @@ export function useCreateRagSource() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (body: { url: string | string[]; knowledgeBaseId?: string }) => {
-      const { data, error } = await api.POST<{ source: KnowledgeBaseSource }>(
+    mutationFn: async (body: {
+      url: string | string[];
+      mode?: "scrape" | "crawl";
+      knowledgeBaseId?: string;
+      includePaths?: string;
+      excludePaths?: string;
+      maxPages?: number;
+      maxDepth?: number;
+    }) => {
+      const { data, error } = await api.POST<{ addedSources: number; sourceIds: string[] }>(
         "/api/knowledge-base/sources/website",
         { body },
       );

@@ -17,12 +17,3 @@ export function chunkText(text: string) {
 
   return chunks.filter(Boolean);
 }
-
-export function stripHtml(html: string) {
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}

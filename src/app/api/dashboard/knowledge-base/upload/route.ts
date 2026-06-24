@@ -19,16 +19,10 @@ export async function POST(request: Request) {
   const mimeType = file.type || "application/octet-stream";
   if (!isAllowedKnowledgeUpload(mimeType, bytes.length)) {
     return NextResponse.json(
-      { error: "Upload a PDF, DOCX, or text file up to 10 MB." },
+      { error: "Upload a PDF, document, text, spreadsheet, or image file up to 10 MB." },
       { status: 400 },
     );
   }
-  const sourceType =
-    mimeType === "application/pdf"
-      ? "PDF"
-      : mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        ? "DOCX"
-        : "TXT";
 
   const saved = await saveObject({
     workspaceId: workspace.id,
@@ -41,7 +35,7 @@ export async function POST(request: Request) {
     data: {
       workspaceId: workspace.id,
       title: title.trim(),
-      sourceType,
+      sourceType: "FILE",
       storageKey: saved.storageKey,
       mimeType,
       status: "PROCESSING",

@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 
+import { getComposioToolkitForProvider } from "@/features/integrations/server/composio";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
+import {
+  getComposioClient,
+  getComposioWorkspaceUserId,
+  isComposioConfigured,
+} from "@/lib/composio/client";
 
 const PROVIDER_SLUGS: Record<string, string> = {
   GMAIL: "gmail",
@@ -63,7 +69,25 @@ export async function POST(request: Request) {
     },
   });
 
-  return NextResponse.json({ ok: true });
+  const toolkit = getComposioToolkitForProvider(provider);
+  if (!toolkit || !isComposioConfigured()) {
+    return NextResponse.json({ ok: true });
+  }
+
+  const composioSession = await getComposioClient().create(
+    getComposioWorkspaceUserId(workspace.id),
+    {
+      toolkits: [toolkit],
+      workbench: { enable: false },
+      manageConnections: { enable: false },
+    },
+  );
+  const origin = new URL(request.url).origin;
+  const connectionRequest = await composioSession.authorize(toolkit, {
+    callbackUrl: `${origin}/integrations`,
+  });
+
+  return NextResponse.json({ ok: true, redirectUrl: connectionRequest.redirectUrl });
 }
 
 export async function DELETE(request: Request) {

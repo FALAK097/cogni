@@ -6,7 +6,12 @@ import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 const DEFAULT_KB_ID = "default";
 
 function mapDocumentToSource(document: Awaited<ReturnType<typeof listDocuments>>[number]) {
-  const sourceType = document.sourceUrl ? "website" : "file";
+  const sourceType =
+    document.sourceType === "CRAWL"
+      ? "crawl"
+      : document.sourceType === "SCRAPE" || document.sourceType === "URL"
+        ? "scrape"
+        : "file";
   return {
     id: document.id,
     knowledgeBaseId: DEFAULT_KB_ID,
@@ -21,6 +26,7 @@ function mapDocumentToSource(document: Awaited<ReturnType<typeof listDocuments>>
     metadata: {
       mimeType: document.mimeType,
       storageKey: document.storageKey,
+      firecrawlMode: sourceType,
     },
     createdAt: document.createdAt.toISOString(),
     updatedAt: document.updatedAt.toISOString(),
