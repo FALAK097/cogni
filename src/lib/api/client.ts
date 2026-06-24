@@ -50,6 +50,9 @@ function mapPath(path: string) {
   if (path === "/api/knowledge-base") {
     return "/api/dashboard/knowledge-base";
   }
+  if (path === "/api/knowledge-base/sources") {
+    return "/api/dashboard/knowledge-base/sources";
+  }
   if (path.startsWith("/api/knowledge-base/sources/{source_id}")) {
     return path.replace(
       "/api/knowledge-base/sources/{source_id}",

@@ -7,7 +7,7 @@ import {
   CheckCircle2,
   ChevronDown,
   Code,
-  File,
+  File as FileIcon,
   Globe,
   LayoutGrid,
   LinkIcon,
@@ -105,7 +105,7 @@ const modes: {
   icon: typeof Search;
 }[] = [
   { id: "scrape", label: "Scrape", icon: LayoutGrid },
-  { id: "parse", label: "Parse", icon: File },
+  { id: "parse", label: "Parse", icon: FileIcon },
   { id: "crawl", label: "Crawl", icon: Search },
 ];
 
@@ -408,7 +408,7 @@ function UrlPanel({
             <Table className="size-4" />
           </Button>
           <Button variant="outline" type="button" className="gap-2">
-            <File className="size-4" />
+            <FileIcon className="size-4" />
             Format: Markdown
             <ChevronDown className="size-4" />
           </Button>
