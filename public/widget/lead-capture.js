@@ -4,7 +4,7 @@
  */
 
 import { detectLeadCaptureAPI, submitLeadCaptureAPI } from "./api.js";
-import { ICONS, WIDGET_LOGO } from "./constants.js";
+import { ICONS, getWidgetLogoSrc } from "./constants.js";
 import { state } from "./state.js";
 import { saveLeadToStorage } from "./storage.js";
 import {
@@ -77,7 +77,7 @@ export function startConversationalLeadCapture(triggerType, triggerValue) {
  * Ask for user's name
  */
 function askForName() {
-  const logoSrc = state.config.logoUrl || WIDGET_LOGO;
+  const logoSrc = getWidgetLogoSrc(state.config.logoUrl);
 
   const questionDiv = document.createElement("div");
   questionDiv.className = "oc-message bot oc-lead-question";
@@ -143,7 +143,7 @@ function handleNameSubmit() {
  * Ask for user's email
  */
 function askForEmail() {
-  const logoSrc = state.config.logoUrl || WIDGET_LOGO;
+  const logoSrc = getWidgetLogoSrc(state.config.logoUrl);
 
   const questionDiv = document.createElement("div");
   questionDiv.className = "oc-message bot oc-lead-question";
@@ -209,7 +209,7 @@ function handleEmailSubmit() {
  * Ask for user's phone
  */
 function askForPhone() {
-  const logoSrc = state.config.logoUrl || WIDGET_LOGO;
+  const logoSrc = getWidgetLogoSrc(state.config.logoUrl);
 
   const questionDiv = document.createElement("div");
   questionDiv.className = "oc-message bot oc-lead-question";
@@ -302,7 +302,7 @@ function handlePhoneSubmit() {
  * Submit lead capture data to backend
  */
 async function submitLeadCapture() {
-  const logoSrc = state.config.logoUrl || WIDGET_LOGO;
+  const logoSrc = getWidgetLogoSrc(state.config.logoUrl);
 
   // Generate conversation summary
   const conversationSummary = state.conversationHistory

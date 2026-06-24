@@ -12,6 +12,30 @@ import {
 } from "./storage.js";
 import { generateUUID, getBrowserMetadata } from "./utils.js";
 
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function ensureUuid(value) {
+  return typeof value === "string" && uuidPattern.test(value) ? value : generateUUID();
+}
+
+function normalizeLeadInfo(leadInfo) {
+  if (!leadInfo) return null;
+
+  const name = typeof leadInfo.name === "string" ? leadInfo.name.trim() : "";
+  const email = typeof leadInfo.email === "string" ? leadInfo.email.trim() : "";
+  const phone = typeof leadInfo.phone === "string" ? leadInfo.phone.trim() : "";
+
+  if (!name && !email && !phone) {
+    return null;
+  }
+
+  return {
+    name: name || null,
+    email: email || null,
+    phone: phone || null,
+  };
+}
+
 const buildPublicApiUrl = (path) => `${state.baseUrl}${path}`;
 
 function widgetKeyPath(suffix) {
@@ -243,12 +267,12 @@ export async function callWidgetChatAPI(
       ...(state.sessionToken ? { Authorization: `Bearer ${state.sessionToken}` } : {}),
     },
     body: JSON.stringify({
-      sessionId: state.sessionId,
-      interactionId,
-      visitorId: state.visitorId,
+      sessionId: ensureUuid(state.sessionId),
+      interactionId: ensureUuid(interactionId),
+      visitorId: state.visitorId ? ensureUuid(state.visitorId) : null,
       message: userMessage,
       history: historyToSend,
-      leadInfo,
+      leadInfo: normalizeLeadInfo(leadInfo),
       preview: state.preview,
       metadata,
     }),

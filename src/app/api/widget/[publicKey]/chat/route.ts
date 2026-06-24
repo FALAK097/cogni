@@ -34,10 +34,29 @@ export const maxDuration = 60;
 
 const nullableText = (max: number) => z.string().trim().max(max).nullable().default(null);
 
+function emptyToNull(value: unknown) {
+  if (typeof value === "string" && value.trim() === "") {
+    return null;
+  }
+  return value;
+}
+
+const leadInfoSchema = z.preprocess(
+  (value) => (value === undefined ? null : value),
+  z
+    .object({
+      name: z.preprocess(emptyToNull, nullableText(100)),
+      email: z.preprocess(emptyToNull, z.email().nullable().default(null)),
+      phone: z.preprocess(emptyToNull, nullableText(30)),
+    })
+    .nullable()
+    .default(null),
+);
+
 const chatRequestSchema = z.object({
   sessionId: z.string().uuid(),
   interactionId: z.string().uuid(),
-  visitorId: z.string().uuid().nullable().default(null),
+  visitorId: z.preprocess(emptyToNull, z.string().uuid().nullable().default(null)),
   message: z.string().trim().min(1).max(4_000),
   history: z
     .array(
@@ -46,16 +65,9 @@ const chatRequestSchema = z.object({
         content: z.string().trim().min(1).max(4_000),
       }),
     )
-    .min(1)
+    .min(0)
     .max(50),
-  leadInfo: z
-    .object({
-      name: nullableText(100),
-      email: z.email().nullable().default(null),
-      phone: nullableText(30),
-    })
-    .nullable()
-    .default(null),
+  leadInfo: leadInfoSchema,
   preview: z.boolean().default(false),
   metadata: z
     .object({
@@ -116,7 +128,9 @@ export async function POST(
   const { publicKey } = await params;
   const db = getDb();
   const body = parsed.data;
-  const historyMessages = widgetHistoryToUiMessages(body.history);
+  const history =
+    body.history.length > 0 ? body.history : [{ role: "user" as const, content: body.message }];
+  const historyMessages = widgetHistoryToUiMessages(history);
   if (!historyMessages) {
     return Response.json({ error: "A valid message history is required." }, { status: 400 });
   }

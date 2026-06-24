@@ -3,7 +3,9 @@
  * Icons, default configuration, and constant values
  */
 
-export const WIDGET_LOGO = null;
+export function getWidgetLogoSrc(logoUrl) {
+  return typeof logoUrl === "string" && logoUrl.trim() ? logoUrl.trim() : "";
+}
 
 export const STORAGE_KEYS = {
   SESSION: "widget_session_id",

@@ -5,6 +5,85 @@ import { queryVectorize } from "@/lib/cloudflare/vectorize";
 import { getDb } from "@/lib/db/client";
 import { searchCloudflareIndex } from "@/lib/search/cloudflare-search";
 
+type RetrievedChunk = {
+  documentId: string;
+  title: string;
+  content: string;
+};
+
+type DocumentFilter = {
+  workspaceId: string;
+  status: "READY";
+  id?: { in: string[] };
+};
+
+function toRetrievedChunks(
+  chunks: {
+    content: string;
+    document: { id: string; title: string };
+  }[],
+): RetrievedChunk[] {
+  return chunks.map((chunk) => ({
+    documentId: chunk.document.id,
+    title: chunk.document.title,
+    content: chunk.content,
+  }));
+}
+
+function queryTerms(query: string) {
+  return [
+    ...new Set(
+      query
+        .toLowerCase()
+        .replace(/[^\w\s]/g, " ")
+        .split(/\s+/)
+        .map((term) => term.trim())
+        .filter((term) => term.length > 2),
+    ),
+  ].slice(0, 10);
+}
+
+function scoreChunk(content: string, terms: string[]) {
+  const normalized = content.toLowerCase();
+  return terms.reduce((score, term) => (normalized.includes(term) ? score + 1 : score), 0);
+}
+
+async function retrieveByQueryTerms(documentFilter: DocumentFilter, query: string, limit: number) {
+  const terms = queryTerms(query);
+  if (terms.length === 0) {
+    return [];
+  }
+
+  const chunks = await getDb().documentChunk.findMany({
+    where: {
+      document: documentFilter,
+      OR: terms.map((term) => ({
+        content: { contains: term },
+      })),
+    },
+    include: {
+      document: {
+        select: {
+          id: true,
+          title: true,
+        },
+      },
+    },
+    take: Math.max(limit * 8, 32),
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (chunks.length === 0) {
+    return [];
+  }
+
+  return toRetrievedChunks(
+    [...chunks]
+      .sort((left, right) => scoreChunk(right.content, terms) - scoreChunk(left.content, terms))
+      .slice(0, limit),
+  );
+}
+
 export async function retrieveKnowledgeContext(
   workspaceId: string,
   query: string,
@@ -14,10 +93,10 @@ export async function retrieveKnowledgeContext(
   const normalized = query.trim();
   if (!normalized) return [];
 
-  const documentFilter =
+  const documentFilter: DocumentFilter =
     documentIds && documentIds.length > 0
-      ? { workspaceId, status: "READY" as const, id: { in: documentIds } }
-      : { workspaceId, status: "READY" as const };
+      ? { workspaceId, status: "READY", id: { in: documentIds } }
+      : { workspaceId, status: "READY" };
 
   const embedding = await embedText(normalized);
   if (embedding) {
@@ -42,11 +121,7 @@ export async function retrieveKnowledgeContext(
       });
 
       if (chunks.length > 0) {
-        return chunks.map((chunk) => ({
-          documentId: chunk.document.id,
-          title: chunk.document.title,
-          content: chunk.content,
-        }));
+        return toRetrievedChunks(chunks);
       }
     }
   }
@@ -67,39 +142,13 @@ export async function retrieveKnowledgeContext(
     });
 
     if (chunks.length > 0) {
-      return chunks.map((chunk) => ({
-        documentId: chunk.document.id,
-        title: chunk.document.title,
-        content: chunk.content,
-      }));
+      return toRetrievedChunks(chunks);
     }
   }
 
-  const chunks = await getDb().documentChunk.findMany({
-    where: {
-      document: documentFilter,
-      content: {
-        contains: normalized.slice(0, 120),
-      },
-    },
-    include: {
-      document: {
-        select: {
-          id: true,
-          title: true,
-        },
-      },
-    },
-    take: limit,
-    orderBy: { createdAt: "desc" },
-  });
-
-  if (chunks.length > 0) {
-    return chunks.map((chunk) => ({
-      documentId: chunk.document.id,
-      title: chunk.document.title,
-      content: chunk.content,
-    }));
+  const keywordMatches = await retrieveByQueryTerms(documentFilter, normalized, limit);
+  if (keywordMatches.length > 0) {
+    return keywordMatches;
   }
 
   const fallback = await getDb().documentChunk.findMany({
@@ -118,9 +167,5 @@ export async function retrieveKnowledgeContext(
     orderBy: { createdAt: "desc" },
   });
 
-  return fallback.map((chunk) => ({
-    documentId: chunk.document.id,
-    title: chunk.document.title,
-    content: chunk.content,
-  }));
+  return toRetrievedChunks(fallback);
 }

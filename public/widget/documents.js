@@ -4,7 +4,7 @@
  */
 
 import { searchDocuments, saveMessage } from "./api.js";
-import { ICONS, WIDGET_LOGO, BROCHURE_KEYWORDS } from "./constants.js";
+import { ICONS, getWidgetLogoSrc, BROCHURE_KEYWORDS } from "./constants.js";
 import { state } from "./state.js";
 import { escapeHtml, scrollToBottom, getCurrentTime, formatBotMessage } from "./utils.js";
 
@@ -48,7 +48,7 @@ export function extractBrochureSearchQuery(message) {
  * Search and display documents/brochures
  */
 export async function searchAndDisplayDocuments(searchQuery = null) {
-  const logoSrc = state.config.logoUrl || WIDGET_LOGO;
+  const logoSrc = getWidgetLogoSrc(state.config.logoUrl);
 
   // Show loading message
   const loadingDiv = document.createElement("div");
@@ -152,7 +152,7 @@ export async function searchAndDisplayDocuments(searchQuery = null) {
  * Restore document message from history
  */
 export function restoreDocumentMessage(text, documents, timestamp, messageId, existingFeedback) {
-  const logoSrc = state.config.logoUrl || WIDGET_LOGO;
+  const logoSrc = getWidgetLogoSrc(state.config.logoUrl);
 
   const msg = document.createElement("div");
   msg.className = "oc-message bot";

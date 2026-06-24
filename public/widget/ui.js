@@ -11,7 +11,7 @@ import {
   fetchSessionHistory,
   uploadFile,
 } from "./api.js";
-import { ICONS, WIDGET_LOGO } from "./constants.js";
+import { ICONS, getWidgetLogoSrc } from "./constants.js";
 import { DEFAULT_CONFIG } from "./constants.js";
 import {
   checkBrochureKeywords,
@@ -56,7 +56,7 @@ export function createWidget() {
 		<div class="oc-header">
 			<div class="oc-header-left">
 				<div class="oc-avatar">
-					<img src="${config.logoUrl || WIDGET_LOGO || ""}" alt="Logo" />
+					<img src="${getWidgetLogoSrc(config.logoUrl)}" alt="Logo" />
 					<div class="oc-status-dot"></div>
 				</div>
 				<div class="oc-agent-info">
@@ -370,7 +370,7 @@ export function addBotMessage(
 ) {
   const msg = document.createElement("div");
   msg.className = "oc-message bot";
-  const logoSrc = state.config.logoUrl || WIDGET_LOGO;
+  const logoSrc = getWidgetLogoSrc(state.config.logoUrl);
 
   // Only show feedback buttons if messageId exists (not welcome message)
   const feedbackHtml = messageId ? createFeedbackButtons(messageId, existingFeedback) : "";
@@ -448,7 +448,7 @@ export function showTypingIndicator() {
   const indicator = document.createElement("div");
   indicator.id = "oc-typing-indicator";
   indicator.className = "oc-message bot";
-  const logoSrc = state.config.logoUrl || WIDGET_LOGO;
+  const logoSrc = getWidgetLogoSrc(state.config.logoUrl);
   indicator.innerHTML = `
 		<div class="oc-bot-header">
 			<div class="oc-bot-avatar">
@@ -541,7 +541,7 @@ async function callWidgetChat(userMessage, interactionId) {
     // Create streaming message container
     const msg = document.createElement("div");
     msg.className = "oc-message bot";
-    const logoSrc = state.config.logoUrl || WIDGET_LOGO;
+    const logoSrc = getWidgetLogoSrc(state.config.logoUrl);
     msg.innerHTML = `
 			<div class="oc-bot-header">
 				<div class="oc-bot-avatar">
