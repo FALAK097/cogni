@@ -1,32 +1,50 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { Check, Copy, Loader2, Moon, Save, Sun, Trash2 } from "@/components/icons";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { WidgetLiveWidgetPreview } from "@/components/widget/widget-live-preview";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
+  Bot,
+  Code,
+  ExternalLink,
+  Menu,
+  MessageCircle,
+  MessageSquare,
+  Sliders,
+  Sparkles,
+  X,
+} from "@/components/icons";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/use-toast";
-import { useWidgetConfig, useSaveWidgetConfig } from "@/hooks/query";
 import type { DashboardWidgetConfig } from "@/hooks/query";
-import { getRootHref } from "@/lib/deployment-urls";
+import { useWidgetConfig, useSaveWidgetConfig } from "@/hooks/query";
 import { isValidDomain, sanitizeDomain } from "@/lib/domain-validation";
+import { getWidgetAccentVars, WIDGET_BRAND_COLOR } from "@/lib/widget-accent";
+import { cn } from "@/lib/utils";
 
-const VALID_TABS = ["general", "appearance", "content", "lead-capture", "embed"];
+import { WidgetPreviewPanel } from "./widget-preview-panel";
+import {
+  APPEARANCE_DEFAULTS,
+  getAppearanceDefaults,
+  WidgetAgentPanel,
+  WidgetAppearancePanel,
+  WidgetBehaviourPanel,
+  WidgetConversationStarterPanel,
+  WidgetInstallationPanel,
+  WidgetSuggestedQuestionsPanel,
+  type AppearanceConfig,
+} from "./widget-settings-panels";
+
+const WIDGET_SETTINGS_TABS = [
+  "appearance",
+  "agent",
+  "behaviour",
+  "conversation-starter",
+  "suggested-questions",
+  "installation",
+] as const;
+
+type WidgetSettingsTab = (typeof WIDGET_SETTINGS_TABS)[number];
 
 type WidgetCustomizerConfig = Pick<
   DashboardWidgetConfig,
@@ -37,6 +55,8 @@ type WidgetCustomizerConfig = Pick<
   | "welcomeMessage"
   | "logoUrl"
   | "primaryColor"
+  | "backgroundColor"
+  | "textColor"
   | "userBubbleColor"
   | "userBubbleTextColor"
   | "botBubbleColor"
@@ -60,9 +80,208 @@ type WidgetCustomizerConfig = Pick<
   | "enableBrochure"
   | "brochureSuggestionText"
   | "allowedDomains"
+  | "instructions"
+  | "escalationKeywords"
 > & {
   workspaceId: string;
+  secondaryTextColor: string;
+  borderColor: string;
+  linkColor: string;
+  fontFamily: string;
+  fontSize: string;
 };
+
+const LEGACY_TAB_MAP: Record<string, WidgetSettingsTab> = {
+  general: "agent",
+  appearance: "appearance",
+  content: "conversation-starter",
+  "lead-capture": "behaviour",
+  embed: "installation",
+};
+
+const NAV_ITEMS: {
+  id: WidgetSettingsTab;
+  label: string;
+  icon: typeof Sparkles;
+}[] = [
+  { id: "appearance", label: "Appearance", icon: Sparkles },
+  { id: "agent", label: "Agent", icon: Bot },
+  { id: "behaviour", label: "Behaviour", icon: Sliders },
+  { id: "conversation-starter", label: "Conversation Starter", icon: MessageCircle },
+  { id: "suggested-questions", label: "Suggested Questions", icon: MessageSquare },
+  { id: "installation", label: "Installation", icon: Code },
+];
+
+const WIDGET_CARD_CLASS = "rounded-xl border border-[#E5E7EB]";
+
+const WIDGET_SETTINGS_CARD_CLASS = `${WIDGET_CARD_CLASS} overflow-hidden`;
+
+function resolveInitialTab(initialSubtab?: string | null): WidgetSettingsTab {
+  if (!initialSubtab) return "appearance";
+  if (WIDGET_SETTINGS_TABS.includes(initialSubtab as WidgetSettingsTab)) {
+    return initialSubtab as WidgetSettingsTab;
+  }
+  return LEGACY_TAB_MAP[initialSubtab] ?? "appearance";
+}
+
+function mergeWidgetConfig(
+  server: DashboardWidgetConfig,
+  overrides: Partial<WidgetCustomizerConfig>,
+  workspaceId: string,
+): WidgetCustomizerConfig {
+  const secondaryTextColor =
+    overrides.secondaryTextColor ??
+    (server.botBubbleTextColor === "#171717"
+      ? APPEARANCE_DEFAULTS.secondaryTextColor
+      : server.botBubbleTextColor);
+
+  return {
+    ...server,
+    workspaceId,
+    ...overrides,
+    secondaryTextColor,
+    linkColor: overrides.linkColor ?? server.primaryColor,
+    borderColor: overrides.borderColor ?? APPEARANCE_DEFAULTS.borderColor,
+    fontFamily: overrides.fontFamily ?? APPEARANCE_DEFAULTS.fontFamily,
+    fontSize: overrides.fontSize ?? APPEARANCE_DEFAULTS.fontSize,
+  };
+}
+
+function toSavePayload(config: WidgetCustomizerConfig) {
+  return {
+    ...config,
+    botBubbleTextColor: config.secondaryTextColor,
+    headerGradientTo: config.headerGradientFrom,
+    suggestions: config.suggestions.filter((item) => item.trim()),
+    previewMessages: config.previewMessages.filter((item) => item.trim()),
+    leadCaptureKeywords: config.leadCaptureKeywords.filter((item) => item.trim()),
+    allowedDomains: config.allowedDomains || [],
+  };
+}
+
+function WidgetSettingsMenu({
+  activeTab,
+  isOpen,
+  onClose,
+  onTabChange,
+  menuRef,
+}: {
+  activeTab: WidgetSettingsTab;
+  isOpen: boolean;
+  onClose: () => void;
+  onTabChange: (tab: WidgetSettingsTab) => void;
+  menuRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  if (!isOpen) return null;
+
+  return (
+    <div
+      ref={menuRef}
+      className={cn(
+        WIDGET_CARD_CLASS,
+        "absolute top-full left-0 z-50 mt-2 flex w-[248px] flex-col bg-white shadow-[0_4px_16px_rgba(0,0,0,0.08)]",
+      )}
+    >
+      <div className="flex items-center justify-between border-b border-[#E5E7EB] px-4 py-3">
+        <div>
+          <p className="text-sm font-semibold text-[#101828]">Widget</p>
+          <p className="mt-0.5 text-xs leading-4 text-[#667085]">Customize your AI assistant</p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-md p-1.5 text-[#667085] hover:bg-[#F9FAFB] hover:text-[#101828]"
+          aria-label="Close menu"
+        >
+          <X className="size-4" />
+        </button>
+      </div>
+
+      <ul className="flex flex-col gap-0.5 p-2">
+        {NAV_ITEMS.map((item) => {
+          const Icon = item.icon;
+          const isActive = activeTab === item.id;
+          return (
+            <li key={item.id}>
+              <button
+                type="button"
+                onClick={() => onTabChange(item.id)}
+                className={cn(
+                  "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors",
+                  isActive
+                    ? "bg-[var(--widget-accent-muted)] text-[var(--widget-accent)]"
+                    : "text-[#344054] hover:bg-[#F9FAFB]",
+                )}
+              >
+                <Icon
+                  className={cn(
+                    "size-4 shrink-0",
+                    isActive ? "text-[var(--widget-accent)]" : "text-[#98A2B3]",
+                  )}
+                />
+                {item.label}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+
+      <div className="border-t border-[#E5E7EB] px-4 py-3">
+        <p className="text-xs text-[#667085]">Need help?</p>
+        <a
+          href="https://docs.widget.app"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-0.5 inline-flex items-center gap-1 text-xs font-medium text-[var(--widget-accent)] hover:opacity-80"
+        >
+          View documentation
+          <ExternalLink className="size-3" />
+        </a>
+      </div>
+    </div>
+  );
+}
+
+function WidgetCustomizerSkeleton() {
+  return (
+    <div
+      className="flex h-full min-h-0 w-full gap-3 overflow-hidden bg-[#F9FAFB] p-3"
+      style={getWidgetAccentVars(WIDGET_BRAND_COLOR)}
+    >
+      <Skeleton className="size-9 shrink-0 rounded-lg" />
+
+      <div className={cn(WIDGET_SETTINGS_CARD_CLASS, "flex min-h-0 min-w-0 flex-1 flex-col")}>
+        <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto p-6">
+          <Skeleton className="h-5 w-28 rounded" />
+          <Skeleton className="mt-2 h-4 w-56 rounded" />
+          <div className="mt-6 space-y-4">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <Skeleton key={index} className="h-14 w-full rounded-lg" />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div
+        className={cn(
+          WIDGET_CARD_CLASS,
+          "flex w-[380px] shrink-0 flex-col overflow-visible xl:w-[420px]",
+        )}
+      >
+        <div className="flex shrink-0 gap-2 px-4 py-3">
+          <Skeleton className="h-8 w-20 rounded-md" />
+          <Skeleton className="h-8 w-20 rounded-md" />
+          <Skeleton className="h-7 w-7 rounded-md" />
+          <Skeleton className="h-7 w-7 rounded-md" />
+          <Skeleton className="h-7 w-7 rounded-md" />
+        </div>
+        <div className="flex min-h-0 flex-1 items-center justify-center p-4">
+          <Skeleton className="h-[460px] w-[320px] rounded-2xl" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function WidgetCustomizer({
   workspaceId,
@@ -74,143 +293,177 @@ export function WidgetCustomizer({
   const activeWorkspaceId = workspaceId || "";
   const { toast } = useToast();
   const router = useRouter();
-  const [ui, setUi] = useState({
-    activeTab: initialSubtab && VALID_TABS.includes(initialSubtab) ? initialSubtab : "general",
-    isSaving: false,
-    copied: false,
-    domainInput: "",
-  });
-  const { activeTab, isSaving, copied, domainInput } = ui;
-  const inboundNumber = "";
+  const [activeTab, setActiveTab] = useState<WidgetSettingsTab>(() =>
+    resolveInitialTab(initialSubtab),
+  );
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [domainInput, setDomainInput] = useState("");
   const [configOverrides, setConfigOverrides] = useState<Partial<WidgetCustomizerConfig>>({});
-  const defaultConfig: WidgetCustomizerConfig = {
-    workspaceId: activeWorkspaceId || "your-workspace-id",
-    publicKey: "",
-    position: "bottom-right",
-    theme: "light",
-    agentName: "Support",
-    welcomeMessage: "Hi! How can I help you today?",
-    logoUrl: "",
-    primaryColor: "#14805e",
-    userBubbleColor: "#14805e",
-    userBubbleTextColor: "#ffffff",
-    botBubbleColor: "#f2f2f8",
-    botBubbleTextColor: "#171717",
-    headerGradientFrom: "#14805e",
-    headerGradientTo: "#0f6b4e",
-    launcherSize: "md",
-    borderRadius: "default",
-    shadowSize: "md",
-    inputPlaceholder: "Type your message...",
-    suggestions: [
-      "What services do you offer?",
-      "How can I get started?",
-      "Tell me more about pricing",
-    ],
-    hideSuggestionsOnInteract: true,
-    previewMessages: ["Hi there! 👋", "Need help with anything?"],
-    autoShowPreviewDelay: 3000,
-    showBranding: true,
-    privacyPolicyUrl: getRootHref("/privacy-policy"),
-    enableLeadCapture: false,
-    leadCaptureKeywords: ["contact", "contact me", "call me", "reach me", "get in touch"],
-    leadCaptureMinutesThreshold: 5,
-    leadCaptureMessageThreshold: 4,
-    enableBrochure: false,
-    brochureSuggestionText: "Receive Brochure",
-    allowedDomains: [],
-  };
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isSavingRef = useRef(false);
+  const buildSavePayloadRef = useRef<() => Record<string, unknown>>(() => ({}));
+  const menuContainerRef = useRef<HTMLDivElement>(null);
+  const menuPanelRef = useRef<HTMLDivElement>(null);
 
-  // Load data from hooks
   const { data: widgetConfigData, isLoading } = useWidgetConfig(activeWorkspaceId);
   const saveWidgetConfigMutation = useSaveWidgetConfig();
-  const config: WidgetCustomizerConfig = {
-    ...defaultConfig,
-    ...(widgetConfigData && typeof widgetConfigData === "object" ? widgetConfigData : {}),
-    ...configOverrides,
-    workspaceId: activeWorkspaceId || "your-workspace-id",
-  };
 
-  const handleSubTabChange = (value: string) => {
-    setUi((current) => ({ ...current, activeTab: value }));
+  const isReady = Boolean(activeWorkspaceId) && Boolean(widgetConfigData) && !isLoading;
+
+  const config =
+    isReady && widgetConfigData
+      ? mergeWidgetConfig(widgetConfigData, configOverrides, activeWorkspaceId)
+      : null;
+
+  const updateConfig = useCallback(
+    <Key extends keyof WidgetCustomizerConfig>(key: Key, value: WidgetCustomizerConfig[Key]) => {
+      setConfigOverrides((current) => ({ ...current, [key]: value }));
+    },
+    [],
+  );
+
+  const handleSubTabChange = (value: WidgetSettingsTab) => {
+    setActiveTab(value);
+    setMenuOpen(false);
     const url = new URL(window.location.href);
     url.searchParams.set("subtab", value);
     router.push(`${url.pathname}?${url.searchParams.toString()}`, { scroll: false });
   };
 
-  const updateConfig = <Key extends keyof WidgetCustomizerConfig>(
-    key: Key,
-    value: WidgetCustomizerConfig[Key],
-  ) => {
-    setConfigOverrides((current) => ({ ...current, [key]: value }));
-  };
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (menuContainerRef.current?.contains(target) || menuPanelRef.current?.contains(target)) {
+        return;
+      }
+      setMenuOpen(false);
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [menuOpen]);
 
   const handleArrayChange = (
     key: "suggestions" | "previewMessages" | "leadCaptureKeywords",
     value: string,
   ) => {
-    const array = value.split("\n");
-    updateConfig(key, array);
+    updateConfig(key, value.split("\n"));
   };
 
-  const handleSave = () => {
-    if (!activeWorkspaceId) {
-      toast({
-        title: "Error",
-        description: "Workspace ID is required to save configuration.",
-        variant: "destructive",
-      });
-      return;
-    }
+  const handleBehaviourUpdate = (
+    key:
+      | "inputPlaceholder"
+      | "autoShowPreviewDelay"
+      | "hideSuggestionsOnInteract"
+      | "enableLeadCapture"
+      | "leadCaptureMinutesThreshold"
+      | "leadCaptureMessageThreshold"
+      | "enableBrochure"
+      | "brochureSuggestionText"
+      | "privacyPolicyUrl",
+    value: string | number | boolean,
+  ) => {
+    updateConfig(key, value as WidgetCustomizerConfig[typeof key]);
+  };
 
-    setUi((current) => ({ ...current, isSaving: true }));
-    saveWidgetConfigMutation.mutate(
-      {
-        workspaceId: activeWorkspaceId,
-        body: {
-          ...config,
-          suggestions: config.suggestions.filter((suggestion) => suggestion.trim()),
-          previewMessages: config.previewMessages.filter((message) => message.trim()),
-          leadCaptureKeywords: config.leadCaptureKeywords.filter((keyword) => keyword.trim()),
-          allowedDomains: config.allowedDomains || [],
-        },
-      },
-      {
-        onSuccess: () => {
+  const buildSavePayload = useCallback(() => {
+    if (!widgetConfigData) return {};
+    const merged = mergeWidgetConfig(widgetConfigData, configOverrides, activeWorkspaceId);
+    return toSavePayload(merged);
+  }, [activeWorkspaceId, configOverrides, widgetConfigData]);
+
+  buildSavePayloadRef.current = buildSavePayload;
+
+  const persistConfig = useCallback(
+    (options?: { silent?: boolean }) => {
+      if (!activeWorkspaceId || !widgetConfigData || isSavingRef.current) {
+        if (!activeWorkspaceId && !options?.silent) {
           toast({
-            title: "Configuration saved",
-            description: "Your widget configuration has been saved successfully.",
-          });
-          setUi((current) => ({ ...current, isSaving: false }));
-        },
-        onError: (error) => {
-          toast({
-            title: "Error saving configuration",
-            description: error.message || "Failed to save configuration. Please try again.",
+            title: "Error",
+            description: "Workspace ID is required to save configuration.",
             variant: "destructive",
           });
-          setUi((current) => ({ ...current, isSaving: false }));
+        }
+        return;
+      }
+
+      isSavingRef.current = true;
+
+      saveWidgetConfigMutation.mutate(
+        {
+          workspaceId: activeWorkspaceId,
+          body: buildSavePayloadRef.current(),
         },
-      },
-    );
+        {
+          onSuccess: () => {
+            setConfigOverrides({});
+            isSavingRef.current = false;
+            if (!options?.silent) {
+              toast({
+                title: "Configuration saved",
+                description: "Your widget configuration has been published.",
+              });
+            }
+          },
+          onError: (error) => {
+            isSavingRef.current = false;
+            if (!options?.silent) {
+              toast({
+                title: "Error saving configuration",
+                description: error.message || "Failed to save configuration. Please try again.",
+                variant: "destructive",
+              });
+            }
+          },
+        },
+      );
+    },
+    [activeWorkspaceId, saveWidgetConfigMutation, toast, widgetConfigData],
+  );
+
+  useEffect(() => {
+    if (!isReady) return;
+    if (Object.keys(configOverrides).length === 0) return;
+    if (isSavingRef.current) return;
+
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+    }
+
+    saveTimerRef.current = setTimeout(() => {
+      persistConfig({ silent: true });
+    }, 1200);
+
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+      }
+    };
+  }, [configOverrides, isReady, persistConfig]);
+
+  const handleResetAppearance = () => {
+    const defaults = getAppearanceDefaults();
+    setConfigOverrides((current) => ({
+      ...current,
+      ...defaults,
+      userBubbleTextColor: APPEARANCE_DEFAULTS.userBubbleTextColor,
+      headerGradientTo: defaults.headerGradientFrom,
+    }));
   };
+
+  if (!isReady || !config) {
+    return <WidgetCustomizerSkeleton />;
+  }
 
   const handleAddDomain = () => {
     const sanitized = sanitizeDomain(domainInput);
-
-    if (!sanitized) {
+    if (!sanitized || !isValidDomain(domainInput)) {
       toast({
         title: "Invalid domain",
-        description: "Please enter a valid domain name",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!isValidDomain(domainInput)) {
-      toast({
-        title: "Invalid domain format",
-        description: "Domain must be a valid format (e.g., example.com)",
+        description: "Please enter a valid domain name (e.g., example.com)",
         variant: "destructive",
       });
       return;
@@ -227,20 +480,14 @@ export function WidgetCustomizer({
     }
 
     updateConfig("allowedDomains", [...existingDomains, sanitized]);
-    setUi((current) => ({ ...current, domainInput: "" }));
-    toast({
-      title: "Domain added",
-      description: `${sanitized} has been added to allowed domains`,
-    });
+    setDomainInput("");
   };
 
   const handleRemoveDomain = (domain: string) => {
-    const updatedDomains = config.allowedDomains.filter((item) => item !== domain);
-    updateConfig("allowedDomains", updatedDomains);
-    toast({
-      title: "Domain removed",
-      description: `${domain} has been removed from allowed domains`,
-    });
+    updateConfig(
+      "allowedDomains",
+      config.allowedDomains.filter((item) => item !== domain),
+    );
   };
 
   const generateScript = () => {
@@ -250,637 +497,187 @@ export function WidgetCustomizer({
 
   const copyScript = () => {
     navigator.clipboard.writeText(generateScript());
-    setUi((current) => ({ ...current, copied: true }));
+    setCopied(true);
     toast({
       title: "Copied to clipboard",
       description: "Embed code has been copied to your clipboard.",
     });
-    setTimeout(() => setUi((current) => ({ ...current, copied: false })), 2000);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const appearanceConfig: AppearanceConfig = {
+    logoUrl: config.logoUrl ?? "",
+    primaryColor: config.primaryColor,
+    backgroundColor: config.backgroundColor,
+    headerGradientFrom: config.headerGradientFrom,
+    userBubbleColor: config.userBubbleColor,
+    botBubbleColor: config.botBubbleColor,
+    textColor: config.textColor,
+    secondaryTextColor: config.secondaryTextColor,
+    borderColor: config.borderColor,
+    linkColor: config.linkColor,
+    position: config.position,
+    theme: config.theme,
+    showBranding: config.showBranding,
+    welcomeMessage: config.welcomeMessage,
+    fontFamily: config.fontFamily,
+    fontSize: config.fontSize,
+  };
+
+  const handleAppearanceUpdate = <K extends keyof AppearanceConfig>(
+    key: K,
+    value: AppearanceConfig[K],
+  ) => {
+    if (key === "secondaryTextColor") {
+      updateConfig("secondaryTextColor", value as string);
+      updateConfig("botBubbleTextColor", value as string);
+      return;
+    }
+    updateConfig(
+      key as keyof WidgetCustomizerConfig,
+      value as WidgetCustomizerConfig[keyof WidgetCustomizerConfig],
+    );
   };
 
   return (
-    <div className="relative w-full min-h-[calc(100vh-140px)]">
-      {/* Full Width Controls */}
-      <div className="w-full">
-        <Card className="border-0 ring-0 shadow-none bg-transparent">
-          <CardContent className="px-0">
-            <Tabs value={activeTab} onValueChange={handleSubTabChange} className="w-full">
-              <div className="flex flex-col gap-4 mb-6 md:flex-row md:items-center md:justify-between">
-                <TabsList className="grid w-full grid-cols-5 md:max-w-2xl">
-                  <TabsTrigger value="general">General</TabsTrigger>
-                  <TabsTrigger value="appearance">Style</TabsTrigger>
-                  <TabsTrigger value="content">Content</TabsTrigger>
-                  <TabsTrigger value="lead-capture">Lead Capture</TabsTrigger>
-                  <TabsTrigger value="embed">Embed</TabsTrigger>
-                </TabsList>
-                <Button
-                  variant="outline"
-                  onClick={handleSave}
-                  disabled={isSaving || isLoading}
-                  className="gap-2 md:w-auto"
-                >
-                  {isSaving ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Save className="w-4 h-4" />
-                  )}
-                  {isSaving ? "Saving..." : "Save"}
-                </Button>
-              </div>
+    <div
+      className="flex h-full min-h-0 w-full gap-3 overflow-hidden bg-[#F9FAFB] p-3"
+      style={getWidgetAccentVars(config.primaryColor)}
+    >
+      {/* Left hamburger */}
+      <div ref={menuContainerRef} className="relative shrink-0 self-start pt-1">
+        <button
+          type="button"
+          onClick={() => setMenuOpen((open) => !open)}
+          className="inline-flex size-9 items-center justify-center rounded-lg border border-[#E5E7EB] bg-white text-[#667085] shadow-[0_1px_2px_0_rgba(0,0,0,0.05)] transition-colors hover:bg-[#F9FAFB] hover:text-[#101828]"
+          aria-label="Open widget settings menu"
+          aria-expanded={menuOpen}
+        >
+          <Menu className="size-5" />
+        </button>
 
-              <TabsContent value="general" className="space-y-4">
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="agentName">Agent Name</Label>
-                    <Input
-                      id="agentName"
-                      value={config.agentName}
-                      onChange={(e) => updateConfig("agentName", e.target.value)}
-                      placeholder="Enter agent name"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Position</Label>
-                    <Select
-                      value={config.position}
-                      onValueChange={(value) => {
-                        if (value) updateConfig("position", value);
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select position" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="bottom-right">Bottom Right</SelectItem>
-                        <SelectItem value="bottom-left">Bottom Left</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Theme</Label>
-                    <div className="flex items-center gap-2 p-1 border rounded-lg w-fit">
-                      <Button
-                        type="button"
-                        variant={config.theme === "light" ? "secondary" : "ghost"}
-                        size="sm"
-                        onClick={() => updateConfig("theme", "light")}
-                        className="gap-2"
-                      >
-                        <Sun className="w-4 h-4" /> Light
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={config.theme === "dark" ? "secondary" : "ghost"}
-                        size="sm"
-                        onClick={() => updateConfig("theme", "dark")}
-                        className="gap-2"
-                      >
-                        <Moon className="w-4 h-4" /> Dark
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="welcomeMessage">Welcome Message</Label>
-                  <Textarea
-                    id="welcomeMessage"
-                    value={config.welcomeMessage}
-                    onChange={(e) => updateConfig("welcomeMessage", e.target.value)}
-                    placeholder="Enter welcome message"
-                    rows={2}
-                  />
-                </div>
-
-                <Separator />
-
-                <div className="space-y-4">
-                  <Label className="text-sm font-medium">Logo Settings</Label>
-                  <div className="max-w-md space-y-2">
-                    <Label htmlFor="logoUrl">Logo URL</Label>
-                    <Input
-                      id="logoUrl"
-                      value={config.logoUrl ?? ""}
-                      onChange={(e) => updateConfig("logoUrl", e.target.value)}
-                      placeholder="https://example.com/logo.png"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      URL for the bot avatar and header logo
-                    </p>
-                  </div>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="appearance" className="space-y-6">
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="primaryColor">Primary Color</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="primaryColor"
-                        type="color"
-                        value={config.primaryColor}
-                        onChange={(e) => updateConfig("primaryColor", e.target.value)}
-                        className="w-12 h-10 p-1 border-2 cursor-pointer"
-                      />
-                      <Input
-                        value={config.primaryColor}
-                        onChange={(e) => updateConfig("primaryColor", e.target.value)}
-                        placeholder="#000000"
-                        className="flex-1"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Launcher Size</Label>
-                    <Select
-                      value={config.launcherSize}
-                      onValueChange={(value) => {
-                        if (value) updateConfig("launcherSize", value);
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select size" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="sm">Small</SelectItem>
-                        <SelectItem value="md">Medium</SelectItem>
-                        <SelectItem value="lg">Large</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Border Radius</Label>
-                    <Select
-                      value={config.borderRadius}
-                      onValueChange={(value) => {
-                        if (value) updateConfig("borderRadius", value);
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select radius" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        <SelectItem value="default">Default</SelectItem>
-                        <SelectItem value="full">Full</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Shadow</Label>
-                    <Select
-                      value={config.shadowSize}
-                      onValueChange={(value) => {
-                        if (value) updateConfig("shadowSize", value);
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select shadow" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        <SelectItem value="md">Medium</SelectItem>
-                        <SelectItem value="lg">Large</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div className="space-y-4">
-                  <Label className="text-sm font-medium">Header Gradient</Label>
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">From</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          type="color"
-                          value={config.headerGradientFrom}
-                          onChange={(e) => updateConfig("headerGradientFrom", e.target.value)}
-                          className="w-12 p-1 border-2 cursor-pointer h-9"
-                        />
-                        <Input
-                          value={config.headerGradientFrom}
-                          onChange={(e) => updateConfig("headerGradientFrom", e.target.value)}
-                          placeholder="#18181b"
-                          className="flex-1"
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">To</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          type="color"
-                          value={config.headerGradientTo}
-                          onChange={(e) => updateConfig("headerGradientTo", e.target.value)}
-                          className="w-12 p-1 border-2 cursor-pointer h-9"
-                        />
-                        <Input
-                          value={config.headerGradientTo}
-                          onChange={(e) => updateConfig("headerGradientTo", e.target.value)}
-                          placeholder="#000000"
-                          className="flex-1"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                  <div className="space-y-4">
-                    <Label className="text-sm font-medium">User Bubble</Label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">Background</Label>
-                        <div className="flex gap-2">
-                          <Input
-                            type="color"
-                            value={config.userBubbleColor}
-                            onChange={(e) => updateConfig("userBubbleColor", e.target.value)}
-                            className="w-12 p-1 border-2 cursor-pointer h-9"
-                          />
-                          <Input
-                            value={config.userBubbleColor}
-                            onChange={(e) => updateConfig("userBubbleColor", e.target.value)}
-                            placeholder="#000000"
-                            className="flex-1"
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">Text</Label>
-                        <div className="flex gap-2">
-                          <Input
-                            type="color"
-                            value={config.userBubbleTextColor}
-                            onChange={(e) => updateConfig("userBubbleTextColor", e.target.value)}
-                            className="w-12 p-1 border-2 cursor-pointer h-9"
-                          />
-                          <Input
-                            value={config.userBubbleTextColor}
-                            onChange={(e) => updateConfig("userBubbleTextColor", e.target.value)}
-                            placeholder="#ffffff"
-                            className="flex-1"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <Label className="text-sm font-medium">Bot Bubble</Label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">Background</Label>
-                        <div className="flex gap-2">
-                          <Input
-                            type="color"
-                            value={config.botBubbleColor}
-                            onChange={(e) => updateConfig("botBubbleColor", e.target.value)}
-                            className="w-12 p-1 border-2 cursor-pointer h-9"
-                          />
-                          <Input
-                            value={config.botBubbleColor}
-                            onChange={(e) => updateConfig("botBubbleColor", e.target.value)}
-                            placeholder="#f4f4f5"
-                            className="flex-1"
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">Text</Label>
-                        <div className="flex gap-2">
-                          <Input
-                            type="color"
-                            value={config.botBubbleTextColor}
-                            onChange={(e) => updateConfig("botBubbleTextColor", e.target.value)}
-                            className="w-12 p-1 border-2 cursor-pointer h-9"
-                          />
-                          <Input
-                            value={config.botBubbleTextColor}
-                            onChange={(e) => updateConfig("botBubbleTextColor", e.target.value)}
-                            placeholder="#18181b"
-                            className="flex-1"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="content" className="space-y-4">
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="inputPlaceholder">Input Placeholder</Label>
-                    <Input
-                      id="inputPlaceholder"
-                      value={config.inputPlaceholder}
-                      onChange={(e) => updateConfig("inputPlaceholder", e.target.value)}
-                      placeholder="Type your message..."
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="autoShowDelay">Auto Show Delay (ms)</Label>
-                    <Input
-                      id="autoShowDelay"
-                      type="number"
-                      value={config.autoShowPreviewDelay}
-                      onChange={(e) =>
-                        updateConfig("autoShowPreviewDelay", parseInt(e.target.value) || 0)
-                      }
-                      placeholder="3000"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Set to 0 to show immediately, or -1 to disable.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="suggestions">Suggested Questions (one per line)</Label>
-                    <Textarea
-                      id="suggestions"
-                      value={(config.suggestions || []).join("\n")}
-                      onChange={(e) => handleArrayChange("suggestions", e.target.value)}
-                      placeholder={
-                        "What services do you offer?\nHow can I get started?\nHow can I contact support?"
-                      }
-                      rows={4}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="previewMessages">Preview Messages (one per line)</Label>
-                    <Textarea
-                      id="previewMessages"
-                      value={(config.previewMessages || []).join("\n")}
-                      onChange={(e) => handleArrayChange("previewMessages", e.target.value)}
-                      placeholder="Hi! How can I help?"
-                      rows={4}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="hideSuggestionsOnInteract">Hide Suggestions on Interact</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Hide suggested questions after user sends a message
-                    </p>
-                  </div>
-                  <Switch
-                    id="hideSuggestionsOnInteract"
-                    checked={config.hideSuggestionsOnInteract}
-                    onCheckedChange={(val) => updateConfig("hideSuggestionsOnInteract", val)}
-                  />
-                </div>
-
-                <Separator />
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="showBranding">Show Branding</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Display &quot;Powered by widget&quot; link in the widget
-                    </p>
-                  </div>
-                  <Switch
-                    id="showBranding"
-                    checked={config.showBranding}
-                    onCheckedChange={(val) => updateConfig("showBranding", val)}
-                  />
-                </div>
-
-                <Separator />
-
-                <div className="space-y-2">
-                  <Label htmlFor="privacyPolicyUrl">Privacy Policy URL</Label>
-                  <Input
-                    id="privacyPolicyUrl"
-                    value={config.privacyPolicyUrl}
-                    onChange={(e) => updateConfig("privacyPolicyUrl", e.target.value)}
-                    placeholder="https://example.com/privacy-policy"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Link to your privacy policy shown in the widget footer
-                  </p>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="embed" className="space-y-6">
-                <div className="space-y-4">
-                  <div className="space-y-1">
-                    <Label className="text-base font-medium">Authorized Domains</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Add each website domain where the widget is embedded (for example{" "}
-                      <code className="px-1 py-0.5 bg-muted rounded text-xs">acme.com</code>
-                      ). Subdomains are included automatically. The widget dashboard is always
-                      allowed for preview.
-                    </p>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                        <span className="text-sm text-muted-foreground">https://</span>
-                      </div>
-                      <Input
-                        id="domainInput"
-                        placeholder="example.com"
-                        value={domainInput}
-                        onChange={(event) =>
-                          setUi((current) => ({
-                            ...current,
-                            domainInput: event.target.value,
-                          }))
-                        }
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            handleAddDomain();
-                          }
-                        }}
-                        className="pl-18"
-                      />
-                    </div>
-                    <Button onClick={handleAddDomain} disabled={!domainInput}>
-                      Add
-                    </Button>
-                  </div>
-
-                  <div className="space-y-2">
-                    {(config.allowedDomains || []).map((domain: string) => (
-                      <div
-                        key={domain}
-                        className="flex items-center justify-between px-3 py-2 border rounded-md bg-muted/40"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">{domain}</span>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRemoveDomain(domain)}
-                          className="w-8 h-8 text-muted-foreground hover:text-destructive"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ))}
-                    {(!config.allowedDomains || config.allowedDomains.length === 0) && (
-                      <div className="flex flex-col items-center justify-center py-6 border-2 border-dashed rounded-lg border-muted/50">
-                        <p className="text-sm text-muted-foreground">No domains authorized yet</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div className="space-y-4">
-                  <div className="space-y-1">
-                    <Label className="text-base font-medium">Installation</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Copy this code and paste it before the closing{" "}
-                      <code className="px-1 py-0.5 bg-muted rounded text-xs">&lt;/body&gt;</code>{" "}
-                      tag.
-                    </p>
-                  </div>
-                  <div className="relative">
-                    <pre className="p-4 overflow-x-auto font-mono text-xs border rounded-lg bg-muted/50 max-h-80">
-                      {generateScript()}
-                    </pre>
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="secondary"
-                      className="absolute w-8 h-8 top-2 right-2"
-                      onClick={copyScript}
-                    >
-                      {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                    </Button>
-                  </div>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="lead-capture" className="space-y-4">
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="enableLeadCapture" className="flex items-center gap-2">
-                      <Switch
-                        id="enableLeadCapture"
-                        checked={config.enableLeadCapture || false}
-                        onCheckedChange={(checked) => updateConfig("enableLeadCapture", checked)}
-                      />
-                      Enable Lead Capture
-                    </Label>
-                    <p className="text-xs text-muted-foreground">
-                      Automatically capture visitor information when they show buying intent
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="leadCaptureMinutesThreshold">
-                      Session Duration Threshold (minutes)
-                    </Label>
-                    <Input
-                      id="leadCaptureMinutesThreshold"
-                      type="number"
-                      min="1"
-                      max="60"
-                      value={config.leadCaptureMinutesThreshold || 5}
-                      onChange={(e) =>
-                        updateConfig("leadCaptureMinutesThreshold", parseInt(e.target.value))
-                      }
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Show form after visitor has been chatting for this long
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="leadCaptureMessageThreshold">Message Count Threshold</Label>
-                    <Input
-                      id="leadCaptureMessageThreshold"
-                      type="number"
-                      min="1"
-                      max="50"
-                      value={config.leadCaptureMessageThreshold || 4}
-                      onChange={(e) =>
-                        updateConfig("leadCaptureMessageThreshold", parseInt(e.target.value))
-                      }
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Show form after visitor has sent this many messages
-                    </p>
-                  </div>
-                </div>
-
-                <Separator className="my-4" />
-
-                <div className="space-y-2">
-                  <Label htmlFor="leadCaptureKeywords">Trigger Keywords (one per line)</Label>
-                  <Textarea
-                    id="leadCaptureKeywords"
-                    placeholder="contact&#10;contact me&#10;call me&#10;reach me&#10;get in touch"
-                    rows={5}
-                    value={(config.leadCaptureKeywords || []).join("\n")}
-                    onChange={(e) => handleArrayChange("leadCaptureKeywords", e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Visitors will be prompted to leave their contact info when they mention any of
-                    these keywords
-                  </p>
-                </div>
-
-                {/* Brochure Feature */}
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="enableBrochure" className="flex items-center gap-2">
-                      <Switch
-                        id="enableBrochure"
-                        checked={config.enableBrochure || false}
-                        onCheckedChange={(checked) => updateConfig("enableBrochure", checked)}
-                      />
-                      Enable Brochure Feature
-                    </Label>
-                    <p className="text-xs text-muted-foreground">
-                      Add a brochure suggestion button to the chat. Visitors can click it or type
-                      keywords like &quot;send brochure&quot; to receive downloadable documents
-                      directly in the chat widget.
-                    </p>
-                  </div>
-
-                  {config.enableBrochure && (
-                    <>
-                      <div className="space-y-2">
-                        <Label htmlFor="brochureSuggestionText">Suggestion Button Text</Label>
-                        <Input
-                          id="brochureSuggestionText"
-                          value={config.brochureSuggestionText || "Receive Brochure"}
-                          onChange={(e) => updateConfig("brochureSuggestionText", e.target.value)}
-                          placeholder="Receive Brochure"
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          The text shown on the suggestion button
-                        </p>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
+        <WidgetSettingsMenu
+          activeTab={activeTab}
+          isOpen={menuOpen}
+          onClose={() => setMenuOpen(false)}
+          onTabChange={handleSubTabChange}
+          menuRef={menuPanelRef}
+        />
       </div>
 
-      <WidgetLiveWidgetPreview config={config} inboundNumber={inboundNumber} />
+      {/* Center settings box — always open */}
+      <div className={cn(WIDGET_SETTINGS_CARD_CLASS, "flex min-h-0 min-w-0 flex-1 flex-col")}>
+        <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto px-6 py-6">
+          {activeTab === "appearance" ? (
+            <WidgetAppearancePanel
+              config={appearanceConfig}
+              onUpdate={handleAppearanceUpdate}
+              onReset={handleResetAppearance}
+            />
+          ) : null}
+
+          {activeTab === "agent" ? (
+            <WidgetAgentPanel
+              agentName={config.agentName}
+              instructions={config.instructions}
+              escalationKeywords={config.escalationKeywords}
+              onUpdate={(key, value) => updateConfig(key, value)}
+            />
+          ) : null}
+
+          {activeTab === "behaviour" ? (
+            <WidgetBehaviourPanel
+              inputPlaceholder={config.inputPlaceholder}
+              autoShowPreviewDelay={config.autoShowPreviewDelay}
+              hideSuggestionsOnInteract={config.hideSuggestionsOnInteract}
+              enableLeadCapture={config.enableLeadCapture}
+              leadCaptureMinutesThreshold={config.leadCaptureMinutesThreshold}
+              leadCaptureMessageThreshold={config.leadCaptureMessageThreshold}
+              leadCaptureKeywords={config.leadCaptureKeywords}
+              enableBrochure={config.enableBrochure}
+              brochureSuggestionText={config.brochureSuggestionText}
+              privacyPolicyUrl={config.privacyPolicyUrl}
+              onUpdate={handleBehaviourUpdate}
+              onKeywordsChange={(value) => handleArrayChange("leadCaptureKeywords", value)}
+            />
+          ) : null}
+
+          {activeTab === "conversation-starter" ? (
+            <WidgetConversationStarterPanel
+              welcomeMessage={config.welcomeMessage}
+              previewMessages={config.previewMessages}
+              onUpdateWelcome={(value) => updateConfig("welcomeMessage", value)}
+              onPreviewMessagesChange={(value) => handleArrayChange("previewMessages", value)}
+            />
+          ) : null}
+
+          {activeTab === "suggested-questions" ? (
+            <WidgetSuggestedQuestionsPanel
+              suggestions={config.suggestions}
+              onChange={(value) => handleArrayChange("suggestions", value)}
+            />
+          ) : null}
+
+          {activeTab === "installation" ? (
+            <WidgetInstallationPanel
+              allowedDomains={config.allowedDomains}
+              domainInput={domainInput}
+              copied={copied}
+              embedScript={generateScript()}
+              onDomainInputChange={setDomainInput}
+              onAddDomain={handleAddDomain}
+              onRemoveDomain={handleRemoveDomain}
+              onCopyScript={copyScript}
+            />
+          ) : null}
+        </div>
+      </div>
+
+      {/* Right preview box — always visible */}
+      <div
+        className={cn(
+          WIDGET_CARD_CLASS,
+          "flex min-h-0 w-[380px] shrink-0 flex-col overflow-visible xl:w-[420px]",
+        )}
+      >
+        <WidgetPreviewPanel
+          liveConfig={{
+            workspaceId: config.workspaceId,
+            publicKey: config.publicKey,
+            agentName: config.agentName,
+            welcomeMessage: config.welcomeMessage,
+            logoUrl: config.logoUrl,
+            primaryColor: config.primaryColor,
+            backgroundColor: config.backgroundColor,
+            textColor: config.textColor,
+            userBubbleColor: config.userBubbleColor,
+            userBubbleTextColor: config.userBubbleTextColor,
+            botBubbleColor: config.botBubbleColor,
+            botBubbleTextColor: config.secondaryTextColor,
+            headerGradientFrom: config.headerGradientFrom,
+            headerGradientTo: config.headerGradientTo,
+            position: config.position,
+            theme: config.theme,
+            launcherSize: config.launcherSize,
+            borderRadius: config.borderRadius,
+            shadowSize: config.shadowSize,
+            inputPlaceholder: config.inputPlaceholder,
+            suggestions: config.suggestions,
+            hideSuggestionsOnInteract: config.hideSuggestionsOnInteract,
+            previewMessages: config.previewMessages,
+            autoShowPreviewDelay: config.autoShowPreviewDelay,
+            showBranding: config.showBranding,
+            privacyPolicyUrl: config.privacyPolicyUrl,
+            enableLeadCapture: config.enableLeadCapture,
+            leadCaptureKeywords: config.leadCaptureKeywords,
+            leadCaptureMinutesThreshold: config.leadCaptureMinutesThreshold,
+            leadCaptureMessageThreshold: config.leadCaptureMessageThreshold,
+            enableBrochure: config.enableBrochure,
+            brochureSuggestionText: config.brochureSuggestionText,
+            allowedDomains: config.allowedDomains,
+          }}
+        />
+      </div>
     </div>
   );
 }

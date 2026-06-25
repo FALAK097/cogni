@@ -1,5 +1,5 @@
 import { parseJsonArray } from "@/features/widget/domain";
-import { detectLeadCaptureTrigger } from "@/features/leads/server/lead-service";
+import { detectLeadCaptureTrigger } from "@/features/widget/server/lead-capture";
 import {
   assertPublicWidgetAccess,
   requireAuthorizedVisitorSession,

@@ -38,7 +38,7 @@ Customer website
 src/
 ├── app/             # Next.js routes, API endpoints
 ├── components/      # Shared React components (Sidebar, Topbar, Widget UI)
-├── features/        # Feature modules: conversations, widget, integrations, leads, workspace
+├── features/        # Feature modules: conversations, widget, integrations, workspace
 ├── hooks/           # Custom React hooks (TanStack Query query-keys, etc.)
 └── lib/             # Shared clients: Prisma database, Better Auth, Vercel AI SDK, rate limiting
 ```

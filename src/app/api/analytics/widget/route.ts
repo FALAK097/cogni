@@ -1,9 +1,6 @@
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
-import {
-  engagedVisitorSessionWhere,
-  widgetLeadWhere,
-} from "@/features/widget/server/widget-data-filters";
+import { engagedVisitorSessionWhere } from "@/features/widget/server/widget-data-filters";
 
 export async function GET(request: Request) {
   const { db, workspace } = await requireDashboardContext();
@@ -22,7 +19,7 @@ export async function GET(request: Request) {
       : {};
   const activeSince = new Date(Date.now() - 30 * 60 * 1000);
 
-  const [totalSessions, activeSessions, totalLeads, sessions, widgetConvos] = await Promise.all([
+  const [totalSessions, activeSessions, sessions, widgetConvos] = await Promise.all([
     db.visitorSession.count({
       where: {
         widget: { workspaceId: workspace.id },
@@ -39,7 +36,6 @@ export async function GET(request: Request) {
         ...dateFilter,
       },
     }),
-    db.lead.count({ where: { ...widgetLeadWhere(workspace.id), ...dateFilter } }),
     db.visitorSession.findMany({
       where: {
         widget: { workspaceId: workspace.id },
@@ -91,7 +87,6 @@ export async function GET(request: Request) {
   return Response.json({
     totalSessions,
     activeSessions,
-    totalLeads,
     feedback: { up: feedbackUp, down: feedbackDown },
     visitorsByCountry: countries,
     visitorsByDevice: devices,

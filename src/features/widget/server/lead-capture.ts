@@ -1,33 +1,6 @@
 import "server-only";
 
 import type { PrismaClient } from "@/generated/prisma/client";
-import { widgetLeadWhere } from "@/features/widget/server/widget-data-filters";
-
-export async function listWorkspaceLeads(
-  db: PrismaClient,
-  workspaceId: string,
-  options: { page?: number; limit?: number } = {},
-) {
-  const page = Math.max(1, options.page ?? 1);
-  const limit = Math.min(50, Math.max(1, options.limit ?? 20));
-  const skip = (page - 1) * limit;
-  const where = widgetLeadWhere(workspaceId);
-
-  const [items, total] = await Promise.all([
-    db.lead.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      skip,
-      take: limit,
-      include: {
-        contact: { select: { id: true, name: true, email: true } },
-      },
-    }),
-    db.lead.count({ where }),
-  ]);
-
-  return { items, total, page, limit };
-}
 
 export async function submitWidgetLeadCapture({
   db,

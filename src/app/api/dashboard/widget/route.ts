@@ -43,6 +43,9 @@ async function saveWidgetConfig(body: Record<string, unknown>) {
       logoUrl: typeof body.logoUrl === "string" ? body.logoUrl || null : current.logoUrl,
       primaryColor:
         typeof body.primaryColor === "string" ? body.primaryColor : current.primaryColor,
+      backgroundColor:
+        typeof body.backgroundColor === "string" ? body.backgroundColor : current.backgroundColor,
+      textColor: typeof body.textColor === "string" ? body.textColor : current.textColor,
       userBubbleColor:
         typeof body.userBubbleColor === "string" ? body.userBubbleColor : current.userBubbleColor,
       userBubbleTextColor:

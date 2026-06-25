@@ -45,7 +45,6 @@ const LABELS: Record<string, string> = {
   dashboard: "Dashboard",
   widget: "Widget",
   integrations: "Integrations",
-  leads: "Leads",
   settings: "Settings",
   usage: "Usage",
   whatsapp: "WhatsApp",

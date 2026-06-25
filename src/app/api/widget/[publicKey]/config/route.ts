@@ -37,6 +37,8 @@ export async function GET(
     botBubbleTextColor: widget.botBubbleTextColor,
     headerGradientFrom: widget.headerGradientFrom,
     headerGradientTo: widget.headerGradientTo,
+    backgroundColor: widget.backgroundColor,
+    textColor: widget.textColor,
     launcherSize: widget.launcherSize,
     borderRadius: widget.borderRadiusStyle,
     shadowSize: widget.shadowSize,
