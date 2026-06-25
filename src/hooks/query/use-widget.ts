@@ -21,6 +21,8 @@ export interface IpData {
   timezone?: string;
 }
 
+export type ConversationFilter = "all" | "unassigned" | "mine" | "open" | "closed";
+
 export interface WidgetSessionSummary {
   id: string;
   visitorId: string;
@@ -36,6 +38,11 @@ export interface WidgetSessionSummary {
   createdAt: string;
   contactName: string;
   contactEmail: string | null;
+  conversationId: string | null;
+  conversationStatus: string;
+  assigneeName: string | null;
+  assigneeId: string | null;
+  unreadCount: number;
   preview: string;
   messages: Array<{ content: string }>;
   ipData?: IpData | null;
@@ -45,15 +52,39 @@ export interface WidgetSessionSummary {
 export interface WidgetMessage {
   id: string;
   role: "user" | "assistant";
+  authorType: "VISITOR" | "AI" | "TEAM";
+  authorName: string | null;
   content: string;
   timestamp: string;
+  visibility: "PUBLIC" | "INTERNAL";
   feedback?: "positive" | "negative" | null;
   feedbackReason?: string | null;
   feedbackAt?: string | null;
+  isInternal: boolean;
   metadata?: {
     type?: string;
     documents?: Array<{ fileName: string; description?: string; fileUrl: string }>;
   };
+}
+
+export interface WidgetContactNote {
+  id: string;
+  body: string;
+  createdAt: string;
+  authorName: string;
+}
+
+export interface WidgetInternalNote {
+  id: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface WidgetPreviousConversation {
+  id: string;
+  subject: string;
+  status: string;
+  lastMessageAt: string;
 }
 
 export interface WidgetSessionDetail {
@@ -66,16 +97,39 @@ export interface WidgetSessionDetail {
   screenSize: string | null;
   pageUrl: string | null;
   referrer: string | null;
+  timezone: string | null;
   createdAt: string;
   lastActivityAt: string;
   ipData?: IpData | null;
   messages: WidgetMessage[];
   contactName?: string | null;
   contactEmail?: string | null;
+  contactId?: string | null;
+  contactExternalId?: string | null;
+  contactCreatedAt?: string | null;
+  contactLastSeenAt?: string | null;
+  conversationId?: string | null;
+  conversationStatus?: string;
+  conversationChannel?: string;
+  conversationStartedAt?: string;
+  assigneeName?: string | null;
+  assigneeId?: string | null;
+  agentName?: string;
+  currentMembershipId?: string;
+  previousConversations?: WidgetPreviousConversation[];
+  contactNotes?: WidgetContactNote[];
+  internalNotes?: WidgetInternalNote[];
 }
 
 export interface WidgetSessionsResponse {
   sessions: WidgetSessionSummary[];
+  counts: {
+    all: number;
+    unassigned: number;
+    mine: number;
+    open: number;
+    closed: number;
+  };
   pagination: {
     page: number;
     limit: number;
@@ -133,7 +187,7 @@ export function useWidgetSessions(
     page?: number;
     limit?: number;
     search?: string;
-    status?: string;
+    filter?: ConversationFilter;
     sort?: string;
     order?: string;
   } = {},
@@ -144,7 +198,7 @@ export function useWidgetSessions(
       options.page ?? 1,
       options.limit ?? 20,
       options.search ?? null,
-      options.status ?? null,
+      options.filter ?? "all",
     ],
     queryFn: async () => {
       const { data, error } = await api.GET<WidgetSessionsResponse>("/api/widget/sessions", {
@@ -153,13 +207,15 @@ export function useWidgetSessions(
             page: options.page ?? 1,
             limit: options.limit ?? 20,
             ...(options.search ? { search: options.search } : {}),
-            ...(options.status && options.status !== "all" ? { status: options.status } : {}),
+            ...(options.filter && options.filter !== "all" ? { filter: options.filter } : {}),
           },
         },
       });
       return requireData(data, error, "Failed to fetch widget sessions");
     },
     placeholderData: (previousData) => previousData,
+    refetchInterval: 8_000,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -176,6 +232,8 @@ export function useWidgetSession(sessionId: string) {
       return requireData(data, error, "Failed to fetch widget session");
     },
     enabled: Boolean(sessionId),
+    refetchInterval: 5_000,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -194,6 +252,243 @@ export function useDeleteWidgetSession() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.widget.sessions() });
+    },
+  });
+}
+
+export function useAssignWidgetSession() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (sessionId: string) => {
+      const { data, error } = await api.PATCH<{ ok: boolean }>(
+        "/api/widget/sessions/{session_id}",
+        {
+          params: { path: { session_id: sessionId } },
+          body: { action: "assign" },
+        },
+      );
+      return requireData(data, error, "Failed to assign conversation");
+    },
+    onSuccess: (_data, sessionId) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.widget.sessions() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.widget.session(sessionId) });
+    },
+  });
+}
+
+export function useSendSessionMessage() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      sessionId,
+      message,
+      action,
+    }: {
+      sessionId: string;
+      message: string;
+      action: "reply" | "note";
+    }) => {
+      const { data, error } = await api.PATCH<{ ok: boolean }>(
+        "/api/widget/sessions/{session_id}",
+        {
+          params: { path: { session_id: sessionId } },
+          body: { action, message },
+        },
+      );
+      return requireData(data, error, "Failed to send message");
+    },
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.widget.session(variables.sessionId),
+      });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.widget.sessions() });
+    },
+  });
+}
+
+export interface ConversationSummary {
+  id: string;
+  visitorSessionId: string | null;
+  visitorId: string;
+  contactName: string;
+  contactEmail: string | null;
+  status: string;
+  assigneeName: string | null;
+  assigneeId: string | null;
+  unreadCount: number;
+  preview: string;
+  lastMessageAt: string;
+  country: string | null;
+  city: string | null;
+}
+
+export type ConversationDetail = WidgetSessionDetail;
+
+export interface ConversationsResponse {
+  conversations: ConversationSummary[];
+  counts: {
+    all: number;
+    unassigned: number;
+    mine: number;
+    open: number;
+    closed: number;
+  };
+  currentMembershipId: string;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+}
+
+export function useConversations(
+  options: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    filter?: ConversationFilter;
+  } = {},
+) {
+  return useQuery<ConversationsResponse>({
+    queryKey: [
+      ...queryKeys.conversations.list(),
+      options.page ?? 1,
+      options.limit ?? 20,
+      options.search ?? null,
+      options.filter ?? "all",
+    ],
+    queryFn: async () => {
+      const { data, error } = await api.GET<ConversationsResponse>("/api/conversations", {
+        params: {
+          query: {
+            page: options.page ?? 1,
+            limit: options.limit ?? 20,
+            ...(options.search ? { search: options.search } : {}),
+            ...(options.filter && options.filter !== "all" ? { filter: options.filter } : {}),
+          },
+        },
+      });
+      return requireData(data, error, "Failed to fetch conversations");
+    },
+    placeholderData: (previousData) => previousData,
+    refetchInterval: 8_000,
+    refetchOnWindowFocus: true,
+  });
+}
+
+export function useConversation(conversationId: string) {
+  return useQuery<ConversationDetail>({
+    queryKey: queryKeys.conversations.detail(conversationId),
+    queryFn: async () => {
+      const { data, error } = await api.GET<ConversationDetail>(
+        "/api/conversations/{conversation_id}",
+        {
+          params: { path: { conversation_id: conversationId } },
+        },
+      );
+      return requireData(data, error, "Failed to fetch conversation");
+    },
+    enabled: Boolean(conversationId),
+    refetchInterval: 5_000,
+    refetchOnWindowFocus: true,
+  });
+}
+
+export function useDeleteConversation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (conversationId: string) => {
+      const { data, error } = await api.DELETE<{ ok: boolean }>(
+        "/api/conversations/{conversation_id}",
+        {
+          params: { path: { conversation_id: conversationId } },
+        },
+      );
+      return requireData(data, error, "Failed to delete conversation");
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all });
+    },
+  });
+}
+
+export function useAssignConversation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (conversationId: string) => {
+      const { data, error } = await api.PATCH<{ ok: boolean }>(
+        "/api/conversations/{conversation_id}",
+        {
+          params: { path: { conversation_id: conversationId } },
+          body: { action: "assign" },
+        },
+      );
+      return requireData(data, error, "Failed to assign conversation");
+    },
+    onSuccess: (_data, conversationId) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.conversations.detail(conversationId),
+      });
+    },
+  });
+}
+
+export function useMarkConversationRead() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (conversationId: string) => {
+      const { data, error } = await api.PATCH<{ ok: boolean }>(
+        "/api/conversations/{conversation_id}",
+        {
+          params: { path: { conversation_id: conversationId } },
+          body: { action: "read" },
+        },
+      );
+      return requireData(data, error, "Failed to mark conversation as read");
+    },
+    onSuccess: (_data, conversationId) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.conversations.detail(conversationId),
+      });
+    },
+  });
+}
+
+export function useSendConversationMessage() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      conversationId,
+      message,
+      action,
+    }: {
+      conversationId: string;
+      message: string;
+      action: "reply" | "note";
+    }) => {
+      const { data, error } = await api.PATCH<{ ok: boolean }>(
+        "/api/conversations/{conversation_id}",
+        {
+          params: { path: { conversation_id: conversationId } },
+          body: { action, message },
+        },
+      );
+      return requireData(data, error, "Failed to send message");
+    },
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.conversations.detail(variables.conversationId),
+      });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all });
     },
   });
 }

@@ -9,6 +9,8 @@ import {
   fetchConfig,
   callWidgetChatAPI,
   fetchSessionHistory,
+  fetchRecentSessions,
+  fetchSessionForResume,
   uploadFile,
 } from "./api.js";
 import { ICONS, WIDGET_LOGO } from "./constants.js";
@@ -71,6 +73,10 @@ export function createWidget() {
 				<button class="oc-menu-item" data-action="new_chat">
 					${ICONS.plus}
 					<span>Start a new chat</span>
+				</button>
+				<button class="oc-menu-item" data-action="recent_chats">
+					${ICONS.historyCircle}
+					<span>Recent chats</span>
 				</button>
 				<button class="oc-menu-item" data-action="end_chat">
 					${ICONS.x}
@@ -190,11 +196,207 @@ export function attachEvents() {
 function handleMenuAction(action) {
   switch (action) {
     case "new_chat":
-      resetChat();
+      void resetChat();
+      break;
+    case "recent_chats":
+      void loadRecentChats();
       break;
     case "end_chat":
-      toggleChat();
+      endChat();
       break;
+  }
+}
+
+function endChat() {
+  hidePanelView();
+  stopMessagePolling();
+  if (state.isOpen) {
+    toggleChat();
+  }
+}
+
+function showPanelView(panelName) {
+  state.activePanel = panelName;
+  state.windowEl.classList.add("is-panel-view");
+  state.windowEl.querySelector(".oc-header")?.classList.add("is-hidden");
+  state.windowEl.querySelector(".oc-footer")?.classList.add("is-hidden");
+}
+
+function hidePanelView() {
+  state.activePanel = null;
+  state.windowEl.classList.remove("is-panel-view");
+  state.windowEl.querySelector(".oc-header")?.classList.remove("is-hidden");
+  state.windowEl.querySelector(".oc-footer")?.classList.remove("is-hidden");
+}
+
+function truncatePreview(text, max = 80) {
+  if (!text || text.length <= max) return text || "No messages yet";
+  return `${text.slice(0, max).trim()}…`;
+}
+
+function formatRelativeTime(isoString) {
+  if (!isoString) return "";
+  const date = new Date(isoString);
+  const diffMs = Date.now() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60_000);
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  return date.toLocaleDateString();
+}
+
+function renderPanel({ title, titleIcon, bodyHtml, footerHtml = "" }) {
+  return `
+    <div class="oc-panel-view">
+      <div class="oc-panel-header">
+        <button type="button" class="oc-panel-back" aria-label="Back">${ICONS.chevronLeft}</button>
+        <div class="oc-panel-title">
+          <span class="oc-panel-title-icon">${titleIcon}</span>
+          <span>${escapeHtml(title)}</span>
+        </div>
+        <button type="button" class="oc-panel-close" aria-label="Close">${ICONS.x}</button>
+      </div>
+      <div class="oc-panel-body">${bodyHtml}</div>
+      ${footerHtml ? `<div class="oc-panel-footer">${footerHtml}</div>` : ""}
+    </div>
+  `;
+}
+
+function attachPanelHandlers(container, { onBack, onAttach }) {
+  container.querySelector(".oc-panel-back")?.addEventListener("click", () => onBack?.());
+  container.querySelector(".oc-panel-close")?.addEventListener("click", () => onBack?.());
+  onAttach?.(container);
+}
+
+function renderRecentChatsPanel(bodyHtml, showStartNew = false) {
+  const footerHtml = showStartNew
+    ? `<button type="button" class="oc-panel-primary-btn" data-action="start_new_chat">${ICONS.plus}<span>Start a new chat</span></button>`
+    : "";
+
+  state.messagesContainer.innerHTML = renderPanel({
+    title: "Recent chats",
+    titleIcon: ICONS.historyCircle,
+    bodyHtml,
+    footerHtml,
+  });
+
+  attachPanelHandlers(state.messagesContainer, {
+    onBack: () => {
+      hidePanelView();
+      void refreshCurrentChatView();
+    },
+    onAttach: (container) => {
+      container
+        .querySelector('[data-action="start_new_chat"]')
+        ?.addEventListener("click", () => resetChat());
+    },
+  });
+}
+
+function renderRecentChatList(sessions) {
+  return `<div class="oc-panel-list">${sessions
+    .map(
+      (session) => `
+    <button
+      type="button"
+      class="oc-panel-list-item${session.isCurrent ? " is-current" : ""}"
+      data-session-id="${escapeHtml(session.id)}"
+    >
+      <div class="oc-panel-list-preview">${escapeHtml(truncatePreview(session.preview))}</div>
+      <div class="oc-panel-list-meta">
+        <span>${escapeHtml(formatRelativeTime(session.lastActivityAt))}</span>
+        ${session.isCurrent ? '<span class="oc-panel-list-badge">Current</span>' : ""}
+      </div>
+    </button>
+  `,
+    )
+    .join("")}</div>`;
+}
+
+async function refreshCurrentChatView() {
+  if (!state.sessionDbId) {
+    state.messagesContainer.innerHTML = "";
+    addBotMessage(state.config.welcomeMessage);
+    return;
+  }
+
+  try {
+    const data = await fetchSessionForResume(state.sessionDbId);
+    if (data?.messages?.length) {
+      restoreMessages(data.messages);
+      return;
+    }
+  } catch (error) {
+    console.error("widget: failed to refresh current chat", error);
+  }
+
+  state.messagesContainer.innerHTML = "";
+  addBotMessage(state.config.welcomeMessage);
+}
+
+async function openRecentChat(session) {
+  if (session.isCurrent) {
+    hidePanelView();
+    await refreshCurrentChatView();
+    return;
+  }
+
+  const scopeKey = state.publicKey || state.config.workspaceId;
+  state.sessionDbId = session.id;
+  if (!state.preview) {
+    state.sessionToken = session.token;
+    state.sessionId = session.browserSessionId;
+    storeSessionId(state.sessionId, scopeKey);
+    storeSessionToken(state.sessionToken, scopeKey);
+  }
+
+  hidePanelView();
+  resetChatState();
+  state.messagesContainer.innerHTML = "";
+
+  try {
+    const data = await fetchSessionForResume(session.id);
+    if (data?.messages?.length) {
+      restoreMessages(data.messages);
+      return;
+    }
+  } catch (error) {
+    console.error("widget: failed to load selected chat", error);
+  }
+
+  addBotMessage(state.config.welcomeMessage);
+}
+
+async function loadRecentChats() {
+  showPanelView("recent-chats");
+  renderRecentChatsPanel('<div class="oc-panel-loading">Loading recent chats…</div>');
+
+  try {
+    const data = await fetchRecentSessions();
+    const sessions = data.sessions || [];
+    if (!sessions.length) {
+      renderRecentChatsPanel(
+        `<div class="oc-panel-empty"><div class="oc-panel-empty-title">No recent chats yet</div></div>`,
+        true,
+      );
+      return;
+    }
+
+    renderRecentChatsPanel(renderRecentChatList(sessions));
+    state.messagesContainer.querySelectorAll(".oc-panel-list-item").forEach((item) => {
+      item.addEventListener("click", () => {
+        const sessionId = item.getAttribute("data-session-id");
+        const session = sessions.find((entry) => entry.id === sessionId);
+        if (session) void openRecentChat(session);
+      });
+    });
+  } catch (error) {
+    console.error("widget: failed to load recent chats", error);
+    renderRecentChatsPanel(
+      `<div class="oc-panel-empty"><div class="oc-panel-empty-title">Unable to load recent chats</div></div>`,
+      true,
+    );
   }
 }
 
@@ -247,7 +449,8 @@ async function refreshMessagesFromServer() {
 /**
  * Initialize session with backend
  */
-export async function initSession() {
+export async function initSession(options = {}) {
+  const forceNew = options.forceNew === true;
   const config = state.config;
   const scopeKey = state.publicKey || config.publicKey || config.workspaceId;
 
@@ -257,19 +460,51 @@ export async function initSession() {
   }
 
   if (state.preview) {
-    state.sessionId = generateUUID();
-    state.visitorId = null;
+    state.visitorId = getOrCreateVisitorId();
+    state.sessionId = forceNew ? generateUUID() : getStoredSessionId(scopeKey) || generateUUID();
+    if (forceNew) {
+      state.sessionDbId = null;
+      state.sessionToken = null;
+      storeSessionToken(null, scopeKey);
+    }
     state.sessionStartTime = Date.now();
     state.leadCaptureEnabled = false;
     state.brochureEnabled = config.enableBrochure || false;
     state.brochureSuggestionText = config.brochureSuggestionText || "Receive Brochure";
-    addBotMessage(config.welcomeMessage);
+    storeSessionId(state.sessionId, scopeKey);
+
+    try {
+      const data = await initSessionAPI(state.publicKey, state.sessionId, state.visitorId, true);
+      state.sessionDbId = data.sessionId;
+      state.sessionToken = data.token || null;
+      storeSessionToken(state.sessionToken, scopeKey);
+
+      if (data.browserSessionId) {
+        state.sessionId = data.browserSessionId;
+        storeSessionId(state.sessionId, scopeKey);
+      }
+
+      if (!data.isNew && data.messages && data.messages.length > 0) {
+        restoreMessages(data.messages);
+      } else {
+        addBotMessage(config.welcomeMessage);
+      }
+    } catch (error) {
+      console.error("widget: Preview session init error", error);
+      addBotMessage(config.welcomeMessage);
+    }
     return;
   }
 
   state.visitorId = getOrCreateVisitorId();
-  state.sessionId = getStoredSessionId(scopeKey) || generateUUID();
-  state.sessionToken = getStoredSessionToken(scopeKey);
+  state.sessionId = forceNew ? generateUUID() : getStoredSessionId(scopeKey) || generateUUID();
+  if (forceNew) {
+    state.sessionDbId = null;
+    state.sessionToken = null;
+    storeSessionToken(null, scopeKey);
+  } else {
+    state.sessionToken = getStoredSessionToken(scopeKey);
+  }
   storeSessionId(state.sessionId, scopeKey);
   state.sessionStartTime = Date.now();
 
@@ -701,18 +936,26 @@ export function destroyWidget() {
  * Reset chat to initial state
  */
 export async function resetChat() {
+  const scopeKey = state.publicKey || state.config.publicKey || state.config.workspaceId;
+
+  stopMessagePolling();
+  hidePanelView();
+
   state.messagesContainer.innerHTML = "";
   resetChatState();
   const privacyEl = state.windowEl.querySelector(".oc-privacy");
   if (privacyEl) privacyEl.style.display = "";
 
   state.sessionId = generateUUID();
-  storeSessionId(state.sessionId, state.config.workspaceId);
   state.sessionDbId = null;
   state.sessionToken = null;
-  storeSessionToken(null, state.publicKey || state.config.workspaceId);
 
-  await initSession();
+  if (scopeKey) {
+    storeSessionId(state.sessionId, scopeKey);
+    storeSessionToken(null, scopeKey);
+  }
+
+  await initSession({ forceNew: true });
 }
 
 /**

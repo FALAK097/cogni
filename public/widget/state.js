@@ -44,6 +44,7 @@ export const state = {
   brochureSuggestionText: "Receive Brochure",
 
   pollIntervalId: null,
+  activePanel: null,
 };
 
 // Helper to reset state for new chat

@@ -2,14 +2,24 @@ import "server-only";
 
 import type { Prisma } from "@/generated/prisma/client";
 
+const engagedConversationWhere = {
+  channel: "WIDGET",
+  messages: { contains: '"authorType":"VISITOR"' },
+} as const;
+
 export const engagedVisitorSessionWhere = {
   hostname: { not: "dashboard-preview" },
   messageCount: { gt: 0 },
   conversations: {
-    some: {
-      channel: "WIDGET",
-      messages: { contains: '"authorType":"VISITOR"' },
-    },
+    some: engagedConversationWhere,
+  },
+} satisfies Prisma.VisitorSessionWhereInput;
+
+/** Dashboard inbox lists every engaged session, including dashboard preview chats. */
+export const dashboardEngagedVisitorSessionWhere = {
+  messageCount: { gt: 0 },
+  conversations: {
+    some: engagedConversationWhere,
   },
 } satisfies Prisma.VisitorSessionWhereInput;
 

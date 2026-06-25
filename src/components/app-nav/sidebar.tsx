@@ -13,11 +13,13 @@ import { cn } from "@/lib/utils";
 export function Sidebar() {
   const isOpen = useSidebar((state) => state.isOpen);
   const isHover = useSidebar((state) => state.isHover);
+  const hasHydrated = useSidebar((state) => state.hasHydrated);
   const toggleOpen = useSidebar((state) => state.toggleOpen);
   const setIsHover = useSidebar((state) => state.setIsHover);
   const settings = useSidebar((state) => state.settings);
 
   const openState = isOpen || (settings.isHoverOpen && isHover);
+  const canAnimate = hasHydrated;
 
   useEffect(() => {
     const handleResize = () => {
@@ -45,7 +47,8 @@ export function Sidebar() {
       />
       <aside
         className={cn(
-          "fixed top-0 bg-card left-0 z-40 h-screen transition-[transform,width] ease-in-out duration-300 print:hidden",
+          "fixed top-0 bg-card left-0 z-40 h-screen print:hidden",
+          canAnimate && "transition-[transform,width] ease-in-out duration-300",
           !openState ? "w-[90px] translate-x-[-90px] lg:translate-x-0" : "w-56 translate-x-0",
           settings.disabled && "hidden",
         )}
@@ -68,7 +71,8 @@ export function Sidebar() {
                 <ThemeLogo className={cn("flex-shrink-0", openState ? "w-6 h-6" : "w-8 h-8")} />
                 <h1
                   className={cn(
-                    "font-bold text-lg whitespace-nowrap transition-[transform,opacity,display] ease-in-out duration-300",
+                    "font-bold text-lg whitespace-nowrap",
+                    canAnimate && "transition-[transform,opacity,display] ease-in-out duration-300",
                     !openState ? "-translate-x-96 opacity-0 hidden" : "translate-x-0 opacity-100",
                   )}
                 >

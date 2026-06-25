@@ -1023,6 +1023,126 @@ export function injectStyles() {
 			color: ${config.theme === "dark" ? "#fafafa" : "#18181b"};
 		}
 
+		.oc-window.is-panel-view .oc-header.is-hidden,
+		.oc-window.is-panel-view .oc-footer.is-hidden {
+			display: none;
+		}
+
+		.oc-panel-view {
+			display: flex;
+			flex-direction: column;
+			height: 100%;
+			min-height: 0;
+		}
+
+		.oc-panel-header {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			padding: 12px 14px;
+			border-bottom: 1px solid ${config.theme === "dark" ? "#3f3f46" : "#e4e4e7"};
+		}
+
+		.oc-panel-back,
+		.oc-panel-close {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			width: 32px;
+			height: 32px;
+			border: none;
+			background: transparent;
+			color: ${config.theme === "dark" ? "#fafafa" : "#18181b"};
+			cursor: pointer;
+			border-radius: 8px;
+		}
+
+		.oc-panel-title {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			flex: 1;
+			font-size: 15px;
+			font-weight: 600;
+			color: ${config.theme === "dark" ? "#fafafa" : "#18181b"};
+		}
+
+		.oc-panel-body {
+			flex: 1;
+			overflow-y: auto;
+			padding: 12px;
+		}
+
+		.oc-panel-footer {
+			padding: 12px;
+			border-top: 1px solid ${config.theme === "dark" ? "#3f3f46" : "#e4e4e7"};
+		}
+
+		.oc-panel-primary-btn {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 8px;
+			width: 100%;
+			padding: 10px 14px;
+			border: none;
+			border-radius: 10px;
+			background: ${config.primaryColor};
+			color: #fff;
+			font-size: 14px;
+			font-weight: 500;
+			cursor: pointer;
+		}
+
+		.oc-panel-list {
+			display: flex;
+			flex-direction: column;
+			gap: 8px;
+		}
+
+		.oc-panel-list-item {
+			display: block;
+			width: 100%;
+			text-align: left;
+			padding: 12px;
+			border: 1px solid ${config.theme === "dark" ? "#3f3f46" : "#e4e4e7"};
+			border-radius: 12px;
+			background: ${config.theme === "dark" ? "#27272a" : "#ffffff"};
+			cursor: pointer;
+		}
+
+		.oc-panel-list-item.is-current {
+			border-color: ${config.primaryColor};
+		}
+
+		.oc-panel-list-preview {
+			font-size: 14px;
+			color: ${config.theme === "dark" ? "#fafafa" : "#18181b"};
+			margin-bottom: 6px;
+		}
+
+		.oc-panel-list-meta {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			font-size: 12px;
+			color: ${config.theme === "dark" ? "#a1a1aa" : "#71717a"};
+		}
+
+		.oc-panel-list-badge {
+			font-size: 11px;
+			font-weight: 600;
+			color: ${config.primaryColor};
+		}
+
+		.oc-panel-loading,
+		.oc-panel-empty {
+			padding: 24px 12px;
+			text-align: center;
+			color: ${config.theme === "dark" ? "#a1a1aa" : "#71717a"};
+			font-size: 14px;
+		}
+
 	`;
   document.head.appendChild(style);
 }

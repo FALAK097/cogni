@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
 import {
@@ -31,6 +32,8 @@ import { notifyWorkspaceMembers } from "@/lib/notifications/create-notification"
 import { checkRateLimit } from "@/lib/rate-limit/memory";
 
 export const maxDuration = 60;
+
+const PREVIEW_HOSTNAME = "dashboard-preview";
 
 const nullableText = (max: number) => z.string().trim().max(max).nullable().default(null);
 
@@ -121,7 +124,16 @@ export async function POST(
     return Response.json({ error: "A valid message history is required." }, { status: 400 });
   }
 
-  if (body.preview) {
+  const isPreview = body.preview;
+  let access:
+    | {
+        widget: NonNullable<Awaited<ReturnType<typeof getPublicWidget>>>;
+        origin: string | null;
+        allowedDomains: string[];
+      }
+    | { error: Response };
+
+  if (isPreview) {
     try {
       const { workspace } = await requireDashboardContext();
       const widget = await getPublicWidget(db, publicKey);
@@ -129,80 +141,77 @@ export async function POST(
         return Response.json({ error: "Preview access denied." }, { status: 403 });
       }
 
-      const result = await streamWidgetAgent({
-        config: {
-          displayName: widget.displayName,
-          instructions: widget.instructions,
-          escalationKeywords: widget.escalationKeywords,
-          modelProvider: widget.modelProvider as WidgetModelProvider,
-          modelName: widget.modelName,
-          workspaceName: widget.workspace.name,
-          workspaceId: widget.workspace.id,
-          latestUserMessage: body.message,
-          memoryContext: "",
-          documentIds: null,
-        },
-        messages: historyMessages,
-        onFinish: async () => {},
-        onError: (error) => {
-          logError("widget.preview.failed", {
-            workspaceId: widget.workspace.id,
-            widgetId: widget.id,
-            error: error instanceof Error ? error.message : "Unknown model error",
-          });
-        },
-      });
-
-      return new Response(createWidgetSseStream(result.textStream), {
-        headers: streamHeaders(),
-      });
+      access = {
+        widget,
+        origin: getRequestOrigin(request),
+        allowedDomains: JSON.parse(widget.authorizedDomains || "[]") as string[],
+      };
     } catch {
       return Response.json({ error: "Preview access denied." }, { status: 403 });
     }
+  } else {
+    const publicAccess = await assertPublicWidgetAccess(db, publicKey, request);
+    if ("error" in publicAccess) return publicAccess.error;
+    access = publicAccess;
   }
 
-  const hostname = (
-    body.metadata.hostname ??
-    getRequestOrigin(request)?.replace(/^https?:\/\//, "") ??
-    "unknown"
-  )
-    .toLowerCase()
-    .replace(/\.$/, "");
-  const access = await assertPublicWidgetAccess(db, publicKey, request);
-  if ("error" in access) return access.error;
+  const hostname = isPreview
+    ? PREVIEW_HOSTNAME
+    : (
+        body.metadata.hostname ??
+        getRequestOrigin(request)?.replace(/^https?:\/\//, "") ??
+        "unknown"
+      )
+        .toLowerCase()
+        .replace(/\.$/, "");
 
   const token = bearerToken(request);
-  if (!token) {
+  if (!token && !isPreview) {
     return Response.json({ error: "Widget session is required." }, { status: 401 });
   }
-  const rateLimit = checkRateLimit({
-    key: `widget-chat:${token}`,
-    limit: 20,
-    windowMs: 60_000,
-  });
-  if (!rateLimit.allowed) {
-    return Response.json(
-      { error: "Too many messages. Wait a moment before trying again." },
-      { status: 429 },
-    );
+
+  if (!isPreview) {
+    const rateLimit = checkRateLimit({
+      key: `widget-chat:${token}`,
+      limit: 20,
+      windowMs: 60_000,
+    });
+    if (!rateLimit.allowed) {
+      return Response.json(
+        { error: "Too many messages. Wait a moment before trying again." },
+        { status: 429 },
+      );
+    }
   }
 
   const authorizedSession = token ? await getAuthorizedVisitorSession(db, publicKey, token) : null;
-  const bootstrapClaims = authorizedSession ? null : verifyWidgetBootstrapToken(token);
+  const bootstrapClaims = authorizedSession
+    ? null
+    : token
+      ? verifyWidgetBootstrapToken(token)
+      : null;
+
   if (
     !authorizedSession &&
-    (!bootstrapClaims ||
-      bootstrapClaims.widgetId !== access.widget.id ||
+    bootstrapClaims &&
+    (bootstrapClaims.widgetId !== access.widget.id ||
       bootstrapClaims.publicKey !== publicKey ||
       bootstrapClaims.browserSessionId !== body.sessionId ||
       bootstrapClaims.hostname !== hostname)
   ) {
     return Response.json({ error: "Widget session is invalid or expired." }, { status: 401 });
   }
-  const bootstrapSession = bootstrapClaims
-    ? await getAuthorizedBootstrapRetry(db, access.widget.id, body.sessionId, body.interactionId)
-    : { retryAllowed: true, session: null, conversation: null, visitorMessageId: "" };
-  if (bootstrapClaims && !bootstrapSession.retryAllowed) {
+
+  if (!authorizedSession && !bootstrapClaims && !isPreview) {
+    return Response.json({ error: "Widget session is required." }, { status: 401 });
+  }
+
+  const bootstrapSession =
+    bootstrapClaims && !isPreview
+      ? await getAuthorizedBootstrapRetry(db, access.widget.id, body.sessionId, body.interactionId)
+      : { retryAllowed: true, session: null, conversation: null, visitorMessageId: "" };
+
+  if (!isPreview && bootstrapClaims && !bootstrapSession.retryAllowed) {
     return Response.json({ error: "Widget session is already active." }, { status: 401 });
   }
 
@@ -228,7 +237,7 @@ export async function POST(
           widget: access.widget,
           hostname,
           browserSessionId: body.sessionId,
-          visitorId: bootstrapClaims?.visitorId ?? body.visitorId,
+          visitorId: bootstrapClaims?.visitorId ?? body.visitorId ?? randomUUID(),
           metadata: {
             ...body.metadata,
             country: body.metadata.country ?? request.headers.get("x-vercel-ip-country"),

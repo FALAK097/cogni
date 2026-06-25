@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { usePathname } from "next/navigation";
 
 import { AppTopbar } from "@/components/app-nav/app-topbar";
 import { Sidebar } from "@/components/app-nav/sidebar";
@@ -17,23 +18,28 @@ type AdminPanelLayoutProps = {
 };
 
 export default function AdminPanelLayout({ children, userData }: AdminPanelLayoutProps) {
+  const pathname = usePathname();
   const isOpen = useSidebar((state) => state.isOpen);
   const isHover = useSidebar((state) => state.isHover);
+  const hasHydrated = useSidebar((state) => state.hasHydrated);
   const settings = useSidebar((state) => state.settings);
 
   const openState = isOpen || (settings.isHoverOpen && isHover);
+  const canAnimate = hasHydrated;
+  const hideTopbar = pathname === "/conversations" || pathname.startsWith("/conversations/");
 
   return (
     <>
       <Sidebar />
       <main
         className={cn(
-          "min-h-screen bg-zinc-50 dark:bg-zinc-900 transition-[margin-left] ease-in-out duration-300",
+          "min-h-screen bg-zinc-50 dark:bg-zinc-900",
+          canAnimate && "transition-[margin-left] ease-in-out duration-300",
           !settings.disabled && (!openState ? "lg:ml-[90px]" : "lg:ml-56"),
           "print:ml-0 print:w-full print:overflow-visible",
         )}
       >
-        <AppTopbar userData={userData} />
+        {!hideTopbar ? <AppTopbar userData={userData} /> : null}
         <div>{children}</div>
       </main>
     </>

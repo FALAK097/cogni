@@ -9,6 +9,7 @@ import {
   saveLeadToStorage,
   storeSessionId,
   storeSessionToken,
+  getOrCreateVisitorId,
 } from "./storage.js";
 import { generateUUID, getBrowserMetadata } from "./utils.js";
 
@@ -23,7 +24,11 @@ async function requestJson(path, options = {}) {
   if (state.sessionToken) {
     headers.set("Authorization", `Bearer ${state.sessionToken}`);
   }
-  const response = await fetch(buildPublicApiUrl(path), { ...options, headers });
+  const response = await fetch(buildPublicApiUrl(path), {
+    credentials: "same-origin",
+    ...options,
+    headers,
+  });
   if (!response.ok) {
     throw new Error(`Request failed: ${response.status}`);
   }
@@ -36,7 +41,11 @@ async function requestOk(path, options = {}) {
   if (state.sessionToken) {
     headers.set("Authorization", `Bearer ${state.sessionToken}`);
   }
-  const response = await fetch(buildPublicApiUrl(path), { ...options, headers });
+  const response = await fetch(buildPublicApiUrl(path), {
+    credentials: "same-origin",
+    ...options,
+    headers,
+  });
   return response.ok;
 }
 
@@ -128,6 +137,46 @@ export async function submitFeedback(messageId, feedback, reason = null) {
 
 export async function fetchSessionHistory(sessionDbId) {
   return requestJson(`${widgetKeyPath("/history")}?sessionId=${encodeURIComponent(sessionDbId)}`);
+}
+
+export async function fetchRecentSessions() {
+  if (state.preview) {
+    const data = await requestJson("/api/dashboard/widget/sessions?limit=20");
+    return {
+      sessions: (data.sessions || []).map((session) => ({
+        id: session.id,
+        browserSessionId: session.id,
+        token: null,
+        preview: session.preview,
+        lastActivityAt: session.lastActivityAt,
+        messageCount: session.messageCount,
+        isCurrent: session.id === state.sessionDbId,
+      })),
+    };
+  }
+
+  const visitorId = state.visitorId || getOrCreateVisitorId();
+  const query = new URLSearchParams({ visitorId });
+  if (state.sessionDbId) {
+    query.set("currentSessionId", state.sessionDbId);
+  }
+  return requestJson(`${widgetKeyPath("/sessions")}?${query.toString()}`);
+}
+
+export async function fetchSessionForResume(sessionDbId) {
+  if (state.preview) {
+    const data = await requestJson(
+      `/api/dashboard/widget/sessions/${encodeURIComponent(sessionDbId)}`,
+    );
+    return {
+      sessionId: data.id,
+      browserSessionId: data.id,
+      token: null,
+      messages: data.messages || [],
+    };
+  }
+
+  return fetchSessionHistory(sessionDbId);
 }
 
 export async function detectLeadCaptureAPI(currentMessage, messageCount, sessionDurationMinutes) {

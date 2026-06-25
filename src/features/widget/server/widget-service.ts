@@ -134,11 +134,20 @@ export async function getPublicWidget(db: PrismaClient, publicKey: string) {
 }
 
 export function validateEmbedOrigin(origin: string | null, allowedDomains: string[]) {
-  if (!origin || allowedDomains.length === 0) return false;
+  if (!origin) return false;
+
+  const effectiveDomains =
+    allowedDomains.length > 0
+      ? allowedDomains
+      : process.env.NODE_ENV === "development"
+        ? ["localhost", "127.0.0.1"]
+        : [];
+
+  if (effectiveDomains.length === 0) return false;
 
   try {
     const hostname = new URL(origin).hostname.toLowerCase();
-    return allowedDomains.some((allowed) => hostnameMatches(hostname, allowed));
+    return effectiveDomains.some((allowed) => hostnameMatches(hostname, allowed));
   } catch {
     return false;
   }
