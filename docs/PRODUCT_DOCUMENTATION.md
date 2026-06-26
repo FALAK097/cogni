@@ -52,9 +52,8 @@ Everything that exists in the codebase today.
 | AI                 | [Vercel AI SDK](https://ai-sdk.dev/) (`ai` v6) + `@ai-sdk/openai` + `@ai-sdk/google` |
 | Async jobs         | Custom `WorkflowRun` DB tracking (not Workflow SDK or Queue SDK yet)                 |
 | Multi-channel chat | Not integrated ([Chat SDK](https://chat-sdk.dev/) planned)                           |
-| Embeddings         | OpenAI `text-embedding-3-small` via AI SDK `embed`                                   |
 | Storage            | Local filesystem (dev) / Cloudflare R2 (prod)                                        |
-| Vector search      | Cloudflare Vectorize + Cloudflare AI Search (optional fallback)                      |
+| Knowledge search   | Cloudflare AI Search with D1 text fallback                                           |
 | Document parsing   | `pdf-parse`, `mammoth` (DOCX)                                                        |
 | Widget embed       | Vanilla JS bundled via esbuild → `public/widget.bundle.js`                           |
 
@@ -166,16 +165,16 @@ Route: `/leads`
 
 Route: `/knowledge-base`
 
-| Capability                                        | Status |
-| ------------------------------------------------- | ------ |
-| Upload PDF, DOCX, TXT                             | ✅     |
-| Single-page URL fetch + HTML strip                | ✅     |
-| Chunking → embedding → Vectorize indexing         | ✅     |
-| Retrieval with fallbacks (vector → search → text) | ✅     |
-| Dashboard add/delete sources                      | ✅     |
-| Multi-page website crawling                       | ❌     |
-| Notion, Drive, GitHub, API sources                | ❌     |
-| Sync scheduling and health monitoring             | ❌     |
+| Capability                                     | Status |
+| ---------------------------------------------- | ------ |
+| Upload PDF, DOCX, TXT                          | ✅     |
+| Single-page URL fetch + HTML strip             | ✅     |
+| Chunking → AI Search indexing                  | ✅     |
+| Retrieval with fallbacks (AI Search → D1 text) | ✅     |
+| Dashboard add/delete sources                   | ✅     |
+| Multi-page website crawling                    | ❌     |
+| Notion, Drive, GitHub, API sources             | ❌     |
+| Sync scheduling and health monitoring          | ❌     |
 
 ---
 
@@ -188,7 +187,7 @@ Route: `/knowledge-base`
 
 - Streaming via Vercel AI SDK `streamText`
 - System prompt: instructions + knowledge + contact memory + citations
-- Embeddings via OpenAI `text-embedding-3-small`
+- Knowledge retrieval via Cloudflare AI Search
 
 **Not yet:** OpenRouter, model selection in dashboard UI.
 
@@ -285,7 +284,7 @@ Route: `/integrations`
 **Dashboard** (`/api/dashboard/`):
 `widget`, `widget/sessions`, `conversations`, `knowledge-base/*`, `integrations`, `workspaces`, `me`
 
-**Other:** `/api/analytics/widget`, `/api/files/[...storageKey]`, `/api/auth/[...all]`, `/widget.js`
+**Other:** `/api/analytics/widget`, `/api/files/[...storageKey]`, `/api/auth/[...all]`
 
 ---
 
@@ -300,7 +299,7 @@ Route: `/integrations`
 | Inbox        | View conversations, escalation      | Team reply, assignment UI, real-time            |
 | AI           | OpenAI + Gemini streaming           | OpenRouter, model picker in UI                  |
 | Platform     | Workflows, events, notifications DB | Notifications UI, settings pages, billing       |
-| SDK stack    | AI SDK (chat + embed)               | Queue SDK, Workflow SDK, Chat SDK               |
+| SDK stack    | AI SDK (chat)                       | Queue SDK, Workflow SDK, Chat SDK               |
 
 ---
 
@@ -312,7 +311,7 @@ Widget is built on the Vercel ecosystem. Four SDKs form the planned full stack; 
 
 | SDK                                             | Docs                                                | Purpose in Widget                                       | Status                   |
 | ----------------------------------------------- | --------------------------------------------------- | ------------------------------------------------------- | ------------------------ |
-| [AI SDK](https://ai-sdk.dev/)                   | [ai-sdk.dev](https://ai-sdk.dev/)                   | Streaming chat, embeddings, future tool calling         | ✅ In use                |
+| [AI SDK](https://ai-sdk.dev/)                   | [ai-sdk.dev](https://ai-sdk.dev/)                   | Streaming chat and future tool calling                  | ✅ In use                |
 | [Workflow SDK](https://workflow-sdk.dev/)       | [workflow-sdk.dev](https://workflow-sdk.dev/)       | Durable document sync, lead follow-ups, AI agent runs   | ❌ Custom DB runner only |
 | [Queue SDK](https://vercel.com/docs/queues/sdk) | [Vercel Queues](https://vercel.com/docs/queues/sdk) | Async background jobs (crawl, index, notify, score)     | ❌ Not integrated        |
 | [Chat SDK](https://chat-sdk.dev/)               | [chat-sdk.dev](https://chat-sdk.dev/)               | Slack, WhatsApp, Teams adapters for multi-channel inbox | ❌ Not integrated        |
@@ -331,12 +330,12 @@ Widget is built on the Vercel ecosystem. Four SDKs form the planned full stack; 
   │  AI SDK   │               │ Workflow SDK  │              │  Queue SDK  │
   │           │               │               │              │             │
   │ streamText│◄──────────────│ durable steps │◄─────────────│ send/handle │
-  │ embed     │               │ sleep/resume  │              │ retries     │
+  │ tools     │               │ sleep/resume  │              │ retries     │
   │ tools     │               │ observability │              │ delay jobs  │
   └─────┬─────┘               └───────┬───────┘              └──────┬──────┘
         │                             │                             │
         │                     long-running flows                      │
-        │              (crawl → chunk → embed → index)                │
+        │              (crawl → extract → AI Search index)            │
         │                             │                             │
         └─────────────────────────────┼─────────────────────────────┘
                                       │
@@ -361,7 +360,6 @@ Widget is built on the Vercel ecosystem. Four SDKs form the planned full stack; 
 | ------------------------ | ------------------------------ | -------------------------------------------- |
 | `streamText`             | Widget chat streaming with RAG | `src/features/widget/server/widget-agent.ts` |
 | `convertToModelMessages` | Message format conversion      | `src/features/widget/server/widget-agent.ts` |
-| `embed`                  | Document chunk embeddings      | `src/lib/ai/embeddings.ts`                   |
 | Provider factories       | OpenAI + Google model routing  | `src/lib/ai/providers.ts`                    |
 
 **Not yet used from AI SDK:**
@@ -439,21 +437,21 @@ bot.onSubscribedMessage(async (thread, msg) => {
 
 ## 1.7 Current File Reference
 
-| Area              | Key Paths                                                                                           |
-| ----------------- | --------------------------------------------------------------------------------------------------- |
-| Widget embed      | `public/widget/`, `scripts/build-widget.js`                                                         |
-| Widget agent      | `src/features/widget/server/widget-agent.ts`                                                        |
-| Widget config     | `src/components/widget/widget-customizer.tsx`                                                       |
-| Widget APIs       | `src/app/api/widget/[publicKey]/`                                                                   |
-| Conversations     | `src/features/conversations/server/`                                                                |
-| Leads             | `src/features/leads/server/lead-service.ts`                                                         |
-| Knowledge         | `src/features/knowledge/`                                                                           |
-| Integrations      | `src/lib/integrations/`, `src/features/integrations/`                                               |
-| AI SDK            | `src/lib/ai/providers.ts`, `src/lib/ai/embeddings.ts`, `src/features/widget/server/widget-agent.ts` |
-| Workflow (custom) | `src/lib/workflows/runner.ts`                                                                       |
-| Auth              | `src/lib/auth/server.ts`                                                                            |
-| Schema            | `prisma/schema.prisma`                                                                              |
-| Env vars          | `.env.example`                                                                                      |
+| Area              | Key Paths                                                               |
+| ----------------- | ----------------------------------------------------------------------- |
+| Widget embed      | `public/widget/`, `scripts/build-widget.js`                             |
+| Widget agent      | `src/features/widget/server/widget-agent.ts`                            |
+| Widget config     | `src/components/widget/widget-customizer.tsx`                           |
+| Widget APIs       | `src/app/api/widget/[publicKey]/`                                       |
+| Conversations     | `src/features/conversations/server/`                                    |
+| Leads             | `src/features/leads/server/lead-service.ts`                             |
+| Knowledge         | `src/features/knowledge/`                                               |
+| Integrations      | `src/lib/integrations/`, `src/features/integrations/`                   |
+| AI SDK            | `src/lib/ai/providers.ts`, `src/features/widget/server/widget-agent.ts` |
+| Workflow (custom) | `src/lib/workflows/runner.ts`                                           |
+| Auth              | `src/lib/auth/server.ts`                                                |
+| Schema            | `prisma/schema.prisma`                                                  |
+| Env vars          | `.env.example`                                                          |
 
 ---
 
@@ -885,7 +883,7 @@ const result = await firecrawl.crawl(url, {
 ```text
 Source created → WorkflowRun started
   → Fetcher runs (Firecrawl / Notion / Drive / GitHub / API)
-  → Extract → chunk → embed → upsert vectors
+  → Extract → chunk locally → upload to AI Search
   → Documents created/updated (dedup by externalId)
   → Stats updated, WorkflowRun completed
 ```
@@ -926,7 +924,7 @@ Source created → WorkflowRun started
 - Failed attempts not billed
 - Env: `OPENROUTER_API_KEY`
 - **Use cases:** Chat model selection, lead scoring, fallback routing
-- **Keep direct:** OpenAI for embeddings
+- **Keep direct:** OpenAI for default chat unless routing is moved behind OpenRouter
 
 ---
 
@@ -1031,7 +1029,7 @@ API route (upload / sync / lead capture)
 
 | Topic                   | Producer                 | Consumer handler                   | Feature |
 | ----------------------- | ------------------------ | ---------------------------------- | ------- |
-| `document.process`      | Knowledge upload API     | Extract → chunk → embed → index    | 2.9     |
+| `document.process`      | Knowledge upload API     | Extract → chunk → AI Search index  | 2.9     |
 | `source.sync`           | Data Sources page / cron | Firecrawl crawl or connector fetch | 2.9     |
 | `lead.qualify`          | Lead capture submit      | AI SDK `generateObject` scoring    | 2.1     |
 | `notification.dispatch` | Routing rules engine     | Slack, email, in-app delivery      | 2.6     |
@@ -1105,7 +1103,7 @@ Replaces custom `WorkflowRun` DB runner for flows that need suspend, resume, sle
 
 | Workflow             | Steps                                                       | Feature       |
 | -------------------- | ----------------------------------------------------------- | ------------- |
-| `documentPipeline`   | fetch → extract → chunk → embed → index                     | 2.9           |
+| `documentPipeline`   | fetch → extract → chunk → AI Search index                   | 2.9           |
 | `sourceSyncPipeline` | crawl site → dedup pages → index each → update stats        | 2.9           |
 | `leadFollowUp`       | qualify → assign → notify → sleep 3 days → WhatsApp message | 2.1, 2.6, 2.7 |
 | `aiAgentRun`         | stream response → tool calls → persist result               | 2.4           |
@@ -1132,7 +1130,7 @@ async function crawlWithFirecrawl(dataSourceId: string) {
 
 async function indexPages(pages: Page[]) {
   "use step";
-  // Chunk + embed + Vectorize upsert
+  // Extract text + upload to Cloudflare AI Search
 }
 ```
 
@@ -1259,7 +1257,7 @@ Visitor (widget embed / WhatsApp / Slack)
 └─────────────────────────────────────────────┘
           │
           ▼
-   Prisma (D1) + R2 + Vectorize
+   Prisma (D1) + R2 + AI Search
 ```
 
 ---
@@ -1288,7 +1286,7 @@ How and when to build everything.
 
 | SDK                                             | Current                 | Target                                      | Phase |
 | ----------------------------------------------- | ----------------------- | ------------------------------------------- | ----- |
-| [AI SDK](https://ai-sdk.dev/)                   | `streamText`, `embed`   | + tools, `generateObject`, OpenRouter       | 1–2   |
+| [AI SDK](https://ai-sdk.dev/)                   | `streamText`            | + tools, `generateObject`, OpenRouter       | 1–2   |
 | [Queue SDK](https://vercel.com/docs/queues/sdk) | Not installed           | Background jobs for process/sync/notify     | 1–2   |
 | [Workflow SDK](https://workflow-sdk.dev/)       | Custom `WorkflowRun` DB | Durable multi-step flows, sleep, follow-ups | 2–3   |
 | [Chat SDK](https://chat-sdk.dev/)               | Not installed           | Slack + WhatsApp multi-channel              | 2–3   |
@@ -1479,13 +1477,13 @@ Phase 4 (Scale)
 
 ### Monthly operating costs (estimated)
 
-| Service                            | Dev         | Production (10 workspaces) |
-| ---------------------------------- | ----------- | -------------------------- |
-| Firecrawl (Hobby/Standard)         | $16         | $83                        |
-| OpenRouter (pay-as-you-go)         | ~$5         | ~$50                       |
-| OpenAI (embeddings + default chat) | ~$10        | ~$100                      |
-| Cloudflare (D1, R2, Vectorize)     | $0          | ~$20                       |
-| **Total**                          | **~$31/mo** | **~$253/mo**               |
+| Service                        | Dev         | Production (10 workspaces) |
+| ------------------------------ | ----------- | -------------------------- |
+| Firecrawl (Hobby/Standard)     | $16         | $83                        |
+| OpenRouter (pay-as-you-go)     | ~$5         | ~$50                       |
+| OpenAI / Gemini chat usage     | ~$10        | ~$100                      |
+| Cloudflare (D1, R2, AI Search) | $0          | ~$20                       |
+| **Total**                      | **~$31/mo** | **~$253/mo**               |
 
 ### Per-workspace usage
 
@@ -1543,7 +1541,6 @@ D1_DATABASE_ID=""
 R2_BUCKET_NAME=""
 R2_ACCESS_KEY_ID=""
 R2_SECRET_ACCESS_KEY=""
-VECTORIZE_INDEX=""
 SEARCH_INDEX=""
 ```
 

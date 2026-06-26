@@ -6,6 +6,12 @@
     "dev": "next dev",
     "build:widget": "node scripts/build-widget.js",
     "build": "pnpm build:widget && next build --webpack",
+    "cf:build": "pnpm build:widget && SKIP_ENV_VALIDATION=1 opennextjs-cloudflare build",
+    "cf:preview": "pnpm cf:build && opennextjs-cloudflare preview",
+    "cf:deploy": "pnpm cf:build && OPEN_NEXT_DEPLOY=true wrangler deploy --env=\"\" --keep-vars --minify",
+    "cf:deploy:preview": "pnpm cf:build && OPEN_NEXT_DEPLOY=true wrangler deploy --env preview --keep-vars --minify",
+    "cf:upload:preview": "pnpm cf:build && OPEN_NEXT_DEPLOY=true wrangler versions upload --env preview --keep-vars",
+    "cf:typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
     "start": "next start",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
@@ -58,6 +64,8 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260625.1",
+    "@opennextjs/cloudflare": "^1.19.11",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
@@ -71,7 +79,8 @@
     "oxlint": "^1.70.0",
     "prisma": "^7.8.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wrangler": "^4.104.0"
   },
   "lint-staged": {
     "*": "oxfmt --no-error-on-unmatched-pattern",

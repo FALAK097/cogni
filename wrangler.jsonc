@@ -1,0 +1,87 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "widget-prod",
+  "account_id": "598a393819cd44e21ef2145dabea9a2f",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-06-26",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": true,
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS",
+  },
+  "observability": {
+    "enabled": true,
+  },
+  "vars": {
+    "ENV": "production",
+    "DATABASE_URL": "file:./prisma/dev.db",
+    "BETTER_AUTH_URL": "https://widget-prod.placeholder.workers.dev",
+    "CLOUDFLARE_ACCOUNT_ID": "598a393819cd44e21ef2145dabea9a2f",
+    "D1_DATABASE_ID": "a9d6acc2-97d4-4b21-aa91-f8738f15afc3",
+    "R2_BUCKET_NAME": "widget-prod-uploads",
+    "SEARCH_INDEX": "widget-prod-search",
+  },
+  "r2_buckets": [
+    {
+      "binding": "UPLOADS",
+      "bucket_name": "widget-prod-uploads",
+    },
+    {
+      "binding": "NEXT_INC_CACHE_R2_BUCKET",
+      "bucket_name": "widget-prod-next-cache",
+    },
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "widget-prod",
+      "database_id": "a9d6acc2-97d4-4b21-aa91-f8738f15afc3",
+    },
+  ],
+  "ai_search": [
+    {
+      "binding": "AI_SEARCH",
+      "instance_name": "widget-prod-search",
+    },
+  ],
+  "env": {
+    "preview": {
+      "name": "widget-preview",
+      "preview_urls": true,
+      "vars": {
+        "ENV": "production",
+        "DATABASE_URL": "file:./prisma/dev.db",
+        "BETTER_AUTH_URL": "https://widget-preview.placeholder.workers.dev",
+        "CLOUDFLARE_ACCOUNT_ID": "598a393819cd44e21ef2145dabea9a2f",
+        "D1_DATABASE_ID": "844a842a-c52a-45e5-b296-33f481bdfb5f",
+        "R2_BUCKET_NAME": "widget-preview-uploads",
+        "SEARCH_INDEX": "widget-preview-search",
+      },
+      "r2_buckets": [
+        {
+          "binding": "UPLOADS",
+          "bucket_name": "widget-preview-uploads",
+        },
+        {
+          "binding": "NEXT_INC_CACHE_R2_BUCKET",
+          "bucket_name": "widget-preview-next-cache",
+        },
+      ],
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "widget-preview",
+          "database_id": "844a842a-c52a-45e5-b296-33f481bdfb5f",
+        },
+      ],
+      "ai_search": [
+        {
+          "binding": "AI_SEARCH",
+          "instance_name": "widget-preview-search",
+        },
+      ],
+    },
+  },
+}

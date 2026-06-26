@@ -2,8 +2,7 @@ import "server-only";
 
 import { readObject } from "@/lib/storage/index";
 import { chunkText, stripHtml } from "@/features/knowledge/server/chunk";
-import { embedText } from "@/lib/ai/embeddings";
-import { upsertVectorizeVectors } from "@/lib/cloudflare/vectorize";
+import { uploadCloudflareSearchDocument } from "@/lib/search/cloudflare-search";
 
 export async function extractDocumentText({
   sourceType,
@@ -78,28 +77,10 @@ export async function indexDocumentContent(
     })),
   });
 
-  const created = await db.documentChunk.findMany({
-    where: { documentId },
-    orderBy: { position: "asc" },
+  await uploadCloudflareSearchDocument({
+    documentId,
+    workspaceId,
+    title: document?.title ?? "Document",
+    text,
   });
-
-  const vectors = [];
-  for (const chunk of created) {
-    const embedding = await embedText(chunk.content);
-    if (!embedding) continue;
-
-    vectors.push({
-      id: chunk.id,
-      values: embedding,
-      metadata: {
-        workspaceId,
-        documentId,
-        title: document?.title ?? "Document",
-      },
-    });
-  }
-
-  if (vectors.length > 0) {
-    await upsertVectorizeVectors(vectors);
-  }
 }

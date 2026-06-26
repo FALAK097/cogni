@@ -41,14 +41,14 @@ BETTER_AUTH_URL="http://localhost:3000"
 GOOGLE_CLIENT_ID=""
 GOOGLE_CLIENT_SECRET=""
 
-# Cloudflare integration keys (optional for local SQLite development)
+# Optional local/fallback Cloudflare keys. Deployed Workers use bindings.
 CLOUDFLARE_ACCOUNT_ID=""
 CLOUDFLARE_API_TOKEN=""
+CLOUDFLARE_AI_SEARCH_TOKEN=""
 D1_DATABASE_ID=""
 R2_BUCKET_NAME="widget-development"
 R2_ACCESS_KEY_ID=""
 R2_SECRET_ACCESS_KEY=""
-VECTORIZE_INDEX="widget-knowledge-development"
 SEARCH_INDEX="widget-search-development"
 OPENAI_API_KEY=""
 GEMINI_API_KEY=""
@@ -67,3 +67,25 @@ pnpm typecheck       # Verify TypeScript types
 pnpm db:migrate      # Generate and apply Prisma migrations
 pnpm db:studio       # Open Prisma database console
 ```
+
+## Cloudflare Workers Deployment
+
+Deployment is configured for Cloudflare Workers through OpenNext, Wrangler, and GitHub Actions.
+
+```bash
+pnpm cf:build             # Build OpenNext Worker output
+pnpm cf:preview           # Preview locally in the Workers runtime
+pnpm cf:deploy            # Deploy widget-prod with Wrangler
+pnpm cf:upload:preview    # Upload a widget-preview version for PR preview aliases
+pnpm cf:typegen           # Generate Cloudflare env binding types
+```
+
+GitHub Actions requires these repository secrets:
+
+```text
+CLOUDFLARE_ACCOUNT_ID
+CLOUDFLARE_API_TOKEN
+CLOUDFLARE_PREVIEW_API_TOKEN
+```
+
+Production deploys run on pushes to `main`. Internal PRs upload preview versions to the isolated `widget-preview` Worker environment. Full setup steps are in `docs/cloudflare-deployment-plan.md`.
