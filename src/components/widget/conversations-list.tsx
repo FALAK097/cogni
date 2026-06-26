@@ -146,7 +146,7 @@ export function ConversationsList({ onSelectSession }: ConversationsListProps) {
       </div>
 
       {/* List */}
-      <div className="flex-1 overflow-auto custom-scrollbar">
+      <div className="flex-1 overflow-auto">
         <Table>
           <TableHeader>
             <TableRow>

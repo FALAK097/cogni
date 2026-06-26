@@ -14,6 +14,8 @@ export const queryKeys = {
   analytics: {
     all: ["analytics"] as const,
     widget: () => [...queryKeys.analytics.all, "widget"] as const,
+    dashboard: (startDate?: string, endDate?: string) =>
+      [...queryKeys.analytics.all, "dashboard", startDate, endDate] as const,
   },
   documents: {
     all: ["documents"] as const,
