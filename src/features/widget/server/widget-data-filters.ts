@@ -26,17 +26,3 @@ export function widgetConversationWhere(workspaceId: string): Prisma.Conversatio
     messages: { contains: '"authorType":"VISITOR"' },
   };
 }
-
-export function widgetLeadWhere(workspaceId: string): Prisma.LeadWhereInput {
-  return {
-    workspaceId,
-    source: "WIDGET",
-    capturedFromChat: true,
-    leadCapture: {
-      is: {
-        formSubmittedAt: { not: null },
-        visitorSession: { is: engagedVisitorSessionWhere },
-      },
-    },
-  };
-}

@@ -120,10 +120,8 @@ export function useSaveWidgetConfig() {
       );
       return requireData(data, error, "Failed to save widget config");
     },
-    onSuccess: (_data, variables) => {
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.widget.config(variables.workspaceId),
-      });
+    onSuccess: (data, variables) => {
+      queryClient.setQueryData(queryKeys.widget.config(variables.workspaceId), data);
     },
   });
 }

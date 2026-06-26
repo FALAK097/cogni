@@ -5,7 +5,6 @@ import { SITE_NAME } from "@/lib/constants";
 import {
   engagedVisitorSessionWhere,
   widgetConversationWhere,
-  widgetLeadWhere,
 } from "@/features/widget/server/widget-data-filters";
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
 
@@ -24,7 +23,6 @@ export default async function DashboardHomePage() {
     documentCount,
     escalationCount,
     widgetSessions,
-    widgetLeads,
     conversations,
   ] = await Promise.all([
     db.conversation.groupBy({
@@ -50,7 +48,6 @@ export default async function DashboardHomePage() {
         ...engagedVisitorSessionWhere,
       },
     }),
-    db.lead.count({ where: widgetLeadWhere(workspace.id) }),
     db.conversation.findMany({
       where: widgetConversationWhere(workspace.id),
       select: { messages: true },
@@ -94,7 +91,6 @@ export default async function DashboardHomePage() {
     { label: "AI messages", value: aiMessageCount },
     { label: "Escalations", value: escalationCount },
     { label: "Engaged visitors", value: widgetSessions },
-    { label: "Widget leads", value: widgetLeads },
     { label: "Helpful responses", value: feedbackUp },
     { label: "Unhelpful responses", value: feedbackDown },
   ];

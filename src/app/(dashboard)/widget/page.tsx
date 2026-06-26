@@ -1,4 +1,3 @@
-import { ContentLayout } from "@/components/app-nav/content-layout";
 import { WidgetCustomizer } from "@/components/widget/widget-customizer";
 import { SITE_NAME } from "@/lib/constants";
 import { Suspense } from "react";
@@ -17,12 +16,10 @@ export default async function WidgetPage({
   const [{ workspace }, { subtab }] = await Promise.all([requireDashboardContext(), searchParams]);
 
   return (
-    <ContentLayout className="max-w-full">
-      <div className="mx-auto max-w-7xl pb-16">
-        <Suspense>
-          <WidgetCustomizer workspaceId={workspace.id} initialSubtab={subtab} key={workspace.id} />
-        </Suspense>
-      </div>
-    </ContentLayout>
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#F9FAFB]">
+      <Suspense>
+        <WidgetCustomizer workspaceId={workspace.id} initialSubtab={subtab} key={workspace.id} />
+      </Suspense>
+    </div>
   );
 }
