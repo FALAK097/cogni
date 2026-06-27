@@ -38,6 +38,7 @@
       "binding": "DB",
       "database_name": "widget-prod",
       "database_id": "c0e9cc6e-438a-4b4f-9bf1-73c24d4417a4",
+      "migrations_dir": "drizzle",
     },
   ],
   "ai_search": [
@@ -74,6 +75,7 @@
           "binding": "DB",
           "database_name": "widget-preview",
           "database_id": "198b258a-481e-4970-a17f-26de89c6785d",
+          "migrations_dir": "drizzle",
         },
       ],
       "ai_search": [
