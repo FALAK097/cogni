@@ -40,23 +40,6 @@
       "database_id": "c0e9cc6e-438a-4b4f-9bf1-73c24d4417a4",
     },
   ],
-  "secrets_store_secrets": [
-    {
-      "binding": "BETTER_AUTH_SECRET",
-      "store_id": "06b91271c8384381b58665f385311eee",
-      "secret_name": "BETTER_AUTH_SECRET",
-    },
-    {
-      "binding": "GOOGLE_CLIENT_ID",
-      "store_id": "06b91271c8384381b58665f385311eee",
-      "secret_name": "GOOGLE_CLIENT_ID",
-    },
-    {
-      "binding": "GOOGLE_CLIENT_SECRET",
-      "store_id": "06b91271c8384381b58665f385311eee",
-      "secret_name": "GOOGLE_CLIENT_SECRET",
-    },
-  ],
   "ai_search": [
     {
       "binding": "AI_SEARCH",
@@ -91,23 +74,6 @@
           "binding": "DB",
           "database_name": "widget-preview",
           "database_id": "198b258a-481e-4970-a17f-26de89c6785d",
-        },
-      ],
-      "secrets_store_secrets": [
-        {
-          "binding": "BETTER_AUTH_SECRET",
-          "store_id": "06b91271c8384381b58665f385311eee",
-          "secret_name": "BETTER_AUTH_SECRET",
-        },
-        {
-          "binding": "GOOGLE_CLIENT_ID",
-          "store_id": "06b91271c8384381b58665f385311eee",
-          "secret_name": "GOOGLE_CLIENT_ID",
-        },
-        {
-          "binding": "GOOGLE_CLIENT_SECRET",
-          "store_id": "06b91271c8384381b58665f385311eee",
-          "secret_name": "GOOGLE_CLIENT_SECRET",
         },
       ],
       "ai_search": [
