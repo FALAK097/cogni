@@ -7,7 +7,6 @@ import { WorkspaceSwitcher } from "@/components/app-nav/workspace-switcher";
 import { ThemeLogo } from "@/components/theme-logo";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { SITE_NAME } from "@/lib/constants";
-import { getDashboardHref } from "@/lib/deployment-urls";
 import { cn } from "@/lib/utils";
 
 export function Sidebar() {
@@ -59,7 +58,7 @@ export function Sidebar() {
           <div className="flex-none px-4 pt-4 pb-2">
             <div className="flex items-center justify-between">
               <Link
-                href={getDashboardHref()}
+                href="/dashboard"
                 className={cn(
                   "flex items-center gap-2.5",
                   openState ? "px-2.5" : "w-full justify-center",

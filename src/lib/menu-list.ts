@@ -1,5 +1,4 @@
 import { BookOpen, LayoutGrid, MessageCircle, MessageSquare, Plug } from "@/components/icons";
-import { getDashboardHref } from "@/lib/deployment-urls";
 
 export type MenuItem = {
   href: string;
@@ -22,7 +21,7 @@ export function getStaticMenuList(): MenuList {
       groupLabel: "",
       menus: [
         {
-          href: getDashboardHref(),
+          href: "/dashboard",
           label: "Dashboard",
           icon: LayoutGrid,
           submenus: [],
