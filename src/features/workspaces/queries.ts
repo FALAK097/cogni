@@ -3,12 +3,12 @@ import "server-only";
 import { getDb } from "@/lib/db/client";
 
 export async function getWorkspaceMembers(workspaceId: string) {
-  return getDb().workspaceMember.findMany({
-    where: { workspaceId },
-    orderBy: { createdAt: "asc" },
-    include: {
+  return getDb().query.workspaceMember.findMany({
+    where: (member, { eq }) => eq(member.workspaceId, workspaceId),
+    orderBy: (member, { asc }) => [asc(member.createdAt)],
+    with: {
       user: {
-        select: {
+        columns: {
           id: true,
           name: true,
           email: true,

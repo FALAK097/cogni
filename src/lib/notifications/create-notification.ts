@@ -1,6 +1,5 @@
-import "server-only";
-
-import type { PrismaClient } from "@/generated/prisma/client";
+import type { Db } from "@/lib/db/client";
+import { notification } from "@/lib/db/schema";
 
 export async function createNotification({
   db,
@@ -10,22 +9,25 @@ export async function createNotification({
   title,
   body,
 }: {
-  db: PrismaClient;
+  db: Db;
   workspaceId: string;
   userId: string;
   type: string;
   title: string;
   body: string;
 }) {
-  return db.notification.create({
-    data: {
+  const results = await db
+    .insert(notification)
+    .values({
+      id: crypto.randomUUID(),
       workspaceId,
       userId,
       type,
       title,
       body,
-    },
-  });
+    })
+    .returning();
+  return results[0];
 }
 
 export async function notifyWorkspaceMembers({
@@ -36,30 +38,36 @@ export async function notifyWorkspaceMembers({
   body,
   excludeUserId,
 }: {
-  db: PrismaClient;
+  db: Db;
   workspaceId: string;
   type: string;
   title: string;
   body: string;
   excludeUserId?: string;
 }) {
-  const members = await db.workspaceMember.findMany({
-    where: {
-      workspaceId,
-      ...(excludeUserId ? { userId: { not: excludeUserId } } : {}),
+  const members = await db.query.workspaceMember.findMany({
+    where: (member, { eq, and, ne }) => {
+      const conds = [eq(member.workspaceId, workspaceId)];
+      if (excludeUserId) {
+        conds.push(ne(member.userId, excludeUserId));
+      }
+      return and(...conds);
     },
-    select: { userId: true },
+    columns: {
+      userId: true,
+    },
   });
 
   if (members.length === 0) return;
 
-  await db.notification.createMany({
-    data: members.map((member) => ({
+  await db.insert(notification).values(
+    members.map((member) => ({
+      id: crypto.randomUUID(),
       workspaceId,
       userId: member.userId,
       type,
       title,
       body,
     })),
-  });
+  );
 }

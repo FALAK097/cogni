@@ -47,7 +47,7 @@ Everything that exists in the codebase today.
 | Framework          | Next.js 16 (App Router), React 19, TypeScript                                        |
 | Styling            | Tailwind CSS v4, shadcn/ui, Base UI                                                  |
 | Auth               | Better Auth — Google OAuth only                                                      |
-| Database           | Prisma 7 — SQLite locally (`dev.db`), Cloudflare D1 in production                    |
+| Database           | Drizzle ORM — SQLite locally (`dev.db`), Cloudflare D1 in production                 |
 | State              | TanStack Query, Zustand, nuqs                                                        |
 | AI                 | [Vercel AI SDK](https://ai-sdk.dev/) (`ai` v6) + `@ai-sdk/openai` + `@ai-sdk/google` |
 | Async jobs         | Custom `WorkflowRun` DB tracking (not Workflow SDK or Queue SDK yet)                 |
@@ -79,7 +79,7 @@ src/
 └── lib/                    # DB, AI, auth, storage, Cloudflare, workflows
 
 public/widget/              # Embeddable widget source
-prisma/schema.prisma        # Database schema (24 tables)
+src/lib/db/schema.ts        # Database schema (24 tables)
 ```
 
 ### Core Design Rules
@@ -238,7 +238,7 @@ Route: `/integrations`
 
 ## 1.3 Current Database Schema
 
-**24 tables** in `prisma/schema.prisma`:
+**24 tables** in `src/lib/db/schema.ts`:
 
 | Group            | Models                                                |
 | ---------------- | ----------------------------------------------------- |
@@ -450,7 +450,7 @@ bot.onSubscribedMessage(async (thread, msg) => {
 | AI SDK            | `src/lib/ai/providers.ts`, `src/features/widget/server/widget-agent.ts` |
 | Workflow (custom) | `src/lib/workflows/runner.ts`                                           |
 | Auth              | `src/lib/auth/server.ts`                                                |
-| Schema            | `prisma/schema.prisma`                                                  |
+| Schema            | `src/lib/db/schema.ts`                                                  |
 | Env vars          | `.env.example`                                                          |
 
 ---
@@ -477,7 +477,7 @@ All planned features with technical design. Each builds on the current structure
 
 ### Schema changes
 
-```prisma
+```ts
 model Lead {
   // ... existing fields ...
   companyName       String?
@@ -523,7 +523,7 @@ Lead captured
 
 ### Schema changes
 
-```prisma
+```ts
 model Widget {
   // ... existing fields ...
   draftConfig     String?     // JSON: full draft configuration
@@ -570,7 +570,7 @@ Edit config → saved as draft
 
 ### Schema changes
 
-```prisma
+```ts
 model WidgetTemplate {
   id          String   @id @default(cuid())
   name        String
@@ -626,7 +626,7 @@ User message
 
 ### Schema changes
 
-```prisma
+```ts
 model Widget {
   // ... existing fields ...
   enabledActions String @default("[]")  // JSON: ["book_meeting", "create_lead"]
@@ -653,7 +653,7 @@ model Widget {
 
 ### Schema changes
 
-```prisma
+```ts
 model Widget {
   deploymentMode          String  @default("EMBED")
   standaloneTitle         String?
@@ -687,7 +687,7 @@ model Widget {
 
 ### Schema changes
 
-```prisma
+```ts
 model RoutingRule {
   id             String   @id @default(cuid())
   workspaceId    String
@@ -733,7 +733,7 @@ Lead qualified → rules evaluated (priority order)
 
 ### Schema changes
 
-```prisma
+```ts
 model WhatsAppConfig {
   id                 String   @id @default(cuid())
   workspaceId        String   @unique
@@ -779,7 +779,7 @@ model AutomationRule {
 
 ### Schema changes
 
-```prisma
+```ts
 model Ticket {
   id               String   @id @default(cuid())
   workspaceId      String
@@ -840,7 +840,7 @@ model TicketAttachment {
 
 ### Schema changes
 
-```prisma
+```ts
 model DataSource {
   id            String   @id @default(cuid())
   workspaceId   String
@@ -1153,7 +1153,7 @@ export async function leadFollowUp(leadId: string) {
 
 | Current (`src/lib/workflows/runner.ts`)    | Workflow SDK                     |
 | ------------------------------------------ | -------------------------------- |
-| `WorkflowRun` Prisma model                 | Workflow observability dashboard |
+| `WorkflowRun` Drizzle table                | Workflow observability dashboard |
 | `startWorkflowRun` / `completeWorkflowRun` | `"use workflow"` + `"use step"`  |
 | Manual `maxAttempts`                       | Built-in step retries            |
 | No cross-request suspend                   | `sleep()`, hooks, webhooks       |
@@ -1257,7 +1257,7 @@ Visitor (widget embed / WhatsApp / Slack)
 └─────────────────────────────────────────────┘
           │
           ▼
-   Prisma (D1) + R2 + AI Search
+   Drizzle (D1) + R2 + AI Search
 ```
 
 ---
@@ -1501,7 +1501,7 @@ Phase 4 (Scale)
 ### Current
 
 ```bash
-DATABASE_URL="file:./prisma/dev.db"
+DATABASE_URL="file:./dev.db"
 BETTER_AUTH_SECRET=""
 BETTER_AUTH_URL="http://localhost:3000"
 GOOGLE_CLIENT_ID=""

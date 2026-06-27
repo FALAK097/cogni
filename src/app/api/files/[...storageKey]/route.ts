@@ -15,9 +15,9 @@ export async function GET(
   const storageKey = storageKeyParts.map(decodeURIComponent).join("/");
   const db = getDb();
 
-  const attachment = await db.attachment.findFirst({
-    where: { storageKey },
-    select: {
+  const attachment = await db.query.attachment.findFirst({
+    where: (fields, { eq }) => eq(fields.storageKey, storageKey),
+    columns: {
       filename: true,
       mimeType: true,
       workspaceId: true,
@@ -32,15 +32,17 @@ export async function GET(
   let authorized = false;
 
   if (widgetToken) {
-    const session = await db.visitorSession.findFirst({
-      where: {
-        token: widgetToken,
-        expiresAt: { gt: new Date() },
-        widget: { workspaceId: attachment.workspaceId },
+    const nowIso = new Date().toISOString();
+    const session = await db.query.visitorSession.findFirst({
+      where: (fields, { eq, and, gt }) =>
+        and(eq(fields.token, widgetToken), gt(fields.expiresAt, nowIso)),
+      with: {
+        widget: {
+          columns: { workspaceId: true },
+        },
       },
-      select: { id: true },
     });
-    authorized = Boolean(session);
+    authorized = Boolean(session && session.widget?.workspaceId === attachment.workspaceId);
   } else {
     try {
       const { workspace } = await requireDashboardContext();

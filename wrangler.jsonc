@@ -16,10 +16,10 @@
   },
   "vars": {
     "ENV": "production",
-    "DATABASE_URL": "file:./prisma/dev.db",
-    "BETTER_AUTH_URL": "https://widget-prod.placeholder.workers.dev",
+    "DATABASE_URL": "file:./dev.db",
+    "BETTER_AUTH_URL": "https://widget-prod.falak-widget.workers.dev",
     "CLOUDFLARE_ACCOUNT_ID": "598a393819cd44e21ef2145dabea9a2f",
-    "D1_DATABASE_ID": "a9d6acc2-97d4-4b21-aa91-f8738f15afc3",
+    "D1_DATABASE_ID": "c0e9cc6e-438a-4b4f-9bf1-73c24d4417a4",
     "R2_BUCKET_NAME": "widget-prod-uploads",
     "SEARCH_INDEX": "widget-prod-search",
   },
@@ -37,7 +37,24 @@
     {
       "binding": "DB",
       "database_name": "widget-prod",
-      "database_id": "a9d6acc2-97d4-4b21-aa91-f8738f15afc3",
+      "database_id": "c0e9cc6e-438a-4b4f-9bf1-73c24d4417a4",
+    },
+  ],
+  "secrets_store_secrets": [
+    {
+      "binding": "BETTER_AUTH_SECRET",
+      "store_id": "06b91271c8384381b58665f385311eee",
+      "secret_name": "BETTER_AUTH_SECRET",
+    },
+    {
+      "binding": "GOOGLE_CLIENT_ID",
+      "store_id": "06b91271c8384381b58665f385311eee",
+      "secret_name": "GOOGLE_CLIENT_ID",
+    },
+    {
+      "binding": "GOOGLE_CLIENT_SECRET",
+      "store_id": "06b91271c8384381b58665f385311eee",
+      "secret_name": "GOOGLE_CLIENT_SECRET",
     },
   ],
   "ai_search": [
@@ -52,10 +69,10 @@
       "preview_urls": true,
       "vars": {
         "ENV": "production",
-        "DATABASE_URL": "file:./prisma/dev.db",
-        "BETTER_AUTH_URL": "https://widget-preview.placeholder.workers.dev",
+        "DATABASE_URL": "file:./dev.db",
+        "BETTER_AUTH_URL": "https://widget-preview.falak-widget.workers.dev",
         "CLOUDFLARE_ACCOUNT_ID": "598a393819cd44e21ef2145dabea9a2f",
-        "D1_DATABASE_ID": "844a842a-c52a-45e5-b296-33f481bdfb5f",
+        "D1_DATABASE_ID": "198b258a-481e-4970-a17f-26de89c6785d",
         "R2_BUCKET_NAME": "widget-preview-uploads",
         "SEARCH_INDEX": "widget-preview-search",
       },
@@ -73,7 +90,24 @@
         {
           "binding": "DB",
           "database_name": "widget-preview",
-          "database_id": "844a842a-c52a-45e5-b296-33f481bdfb5f",
+          "database_id": "198b258a-481e-4970-a17f-26de89c6785d",
+        },
+      ],
+      "secrets_store_secrets": [
+        {
+          "binding": "BETTER_AUTH_SECRET",
+          "store_id": "06b91271c8384381b58665f385311eee",
+          "secret_name": "BETTER_AUTH_SECRET",
+        },
+        {
+          "binding": "GOOGLE_CLIENT_ID",
+          "store_id": "06b91271c8384381b58665f385311eee",
+          "secret_name": "GOOGLE_CLIENT_ID",
+        },
+        {
+          "binding": "GOOGLE_CLIENT_SECRET",
+          "store_id": "06b91271c8384381b58665f385311eee",
+          "secret_name": "GOOGLE_CLIENT_SECRET",
         },
       ],
       "ai_search": [

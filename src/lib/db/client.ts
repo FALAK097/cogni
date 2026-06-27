@@ -2,12 +2,22 @@ import "server-only";
 
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import type { D1Database } from "@cloudflare/workers-types";
-import { PrismaD1 } from "@prisma/adapter-d1";
+import { drizzle as drizzleD1 } from "drizzle-orm/d1";
+import { drizzle as drizzleBetterSqlite3 } from "drizzle-orm/better-sqlite3";
+import type { BaseSQLiteDatabase } from "drizzle-orm/sqlite-core/db";
+import Database from "better-sqlite3";
 
-import { PrismaClient } from "@/generated/prisma/client";
+import * as schema from "./schema";
+import * as relations from "./relations";
 import { env } from "@/lib/env/server";
 
-let prisma: PrismaClient | undefined;
+const fullSchema = { ...schema, ...relations };
+
+type DrizzleDb = BaseSQLiteDatabase<"sync" | "async", unknown, typeof fullSchema>;
+
+let db: DrizzleDb | undefined;
+
+export type Db = DrizzleDb;
 
 type CloudflareD1Env = {
   DB?: D1Database;
@@ -25,49 +35,20 @@ function getD1Binding() {
   }
 }
 
-export function getDb() {
-  if (prisma) {
-    return prisma;
+export function getDb(): Db {
+  if (db) {
+    return db;
   }
 
   const d1Binding = getD1Binding();
-  const accountId = env.CLOUDFLARE_ACCOUNT_ID;
-  const apiToken = env.CLOUDFLARE_API_TOKEN;
-  const databaseId = env.D1_DATABASE_ID;
-
-  const isProd = env.ENV === "production" || process.env.NODE_ENV === "production";
-
-  let adapter;
   if (d1Binding) {
-    adapter = new PrismaD1(d1Binding);
-  } else if (isProd) {
-    if (accountId && apiToken && databaseId) {
-      adapter = new PrismaD1({
-        CLOUDFLARE_ACCOUNT_ID: accountId,
-        CLOUDFLARE_D1_TOKEN: apiToken,
-        CLOUDFLARE_DATABASE_ID: databaseId,
-      });
-    } else {
-      const dummyD1: any = {
-        prepare: () => dummyD1,
-        bind: () => dummyD1,
-        all: async () => ({ results: [] }),
-        run: async () => ({}),
-        select: async () => ({}),
-        first: async () => null,
-        exec: async () => ({}),
-        batch: async () => [],
-      };
-      adapter = new PrismaD1(dummyD1);
-    }
+    db = drizzleD1(d1Binding, { schema: fullSchema });
   } else {
-    const sqliteAdapterName = "@prisma/adapter-better-sqlite3";
-    const { PrismaBetterSqlite3 } = require(
-      sqliteAdapterName,
-    ) as typeof import("@prisma/adapter-better-sqlite3");
-    adapter = new PrismaBetterSqlite3({ url: env.DATABASE_URL });
+    // Local SQLite development using better-sqlite3
+    const dbPath = env.DATABASE_URL.replace(/^file:/, "");
+    const sqlite = new Database(dbPath);
+    db = drizzleBetterSqlite3(sqlite, { schema: fullSchema }) as DrizzleDb;
   }
 
-  prisma = new PrismaClient({ adapter });
-  return prisma;
+  return db;
 }

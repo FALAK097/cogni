@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
-
+import { randomUUID } from "node:crypto";
+import { eq, and } from "drizzle-orm";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
+import { integration as integrationTable } from "@/lib/db/schema";
 
 const PROVIDER_SLUGS: Record<string, string> = {
   GMAIL: "gmail",
@@ -10,19 +12,19 @@ const PROVIDER_SLUGS: Record<string, string> = {
 
 export async function GET() {
   const { db, workspace } = await requireDashboardContext();
-  const integrations = await db.integration.findMany({
-    where: { workspaceId: workspace.id },
-    orderBy: { provider: "asc" },
+  const integrations = await db.query.integration.findMany({
+    where: (fields, { eq }) => eq(fields.workspaceId, workspace.id),
+    orderBy: (fields, { asc }) => [asc(fields.provider)],
   });
 
   return NextResponse.json(
-    integrations.map((integration) => ({
+    integrations.map((integration: any) => ({
       id: integration.id,
       integrationSlug: PROVIDER_SLUGS[integration.provider] ?? integration.provider.toLowerCase(),
       slug: PROVIDER_SLUGS[integration.provider] ?? integration.provider.toLowerCase(),
       provider: integration.provider,
       status: integration.status,
-      connectedAt: integration.updatedAt.toISOString(),
+      connectedAt: integration.updatedAt,
       metadata: {},
     })),
   );
@@ -46,22 +48,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unsupported integration." }, { status: 400 });
   }
 
-  await db.integration.upsert({
-    where: {
-      workspaceId_provider: {
-        workspaceId: workspace.id,
-        provider,
-      },
-    },
-    create: {
+  await db
+    .insert(integrationTable)
+    .values({
+      id: randomUUID(),
       workspaceId: workspace.id,
       provider,
       status: "CONNECTED",
-    },
-    update: {
-      status: "CONNECTED",
-    },
-  });
+      updatedAt: new Date().toISOString(),
+    })
+    .onConflictDoUpdate({
+      target: [integrationTable.workspaceId, integrationTable.provider],
+      set: {
+        status: "CONNECTED",
+        updatedAt: new Date().toISOString(),
+      },
+    });
 
   return NextResponse.json({ ok: true });
 }
@@ -88,10 +90,15 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "Unsupported integration." }, { status: 400 });
   }
 
-  await db.integration.updateMany({
-    where: { workspaceId: workspace.id, provider },
-    data: { status: "DISCONNECTED" },
-  });
+  await db
+    .update(integrationTable)
+    .set({
+      status: "DISCONNECTED",
+      updatedAt: new Date().toISOString(),
+    })
+    .where(
+      and(eq(integrationTable.workspaceId, workspace.id), eq(integrationTable.provider, provider)),
+    );
 
   return NextResponse.json({ ok: true });
 }

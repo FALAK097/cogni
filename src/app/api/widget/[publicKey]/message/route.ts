@@ -32,12 +32,10 @@ export async function POST(
     return Response.json({ error: "Invalid message payload." }, { status: 400 });
   }
 
-  const conversation = await db.conversation.findFirst({
-    where: {
-      visitorSessionId: authorized.session.id,
-      channel: "WIDGET",
-    },
-    orderBy: { updatedAt: "desc" },
+  const conversation = await db.query.conversation.findFirst({
+    where: (fields, { eq, and }) =>
+      and(eq(fields.visitorSessionId, authorized.session.id), eq(fields.channel, "WIDGET")),
+    orderBy: (fields, { desc }) => [desc(fields.updatedAt)],
   });
 
   if (!conversation) {

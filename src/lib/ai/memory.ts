@@ -1,7 +1,5 @@
-import "server-only";
-
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
-import type { PrismaClient } from "@/generated/prisma/client";
+import type { Db } from "@/lib/db/client";
 
 export async function buildAgentMemoryContext({
   db,
@@ -9,19 +7,19 @@ export async function buildAgentMemoryContext({
   conversationId,
   contactId,
 }: {
-  db: PrismaClient;
+  db: Db;
   workspaceId: string;
   conversationId: string;
   contactId: string;
 }) {
   const [contact, conversation] = await Promise.all([
-    db.contact.findFirst({
-      where: { id: contactId, workspaceId },
-      select: { name: true, email: true, tags: true },
+    db.query.contact.findFirst({
+      where: (c, { eq, and }) => and(eq(c.id, contactId), eq(c.workspaceId, workspaceId)),
+      columns: { name: true, email: true, tags: true },
     }),
-    db.conversation.findUnique({
-      where: { id: conversationId },
-      select: { messages: true },
+    db.query.conversation.findFirst({
+      where: (c, { eq }) => eq(c.id, conversationId),
+      columns: { messages: true },
     }),
   ]);
 

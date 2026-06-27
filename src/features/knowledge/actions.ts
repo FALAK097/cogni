@@ -3,6 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import { randomUUID } from "node:crypto";
+import { eq, and } from "drizzle-orm";
+import { document as documentTable } from "@/lib/db/schema";
 import { processDocument } from "@/features/knowledge/server/process-document";
 import { emitDomainEvent } from "@/lib/events/domain-events";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
@@ -32,15 +35,18 @@ export async function addUrlSourceAction(
   }
 
   const { db, workspace } = await requireDashboardContext();
-  const document = await db.document.create({
-    data: {
+  const [document] = await db
+    .insert(documentTable)
+    .values({
+      id: randomUUID(),
       workspaceId: workspace.id,
       title: parsed.data.title,
       sourceType: "URL",
       sourceUrl: parsed.data.sourceUrl,
       status: "PROCESSING",
-    },
-  });
+      updatedAt: new Date().toISOString(),
+    })
+    .returning();
 
   try {
     await processDocument({
@@ -91,16 +97,19 @@ export async function uploadDocumentAction(formData: FormData) {
     bytes,
   });
 
-  const document = await db.document.create({
-    data: {
+  const [document] = await db
+    .insert(documentTable)
+    .values({
+      id: randomUUID(),
       workspaceId: workspace.id,
       title: title.trim(),
       sourceType,
       storageKey: saved.storageKey,
       mimeType,
       status: "PROCESSING",
-    },
-  });
+      updatedAt: new Date().toISOString(),
+    })
+    .returning();
 
   try {
     await processDocument({
@@ -127,17 +136,18 @@ export async function deleteDocumentAction(formData: FormData) {
   if (typeof documentId !== "string") return;
 
   const { db, workspace } = await requireDashboardContext();
-  const document = await db.document.findFirst({
-    where: { id: documentId, workspaceId: workspace.id },
-    select: { storageKey: true },
+  const document = await db.query.document.findFirst({
+    where: (fields, { eq, and }) =>
+      and(eq(fields.id, documentId), eq(fields.workspaceId, workspace.id)),
+    columns: { storageKey: true },
   });
   if (!document) return;
 
   if (document.storageKey) {
     await deleteObject(document.storageKey);
   }
-  await db.document.deleteMany({
-    where: { id: documentId, workspaceId: workspace.id },
-  });
+  await db
+    .delete(documentTable)
+    .where(and(eq(documentTable.id, documentId), eq(documentTable.workspaceId, workspace.id)));
   revalidatePath("/knowledge-base");
 }

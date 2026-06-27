@@ -1,6 +1,11 @@
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
-import { engagedVisitorSessionWhere } from "@/features/widget/server/widget-data-filters";
+import {
+  getEngagedVisitorSessionCond,
+  getWidgetConversationCond,
+} from "@/features/widget/server/widget-data-filters";
+import { and, eq, gte, lte, count } from "drizzle-orm";
+import { conversation, visitorSession, widget } from "@/lib/db/schema";
 
 export async function GET(request: Request) {
   const { db, workspace } = await requireDashboardContext();
@@ -8,60 +13,66 @@ export async function GET(request: Request) {
   const startDate = url.searchParams.get("startDate");
   const endDate = url.searchParams.get("endDate");
 
-  const dateFilter =
-    startDate || endDate
-      ? {
-          createdAt: {
-            ...(startDate ? { gte: new Date(startDate) } : {}),
-            ...(endDate ? { lte: new Date(endDate) } : {}),
-          },
-        }
-      : {};
+  const sessionDateConds = [];
+  const convoDateConds = [];
+  if (startDate) {
+    const startIso = new Date(startDate).toISOString();
+    sessionDateConds.push(gte(visitorSession.createdAt, startIso));
+    convoDateConds.push(gte(conversation.createdAt, startIso));
+  }
+  if (endDate) {
+    const endIso = new Date(endDate).toISOString();
+    sessionDateConds.push(lte(visitorSession.createdAt, endIso));
+    convoDateConds.push(lte(conversation.createdAt, endIso));
+  }
   const activeSince = new Date(Date.now() - 30 * 60 * 1000);
+  const activeSinceIso = activeSince.toISOString();
 
-  const [totalSessions, activeSessions, sessions, widgetConvos] = await Promise.all([
-    db.visitorSession.count({
-      where: {
-        widget: { workspaceId: workspace.id },
-        ...engagedVisitorSessionWhere,
-        ...dateFilter,
-      },
-    }),
-    db.visitorSession.count({
-      where: {
-        widget: { workspaceId: workspace.id },
-        status: "active",
-        lastSeenAt: { gte: activeSince },
-        ...engagedVisitorSessionWhere,
-        ...dateFilter,
-      },
-    }),
-    db.visitorSession.findMany({
-      where: {
-        widget: { workspaceId: workspace.id },
-        ...engagedVisitorSessionWhere,
-        ...dateFilter,
-      },
-      select: { country: true, deviceType: true },
-      take: 500,
-    }),
-    db.conversation.findMany({
-      where: {
-        workspaceId: workspace.id,
-        channel: "WIDGET",
-        visitorSession: {
-          is: {
-            hostname: { not: "dashboard-preview" },
-            messageCount: { gt: 0 },
-          },
-        },
-        ...(dateFilter.createdAt ? { createdAt: dateFilter.createdAt } : {}),
-      },
-      select: {
-        messages: true,
-      },
-    }),
+  const [totalSessionsResult, activeSessionsResult, sessions, widgetConvos] = await Promise.all([
+    db
+      .select({ val: count() })
+      .from(visitorSession)
+      .innerJoin(widget, eq(visitorSession.widgetId, widget.id))
+      .where(
+        and(
+          eq(widget.workspaceId, workspace.id),
+          getEngagedVisitorSessionCond(visitorSession),
+          ...sessionDateConds,
+        ),
+      ),
+    db
+      .select({ val: count() })
+      .from(visitorSession)
+      .innerJoin(widget, eq(visitorSession.widgetId, widget.id))
+      .where(
+        and(
+          eq(widget.workspaceId, workspace.id),
+          eq(visitorSession.status, "active"),
+          gte(visitorSession.lastSeenAt, activeSinceIso),
+          getEngagedVisitorSessionCond(visitorSession),
+          ...sessionDateConds,
+        ),
+      ),
+    db
+      .select({ country: visitorSession.country, deviceType: visitorSession.deviceType })
+      .from(visitorSession)
+      .innerJoin(widget, eq(visitorSession.widgetId, widget.id))
+      .where(
+        and(
+          eq(widget.workspaceId, workspace.id),
+          getEngagedVisitorSessionCond(visitorSession),
+          ...sessionDateConds,
+        ),
+      )
+      .limit(500),
+    db
+      .select({ messages: conversation.messages })
+      .from(conversation)
+      .where(and(getWidgetConversationCond(conversation, workspace.id), ...convoDateConds)),
   ]);
+
+  const totalSessions = totalSessionsResult[0]?.val ?? 0;
+  const activeSessions = activeSessionsResult[0]?.val ?? 0;
 
   let feedbackUp = 0;
   let feedbackDown = 0;

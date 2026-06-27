@@ -1,6 +1,8 @@
 import "server-only";
 
 import { getDb } from "@/lib/db/client";
+import { eq, and, like, inArray, desc } from "drizzle-orm";
+import { document as documentTable, documentChunk as documentChunkTable } from "@/lib/db/schema";
 import {
   type CloudflareSearchFilters,
   searchCloudflareIndex,
@@ -16,14 +18,9 @@ export async function retrieveKnowledgeContext(
   query: string,
   limit = 4,
   documentIds?: string[] | null,
-) {
+): Promise<{ documentId: string; title: string; content: string }[]> {
   const normalized = query.trim();
   if (!normalized) return [];
-
-  const documentFilter =
-    documentIds && documentIds.length > 0
-      ? { workspaceId, status: "READY" as const, id: { in: documentIds } }
-      : { workspaceId, status: "READY" as const };
 
   const searchFilters: CloudflareSearchFilters =
     documentIds && documentIds.length > 0
@@ -34,6 +31,8 @@ export async function retrieveKnowledgeContext(
     limit,
     filters: searchFilters,
   });
+
+  const db = getDb();
 
   if (searchMatches.length > 0) {
     const searchDocumentIds = [
@@ -48,86 +47,105 @@ export async function retrieveKnowledgeContext(
         ? searchDocumentIds.filter((documentId) => documentIds.includes(documentId))
         : searchDocumentIds;
 
-    const documents = await getDb().document.findMany({
-      where: {
-        ...documentFilter,
-        id: { in: validatedDocumentIds },
-      },
-      select: { id: true, title: true },
-    });
-    const titlesByDocumentId = new Map(
-      documents.map((document) => [document.id, document.title] as const),
-    );
+    if (validatedDocumentIds.length > 0) {
+      const documents = await db.query.document.findMany({
+        where: (fields, { eq, and, inArray }) => {
+          const conds = [
+            eq(fields.workspaceId, workspaceId),
+            eq(fields.status, "READY"),
+            inArray(fields.id, validatedDocumentIds),
+          ];
+          if (documentIds && documentIds.length > 0) {
+            conds.push(inArray(fields.id, documentIds));
+          }
+          return and(...conds);
+        },
+        columns: { id: true, title: true },
+      });
+      const titlesByDocumentId = new Map(
+        documents.map((document) => [document.id, document.title] as const),
+      );
 
-    const contexts = searchMatches.flatMap((match) => {
-      const documentId = readSearchMetadataString(match.item?.metadata, "documentId");
-      if (!documentId) {
-        return [];
+      const contexts = searchMatches.flatMap((match) => {
+        const documentId = readSearchMetadataString(match.item?.metadata, "documentId");
+        if (!documentId) {
+          return [];
+        }
+
+        const title = titlesByDocumentId.get(documentId);
+        if (!title) {
+          return [];
+        }
+
+        return {
+          documentId,
+          title,
+          content: match.text,
+        };
+      });
+
+      if (contexts.length > 0) {
+        return contexts.slice(0, limit);
       }
-
-      const title = titlesByDocumentId.get(documentId);
-      if (!title) {
-        return [];
-      }
-
-      return {
-        documentId,
-        title,
-        content: match.text,
-      };
-    });
-
-    if (contexts.length > 0) {
-      return contexts.slice(0, limit);
     }
   }
 
-  const chunks = await getDb().documentChunk.findMany({
-    where: {
-      document: documentFilter,
-      content: {
-        contains: normalized.slice(0, 120),
-      },
-    },
-    include: {
+  const chunksWhereConds = [
+    eq(documentTable.workspaceId, workspaceId),
+    eq(documentTable.status, "READY"),
+    like(documentChunkTable.content, `%${normalized.slice(0, 120)}%`),
+  ];
+  if (documentIds && documentIds.length > 0) {
+    chunksWhereConds.push(inArray(documentTable.id, documentIds));
+  }
+
+  const chunks = await (db as any)
+    .select({
+      chunk: documentChunkTable,
       document: {
-        select: {
-          id: true,
-          title: true,
-        },
+        id: documentTable.id,
+        title: documentTable.title,
       },
-    },
-    take: limit,
-    orderBy: { createdAt: "desc" },
-  });
+    })
+    .from(documentChunkTable)
+    .innerJoin(documentTable, eq(documentChunkTable.documentId, documentTable.id))
+    .where(and(...chunksWhereConds))
+    .orderBy(desc(documentChunkTable.createdAt))
+    .limit(limit);
 
   if (chunks.length > 0) {
-    return chunks.map((chunk) => ({
-      documentId: chunk.document.id,
-      title: chunk.document.title,
-      content: chunk.content,
+    return chunks.map((item: any) => ({
+      documentId: item.document.id,
+      title: item.document.title,
+      content: item.chunk.content,
     }));
   }
 
-  const fallback = await getDb().documentChunk.findMany({
-    where: {
-      document: documentFilter,
-    },
-    include: {
-      document: {
-        select: {
-          id: true,
-          title: true,
-        },
-      },
-    },
-    take: limit,
-    orderBy: { createdAt: "desc" },
-  });
+  const fallbackWhereConds = [
+    eq(documentTable.workspaceId, workspaceId),
+    eq(documentTable.status, "READY"),
+  ];
+  if (documentIds && documentIds.length > 0) {
+    fallbackWhereConds.push(inArray(documentTable.id, documentIds));
+  }
 
-  return fallback.map((chunk) => ({
-    documentId: chunk.document.id,
-    title: chunk.document.title,
-    content: chunk.content,
+  const fallback = await (db as any)
+    .select({
+      chunk: documentChunkTable,
+      document: {
+        id: documentTable.id,
+        title: documentTable.title,
+      },
+    })
+    .from(documentChunkTable)
+    .innerJoin(documentTable, eq(documentChunkTable.documentId, documentTable.id))
+    .where(and(...fallbackWhereConds))
+    .orderBy(desc(documentChunkTable.createdAt))
+    .limit(limit);
+
+  return fallback.map((item: any) => ({
+    documentId: item.document.id,
+    title: item.document.title,
+    content: item.chunk.content,
   }));
 }

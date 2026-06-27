@@ -1,5 +1,5 @@
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
-import { engagedVisitorSessionWhere } from "@/features/widget/server/widget-data-filters";
+import { getEngagedVisitorSessionCond } from "@/features/widget/server/widget-data-filters";
 import {
   assertPublicWidgetAccess,
   requireAuthorizedVisitorSession,
@@ -44,25 +44,25 @@ export async function GET(
   }
 
   const limit = Math.min(Number(new URL(request.url).searchParams.get("limit") ?? "20"), 20);
+  const nowIso = new Date().toISOString();
 
-  const sessions = await db.visitorSession.findMany({
-    where: {
-      widgetId: access.widget.id,
-      visitorId,
-      expiresAt: { gt: new Date() },
-      ...engagedVisitorSessionWhere,
-    },
-    orderBy: { lastSeenAt: "desc" },
-    take: limit,
-    include: {
+  const sessions = await db.query.visitorSession.findMany({
+    where: (fields, { eq, and, gt }) =>
+      and(
+        eq(fields.widgetId, access.widget.id),
+        eq(fields.visitorId, visitorId),
+        gt(fields.expiresAt, nowIso),
+        getEngagedVisitorSessionCond(fields as any),
+      ),
+    orderBy: (fields, { desc }) => [desc(fields.lastSeenAt)],
+    limit,
+    with: {
       conversations: {
-        where: {
-          channel: "WIDGET",
-          messages: { contains: '"authorType":"VISITOR"' },
-        },
-        orderBy: { lastMessageAt: "desc" },
-        take: 1,
-        select: {
+        where: (fields, { eq, and, like }) =>
+          and(eq(fields.channel, "WIDGET"), like(fields.messages, '%"authorType":"VISITOR"%')),
+        orderBy: (fields, { desc }) => [desc(fields.lastMessageAt)],
+        limit: 1,
+        columns: {
           messages: true,
           subject: true,
         },
@@ -73,12 +73,12 @@ export async function GET(
   const origin = getRequestOrigin(request);
   return withWidgetCors(
     Response.json({
-      sessions: sessions.map((session) => ({
+      sessions: sessions.map((session: any) => ({
         id: session.id,
         browserSessionId: session.browserSessionId,
         token: session.token,
         preview: sessionPreview(session.conversations),
-        lastActivityAt: session.lastSeenAt.toISOString(),
+        lastActivityAt: session.lastSeenAt || new Date().toISOString(),
         messageCount: session.messageCount,
         isCurrent: session.id === authorized.session.id,
       })),

@@ -1,36 +1,45 @@
 import { NextResponse } from "next/server";
-
+import { eq, and } from "drizzle-orm";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
-import { engagedVisitorSessionWhere } from "@/features/widget/server/widget-data-filters";
+import { getEngagedVisitorSessionCond } from "@/features/widget/server/widget-data-filters";
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
+import {
+  visitorSession as visitorSessionTable,
+  lead as leadTable,
+  conversation as conversationTable,
+  contact as contactTable,
+} from "@/lib/db/schema";
 
 type RouteContext = { params: Promise<{ session_id: string }> };
 
 export async function GET(_request: Request, context: RouteContext) {
   const { db, workspace } = await requireDashboardContext();
   const { session_id: sessionId } = await context.params;
-  const widget = await db.widget.findUnique({ where: { workspaceId: workspace.id } });
+  const widget = await db.query.widget.findFirst({
+    where: (fields, { eq }) => eq(fields.workspaceId, workspace.id),
+  });
 
   if (!widget) {
     return NextResponse.json({ error: "Widget not found." }, { status: 404 });
   }
 
-  const session = await db.visitorSession.findFirst({
-    where: {
-      id: sessionId,
-      widgetId: widget.id,
-      ...engagedVisitorSessionWhere,
-    },
-    include: {
+  const session = await db.query.visitorSession.findFirst({
+    where: (fields, { eq, and }) =>
+      and(
+        eq(fields.id, sessionId),
+        eq(fields.widgetId, widget.id),
+        getEngagedVisitorSessionCond(fields as any),
+      ),
+    with: {
       contact: true,
-      leadCapture: { select: { leadId: true } },
+      widgetLeadCaptures: {
+        columns: { leadId: true },
+      },
       conversations: {
-        where: {
-          channel: "WIDGET",
-          messages: { contains: '"authorType":"VISITOR"' },
-        },
-        orderBy: { lastMessageAt: "desc" },
-        take: 1,
+        where: (fields, { eq, and, like }) =>
+          and(eq(fields.channel, "WIDGET"), like(fields.messages, '%"authorType":"VISITOR"%')),
+        orderBy: (fields, { desc }) => [desc(fields.lastMessageAt)],
+        limit: 1,
       },
     },
   });
@@ -53,6 +62,13 @@ export async function GET(_request: Request, context: RouteContext) {
     feedbackReason: message.feedbackReason ?? null,
   }));
 
+  const createdAtIso = session.createdAt
+    ? new Date(session.createdAt).toISOString()
+    : new Date().toISOString();
+  const lastSeenAtIso = session.lastSeenAt
+    ? new Date(session.lastSeenAt).toISOString()
+    : new Date().toISOString();
+
   return NextResponse.json({
     id: session.id,
     visitorId: session.visitorId ?? session.id,
@@ -63,8 +79,8 @@ export async function GET(_request: Request, context: RouteContext) {
     screenSize: session.screenSize,
     pageUrl: session.pageUrl,
     referrer: session.referrer,
-    createdAt: session.createdAt.toISOString(),
-    lastActivityAt: session.lastSeenAt.toISOString(),
+    createdAt: createdAtIso,
+    lastActivityAt: lastSeenAtIso,
     ipData: session.ipData ? JSON.parse(session.ipData) : null,
     messages,
     contactName: session.contact?.name,
@@ -75,20 +91,25 @@ export async function GET(_request: Request, context: RouteContext) {
 export async function DELETE(_request: Request, context: RouteContext) {
   const { db, workspace } = await requireDashboardContext();
   const { session_id: sessionId } = await context.params;
-  const widget = await db.widget.findUnique({ where: { workspaceId: workspace.id } });
+  const widget = await db.query.widget.findFirst({
+    where: (fields, { eq }) => eq(fields.workspaceId, workspace.id),
+  });
 
   if (!widget) {
     return NextResponse.json({ error: "Widget not found." }, { status: 404 });
   }
 
-  const session = await db.visitorSession.findFirst({
-    where: {
-      id: sessionId,
-      widgetId: widget.id,
-      ...engagedVisitorSessionWhere,
-    },
-    include: {
-      leadCapture: { select: { leadId: true } },
+  const session = await db.query.visitorSession.findFirst({
+    where: (fields, { eq, and }) =>
+      and(
+        eq(fields.id, sessionId),
+        eq(fields.widgetId, widget.id),
+        getEngagedVisitorSessionCond(fields as any),
+      ),
+    with: {
+      widgetLeadCaptures: {
+        columns: { leadId: true },
+      },
     },
   });
 
@@ -96,28 +117,31 @@ export async function DELETE(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Session not found." }, { status: 404 });
   }
 
-  if (session.leadCapture?.leadId) {
-    await db.lead.deleteMany({
-      where: { id: session.leadCapture.leadId, workspaceId: workspace.id },
-    });
+  const leadId = session.widgetLeadCaptures[0]?.leadId;
+  if (leadId) {
+    await db
+      .delete(leadTable)
+      .where(and(eq(leadTable.id, leadId), eq(leadTable.workspaceId, workspace.id)));
   }
-  await db.conversation.deleteMany({ where: { visitorSessionId: session.id } });
-  await db.visitorSession.delete({ where: { id: session.id } });
+  await db.delete(conversationTable).where(eq(conversationTable.visitorSessionId, session.id));
+  await db.delete(visitorSessionTable).where(eq(visitorSessionTable.id, session.id));
 
   if (session.contactId) {
-    const contactStillUsed = await db.contact.findFirst({
-      where: {
-        id: session.contactId,
-        OR: [
-          { conversations: { some: {} } },
-          { leads: { some: {} } },
-          { visitorSessions: { some: {} } },
-        ],
-      },
-      select: { id: true },
+    const hasConvos = await db.query.conversation.findFirst({
+      where: (fields: any, { eq }: any) => eq(fields.contactId, session.contactId!),
+      columns: { id: true },
     });
-    if (!contactStillUsed) {
-      await db.contact.delete({ where: { id: session.contactId } });
+    const hasLeads = await db.query.lead.findFirst({
+      where: (fields: any, { eq }: any) => eq(fields.contactId, session.contactId!),
+      columns: { id: true },
+    });
+    const hasSessions = await db.query.visitorSession.findFirst({
+      where: (fields: any, { eq }: any) => eq(fields.contactId, session.contactId!),
+      columns: { id: true },
+    });
+
+    if (!hasConvos && !hasLeads && !hasSessions) {
+      await db.delete(contactTable).where(eq(contactTable.id, session.contactId));
     }
   }
   return NextResponse.json({ ok: true });

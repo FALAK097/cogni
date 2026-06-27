@@ -7,7 +7,7 @@ widget is an AI-first customer support platform with an embedded chat widget, sh
 - Next.js 16 App Router, React 19, TypeScript
 - Tailwind CSS v4, shadcn/ui with Base UI, Hugeicons
 - Better Auth with Google OAuth
-- Prisma ORM using SQLite locally and Cloudflare D1 in production
+- Drizzle ORM using SQLite locally and Cloudflare D1 in production
 - TanStack Query, next-themes, Vercel AI SDK
 
 ## Quick Start
@@ -35,7 +35,7 @@ Copy `.env.example` to `.env.local` and fill in the values:
 
 ```env
 ENV="development"
-DATABASE_URL="file:./prisma/dev.db"
+DATABASE_URL="file:./dev.db"
 BETTER_AUTH_SECRET="at-least-32-random-characters"
 BETTER_AUTH_URL="http://localhost:3000"
 GOOGLE_CLIENT_ID=""
@@ -64,8 +64,9 @@ pnpm check           # Run formatting + types + linting checks
 pnpm lint            # Run Oxlint checks
 pnpm fmt             # Format code using Oxfmt
 pnpm typecheck       # Verify TypeScript types
-pnpm db:migrate      # Generate and apply Prisma migrations
-pnpm db:studio       # Open Prisma database console
+pnpm db:generate     # Generate Drizzle SQL migrations
+pnpm db:migrate      # Apply Drizzle migrations locally
+pnpm db:studio       # Open Drizzle Studio
 ```
 
 ## Cloudflare Workers Deployment

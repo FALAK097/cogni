@@ -43,7 +43,7 @@ export async function POST(
     leadCaptureMessageThreshold: access.widget.leadCaptureMessageThreshold,
     currentMessage: body.currentMessage,
     messageCount: body.messageCount ?? authorized.session.messageCount,
-    sessionStartedAt: authorized.session.createdAt,
+    sessionStartedAt: new Date(authorized.session.createdAt),
   });
 
   const origin = getRequestOrigin(request);

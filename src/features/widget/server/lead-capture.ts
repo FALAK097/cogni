@@ -1,6 +1,12 @@
-import "server-only";
-
-import type { PrismaClient } from "@/generated/prisma/client";
+import { randomUUID } from "node:crypto";
+import type { Db } from "@/lib/db/client";
+import { eq, type SQL } from "drizzle-orm";
+import {
+  contact as contactTable,
+  lead as leadTable,
+  visitorSession as visitorSessionTable,
+  widgetLeadCapture as widgetLeadCaptureTable,
+} from "@/lib/db/schema";
 
 export async function submitWidgetLeadCapture({
   db,
@@ -14,7 +20,7 @@ export async function submitWidgetLeadCapture({
   triggerValue,
   messageCount,
 }: {
-  db: PrismaClient;
+  db: Db;
   visitorSessionId: string;
   workspaceId: string;
   name: string;
@@ -25,48 +31,60 @@ export async function submitWidgetLeadCapture({
   triggerValue?: string | null;
   messageCount: number;
 }) {
-  return db.$transaction(async (tx) => {
-    const session = await tx.visitorSession.findUnique({
-      where: { id: visitorSessionId },
+  return (db as any).transaction(async (tx: any) => {
+    const session = await tx.query.visitorSession.findFirst({
+      where: (fields: any, { eq }: any) => eq(fields.id, visitorSessionId),
     });
     if (!session) {
       throw new Error("Session not found");
     }
 
     let contact = email
-      ? await tx.contact.findFirst({
-          where: {
-            workspaceId,
-            email,
-          },
+      ? await tx.query.contact.findFirst({
+          where: (fields: any, { eq, and }: any) =>
+            and(eq(fields.workspaceId, workspaceId), eq(fields.email, email)),
         })
       : null;
 
     if (!contact) {
-      contact = await tx.contact.create({
-        data: {
+      const [newContact] = await tx
+        .insert(contactTable)
+        .values({
+          id: randomUUID(),
           workspaceId,
           name: name || "Visitor",
           email: email ?? null,
-        },
-      });
+          updatedAt: new Date().toISOString(),
+        })
+        .returning();
+      contact = newContact;
     } else if (name && contact.name !== name) {
-      contact = await tx.contact.update({
-        where: { id: contact.id },
-        data: { name },
+      const [updatedContact] = await tx
+        .update(contactTable)
+        .set({ name, updatedAt: new Date().toISOString() })
+        .where(eq(contactTable.id, contact.id))
+        .returning();
+      contact = updatedContact;
+    }
+
+    let lead: typeof leadTable.$inferSelect | null | undefined = null;
+    const orConds: SQL[] = [
+      email ? eq(leadTable.email, email) : undefined,
+      phone ? eq(leadTable.phone, phone) : undefined,
+    ].filter((cond): cond is SQL => cond !== undefined);
+
+    if (orConds.length > 0) {
+      lead = await tx.query.lead.findFirst({
+        where: (fields: any, { eq, and, or }: any) =>
+          and(eq(fields.workspaceId, workspaceId), or(...orConds)),
       });
     }
 
-    let lead = await tx.lead.findFirst({
-      where: {
-        workspaceId,
-        OR: [...(email ? [{ email }] : []), ...(phone ? [{ phone }] : [])],
-      },
-    });
-
     if (!lead) {
-      lead = await tx.lead.create({
-        data: {
+      const [newLead] = await tx
+        .insert(leadTable)
+        .values({
+          id: randomUUID(),
           workspaceId,
           contactId: contact.id,
           name: name || contact.name,
@@ -77,12 +95,14 @@ export async function submitWidgetLeadCapture({
           capturedFromChat: true,
           chatSessionId: session.browserSessionId,
           chatSummary: conversationSummary ?? null,
-        },
-      });
+          updatedAt: new Date().toISOString(),
+        })
+        .returning();
+      lead = newLead;
     } else {
-      lead = await tx.lead.update({
-        where: { id: lead.id },
-        data: {
+      const [updatedLead] = await tx
+        .update(leadTable)
+        .set({
           contactId: contact.id,
           source: "WIDGET",
           name: name || lead.name,
@@ -91,36 +111,53 @@ export async function submitWidgetLeadCapture({
           capturedFromChat: true,
           chatSessionId: session.browserSessionId,
           chatSummary: conversationSummary ?? lead.chatSummary,
-        },
-      });
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(leadTable.id, lead.id))
+        .returning();
+      lead = updatedLead;
     }
 
-    await tx.visitorSession.update({
-      where: { id: visitorSessionId },
-      data: { contactId: contact.id },
-    });
+    if (!lead) {
+      throw new Error("Failed to create or find lead");
+    }
 
-    const capture = await tx.widgetLeadCapture.upsert({
-      where: { visitorSessionId },
-      update: {
-        leadId: lead.id,
+    await tx
+      .update(visitorSessionTable)
+      .set({
+        contactId: contact.id,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(visitorSessionTable.id, visitorSessionId));
+
+    const [capture] = await tx
+      .insert(widgetLeadCaptureTable)
+      .values({
+        id: randomUUID(),
+        visitorSessionId,
+        leadId: lead!.id,
         triggerType,
         triggerValue: triggerValue ?? null,
-        formSubmittedAt: new Date(),
+        formSubmittedAt: new Date().toISOString(),
         abandoned: false,
         messageCountAtCapture: messageCount,
         conversationSummary: conversationSummary ?? null,
-      },
-      create: {
-        visitorSessionId,
-        leadId: lead.id,
-        triggerType,
-        triggerValue: triggerValue ?? null,
-        formSubmittedAt: new Date(),
-        messageCountAtCapture: messageCount,
-        conversationSummary: conversationSummary ?? null,
-      },
-    });
+        updatedAt: new Date().toISOString(),
+      })
+      .onConflictDoUpdate({
+        target: widgetLeadCaptureTable.visitorSessionId,
+        set: {
+          leadId: lead!.id,
+          triggerType,
+          triggerValue: triggerValue ?? null,
+          formSubmittedAt: new Date().toISOString(),
+          abandoned: false,
+          messageCountAtCapture: messageCount,
+          conversationSummary: conversationSummary ?? null,
+          updatedAt: new Date().toISOString(),
+        },
+      })
+      .returning();
 
     return { lead, contact, capture };
   });
@@ -137,7 +174,7 @@ export async function detectLeadCaptureTrigger({
   messageCount,
   sessionStartedAt,
 }: {
-  db: PrismaClient;
+  db: Db;
   visitorSessionId: string;
   enableLeadCapture: boolean;
   leadCaptureKeywords: string[];
@@ -151,8 +188,8 @@ export async function detectLeadCaptureTrigger({
     return { triggered: false, reason: "Lead capture disabled" };
   }
 
-  const existing = await db.widgetLeadCapture.findUnique({
-    where: { visitorSessionId },
+  const existing = await db.query.widgetLeadCapture.findFirst({
+    where: (fields, { eq }) => eq(fields.visitorSessionId, visitorSessionId),
   });
 
   if (existing?.formSubmittedAt) {

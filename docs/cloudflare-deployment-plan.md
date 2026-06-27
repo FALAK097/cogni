@@ -4,11 +4,11 @@ This plan deploys the current Next.js 16 app to Cloudflare Workers using OpenNex
 
 ## Environment Model
 
-| Environment | Trigger                        | App URL                                                 | Database               | Uploads                     | Knowledge Search                  |
-| ----------- | ------------------------------ | ------------------------------------------------------- | ---------------------- | --------------------------- | --------------------------------- |
-| Local dev   | `pnpm dev`                     | `http://localhost:3000`                                 | SQLite `prisma/dev.db` | local `.uploads`            | optional dev AI Search            |
-| PR preview  | pull request / non-main branch | `pr-123-widget-preview.<workers-subdomain>.workers.dev` | D1 `widget-preview`    | R2 `widget-preview-uploads` | AI Search `widget-preview-search` |
-| Production  | push to `main`                 | `widget-prod.<workers-subdomain>.workers.dev`           | D1 `widget-prod`       | R2 `widget-prod-uploads`    | AI Search `widget-prod-search`    |
+| Environment | Trigger                        | App URL                                          | Database            | Uploads                     | Knowledge Search                  |
+| ----------- | ------------------------------ | ------------------------------------------------ | ------------------- | --------------------------- | --------------------------------- |
+| Local dev   | `pnpm dev`                     | `http://localhost:3000`                          | SQLite `dev.db`     | local `.uploads`            | optional dev AI Search            |
+| PR preview  | pull request / non-main branch | `pr-123-widget-preview.falak-widget.workers.dev` | D1 `widget-preview` | R2 `widget-preview-uploads` | AI Search `widget-preview-search` |
+| Production  | push to `main`                 | `widget-prod.falak-widget.workers.dev`           | D1 `widget-prod`    | R2 `widget-prod-uploads`    | AI Search `widget-prod-search`    |
 
 This is not a staging setup. The preview resources exist only to keep PR preview builds away from production data.
 
@@ -28,9 +28,9 @@ This is not a staging setup. The preview resources exist only to keep PR preview
 For now, no custom domain:
 
 ```text
-Landing + dashboard: https://widget-prod.<workers-subdomain>.workers.dev
-Dashboard route:      https://widget-prod.<workers-subdomain>.workers.dev/dashboard
-PR preview:           https://pr-123-widget-preview.<workers-subdomain>.workers.dev
+Landing + dashboard: https://widget-prod.falak-widget.workers.dev
+Dashboard route:      https://widget-prod.falak-widget.workers.dev/dashboard
+PR preview:           https://pr-123-widget-preview.falak-widget.workers.dev
 ```
 
 `workers.dev` cannot give you `dashboard.yourdomain.com`, `admin.yourdomain.com`, or `docs.yourdomain.com`. Those are custom hostnames and should be added later when a real zone/domain is connected to Cloudflare.
@@ -249,8 +249,8 @@ Production Worker `widget-prod` non-secret variables:
 
 ```env
 ENV=production
-DATABASE_URL=file:./prisma/dev.db
-BETTER_AUTH_URL=https://widget-prod.<workers-subdomain>.workers.dev
+DATABASE_URL=file:./dev.db
+BETTER_AUTH_URL=https://widget-prod.falak-widget.workers.dev
 CLOUDFLARE_ACCOUNT_ID=<account_id>
 D1_DATABASE_ID=<prod_d1_database_id>
 R2_BUCKET_NAME=widget-prod-uploads
@@ -278,8 +278,8 @@ Preview Worker env `preview` non-secret variables:
 
 ```env
 ENV=production
-DATABASE_URL=file:./prisma/dev.db
-BETTER_AUTH_URL=https://widget-preview.<workers-subdomain>.workers.dev
+DATABASE_URL=file:./dev.db
+BETTER_AUTH_URL=https://widget-preview.falak-widget.workers.dev
 CLOUDFLARE_ACCOUNT_ID=<account_id>
 D1_DATABASE_ID=<preview_d1_database_id>
 R2_BUCKET_NAME=widget-preview-uploads
@@ -305,7 +305,7 @@ pnpm wrangler secret put GEMINI_API_KEY --env preview
 
 Use different values for production and preview wherever possible. `BETTER_AUTH_SECRET` must be at least 32 characters.
 
-`DATABASE_URL` remains required by the env schema even though production-like runtimes use D1 through the Prisma D1 adapter. Keep it set to a harmless local SQLite URL.
+`DATABASE_URL` remains required by the env schema for local fallback. Production-like runtimes use the Cloudflare D1 binding through Drizzle.
 
 ## Phase 8: Google OAuth Setup
 
@@ -321,14 +321,14 @@ In Google Cloud Console:
 
    ```text
    http://localhost:3000
-   https://widget-prod.<workers-subdomain>.workers.dev
+   https://widget-prod.falak-widget.workers.dev
    ```
 
 8. Add authorized redirect URIs:
 
    ```text
    http://localhost:3000/api/auth/callback/google
-   https://widget-prod.<workers-subdomain>.workers.dev/api/auth/callback/google
+   https://widget-prod.falak-widget.workers.dev/api/auth/callback/google
    ```
 
 9. Copy the client ID and client secret into Cloudflare Worker secrets.
@@ -343,24 +343,25 @@ For PR previews:
 
 ## Phase 9: Database Migration
 
-Apply the existing schema to production D1:
+Apply the existing Drizzle schema to production D1:
 
 ```bash
-pnpm wrangler d1 execute widget-prod --remote --file prisma/migrations/20260621074716_init/migration.sql
+pnpm wrangler d1 execute widget-prod --remote --file drizzle/0000_dapper_mauler.sql
 ```
 
 Apply the same schema to preview D1:
 
 ```bash
-pnpm wrangler d1 execute widget-preview --remote --file prisma/migrations/20260621074716_init/migration.sql
+pnpm wrangler d1 execute widget-preview --remote --file drizzle/0000_dapper_mauler.sql
 ```
 
 For future schema changes:
 
 ```bash
-pnpm db:migrate -- --name <name>
-pnpm wrangler d1 execute widget-prod --remote --file prisma/migrations/<timestamp_name>/migration.sql
-pnpm wrangler d1 execute widget-preview --remote --file prisma/migrations/<timestamp_name>/migration.sql
+pnpm db:generate -- --name <name>
+pnpm db:migrate
+pnpm wrangler d1 execute widget-prod --remote --file drizzle/<migration_name>.sql
+pnpm wrangler d1 execute widget-preview --remote --file drizzle/<migration_name>.sql
 ```
 
 Do not run production D1 migrations from PR preview builds. Run prod migrations as an explicit release step before or with the main-branch production deploy.
@@ -369,9 +370,9 @@ Do not run production D1 migrations from PR preview builds. Run prod migrations 
 
 Before first deploy:
 
-1. Verify `pdf-parse`, `mammoth`, Prisma D1 adapter, and AWS SDK R2 calls under `pnpm cf:preview`.
+1. Verify `pdf-parse`, `mammoth`, Drizzle D1 queries, and AWS SDK R2 calls under `pnpm cf:preview`.
 2. Keep production and preview uploads on R2. The local `.uploads` path must never be used when `ENV=production`.
-3. Confirm no route exports `runtime = "edge"`. OpenNext Cloudflare expects the Next.js Node runtime.
+3. Confirm no `src/proxy.ts` or Node middleware is present. Next.js 16 Proxy runs on the Node middleware runtime, which OpenNext Cloudflare cannot bundle.
 4. Validate AI Search indexing by uploading a small TXT document and asking a question that should retrieve that text.
 5. Confirm representative `<Image />` usage emits `/cdn-cgi/image/...` URLs in production builds.
 
@@ -408,7 +409,7 @@ pnpm cf:deploy
 Record the production URL:
 
 ```text
-https://widget-prod.<workers-subdomain>.workers.dev
+https://widget-prod.falak-widget.workers.dev
 ```
 
 Post-deploy validation:
@@ -418,7 +419,7 @@ Post-deploy validation:
 - Sign in with Google.
 - Create or load the default workspace.
 - Configure a widget.
-- Load `https://widget-prod.<workers-subdomain>.workers.dev/widget.bundle.js`.
+- Load `https://widget-prod.falak-widget.workers.dev/widget.bundle.js`.
 - Test a widget session.
 - Upload a small text file to the Knowledge Base.
 - Verify an R2 object was created.
@@ -500,7 +501,7 @@ You need to provide or complete:
 - Google OAuth production redirect URI:
 
   ```text
-  https://widget-prod.<workers-subdomain>.workers.dev/api/auth/callback/google
+  https://widget-prod.falak-widget.workers.dev/api/auth/callback/google
   ```
 
 - `BETTER_AUTH_SECRET`.

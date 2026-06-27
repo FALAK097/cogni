@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import { eq } from "drizzle-orm";
+import { widget as widgetTable } from "@/lib/db/schema";
 import {
   normalizeHostname,
   normalizeLauncherSize,
@@ -129,9 +131,9 @@ export async function saveWidgetWidgetSettingsAction(
   const { db, workspace } = await requireDashboardContext();
   const widget = await ensureWorkspaceWidget(db, workspace.id);
 
-  await db.widget.update({
-    where: { id: widget.id },
-    data: {
+  await db
+    .update(widgetTable)
+    .set({
       displayName: parsed.data.displayName,
       welcomeMessage: parsed.data.welcomeMessage,
       inputPlaceholder: parsed.data.inputPlaceholder,
@@ -161,8 +163,9 @@ export async function saveWidgetWidgetSettingsAction(
       leadCaptureMessageThreshold:
         parsed.data.leadCaptureMessageThreshold ?? widget.leadCaptureMessageThreshold,
       authorizedDomains: JSON.stringify(domains),
-    },
-  });
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(widgetTable.id, widget.id));
 
   revalidatePath("/dashboard/widget");
   return { savedAt: Date.now() };
@@ -196,13 +199,14 @@ export async function saveWidgetAgentSettingsAction(
   const { db, workspace } = await requireDashboardContext();
   const widget = await ensureWorkspaceWidget(db, workspace.id);
 
-  await db.widget.update({
-    where: { id: widget.id },
-    data: {
+  await db
+    .update(widgetTable)
+    .set({
       instructions: parsed.data.instructions,
       escalationKeywords: parsed.data.escalationKeywords,
-    },
-  });
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(widgetTable.id, widget.id));
 
   revalidatePath("/dashboard/agent");
   revalidatePath("/dashboard/widget");

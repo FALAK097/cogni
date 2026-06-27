@@ -9,10 +9,10 @@ import { getAuth } from "@/lib/auth/server";
 import { getDb } from "@/lib/db/client";
 
 export async function listUserWorkspaces(userId: string) {
-  return getDb().workspaceMember.findMany({
-    where: { userId },
-    orderBy: [{ role: "asc" }, { createdAt: "asc" }],
-    include: {
+  return getDb().query.workspaceMember.findMany({
+    where: (member, { eq }) => eq(member.userId, userId),
+    orderBy: (member, { asc }) => [asc(member.role), asc(member.createdAt)],
+    with: {
       workspace: true,
     },
   });

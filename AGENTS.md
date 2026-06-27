@@ -25,11 +25,12 @@ Customer website
 
 ### Changing the Schema
 
-1. Edit `prisma/schema.prisma`.
-2. Run `pnpm db:migrate -- --name <name>` to apply to local SQLite.
-3. Apply SQL migration to production D1 with Wrangler:
+1. Edit `src/lib/db/schema.ts`.
+2. Run `pnpm db:generate -- --name <name>` to generate SQL in `drizzle/`.
+3. Run `pnpm db:migrate` to apply to local SQLite.
+4. Apply SQL migration to production D1 with Wrangler:
    ```bash
-   wrangler d1 execute <database-name> --remote --file prisma/migrations/<timestamp_name>/migration.sql
+   wrangler d1 execute <database-name> --remote --file drizzle/<migration_name>.sql
    ```
 
 ## Repository Structure
@@ -40,7 +41,7 @@ src/
 ├── components/      # Shared React components (Sidebar, Topbar, Widget UI)
 ├── features/        # Feature modules: conversations, widget, integrations, workspace
 ├── hooks/           # Custom React hooks (TanStack Query query-keys, etc.)
-└── lib/             # Shared clients: Prisma database, Better Auth, Vercel AI SDK, rate limiting
+└── lib/             # Shared clients: Drizzle database, Better Auth, Vercel AI SDK, rate limiting
 ```
 
 ## Implementation Rules
