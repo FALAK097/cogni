@@ -10,6 +10,8 @@ export const metadata = {
   description: "Customer support dashboard",
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function DashboardShellLayout({ children }: { children: ReactNode }) {
   const { session } = await requireDashboardContext();
 

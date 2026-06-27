@@ -40,6 +40,7 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+      - run: pnpm db:migrate
       - run: pnpm cf:build
 
       - name: Deploy production Worker
@@ -72,6 +73,7 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+      - run: pnpm db:migrate
       - run: pnpm cf:build
 
       - name: Upload preview Worker version

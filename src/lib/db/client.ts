@@ -45,7 +45,8 @@ export function getDb(): Db {
     db = drizzleD1(d1Binding, { schema: fullSchema });
   } else {
     // Local SQLite development using better-sqlite3
-    const dbPath = env.DATABASE_URL.replace(/^file:/, "");
+    const databaseUrl = env.DATABASE_URL || "file:./dev.db";
+    const dbPath = databaseUrl.replace(/^file:/, "");
     const sqlite = new Database(dbPath);
     db = drizzleBetterSqlite3(sqlite, { schema: fullSchema }) as DrizzleDb;
   }
