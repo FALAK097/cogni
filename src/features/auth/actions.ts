@@ -28,7 +28,7 @@ export async function updateProfileAction(
   const { db, session } = await requireDashboardContext();
   await db
     .update(user)
-    .set({ name: parsed.data.name, updatedAt: new Date().toISOString() })
+    .set({ name: parsed.data.name, updatedAt: new Date() })
     .where(eq(user.id, session.user.id));
 
   revalidatePath("/dashboard/settings");

@@ -9,10 +9,10 @@ export const user = sqliteTable(
     email: text().notNull(),
     emailVerified: integer({ mode: "boolean" }).default(false).notNull(),
     image: text(),
-    createdAt: numeric()
+    createdAt: integer({ mode: "timestamp" })
       .default(sql`(CURRENT_TIMESTAMP)`)
       .notNull(),
-    updatedAt: numeric().notNull(),
+    updatedAt: integer({ mode: "timestamp" }).notNull(),
   },
   (table) => [uniqueIndex("user_email_key").on(table.email)],
 );
@@ -21,12 +21,12 @@ export const session = sqliteTable(
   "session",
   {
     id: text().primaryKey().notNull(),
-    expiresAt: numeric().notNull(),
+    expiresAt: integer({ mode: "timestamp" }).notNull(),
     token: text().notNull(),
-    createdAt: numeric()
+    createdAt: integer({ mode: "timestamp" })
       .default(sql`(CURRENT_TIMESTAMP)`)
       .notNull(),
-    updatedAt: numeric().notNull(),
+    updatedAt: integer({ mode: "timestamp" }).notNull(),
     ipAddress: text(),
     userAgent: text(),
     userId: text()
@@ -51,14 +51,14 @@ export const account = sqliteTable(
     accessToken: text(),
     refreshToken: text(),
     idToken: text(),
-    accessTokenExpiresAt: numeric(),
-    refreshTokenExpiresAt: numeric(),
+    accessTokenExpiresAt: integer({ mode: "timestamp" }),
+    refreshTokenExpiresAt: integer({ mode: "timestamp" }),
     scope: text(),
     password: text(),
-    createdAt: numeric()
+    createdAt: integer({ mode: "timestamp" })
       .default(sql`(CURRENT_TIMESTAMP)`)
       .notNull(),
-    updatedAt: numeric().notNull(),
+    updatedAt: integer({ mode: "timestamp" }).notNull(),
   },
   (table) => [index("account_userId_idx").on(table.userId)],
 );
@@ -69,11 +69,11 @@ export const verification = sqliteTable(
     id: text().primaryKey().notNull(),
     identifier: text().notNull(),
     value: text().notNull(),
-    expiresAt: numeric().notNull(),
-    createdAt: numeric()
+    expiresAt: integer({ mode: "timestamp" }).notNull(),
+    createdAt: integer({ mode: "timestamp" })
       .default(sql`(CURRENT_TIMESTAMP)`)
       .notNull(),
-    updatedAt: numeric().notNull(),
+    updatedAt: integer({ mode: "timestamp" }).notNull(),
   },
   (table) => [index("verification_identifier_idx").on(table.identifier)],
 );
