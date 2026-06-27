@@ -63,6 +63,8 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260625.1",
+    "@commitlint/cli": "^21.1.0",
+    "@commitlint/config-conventional": "^21.1.0",
     "@opennextjs/cloudflare": "^1.19.11",
     "@tailwindcss/postcss": "^4",
     "@types/better-sqlite3": "^7.6.13",
