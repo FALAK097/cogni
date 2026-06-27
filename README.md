@@ -71,22 +71,20 @@ pnpm db:studio       # Open Drizzle Studio
 
 ## Cloudflare Workers Deployment
 
-Deployment is configured for Cloudflare Workers through OpenNext, Wrangler, and GitHub Actions.
+Deployment is configured using Cloudflare's native **Git Integration (Workers Builds)**:
 
-```bash
-pnpm cf:build             # Build OpenNext Worker output
-pnpm cf:preview           # Preview locally in the Workers runtime
-pnpm cf:deploy            # Deploy widget-prod with Wrangler
-pnpm cf:upload:preview    # Upload a widget-preview version for PR preview aliases
-pnpm cf:typegen           # Generate Cloudflare env binding types
-```
+- **Production**: Pushes and merges to `main` automatically deploy to the `widget-prod` worker using production database and assets.
+- **PR Previews**: Open Pull Requests automatically trigger builds that deploy to the `widget-preview` worker (with isolated preview databases and R2 buckets) and post a live preview URL comment on your PR.
 
-GitHub Actions requires these repository secrets:
+### Environment & Secret Setup
 
-```text
-CLOUDFLARE_ACCOUNT_ID
-CLOUDFLARE_API_TOKEN
-CLOUDFLARE_PREVIEW_API_TOKEN
-```
+All environment variables and secrets must be defined in the Cloudflare Dashboard under your Worker's settings (**Settings > Variables and secrets**):
 
-Production deploys run on pushes to `main`. Internal PRs upload preview versions to the isolated `widget-preview` Worker environment. Full setup steps are in `docs/cloudflare-deployment-plan.md`.
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `BETTER_AUTH_SECRET`
+- `BETTER_AUTH_URL`
+
+### Database Migrations
+
+Migrations are automatically applied by the Cloudflare build machine before the code is deployed, using Wrangler's built-in migrations command linked to the `drizzle/` SQL files. No manual database update command is required on push.

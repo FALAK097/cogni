@@ -28,10 +28,12 @@ Customer website
 1. Edit `src/lib/db/schema.ts`.
 2. Run `pnpm db:generate -- --name <name>` to generate SQL in `drizzle/`.
 3. Run `pnpm db:migrate` to apply to local SQLite.
-4. Apply SQL migration to production D1 with Wrangler:
-   ```bash
-   wrangler d1 execute <database-name> --remote --file drizzle/<migration_name>.sql
-   ```
+4. **Deploying Migrations**:
+   - **Automated (Preferred)**: Pushing to `main` or opening a PR triggers Cloudflare Workers Builds, which automatically runs `npx wrangler d1 migrations apply` using the `drizzle/` directory.
+   - **Manual Fallback**: If you need to manually apply a migration to remote D1:
+     ```bash
+     pnpm wrangler d1 execute <database-name> --remote --file drizzle/<migration_name>.sql
+     ```
 
 ## Repository Structure
 
@@ -51,3 +53,4 @@ src/
 3. **Multi-tenancy**: Every database query must be scoped and checked against `workspaceId` membership.
 4. **Google-only Auth**: Google OAuth is the only authentication method.
 5. **Code Style**: Format using Oxfmt (`pnpm fmt`) and lint using Oxlint (`pnpm lint`). Check types via `pnpm typecheck`.
+6. **Commit Messages**: All git commits must adhere to the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) format (checked via commitlint).
