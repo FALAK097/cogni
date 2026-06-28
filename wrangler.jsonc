@@ -47,43 +47,4 @@
       "instance_name": "widget-prod-search",
     },
   ],
-  "env": {
-    "preview": {
-      "name": "widget-preview",
-      "preview_urls": true,
-      "vars": {
-        "ENV": "production",
-        "DATABASE_URL": "file:./dev.db",
-        "BETTER_AUTH_URL": "https://widget-preview.falak-widget.workers.dev",
-        "CLOUDFLARE_ACCOUNT_ID": "598a393819cd44e21ef2145dabea9a2f",
-        "D1_DATABASE_ID": "198b258a-481e-4970-a17f-26de89c6785d",
-        "R2_BUCKET_NAME": "widget-preview-uploads",
-        "SEARCH_INDEX": "widget-preview-search",
-      },
-      "r2_buckets": [
-        {
-          "binding": "UPLOADS",
-          "bucket_name": "widget-preview-uploads",
-        },
-        {
-          "binding": "NEXT_INC_CACHE_R2_BUCKET",
-          "bucket_name": "widget-preview-next-cache",
-        },
-      ],
-      "d1_databases": [
-        {
-          "binding": "DB",
-          "database_name": "widget-preview",
-          "database_id": "198b258a-481e-4970-a17f-26de89c6785d",
-          "migrations_dir": "drizzle",
-        },
-      ],
-      "ai_search": [
-        {
-          "binding": "AI_SEARCH",
-          "instance_name": "widget-preview-search",
-        },
-      ],
-    },
-  },
 }
