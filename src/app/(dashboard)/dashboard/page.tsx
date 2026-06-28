@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { ContentLayout } from "@/components/app-nav/content-layout";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { SITE_NAME } from "@/lib/constants";
 import {
@@ -8,7 +9,7 @@ import {
 } from "@/features/widget/server/widget-data-filters";
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
 import { and, eq, count, sql } from "drizzle-orm";
-import { conversation, contact, document, visitorSession, widget } from "@/lib/db/schema";
+import { conversation, visitorSession, document, widget } from "@/lib/db/schema";
 
 export const metadata: Metadata = {
   title: `Dashboard | ${SITE_NAME}`,
@@ -21,7 +22,7 @@ export default async function DashboardHomePage() {
 
   const [
     statusCounts,
-    contactCountResult,
+    identifiedVisitorCountResult,
     documentCountResult,
     escalationCountResult,
     widgetSessionsResult,
@@ -37,16 +38,11 @@ export default async function DashboardHomePage() {
       .groupBy(conversation.status),
     (db as any)
       .select({ val: count() })
-      .from(contact)
+      .from(visitorSession)
       .where(
         and(
-          eq(contact.workspaceId, workspace.id),
-          sql`exists (
-            select 1 from conversation 
-            where conversation.contactId = ${contact.id} 
-              and conversation.channel = 'WIDGET' 
-              and conversation.visitorSessionId is not null
-          )`,
+          sql`${visitorSession.widgetId} in (select id from ${widget} where ${widget.workspaceId} = ${workspace.id})`,
+          sql`(${visitorSession.email} is not null or ${visitorSession.name} is not null)`,
         ),
       ),
     (db as any)
@@ -78,7 +74,7 @@ export default async function DashboardHomePage() {
       .where(getWidgetConversationCond(conversation as any, workspace.id)),
   ]);
 
-  const contactCount = contactCountResult[0]?.val ?? 0;
+  const contactCount = identifiedVisitorCountResult[0]?.val ?? 0;
   const documentCount = documentCountResult[0]?.val ?? 0;
   const escalationCount = escalationCountResult[0]?.val ?? 0;
   const widgetSessions = widgetSessionsResult[0]?.val ?? 0;
@@ -125,19 +121,17 @@ export default async function DashboardHomePage() {
   ];
 
   return (
-    <main className="mx-auto max-w-7xl space-y-6 p-4 md:p-6 lg:p-8">
-      <section>
-        <h1 className="text-3xl font-semibold tracking-tight">Dashboard</h1>
-      </section>
-
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {metrics.map((metric) => (
-          <article key={metric.label} className="rounded-3xl border p-5">
-            <p className="text-xs text-muted-foreground">{metric.label}</p>
-            <p className="mt-2 font-mono text-3xl font-semibold">{metric.value}</p>
-          </article>
-        ))}
-      </section>
-    </main>
+    <ContentLayout>
+      <div className="container mx-auto">
+        <section className="grid gap-4 pt-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {metrics.map((metric) => (
+            <article key={metric.label} className="rounded-3xl border p-5">
+              <p className="text-xs text-muted-foreground">{metric.label}</p>
+              <p className="mt-2 font-mono text-3xl font-semibold">{metric.value}</p>
+            </article>
+          ))}
+        </section>
+      </div>
+    </ContentLayout>
   );
 }

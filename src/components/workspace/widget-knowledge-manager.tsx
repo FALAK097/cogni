@@ -1,51 +1,584 @@
 "use client";
 
+import { formatDistanceToNow } from "date-fns";
 import { useRef, useState } from "react";
+import {
+  type ColumnDef,
+  type SortingState,
+  functionalUpdate,
+  getCoreRowModel,
+  getSortedRowModel,
+  flexRender,
+  type RowData,
+  useReactTable,
+} from "@tanstack/react-table";
+import { parseAsStringLiteral, useQueryState } from "nuqs";
 
+import {
+  ArrowUpDown,
+  BookOpen,
+  ChevronDown,
+  ChevronUp,
+  Ellipsis,
+  FileText,
+  Globe,
+  ListTree,
+  Plus,
+  ScrollText,
+  Trash2,
+  Upload,
+} from "@/components/icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   addUrlSourceAction,
-  deleteDocumentAction,
-  uploadDocumentAction,
+  addManualTextSourceAction,
+  importSitemapSourceAction,
 } from "@/features/knowledge/actions";
-import { useKnowledgeBaseSources } from "@/hooks/query";
+import {
+  useDeleteKnowledgeBaseSource,
+  useKnowledgeBaseSources,
+  useUploadRagDocument,
+} from "@/hooks/query";
+import { cn } from "@/lib/utils";
+
+import { KnowledgeBaseSkeleton } from "./knowledge-base-skeleton";
+
+type KnowledgeBaseSourceRow = {
+  id: string;
+  displayName: string;
+  sourceType: string;
+  status: string;
+  chunkCount: number;
+  createdAt: string;
+  updatedAt: string;
+  canonicalUrl?: string | null;
+  metadata?: { mimeType?: string; storageKey?: string };
+};
+
+type SourceSortKey = "displayName" | "sourceType" | "status" | "chunkCount" | "updatedAt";
+
+const sortValues = [
+  "displayName.asc",
+  "displayName.desc",
+  "sourceType.asc",
+  "sourceType.desc",
+  "status.asc",
+  "status.desc",
+  "chunkCount.asc",
+  "chunkCount.desc",
+  "updatedAt.asc",
+  "updatedAt.desc",
+] as const;
+
+const sortParser = parseAsStringLiteral(sortValues);
+
+declare module "@tanstack/react-table" {
+  // Keep column meta typed locally.
+  interface ColumnMeta<TData extends RowData, TValue> {
+    align?: "left" | "center" | "right";
+  }
+}
+
+function getSourceTypeMeta(sourceType: string) {
+  switch (sourceType.toLowerCase()) {
+    case "website":
+      return {
+        label: "Website",
+        className: "border-indigo-500/15 bg-indigo-500/10 text-indigo-700 dark:text-indigo-300",
+      };
+    case "sitemap":
+      return {
+        label: "Sitemap",
+        className: "border-fuchsia-500/15 bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-300",
+      };
+    case "file":
+      return {
+        label: "Document",
+        className: "border-emerald-500/15 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+      };
+    case "txt":
+      return {
+        label: "Text",
+        className: "border-amber-500/15 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+      };
+    default:
+      return {
+        label: sourceType,
+        className: "border-slate-500/15 bg-slate-500/10 text-slate-700 dark:text-slate-300",
+      };
+  }
+}
+
+function getStatusMeta(status: string) {
+  switch (status.toLowerCase()) {
+    case "ready":
+    case "indexed":
+      return {
+        label: "Indexed",
+        className: "border-emerald-500/15 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+      };
+    case "processing":
+      return {
+        label: "Processing",
+        className: "border-sky-500/15 bg-sky-500/10 text-sky-700 dark:text-sky-300",
+      };
+    case "failed":
+      return {
+        label: "Failed",
+        className: "border-red-500/15 bg-red-500/10 text-red-700 dark:text-red-300",
+      };
+    default:
+      return {
+        label: status,
+        className: "border-slate-500/15 bg-slate-500/10 text-slate-700 dark:text-slate-300",
+      };
+  }
+}
+
+function getSourceTypeIcon(sourceType: string) {
+  switch (sourceType.toLowerCase()) {
+    case "website":
+      return Globe;
+    case "sitemap":
+      return ListTree;
+    case "txt":
+      return ScrollText;
+    default:
+      return FileText;
+  }
+}
+
+function getDocumentFileName(storageKey?: string) {
+  if (!storageKey) return null;
+  const segments = storageKey.split("/");
+  return segments[segments.length - 1] ?? null;
+}
+
+function formatUpdatedAt(value: string) {
+  try {
+    return formatDistanceToNow(new Date(value), { addSuffix: true });
+  } catch {
+    return value;
+  }
+}
+
+function sortNextValue(columnId: SourceSortKey, current: string) {
+  const [activeColumn, direction] = current.split(".") as [SourceSortKey, "asc" | "desc"];
+  if (activeColumn !== columnId) {
+    return `${columnId}.asc` as const;
+  }
+  return direction === "asc" ? (`${columnId}.desc` as const) : (`${columnId}.asc` as const);
+}
 
 export function WidgetKnowledgeManager() {
   const sourcesQuery = useKnowledgeBaseSources("default");
+  const uploadMutation = useUploadRagDocument();
+  const deleteMutation = useDeleteKnowledgeBaseSource();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [sortBy, setSortBy] = useQueryState("kbSort", sortParser.withDefault("updatedAt.desc"));
+  const [urlDialogOpen, setUrlDialogOpen] = useState(false);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [manualDialogOpen, setManualDialogOpen] = useState(false);
+  const [sitemapDialogOpen, setSitemapDialogOpen] = useState(false);
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
-  const [pending, setPending] = useState(false);
+  const [manualTitle, setManualTitle] = useState("");
+  const [manualContent, setManualContent] = useState("");
+  const [sitemapUrl, setSitemapUrl] = useState("");
+  const [sitemapTitle, setSitemapTitle] = useState("");
+  const [pendingUrl, setPendingUrl] = useState(false);
+  const [pendingUpload, setPendingUpload] = useState(false);
+  const [pendingManual, setPendingManual] = useState(false);
+  const [pendingSitemap, setPendingSitemap] = useState(false);
 
-  const sources =
-    (sourcesQuery.data as { sources?: Array<{ id: string; displayName: string; status: string }> })
-      ?.sources ?? [];
+  function openAddDialog(opener: () => void) {
+    setAddMenuOpen(false);
+    queueMicrotask(opener);
+  }
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+
+  const sources = (sourcesQuery.data?.sources as KnowledgeBaseSourceRow[] | undefined) ?? [];
+
+  const sorting: SortingState = (() => {
+    const [columnId, direction] = sortBy.split(".") as [SourceSortKey, "asc" | "desc"];
+    return [{ id: columnId, desc: direction === "desc" }];
+  })();
+
+  const tableColumns: ColumnDef<KnowledgeBaseSourceRow>[] = [
+    {
+      accessorKey: "displayName",
+      header: "Source",
+      cell: ({ row }) => {
+        const Icon = getSourceTypeIcon(row.original.sourceType);
+        const sourceType = row.original.sourceType.toLowerCase();
+        const fileName = getDocumentFileName(row.original.metadata?.storageKey);
+        const primaryLabel =
+          (sourceType === "file" || sourceType === "txt") && fileName
+            ? fileName
+            : row.original.displayName;
+        const secondaryLabel =
+          (sourceType === "file" || sourceType === "txt") &&
+          fileName &&
+          row.original.displayName !== fileName
+            ? row.original.displayName
+            : sourceType === "website" || sourceType === "sitemap"
+              ? (row.original.canonicalUrl ?? row.original.displayName)
+              : null;
+        return (
+          <div className="flex min-w-0 items-center gap-3.5">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 text-muted-foreground">
+              <Icon className="h-4 w-4" />
+            </div>
+            <div className="min-w-0 space-y-0.5">
+              <p className="truncate text-sm font-medium text-foreground">{primaryLabel}</p>
+              {secondaryLabel ? (
+                <p className="truncate text-[12px] text-muted-foreground">{secondaryLabel}</p>
+              ) : null}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "sourceType",
+      header: "Type",
+      cell: ({ row }) => {
+        const meta = getSourceTypeMeta(row.original.sourceType);
+        return (
+          <Badge
+            variant="secondary"
+            className={cn("h-7 rounded-full border px-3 text-[12px] font-medium", meta.className)}
+          >
+            {meta.label}
+          </Badge>
+        );
+      },
+    },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => {
+        const meta = getStatusMeta(row.original.status);
+        return (
+          <Badge
+            variant="secondary"
+            className={cn("h-7 rounded-full border px-3 text-[12px] font-medium", meta.className)}
+          >
+            <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-current" />
+            {meta.label}
+          </Badge>
+        );
+      },
+    },
+    {
+      accessorKey: "chunkCount",
+      header: "Indexed Pages",
+      cell: ({ getValue }) => (
+        <span className="text-sm text-foreground/80">
+          {getValue<number>() > 0 ? getValue<number>() : "—"}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "updatedAt",
+      header: "Last Updated",
+      cell: ({ getValue }) => (
+        <span className="text-sm text-foreground/75">{formatUpdatedAt(getValue<string>())}</span>
+      ),
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="cursor-pointer text-muted-foreground hover:text-foreground"
+              >
+                <Ellipsis className="h-4 w-4" />
+              </Button>
+            }
+          />
+          <DropdownMenuContent align="end" sideOffset={8} className="w-44">
+            <DropdownMenuItem
+              className="cursor-pointer gap-2 text-destructive"
+              variant="destructive"
+              onClick={() => {
+                void deleteMutation.mutateAsync(row.original.id);
+              }}
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+    },
+  ];
+
+  const table = useReactTable({
+    data: sources,
+    columns: tableColumns,
+    state: { sorting },
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    onSortingChange: (updater) => {
+      const nextSorting = functionalUpdate(updater, sorting);
+      const first = nextSorting[0];
+      const nextSortValue = first
+        ? (`${first.id as SourceSortKey}.${first.desc ? "desc" : "asc"}` as
+            | (typeof sortValues)[number]
+            | "updatedAt.desc")
+        : "updatedAt.desc";
+      void setSortBy(nextSortValue);
+    },
+  });
+
+  function getSortIndicator(columnId: SourceSortKey, current: string) {
+    const [activeColumn, direction] = current.split(".") as [SourceSortKey, "asc" | "desc"];
+    if (activeColumn !== columnId) {
+      return <ArrowUpDown className="h-3.5 w-3.5 opacity-50" />;
+    }
+    return direction === "asc" ? (
+      <ChevronUp className="h-3.5 w-3.5" />
+    ) : (
+      <ChevronDown className="h-3.5 w-3.5" />
+    );
+  }
 
   return (
-    <div className="space-y-8 pb-10">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Knowledge Base</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Upload documents and add website sources for grounded widget answers.
-        </p>
+    <div className="space-y-6 pb-10">
+      <div className="flex items-center justify-end">
+        <DropdownMenu open={addMenuOpen} onOpenChange={setAddMenuOpen}>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                className="h-9 rounded-full px-4 shadow-none"
+                size="default"
+                aria-label="Add knowledge source"
+              >
+                <Plus className="h-4 w-4" />
+                Add Source
+                <ChevronDown className="h-4 w-4 opacity-70" />
+              </Button>
+            }
+          />
+          <DropdownMenuContent align="end" sideOffset={10} className="w-80 p-2">
+            <DropdownMenuItem
+              className="cursor-pointer items-start gap-3 rounded-2xl px-3 py-3"
+              closeOnClick={false}
+              onClick={() => openAddDialog(() => setUrlDialogOpen(true))}
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-muted/30 text-muted-foreground">
+                <Globe className="h-4 w-4" />
+              </span>
+              <span className="space-y-0.5">
+                <span className="block text-sm font-medium text-foreground">Add Website URL</span>
+                <span className="block text-xs text-muted-foreground">
+                  Crawl and index a website
+                </span>
+              </span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="cursor-pointer items-start gap-3 rounded-2xl px-3 py-3"
+              closeOnClick={false}
+              onClick={() => openAddDialog(() => setUploadDialogOpen(true))}
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-muted/30 text-muted-foreground">
+                <Upload className="h-4 w-4" />
+              </span>
+              <span className="space-y-0.5">
+                <span className="block text-sm font-medium text-foreground">Upload Document</span>
+                <span className="block text-xs text-muted-foreground">
+                  PDF, DOCX, TXT up to 50MB
+                </span>
+              </span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="cursor-pointer items-start gap-3 rounded-2xl px-3 py-3"
+              closeOnClick={false}
+              onClick={() => openAddDialog(() => setManualDialogOpen(true))}
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-muted/30 text-muted-foreground">
+                <ScrollText className="h-4 w-4" />
+              </span>
+              <span className="space-y-0.5">
+                <span className="block text-sm font-medium text-foreground">Add Text Manually</span>
+                <span className="block text-xs text-muted-foreground">
+                  Add text content directly
+                </span>
+              </span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="cursor-pointer items-start gap-3 rounded-2xl px-3 py-3"
+              closeOnClick={false}
+              onClick={() => openAddDialog(() => setSitemapDialogOpen(true))}
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-muted/30 text-muted-foreground">
+                <ListTree className="h-4 w-4" />
+              </span>
+              <span className="space-y-0.5">
+                <span className="block text-sm font-medium text-foreground">
+                  Import from Sitemap
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                  Import pages from sitemap.xml
+                </span>
+              </span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="space-y-4 p-5">
-          <h2 className="text-base font-medium">Add website</h2>
+      <div className="overflow-hidden rounded-[20px] border border-border/60 bg-transparent shadow-none [--card-spacing:0rem]">
+        {sourcesQuery.isLoading ? (
+          <KnowledgeBaseSkeleton />
+        ) : sources.length === 0 ? (
+          <div className="p-6">
+            <EmptyState
+              icon={BookOpen}
+              title="No knowledge sources yet"
+              description="Add a website URL, upload documents, or paste text to teach your AI assistant how to answer questions."
+            >
+              <Button
+                size="sm"
+                className="h-9 rounded-xl shadow-none"
+                onClick={() => setUrlDialogOpen(true)}
+              >
+                <Plus className="mr-1.5 h-4 w-4" />
+                Add Source
+              </Button>
+            </EmptyState>
+          </div>
+        ) : (
+          <Table className="table-fixed">
+            <colgroup>
+              <col className="w-[30%]" />
+              <col className="w-[14%]" />
+              <col className="w-[16%]" />
+              <col className="w-[12%]" />
+              <col className="w-[18%]" />
+              <col className="w-[10%]" />
+            </colgroup>
+            <TableHeader className="border-b border-border/60">
+              <TableRow className="border-border/60 hover:bg-transparent">
+                {table.getAllLeafColumns().map((column) => {
+                  const header = column.columnDef.header;
+                  const headerLabel =
+                    typeof header === "string"
+                      ? header
+                      : column.id === "actions"
+                        ? "Actions"
+                        : column.id;
+                  const isSortable = column.id !== "actions";
+
+                  return (
+                    <TableHead
+                      key={column.id}
+                      className="h-auto px-5 py-4 text-[12px] font-medium text-foreground/60"
+                    >
+                      {isSortable ? (
+                        <button
+                          type="button"
+                          className="inline-flex cursor-pointer items-center gap-1.5 text-left transition-colors hover:text-foreground"
+                          onClick={() => {
+                            if (column.id === "actions") return;
+                            void setSortBy(sortNextValue(column.id as SourceSortKey, sortBy));
+                          }}
+                        >
+                          <span>{headerLabel}</span>
+                          {getSortIndicator(column.id as SourceSortKey, sortBy)}
+                        </button>
+                      ) : (
+                        <span>{headerLabel}</span>
+                      )}
+                    </TableHead>
+                  );
+                })}
+              </TableRow>
+            </TableHeader>
+            <TableBody className="text-[13px]">
+              {table.getRowModel().rows.map((row) => (
+                <TableRow key={row.id} className="border-border/60 hover:bg-muted/30">
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell
+                      key={cell.id}
+                      className={cn(
+                        "whitespace-normal px-5 py-4 align-middle",
+                        cell.column.id === "actions" && "text-right",
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          cell.column.id === "actions" && "ml-auto flex w-full justify-end",
+                        )}
+                      >
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </div>
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+
+        {!sourcesQuery.isLoading && sources.length > 0 ? (
+          <div className="border-t border-border/60 px-5 py-4 text-sm text-muted-foreground">
+            Showing 1 to {sources.length} of {sources.length} sources
+          </div>
+        ) : null}
+      </div>
+
+      <Dialog open={urlDialogOpen} onOpenChange={setUrlDialogOpen}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>Add Website URL</DialogTitle>
+            <DialogDescription>Crawl and index pages from a website root.</DialogDescription>
+          </DialogHeader>
           <form
-            className="space-y-3"
+            className="space-y-4"
             action={async (formData) => {
-              setPending(true);
-              await addUrlSourceAction({}, formData);
-              setPending(false);
-              setUrl("");
-              setTitle("");
-              await sourcesQuery.refetch();
+              setPendingUrl(true);
+              try {
+                await addUrlSourceAction({}, formData);
+                setTitle("");
+                setUrl("");
+                setUrlDialogOpen(false);
+                await sourcesQuery.refetch();
+              } finally {
+                setPendingUrl(false);
+              }
             }}
           >
             <div className="space-y-2">
@@ -54,7 +587,8 @@ export function WidgetKnowledgeManager() {
                 id="title"
                 name="title"
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(event) => setTitle(event.target.value)}
+                placeholder="Help Center"
                 required
               />
             </div>
@@ -64,80 +598,213 @@ export function WidgetKnowledgeManager() {
                 id="sourceUrl"
                 name="sourceUrl"
                 value={url}
-                onChange={(e) => setUrl(e.target.value)}
+                onChange={(event) => setUrl(event.target.value)}
                 placeholder="https://example.com/docs"
                 required
               />
             </div>
-            <Button type="submit" disabled={pending}>
-              Add URL source
-            </Button>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setUrlDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={pendingUrl}>
+                Add URL source
+              </Button>
+            </DialogFooter>
           </form>
-        </Card>
+        </DialogContent>
+      </Dialog>
 
-        <Card className="space-y-4 p-5">
-          <h2 className="text-base font-medium">Upload document</h2>
+      <Dialog
+        open={uploadDialogOpen}
+        onOpenChange={(open) => {
+          setUploadDialogOpen(open);
+          if (!open && fileInputRef.current) fileInputRef.current.value = "";
+        }}
+      >
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>Upload Document</DialogTitle>
+            <DialogDescription>
+              PDF, DOCX, and TXT files are indexed from uploaded content. The file name is used as
+              the source title.
+            </DialogDescription>
+          </DialogHeader>
           <form
-            className="space-y-3"
-            action={async (formData) => {
-              setPending(true);
-              await uploadDocumentAction(formData);
-              setPending(false);
-              if (fileInputRef.current) fileInputRef.current.value = "";
-              await sourcesQuery.refetch();
+            className="space-y-4"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              const form = event.currentTarget;
+              const formData = new FormData(form);
+              setPendingUpload(true);
+              try {
+                await uploadMutation.mutateAsync(formData);
+                form.reset();
+                if (fileInputRef.current) fileInputRef.current.value = "";
+                setUploadDialogOpen(false);
+                await sourcesQuery.refetch();
+              } finally {
+                setPendingUpload(false);
+              }
             }}
           >
             <div className="space-y-2">
-              <Label htmlFor="upload-title">Title</Label>
-              <Input id="upload-title" name="title" required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="file">File (PDF, DOCX, TXT)</Label>
+              <Label htmlFor="file">File</Label>
               <Input id="file" name="file" type="file" ref={fileInputRef} required />
             </div>
-            <Button type="submit" disabled={pending}>
-              Upload
-            </Button>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setUploadDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={pendingUpload}>
+                Upload
+              </Button>
+            </DialogFooter>
           </form>
-        </Card>
-      </div>
+        </DialogContent>
+      </Dialog>
 
-      <Card className="p-5">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-base font-medium">Sources</h2>
-          <Badge variant="secondary">{sources.length}</Badge>
-        </div>
-        <div className="space-y-3">
-          {sourcesQuery.isLoading ? (
-            <p className="text-sm text-muted-foreground">Loading sources…</p>
-          ) : sources.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No sources yet.</p>
-          ) : (
-            sources.map((source) => (
-              <div
-                key={source.id}
-                className="flex items-center justify-between rounded-xl border px-4 py-3"
-              >
-                <div>
-                  <p className="text-sm font-medium">{source.displayName}</p>
-                  <p className="text-xs text-muted-foreground capitalize">{source.status}</p>
-                </div>
-                <form
-                  action={async (formData) => {
-                    await deleteDocumentAction(formData);
-                    await sourcesQuery.refetch();
-                  }}
-                >
-                  <input type="hidden" name="documentId" value={source.id} />
-                  <Button type="submit" variant="outline" size="sm">
-                    Delete
-                  </Button>
-                </form>
-              </div>
-            ))
-          )}
-        </div>
-      </Card>
+      <Dialog
+        open={manualDialogOpen}
+        onOpenChange={(open) => {
+          setManualDialogOpen(open);
+          if (!open) {
+            setManualTitle("");
+            setManualContent("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[560px]">
+          <DialogHeader>
+            <DialogTitle>Add Text Manually</DialogTitle>
+            <DialogDescription>
+              Paste or type content directly. The text is indexed as a single source.
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            className="space-y-4"
+            action={async (formData) => {
+              setPendingManual(true);
+              try {
+                const result = await addManualTextSourceAction({}, formData);
+                if (!result?.error) {
+                  setManualTitle("");
+                  setManualContent("");
+                  setManualDialogOpen(false);
+                  await sourcesQuery.refetch();
+                }
+              } finally {
+                setPendingManual(false);
+              }
+            }}
+          >
+            <div className="space-y-2">
+              <Label htmlFor="manual-title">Title</Label>
+              <Input
+                id="manual-title"
+                name="title"
+                value={manualTitle}
+                onChange={(event) => setManualTitle(event.target.value)}
+                placeholder="FAQ answers"
+                required
+                maxLength={120}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="manual-content">Content</Label>
+              <Textarea
+                id="manual-content"
+                name="content"
+                value={manualContent}
+                onChange={(event) => setManualContent(event.target.value)}
+                placeholder="Paste the content you want to index…"
+                required
+                maxLength={100_000}
+                className="min-h-[180px] resize-y"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setManualDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={pendingManual}>
+                Add text
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={sitemapDialogOpen}
+        onOpenChange={(open) => {
+          setSitemapDialogOpen(open);
+          if (!open) {
+            setSitemapTitle("");
+            setSitemapUrl("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>Import from Sitemap</DialogTitle>
+            <DialogDescription>
+              Provide a sitemap URL (e.g. <code>sitemap.xml</code>). Each URL listed will be fetched
+              and combined into a single source.
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            className="space-y-4"
+            action={async (formData) => {
+              setPendingSitemap(true);
+              try {
+                const result = await importSitemapSourceAction({}, formData);
+                if (!result?.error) {
+                  setSitemapTitle("");
+                  setSitemapUrl("");
+                  setSitemapDialogOpen(false);
+                  await sourcesQuery.refetch();
+                }
+              } finally {
+                setPendingSitemap(false);
+              }
+            }}
+          >
+            <div className="space-y-2">
+              <Label htmlFor="sitemap-title">Title</Label>
+              <Input
+                id="sitemap-title"
+                name="title"
+                value={sitemapTitle}
+                onChange={(event) => setSitemapTitle(event.target.value)}
+                placeholder="Docs sitemap"
+                required
+                maxLength={120}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="sitemap-url">Sitemap URL</Label>
+              <Input
+                id="sitemap-url"
+                name="sourceUrl"
+                type="url"
+                value={sitemapUrl}
+                onChange={(event) => setSitemapUrl(event.target.value)}
+                placeholder="https://example.com/sitemap.xml"
+                required
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setSitemapDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={pendingSitemap}>
+                Import sitemap
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
