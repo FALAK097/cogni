@@ -5,6 +5,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, requireData } from "@/lib/api/client";
 import { useActiveWorkspaceId } from "@/hooks/use-auth";
 import { queryKeys } from "@/lib/query-keys";
+import {
+  addManualTextSourceAction,
+  addUrlSourceAction,
+  importSitemapSourceAction,
+} from "@/features/knowledge/actions";
 
 export type KnowledgeBaseSource = {
   id: string;
@@ -190,10 +195,77 @@ export function useUploadRagDocument() {
         body: formData,
       });
       if (!response.ok) {
-        const json = (await response.json()) as { error?: string };
+        const json = (await response.json().catch(() => ({}))) as { error?: string };
         throw new Error(json.error ?? "Failed to upload file");
       }
       return response.json();
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeBase.all });
+    },
+  });
+}
+
+type KnowledgeActionState = { error?: string; savedAt?: number };
+
+function extractActionError(result: unknown): string | null {
+  if (result && typeof result === "object" && "error" in result) {
+    const error = (result as KnowledgeActionState).error;
+    if (typeof error === "string" && error.length > 0) return error;
+  }
+  return null;
+}
+
+export function useAddUrlSource() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { title: string; sourceUrl: string }) => {
+      const formData = new FormData();
+      formData.set("title", input.title);
+      formData.set("sourceUrl", input.sourceUrl);
+      const result = await addUrlSourceAction({}, formData);
+      const error = extractActionError(result);
+      if (error) throw new Error(error);
+      return result;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeBase.all });
+    },
+  });
+}
+
+export function useAddManualTextSource() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { title: string; content: string }) => {
+      const formData = new FormData();
+      formData.set("title", input.title);
+      formData.set("content", input.content);
+      const result = await addManualTextSourceAction({}, formData);
+      const error = extractActionError(result);
+      if (error) throw new Error(error);
+      return result;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeBase.all });
+    },
+  });
+}
+
+export function useImportSitemapSource() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { title: string; sourceUrl: string }) => {
+      const formData = new FormData();
+      formData.set("title", input.title);
+      formData.set("sourceUrl", input.sourceUrl);
+      const result = await importSitemapSourceAction({}, formData);
+      const error = extractActionError(result);
+      if (error) throw new Error(error);
+      return result;
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeBase.all });

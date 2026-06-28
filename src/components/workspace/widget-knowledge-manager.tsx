@@ -14,6 +14,7 @@ import { z } from "zod";
 import { parseAsStringLiteral, useQueryState } from "nuqs";
 
 import {
+  AlertCircle,
   ArrowUpDown,
   BookOpen,
   ChevronDown,
@@ -21,8 +22,11 @@ import {
   Ellipsis,
   FileText,
   Globe,
+  Info,
   ListTree,
+  Loader2,
   Plus,
+  RefreshCw,
   ScrollText,
   Trash2,
   Upload,
@@ -56,15 +60,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  addUrlSourceAction,
-  addManualTextSourceAction,
-  importSitemapSourceAction,
-} from "@/features/knowledge/actions";
-import {
+  useAddManualTextSource,
+  useAddUrlSource,
   useDeleteKnowledgeBaseSource,
+  useImportSitemapSource,
   useKnowledgeBaseSources,
+  useUploadRagDocument,
   type KnowledgeBaseSource,
 } from "@/hooks/query/use-knowledge-base";
+import { cn } from "@/lib/utils";
 
 import { KnowledgeBaseSkeleton } from "./knowledge-base-skeleton";
 
@@ -99,10 +103,13 @@ const manualFormSchema = z.object({
   content: z.string().trim().min(1, "Content is required").max(100_000),
 });
 
-const SOURCE_TYPE_META: Record<
-  string,
-  { label: string; className: string; icon: React.ComponentType<{ className?: string }> }
-> = {
+type SourceTypeMeta = {
+  label: string;
+  className: string;
+  icon: React.ComponentType<{ className?: string }>;
+};
+
+const SOURCE_TYPE_META: Record<string, SourceTypeMeta> = {
   website: {
     label: "Website",
     className: "border-indigo-500/15 bg-indigo-500/10 text-indigo-700 dark:text-indigo-300",
@@ -125,7 +132,9 @@ const SOURCE_TYPE_META: Record<
   },
 };
 
-const STATUS_META: Record<string, { label: string; className: string }> = {
+type StatusMeta = { label: string; className: string };
+
+const STATUS_META: Record<string, StatusMeta> = {
   ready: {
     label: "Indexed",
     className: "border-emerald-500/15 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
@@ -144,23 +153,23 @@ const STATUS_META: Record<string, { label: string; className: string }> = {
   },
 };
 
-function getSourceTypeMeta(sourceType: string) {
-  return (
-    SOURCE_TYPE_META[sourceType.toLowerCase()] ?? {
-      label: sourceType,
-      className: "border-slate-500/15 bg-slate-500/10 text-slate-700 dark:text-slate-300",
-      icon: FileText,
-    }
-  );
+const FALLBACK_SOURCE_TYPE: SourceTypeMeta = {
+  label: "Unknown",
+  className: "border-slate-500/15 bg-slate-500/10 text-slate-700 dark:text-slate-300",
+  icon: FileText,
+};
+
+const FALLBACK_STATUS: StatusMeta = {
+  label: "Unknown",
+  className: "border-slate-500/15 bg-slate-500/10 text-slate-700 dark:text-slate-300",
+};
+
+function getSourceTypeMeta(sourceType: string): SourceTypeMeta {
+  return SOURCE_TYPE_META[sourceType.toLowerCase()] ?? FALLBACK_SOURCE_TYPE;
 }
 
-function getStatusMeta(status: string) {
-  return (
-    STATUS_META[status.toLowerCase()] ?? {
-      label: status,
-      className: "border-slate-500/15 bg-slate-500/10 text-slate-700 dark:text-slate-300",
-    }
-  );
+function getStatusMeta(status: string): StatusMeta {
+  return STATUS_META[status.toLowerCase()] ?? FALLBACK_STATUS;
 }
 
 function getDocumentFileName(storageKey?: string | null) {
@@ -190,6 +199,165 @@ function formatSortValue(state: SortingState): SortValue {
 
 type AddDialog = "url" | "upload" | "manual" | "sitemap" | null;
 
+function SourceTypeBadge({ sourceType }: { sourceType: string }) {
+  const meta = getSourceTypeMeta(sourceType);
+  return (
+    <Badge
+      variant="secondary"
+      className={cn("h-7 rounded-full border px-3 text-[12px] font-medium", meta.className)}
+    >
+      {meta.label}
+    </Badge>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const meta = getStatusMeta(status);
+  return (
+    <Badge
+      variant="secondary"
+      className={cn("h-7 rounded-full border px-3 text-[12px] font-medium", meta.className)}
+    >
+      <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-current" />
+      {meta.label}
+    </Badge>
+  );
+}
+
+function QueryErrorState({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="m-6 flex flex-col items-center justify-center rounded-2xl border border-dashed border-destructive/40 bg-destructive/5 p-8 text-center">
+      <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl border border-destructive/30 bg-card text-destructive">
+        <AlertCircle className="h-5 w-5" />
+      </span>
+      <h3 className="text-sm font-semibold text-foreground">Failed to load sources</h3>
+      <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+        We couldn&apos;t reach the knowledge base. Check your connection and try again.
+      </p>
+      <Button size="sm" variant="outline" className="mt-4 h-8 rounded-lg" onClick={onRetry}>
+        <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+        Retry
+      </Button>
+    </div>
+  );
+}
+
+function DeleteConfirmDialog({
+  open,
+  onOpenChange,
+  source,
+  onConfirm,
+  pending,
+  error,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  source: KnowledgeBaseSource | null;
+  onConfirm: () => void;
+  pending: boolean;
+  error: string | null;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[420px]">
+        <DialogHeader>
+          <DialogTitle>Delete this source?</DialogTitle>
+          <DialogDescription>
+            {source?.displayName
+              ? `“${source.displayName}” will be removed and its chunks deleted.`
+              : "This source will be removed and its chunks deleted."}
+          </DialogDescription>
+        </DialogHeader>
+        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button type="button" variant="destructive" onClick={onConfirm} disabled={pending}>
+            {pending ? (
+              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+            ) : (
+              <Trash2 className="mr-1.5 h-4 w-4" />
+            )}
+            Delete
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ErrorBanner({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  return (
+    <div className="mb-4 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+      <p className="flex-1">{message}</p>
+      <button
+        type="button"
+        onClick={onDismiss}
+        className="text-destructive/70 hover:text-destructive"
+        aria-label="Dismiss"
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
+function AddSourceMenu({ onSelect }: { onSelect: (dialog: Exclude<AddDialog, null>) => void }) {
+  const items: Array<{
+    dialog: Exclude<AddDialog, null>;
+    label: string;
+    description: string;
+    icon: React.ComponentType<{ className?: string }>;
+  }> = [
+    {
+      dialog: "url",
+      label: "Add Website URL",
+      description: "Crawl and index a website",
+      icon: Globe,
+    },
+    {
+      dialog: "upload",
+      label: "Upload Document",
+      description: "PDF, DOCX, TXT up to 50MB",
+      icon: Upload,
+    },
+    {
+      dialog: "manual",
+      label: "Add Text Manually",
+      description: "Add text content directly",
+      icon: ScrollText,
+    },
+    {
+      dialog: "sitemap",
+      label: "Import from Sitemap",
+      description: "Import pages from sitemap.xml",
+      icon: ListTree,
+    },
+  ];
+  return (
+    <>
+      {items.map((item) => (
+        <DropdownMenuItem
+          key={item.dialog}
+          className="cursor-pointer items-start gap-3 rounded-2xl px-3 py-3"
+          closeOnClick={false}
+          onClick={() => onSelect(item.dialog)}
+        >
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-muted/30 text-muted-foreground">
+            <item.icon className="h-4 w-4" />
+          </span>
+          <span className="space-y-0.5">
+            <span className="block text-sm font-medium text-foreground">{item.label}</span>
+            <span className="block text-xs text-muted-foreground">{item.description}</span>
+          </span>
+        </DropdownMenuItem>
+      ))}
+    </>
+  );
+}
+
 export function WidgetKnowledgeManager() {
   const sourcesQuery = useKnowledgeBaseSources("default");
   const deleteMutation = useDeleteKnowledgeBaseSource();
@@ -198,14 +366,13 @@ export function WidgetKnowledgeManager() {
   const [sortBy, setSortBy] = useQueryState("kbSort", sortParser);
   const [addDialog, setAddDialog] = useState<AddDialog>(null);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
-  const [pending, setPending] = useState<{
-    url: boolean;
-    upload: boolean;
-    manual: boolean;
-    sitemap: boolean;
-  }>({ url: false, upload: false, manual: false, sitemap: false });
+  const [deleteTarget, setDeleteTarget] = useState<KnowledgeBaseSource | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [addError, setAddError] = useState<string | null>(null);
 
   const sources = sourcesQuery.data?.sources ?? [];
+  const isInitialLoading = sourcesQuery.isLoading;
+  const isRefetching = sourcesQuery.isFetching && !sourcesQuery.isLoading;
 
   const sorting = parseSortValue(sortBy);
   const setSorting = (updater: SortingState | ((old: SortingState) => SortingState)) => {
@@ -258,34 +425,13 @@ export function WidgetKnowledgeManager() {
         id: "sourceType",
         accessorKey: "sourceType",
         header: "Type",
-        cell: ({ row }) => {
-          const meta = getSourceTypeMeta(row.original.sourceType);
-          return (
-            <Badge
-              variant="secondary"
-              className={`h-7 rounded-full border px-3 text-[12px] font-medium ${meta.className}`}
-            >
-              {meta.label}
-            </Badge>
-          );
-        },
+        cell: ({ row }) => <SourceTypeBadge sourceType={row.original.sourceType} />,
       },
       {
         id: "status",
         accessorKey: "status",
         header: "Status",
-        cell: ({ row }) => {
-          const meta = getStatusMeta(row.original.status);
-          return (
-            <Badge
-              variant="secondary"
-              className={`h-7 rounded-full border px-3 text-[12px] font-medium ${meta.className}`}
-            >
-              <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-current" />
-              {meta.label}
-            </Badge>
-          );
-        },
+        cell: ({ row }) => <StatusBadge status={row.original.status} />,
       },
       {
         id: "chunkCount",
@@ -317,6 +463,7 @@ export function WidgetKnowledgeManager() {
                   variant="ghost"
                   size="icon-sm"
                   className="cursor-pointer text-muted-foreground hover:text-foreground"
+                  aria-label={`Open actions for ${row.original.displayName}`}
                 >
                   <Ellipsis className="h-4 w-4" />
                 </Button>
@@ -326,9 +473,7 @@ export function WidgetKnowledgeManager() {
               <DropdownMenuItem
                 className="cursor-pointer gap-2 text-destructive"
                 variant="destructive"
-                onClick={() => {
-                  void deleteMutation.mutateAsync(row.original.id);
-                }}
+                onClick={() => setDeleteTarget(row.original)}
               >
                 <Trash2 className="h-4 w-4" />
                 Delete
@@ -338,7 +483,7 @@ export function WidgetKnowledgeManager() {
         ),
       },
     ],
-    [deleteMutation],
+    [],
   );
 
   const table = useReactTable({
@@ -350,18 +495,37 @@ export function WidgetKnowledgeManager() {
     getSortedRowModel: getSortedRowModel(),
   });
 
-  function openAddDialog(dialog: AddDialog) {
+  function openAddDialog(dialog: Exclude<AddDialog, null>) {
     setAddMenuOpen(false);
+    setAddError(null);
     queueMicrotask(() => setAddDialog(dialog));
   }
 
-  function setPendingFlag(key: keyof typeof pending, value: boolean) {
-    setPending((prev) => ({ ...prev, [key]: value }));
+  async function handleDeleteConfirm() {
+    if (!deleteTarget) return;
+    setDeleteError(null);
+    try {
+      await deleteMutation.mutateAsync(deleteTarget.id);
+      setDeleteTarget(null);
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Failed to delete source");
+    }
   }
 
   return (
     <div className="space-y-6 pb-10">
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-end gap-2">
+        {sourcesQuery.isError && !isInitialLoading ? (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-9 rounded-full"
+            onClick={() => sourcesQuery.refetch()}
+          >
+            <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+            Retry
+          </Button>
+        ) : null}
         <DropdownMenu open={addMenuOpen} onOpenChange={setAddMenuOpen}>
           <DropdownMenuTrigger
             render={
@@ -370,82 +534,29 @@ export function WidgetKnowledgeManager() {
                 size="default"
                 aria-label="Add knowledge source"
               >
-                <Plus className="h-4 w-4" />
+                {isRefetching ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Plus className="h-4 w-4" />
+                )}
                 Add Source
                 <ChevronDown className="h-4 w-4 opacity-70" />
               </Button>
             }
           />
           <DropdownMenuContent align="end" sideOffset={10} className="w-80 p-2">
-            <DropdownMenuItem
-              className="cursor-pointer items-start gap-3 rounded-2xl px-3 py-3"
-              closeOnClick={false}
-              onClick={() => openAddDialog("url")}
-            >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-muted/30 text-muted-foreground">
-                <Globe className="h-4 w-4" />
-              </span>
-              <span className="space-y-0.5">
-                <span className="block text-sm font-medium text-foreground">Add Website URL</span>
-                <span className="block text-xs text-muted-foreground">
-                  Crawl and index a website
-                </span>
-              </span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="cursor-pointer items-start gap-3 rounded-2xl px-3 py-3"
-              closeOnClick={false}
-              onClick={() => openAddDialog("upload")}
-            >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-muted/30 text-muted-foreground">
-                <Upload className="h-4 w-4" />
-              </span>
-              <span className="space-y-0.5">
-                <span className="block text-sm font-medium text-foreground">Upload Document</span>
-                <span className="block text-xs text-muted-foreground">
-                  PDF, DOCX, TXT up to 50MB
-                </span>
-              </span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="cursor-pointer items-start gap-3 rounded-2xl px-3 py-3"
-              closeOnClick={false}
-              onClick={() => openAddDialog("manual")}
-            >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-muted/30 text-muted-foreground">
-                <ScrollText className="h-4 w-4" />
-              </span>
-              <span className="space-y-0.5">
-                <span className="block text-sm font-medium text-foreground">Add Text Manually</span>
-                <span className="block text-xs text-muted-foreground">
-                  Add text content directly
-                </span>
-              </span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="cursor-pointer items-start gap-3 rounded-2xl px-3 py-3"
-              closeOnClick={false}
-              onClick={() => openAddDialog("sitemap")}
-            >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-muted/30 text-muted-foreground">
-                <ListTree className="h-4 w-4" />
-              </span>
-              <span className="space-y-0.5">
-                <span className="block text-sm font-medium text-foreground">
-                  Import from Sitemap
-                </span>
-                <span className="block text-xs text-muted-foreground">
-                  Import pages from sitemap.xml
-                </span>
-              </span>
-            </DropdownMenuItem>
+            <AddSourceMenu onSelect={openAddDialog} />
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
 
+      {addError ? <ErrorBanner message={addError} onDismiss={() => setAddError(null)} /> : null}
+
       <div className="overflow-hidden rounded-[20px] border border-border/60 bg-transparent shadow-none [--card-spacing:0rem]">
-        {sourcesQuery.isLoading ? (
+        {isInitialLoading ? (
           <KnowledgeBaseSkeleton />
+        ) : sourcesQuery.isError ? (
+          <QueryErrorState onRetry={() => sourcesQuery.refetch()} />
         ) : sources.length === 0 ? (
           <div className="p-6">
             <EmptyState
@@ -511,33 +622,57 @@ export function WidgetKnowledgeManager() {
               ))}
             </TableHeader>
             <TableBody className="text-[13px]">
-              {table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} className="border-border/60 hover:bg-muted/30">
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell
-                      key={cell.id}
-                      className={`whitespace-normal px-5 py-4 align-middle ${
-                        cell.column.id === "actions" ? "text-right" : ""
-                      }`}
-                    >
-                      <div
-                        className={
-                          cell.column.id === "actions" ? "ml-auto flex w-full justify-end" : ""
-                        }
-                      >
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </div>
-                    </TableCell>
-                  ))}
+              {table.getRowModel().rows.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={columns.length}
+                    className="h-32 text-center text-muted-foreground"
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <Info className="h-4 w-4" />
+                      No sources match the current sort.
+                    </span>
+                  </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                table.getRowModel().rows.map((row) => (
+                  <TableRow key={row.id} className="border-border/60 hover:bg-muted/30">
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell
+                        key={cell.id}
+                        className={cn(
+                          "whitespace-normal px-5 py-4 align-middle",
+                          cell.column.id === "actions" && "text-right",
+                        )}
+                      >
+                        <div
+                          className={cn(
+                            cell.column.id === "actions" && "ml-auto flex w-full justify-end",
+                          )}
+                        >
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </div>
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         )}
 
-        {!sourcesQuery.isLoading && sources.length > 0 ? (
-          <div className="border-t border-border/60 px-5 py-4 text-sm text-muted-foreground">
-            Showing 1 to {sources.length} of {sources.length} sources
+        {!isInitialLoading && !sourcesQuery.isError && sources.length > 0 ? (
+          <div className="flex items-center justify-between border-t border-border/60 px-5 py-4 text-sm text-muted-foreground">
+            <span>
+              Showing {table.getRowModel().rows.length} of {sources.length} source
+              {sources.length === 1 ? "" : "s"}
+            </span>
+            {isRefetching ? (
+              <span className="inline-flex items-center gap-1.5 text-xs">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Refreshing…
+              </span>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -546,33 +681,42 @@ export function WidgetKnowledgeManager() {
         open={addDialog === "url"}
         onOpenChange={(open) => setAddDialog(open ? "url" : null)}
         onSuccess={() => sourcesQuery.refetch()}
-        pending={pending.url}
-        setPending={(v) => setPendingFlag("url", v)}
+        onError={setAddError}
       />
-
       <UploadDialog
         open={addDialog === "upload"}
         onOpenChange={(open) => setAddDialog(open ? "upload" : null)}
         onSuccess={() => sourcesQuery.refetch()}
-        pending={pending.upload}
-        setPending={(v) => setPendingFlag("upload", v)}
+        onError={setAddError}
         fileInputRef={fileInputRef}
       />
-
       <ManualDialog
         open={addDialog === "manual"}
         onOpenChange={(open) => setAddDialog(open ? "manual" : null)}
         onSuccess={() => sourcesQuery.refetch()}
-        pending={pending.manual}
-        setPending={(v) => setPendingFlag("manual", v)}
+        onError={setAddError}
       />
-
       <SitemapDialog
         open={addDialog === "sitemap"}
         onOpenChange={(open) => setAddDialog(open ? "sitemap" : null)}
         onSuccess={() => sourcesQuery.refetch()}
-        pending={pending.sitemap}
-        setPending={(v) => setPendingFlag("sitemap", v)}
+        onError={setAddError}
+      />
+
+      <DeleteConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteTarget(null);
+            setDeleteError(null);
+          }
+        }}
+        source={deleteTarget}
+        onConfirm={() => {
+          void handleDeleteConfirm();
+        }}
+        pending={deleteMutation.isPending}
+        error={deleteError}
       />
     </div>
   );
@@ -581,15 +725,15 @@ export function WidgetKnowledgeManager() {
 type AddDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess: () => void | Promise<void>;
-  pending: boolean;
-  setPending: (value: boolean) => void;
+  onSuccess: () => void;
+  onError: (message: string) => void;
 };
 
-function UrlDialog({ open, onOpenChange, onSuccess, pending, setPending }: AddDialogProps) {
+function UrlDialog({ open, onOpenChange, onSuccess, onError }: AddDialogProps) {
   const [title, setTitle] = useState("");
   const [url, setUrl] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const mutation = useAddUrlSource();
 
   async function handleSubmit(formData: FormData) {
     const parsed = urlFormSchema.safeParse({
@@ -597,23 +741,18 @@ function UrlDialog({ open, onOpenChange, onSuccess, pending, setPending }: AddDi
       sourceUrl: formData.get("sourceUrl"),
     });
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Check the URL details.");
+      setValidationError(parsed.error.issues[0]?.message ?? "Check the URL details.");
       return;
     }
-    setError(null);
-    setPending(true);
+    setValidationError(null);
     try {
-      const result = await addUrlSourceAction({}, toFormData(parsed.data));
-      if (result?.error) {
-        setError(result.error);
-        return;
-      }
+      await mutation.mutateAsync(parsed.data);
       setTitle("");
       setUrl("");
       onOpenChange(false);
-      await onSuccess();
-    } finally {
-      setPending(false);
+      onSuccess();
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Could not process that URL.");
     }
   }
 
@@ -621,7 +760,7 @@ function UrlDialog({ open, onOpenChange, onSuccess, pending, setPending }: AddDi
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        if (!next) setError(null);
+        if (!next) setValidationError(null);
         onOpenChange(next);
       }}
     >
@@ -654,12 +793,13 @@ function UrlDialog({ open, onOpenChange, onSuccess, pending, setPending }: AddDi
               required
             />
           </div>
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          {validationError ? <p className="text-sm text-destructive">{validationError}</p> : null}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={pending}>
+            <Button type="submit" disabled={mutation.isPending}>
+              {mutation.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
               Add URL source
             </Button>
           </DialogFooter>
@@ -673,28 +813,25 @@ function UploadDialog({
   open,
   onOpenChange,
   onSuccess,
-  pending,
-  setPending,
+  onError,
   fileInputRef,
 }: AddDialogProps & { fileInputRef: React.RefObject<HTMLInputElement | null> }) {
-  const [error, setError] = useState<string | null>(null);
+  const mutation = useUploadRagDocument();
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
     const formData = new FormData(form);
-    setError(null);
-    setPending(true);
+    setValidationError(null);
     try {
-      await uploadMutation.mutateAsync(formData);
+      await mutation.mutateAsync(formData);
       form.reset();
       if (fileInputRef.current) fileInputRef.current.value = "";
       onOpenChange(false);
-      await onSuccess();
+      onSuccess();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
-    } finally {
-      setPending(false);
+      onError(err instanceof Error ? err.message : "Upload failed");
     }
   }
 
@@ -702,7 +839,7 @@ function UploadDialog({
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        if (!next) setError(null);
+        if (!next) setValidationError(null);
         onOpenChange(next);
       }}
     >
@@ -719,12 +856,13 @@ function UploadDialog({
             <Label htmlFor="kb-upload-file">File</Label>
             <Input id="kb-upload-file" name="file" type="file" ref={fileInputRef} required />
           </div>
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          {validationError ? <p className="text-sm text-destructive">{validationError}</p> : null}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={pending}>
+            <Button type="submit" disabled={mutation.isPending}>
+              {mutation.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
               Upload
             </Button>
           </DialogFooter>
@@ -734,10 +872,11 @@ function UploadDialog({
   );
 }
 
-function ManualDialog({ open, onOpenChange, onSuccess, pending, setPending }: AddDialogProps) {
+function ManualDialog({ open, onOpenChange, onSuccess, onError }: AddDialogProps) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const mutation = useAddManualTextSource();
 
   async function handleSubmit(formData: FormData) {
     const parsed = manualFormSchema.safeParse({
@@ -745,23 +884,18 @@ function ManualDialog({ open, onOpenChange, onSuccess, pending, setPending }: Ad
       content: formData.get("content"),
     });
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Check the text details.");
+      setValidationError(parsed.error.issues[0]?.message ?? "Check the text details.");
       return;
     }
-    setError(null);
-    setPending(true);
+    setValidationError(null);
     try {
-      const result = await addManualTextSourceAction({}, toFormData(parsed.data));
-      if (result?.error) {
-        setError(result.error);
-        return;
-      }
+      await mutation.mutateAsync(parsed.data);
       setTitle("");
       setContent("");
       onOpenChange(false);
-      await onSuccess();
-    } finally {
-      setPending(false);
+      onSuccess();
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Could not process that text.");
     }
   }
 
@@ -769,7 +903,7 @@ function ManualDialog({ open, onOpenChange, onSuccess, pending, setPending }: Ad
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        if (!next) setError(null);
+        if (!next) setValidationError(null);
         onOpenChange(next);
       }}
     >
@@ -806,12 +940,13 @@ function ManualDialog({ open, onOpenChange, onSuccess, pending, setPending }: Ad
               className="min-h-[180px] resize-y"
             />
           </div>
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          {validationError ? <p className="text-sm text-destructive">{validationError}</p> : null}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={pending}>
+            <Button type="submit" disabled={mutation.isPending}>
+              {mutation.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
               Add text
             </Button>
           </DialogFooter>
@@ -821,10 +956,11 @@ function ManualDialog({ open, onOpenChange, onSuccess, pending, setPending }: Ad
   );
 }
 
-function SitemapDialog({ open, onOpenChange, onSuccess, pending, setPending }: AddDialogProps) {
+function SitemapDialog({ open, onOpenChange, onSuccess, onError }: AddDialogProps) {
   const [title, setTitle] = useState("");
   const [sitemapUrl, setSitemapUrl] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const mutation = useImportSitemapSource();
 
   async function handleSubmit(formData: FormData) {
     const parsed = sitemapFormSchema.safeParse({
@@ -832,23 +968,18 @@ function SitemapDialog({ open, onOpenChange, onSuccess, pending, setPending }: A
       sourceUrl: formData.get("sourceUrl"),
     });
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Check the sitemap details.");
+      setValidationError(parsed.error.issues[0]?.message ?? "Check the sitemap details.");
       return;
     }
-    setError(null);
-    setPending(true);
+    setValidationError(null);
     try {
-      const result = await importSitemapSourceAction({}, toFormData(parsed.data));
-      if (result?.error) {
-        setError(result.error);
-        return;
-      }
+      await mutation.mutateAsync(parsed.data);
       setTitle("");
       setSitemapUrl("");
       onOpenChange(false);
-      await onSuccess();
-    } finally {
-      setPending(false);
+      onSuccess();
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Could not process that sitemap.");
     }
   }
 
@@ -856,7 +987,7 @@ function SitemapDialog({ open, onOpenChange, onSuccess, pending, setPending }: A
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        if (!next) setError(null);
+        if (!next) setValidationError(null);
         onOpenChange(next);
       }}
     >
@@ -893,12 +1024,13 @@ function SitemapDialog({ open, onOpenChange, onSuccess, pending, setPending }: A
               required
             />
           </div>
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          {validationError ? <p className="text-sm text-destructive">{validationError}</p> : null}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={pending}>
+            <Button type="submit" disabled={mutation.isPending}>
+              {mutation.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
               Import sitemap
             </Button>
           </DialogFooter>
@@ -906,12 +1038,4 @@ function SitemapDialog({ open, onOpenChange, onSuccess, pending, setPending }: A
       </DialogContent>
     </Dialog>
   );
-}
-
-function toFormData<T extends Record<string, string>>(values: T): FormData {
-  const formData = new FormData();
-  for (const [key, value] of Object.entries(values)) {
-    formData.set(key, value);
-  }
-  return formData;
 }
