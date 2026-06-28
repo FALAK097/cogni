@@ -21,6 +21,16 @@ const urlSchema = z.object({
   sourceUrl: z.url(),
 });
 
+const sitemapSchema = z.object({
+  title: z.string().trim().min(1).max(120),
+  sourceUrl: z.url(),
+});
+
+const manualTextSchema = z.object({
+  title: z.string().trim().min(1).max(120),
+  content: z.string().trim().min(1).max(100_000),
+});
+
 export async function addUrlSourceAction(
   _previousState: KnowledgeActionState,
   formData: FormData,
@@ -133,6 +143,115 @@ export async function uploadDocumentAction(formData: FormData) {
   }
 
   revalidatePath("/knowledge-base");
+}
+
+export async function addManualTextSourceAction(
+  _previousState: KnowledgeActionState,
+  formData: FormData,
+): Promise<KnowledgeActionState> {
+  await requireAuth();
+  const { db, workspace } = await requireDashboardContext();
+
+  const parsed = manualTextSchema.safeParse({
+    title: formData.get("title"),
+    content: formData.get("content"),
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Check the text details." };
+  }
+
+  const contentBytes = Buffer.from(parsed.data.content, "utf8");
+  const saved = await saveObject({
+    workspaceId: workspace.id,
+    filename: `${parsed.data.title}.txt`,
+    mimeType: "text/plain",
+    bytes: contentBytes,
+  });
+
+  const [document] = await db
+    .insert(documentTable)
+    .values({
+      id: randomUUID(),
+      workspaceId: workspace.id,
+      title: parsed.data.title,
+      sourceType: "TXT",
+      storageKey: saved.storageKey,
+      mimeType: "text/plain",
+      status: "PROCESSING",
+      updatedAt: new Date().toISOString(),
+    })
+    .returning();
+
+  try {
+    await processDocument({
+      db,
+      workspaceId: workspace.id,
+      documentId: document.id,
+      idempotencyKey: `document:manual:${document.id}`,
+    });
+    await emitDomainEvent({
+      db,
+      workspaceId: workspace.id,
+      type: "document.ready",
+      entityId: document.id,
+    });
+  } catch {
+    return { error: "Could not process that text." };
+  }
+
+  revalidatePath("/knowledge-base");
+  return { savedAt: Date.now() };
+}
+
+export async function importSitemapSourceAction(
+  _previousState: KnowledgeActionState,
+  formData: FormData,
+): Promise<KnowledgeActionState> {
+  await requireAuth();
+  const { db, workspace } = await requireDashboardContext();
+
+  const parsed = sitemapSchema.safeParse({
+    title: formData.get("title"),
+    sourceUrl: formData.get("sourceUrl"),
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Check the sitemap details." };
+  }
+
+  const [document] = await db
+    .insert(documentTable)
+    .values({
+      id: randomUUID(),
+      workspaceId: workspace.id,
+      title: parsed.data.title,
+      sourceType: "SITEMAP",
+      sourceUrl: parsed.data.sourceUrl,
+      status: "PROCESSING",
+      updatedAt: new Date().toISOString(),
+    })
+    .returning();
+
+  try {
+    await processDocument({
+      db,
+      workspaceId: workspace.id,
+      documentId: document.id,
+      idempotencyKey: `document:sitemap:${document.id}`,
+    });
+    await emitDomainEvent({
+      db,
+      workspaceId: workspace.id,
+      type: "document.ready",
+      entityId: document.id,
+    });
+  } catch {
+    return { error: "Could not process that sitemap." };
+  }
+
+  revalidatePath("/knowledge-base");
+  return { savedAt: Date.now() };
 }
 
 export async function deleteDocumentAction(formData: FormData) {

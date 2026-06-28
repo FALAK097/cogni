@@ -22,7 +22,7 @@ import {
   Ellipsis,
   FileText,
   Globe,
-  Info,
+  Inbox,
   ListTree,
   Loader2,
   Plus,
@@ -629,7 +629,7 @@ export function WidgetKnowledgeManager() {
                     className="h-32 text-center text-muted-foreground"
                   >
                     <span className="inline-flex items-center gap-2">
-                      <Info className="h-4 w-4" />
+                      <Inbox className="h-4 w-4" />
                       No sources match the current sort.
                     </span>
                   </TableCell>
