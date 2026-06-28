@@ -26,10 +26,7 @@ export async function POST(
 
   const parsed = identifySchema.safeParse(await request.json());
   if (!parsed.success || (!parsed.data.name && !parsed.data.email && !parsed.data.phone)) {
-    return Response.json(
-      { error: "Provide at least a name, email, or phone." },
-      { status: 400 },
-    );
+    return Response.json({ error: "Provide at least a name, email, or phone." }, { status: 400 });
   }
 
   const { publicKey } = await params;
@@ -37,8 +34,7 @@ export async function POST(
   const nowIso = new Date().toISOString();
 
   const visitorSession = await db.query.visitorSession.findFirst({
-    where: (fields, { eq, and, gt }) =>
-      and(eq(fields.token, token), gt(fields.expiresAt, nowIso)),
+    where: (fields, { eq, and, gt }) => and(eq(fields.token, token), gt(fields.expiresAt, nowIso)),
     with: { widget: true },
   });
 
@@ -58,10 +54,7 @@ export async function POST(
   });
 
   if (!rateLimit.allowed) {
-    return Response.json(
-      { error: "Too many requests. Try again shortly." },
-      { status: 429 },
-    );
+    return Response.json({ error: "Too many requests. Try again shortly." }, { status: 429 });
   }
 
   const updates: Record<string, string> = { updatedAt: nowIso };

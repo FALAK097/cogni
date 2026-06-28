@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useEffectEvent, useRef } from "react";
 
 import { getBackendOrigin } from "@/lib/api/client";
 
@@ -121,9 +121,10 @@ export function WidgetLiveWidgetPreview({
 }) {
   const mountedRef = useRef(false);
   const configSnapshotRef = useRef("");
-  const previewModeRef = useRef(previewMode);
 
-  previewModeRef.current = previewMode;
+  const applyLatestPreviewMode = useEffectEvent(() => {
+    applyPreviewMode(previewMode);
+  });
 
   useEffect(() => {
     const host = mountRef.current;
@@ -147,7 +148,7 @@ export function WidgetLiveWidgetPreview({
 
     const finalizeMount = () => {
       if (!mountWidgetInHost(mountRef.current)) return false;
-      applyPreviewMode(previewModeRef.current);
+      applyLatestPreviewMode();
       return true;
     };
 

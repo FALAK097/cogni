@@ -58,8 +58,6 @@ function getSessionSearchText(session: WidgetSessionSummary) {
 
 export function ConversationsList({ onSelectSession }: ConversationsListProps) {
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalSessions, setTotalSessions] = useState(0);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [sort, setSort] = useState("lastActivityAt");
@@ -92,19 +90,12 @@ export function ConversationsList({ onSelectSession }: ConversationsListProps) {
     ? filteredSessions.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
     : filteredSessions;
 
-  useEffect(() => {
-    if (sessionsData) {
-      const total = shouldClientFilterVisitorLabel
-        ? filteredSessions.length
-        : (sessionsData.pagination?.total ?? 0);
-      setTotalPages(
-        shouldClientFilterVisitorLabel
-          ? Math.max(1, Math.ceil(total / PAGE_SIZE))
-          : (sessionsData.pagination?.pages ?? 1),
-      );
-      setTotalSessions(total);
-    }
-  }, [sessionsData, filteredSessions.length, shouldClientFilterVisitorLabel]);
+  const total = shouldClientFilterVisitorLabel
+    ? filteredSessions.length
+    : (sessionsData?.pagination?.total ?? 0);
+  const totalPages = shouldClientFilterVisitorLabel
+    ? Math.max(1, Math.ceil(total / PAGE_SIZE))
+    : (sessionsData?.pagination?.pages ?? 1);
 
   const handleSort = (key: string) => {
     if (sort === key) {
@@ -129,7 +120,7 @@ export function ConversationsList({ onSelectSession }: ConversationsListProps) {
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Conversations</h2>
           <div className="flex items-center gap-2">
-            <Badge variant="secondary">{totalSessions} total</Badge>
+            <Badge variant="secondary">{total} total</Badge>
           </div>
         </div>
         <div className="flex flex-col gap-4 sm:flex-row">

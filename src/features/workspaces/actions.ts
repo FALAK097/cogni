@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { eq } from "drizzle-orm";
 
 import { requireAuth, requireDashboardContext } from "@/lib/auth/dashboard-context";
+import { workspace as workspaceTable } from "@/lib/db/schema";
 
 export type WorkspaceActionState = {
   error?: string;
@@ -21,6 +23,9 @@ export async function updateWorkspaceSettingsAction(
   _previousState: WorkspaceActionState,
   formData: FormData,
 ): Promise<WorkspaceActionState> {
+  await requireAuth();
+  const { db, membership, workspace } = await requireDashboardContext();
+
   const parsed = workspaceSettingsSchema.safeParse({
     name: formData.get("name"),
     timezone: formData.get("timezone"),
@@ -32,14 +37,9 @@ export async function updateWorkspaceSettingsAction(
     return { error: parsed.error.issues[0]?.message ?? "Check the workspace settings." };
   }
 
-  const { db, membership, workspace } = await requireDashboardContext();
-
   if (membership.role !== "OWNER") {
     return { error: "Only workspace owners can change these settings." };
   }
-
-  const { workspace: workspaceTable } = await import("@/lib/db/schema");
-  const { eq } = await import("drizzle-orm");
 
   await db
     .update(workspaceTable)

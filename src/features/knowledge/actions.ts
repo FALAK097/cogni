@@ -8,7 +8,7 @@ import { eq, and } from "drizzle-orm";
 import { document as documentTable } from "@/lib/db/schema";
 import { processDocument } from "@/features/knowledge/server/process-document";
 import { emitDomainEvent } from "@/lib/events/domain-events";
-import { requireDashboardContext } from "@/lib/auth/dashboard-context";
+import { requireAuth, requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { deleteObject, isAllowedKnowledgeUpload, saveObject } from "@/lib/storage/index";
 
 export type KnowledgeActionState = {
@@ -25,6 +25,9 @@ export async function addUrlSourceAction(
   _previousState: KnowledgeActionState,
   formData: FormData,
 ): Promise<KnowledgeActionState> {
+  await requireAuth();
+  const { db, workspace } = await requireDashboardContext();
+
   const parsed = urlSchema.safeParse({
     title: formData.get("title"),
     sourceUrl: formData.get("sourceUrl"),
@@ -34,7 +37,6 @@ export async function addUrlSourceAction(
     return { error: parsed.error.issues[0]?.message ?? "Check the URL details." };
   }
 
-  const { db, workspace } = await requireDashboardContext();
   const [document] = await db
     .insert(documentTable)
     .values({
@@ -70,6 +72,9 @@ export async function addUrlSourceAction(
 }
 
 export async function uploadDocumentAction(formData: FormData) {
+  await requireAuth();
+  const { db, workspace } = await requireDashboardContext();
+
   const title = formData.get("title");
   const file = formData.get("file");
 
@@ -77,7 +82,6 @@ export async function uploadDocumentAction(formData: FormData) {
     return;
   }
 
-  const { db, workspace } = await requireDashboardContext();
   const bytes = Buffer.from(await file.arrayBuffer());
   const mimeType = file.type || "application/octet-stream";
   if (!isAllowedKnowledgeUpload(mimeType, bytes.length)) {
@@ -132,10 +136,12 @@ export async function uploadDocumentAction(formData: FormData) {
 }
 
 export async function deleteDocumentAction(formData: FormData) {
+  await requireAuth();
+  const { db, workspace } = await requireDashboardContext();
+
   const documentId = formData.get("documentId");
   if (typeof documentId !== "string") return;
 
-  const { db, workspace } = await requireDashboardContext();
   const document = await db.query.document.findFirst({
     where: (fields, { eq, and }) =>
       and(eq(fields.id, documentId), eq(fields.workspaceId, workspace.id)),

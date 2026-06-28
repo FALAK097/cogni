@@ -304,7 +304,6 @@ export function WidgetCustomizer({
   const [configOverrides, setConfigOverrides] = useState<Partial<WidgetCustomizerConfig>>({});
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isSavingRef = useRef(false);
-  const buildSavePayloadRef = useRef<() => Record<string, unknown>>(() => ({}));
   const menuContainerRef = useRef<HTMLDivElement>(null);
   const menuPanelRef = useRef<HTMLDivElement>(null);
 
@@ -377,8 +376,6 @@ export function WidgetCustomizer({
     return toSavePayload(merged);
   }, [activeWorkspaceId, configOverrides, widgetConfigData]);
 
-  buildSavePayloadRef.current = buildSavePayload;
-
   const persistConfig = useCallback(
     (options?: { silent?: boolean }) => {
       if (!activeWorkspaceId || !widgetConfigData || isSavingRef.current) {
@@ -397,7 +394,7 @@ export function WidgetCustomizer({
       saveWidgetConfigMutation.mutate(
         {
           workspaceId: activeWorkspaceId,
-          body: buildSavePayloadRef.current(),
+          body: buildSavePayload(),
         },
         {
           onSuccess: () => {
@@ -423,7 +420,7 @@ export function WidgetCustomizer({
         },
       );
     },
-    [activeWorkspaceId, saveWidgetConfigMutation, toast, widgetConfigData],
+    [activeWorkspaceId, buildSavePayload, saveWidgetConfigMutation, toast, widgetConfigData],
   );
 
   useEffect(() => {
