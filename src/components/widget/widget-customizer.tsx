@@ -112,7 +112,7 @@ const NAV_ITEMS: {
   { id: "installation", label: "Installation", icon: Code },
 ];
 
-const WIDGET_CARD_CLASS = "rounded-xl border border-[#E5E7EB]";
+const WIDGET_CARD_CLASS = "rounded-xl border border-border";
 
 const WIDGET_SETTINGS_CARD_CLASS = `${WIDGET_CARD_CLASS} overflow-hidden`;
 
@@ -179,18 +179,20 @@ function WidgetSettingsMenu({
       ref={menuRef}
       className={cn(
         WIDGET_CARD_CLASS,
-        "absolute top-full left-0 z-50 mt-2 flex w-[248px] flex-col bg-white shadow-[0_4px_16px_rgba(0,0,0,0.08)]",
+        "absolute top-full left-0 z-50 mt-2 flex w-[248px] flex-col bg-popover shadow-md",
       )}
     >
-      <div className="flex items-center justify-between border-b border-[#E5E7EB] px-4 py-3">
+      <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <div>
-          <p className="text-sm font-semibold text-[#101828]">Widget</p>
-          <p className="mt-0.5 text-xs leading-4 text-[#667085]">Customize your AI assistant</p>
+          <p className="text-sm font-semibold text-foreground">Widget</p>
+          <p className="mt-0.5 text-xs leading-4 text-muted-foreground">
+            Customize your AI assistant
+          </p>
         </div>
         <button
           type="button"
           onClick={onClose}
-          className="rounded-md p-1.5 text-[#667085] hover:bg-[#F9FAFB] hover:text-[#101828]"
+          className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
           aria-label="Close menu"
         >
           <X className="size-4" />
@@ -210,13 +212,13 @@ function WidgetSettingsMenu({
                   "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors",
                   isActive
                     ? "bg-[var(--widget-accent-muted)] text-[var(--widget-accent)]"
-                    : "text-[#344054] hover:bg-[#F9FAFB]",
+                    : "text-foreground hover:bg-muted",
                 )}
               >
                 <Icon
                   className={cn(
                     "size-4 shrink-0",
-                    isActive ? "text-[var(--widget-accent)]" : "text-[#98A2B3]",
+                    isActive ? "text-[var(--widget-accent)]" : "text-muted-foreground",
                   )}
                 />
                 {item.label}
@@ -226,8 +228,8 @@ function WidgetSettingsMenu({
         })}
       </ul>
 
-      <div className="border-t border-[#E5E7EB] px-4 py-3">
-        <p className="text-xs text-[#667085]">Need help?</p>
+      <div className="border-t border-border px-4 py-3">
+        <p className="text-xs text-muted-foreground">Need help?</p>
         <a
           href="https://docs.widget.app"
           target="_blank"
@@ -245,7 +247,7 @@ function WidgetSettingsMenu({
 function WidgetCustomizerSkeleton() {
   return (
     <div
-      className="flex h-full min-h-0 w-full gap-3 overflow-hidden bg-[#F9FAFB] p-3"
+      className="flex h-full min-h-0 w-full gap-3 overflow-hidden bg-background p-3"
       style={getWidgetAccentVars(WIDGET_BRAND_COLOR)}
     >
       <Skeleton className="size-9 shrink-0 rounded-lg" />
@@ -541,7 +543,7 @@ export function WidgetCustomizer({
 
   return (
     <div
-      className="flex h-full min-h-0 w-full gap-3 overflow-hidden bg-[#F9FAFB] p-3"
+      className="flex h-full min-h-0 w-full gap-3 overflow-hidden bg-background p-3"
       style={getWidgetAccentVars(config.primaryColor)}
     >
       {/* Left hamburger */}
@@ -549,7 +551,7 @@ export function WidgetCustomizer({
         <button
           type="button"
           onClick={() => setMenuOpen((open) => !open)}
-          className="inline-flex size-9 items-center justify-center rounded-lg border border-[#E5E7EB] bg-white text-[#667085] shadow-[0_1px_2px_0_rgba(0,0,0,0.05)] transition-colors hover:bg-[#F9FAFB] hover:text-[#101828]"
+          className="inline-flex size-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground shadow-xs transition-colors hover:bg-muted hover:text-foreground"
           aria-label="Open widget settings menu"
           aria-expanded={menuOpen}
         >

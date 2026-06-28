@@ -29,7 +29,7 @@ export function WidgetPreviewPanel({ liveConfig }: WidgetPreviewPanelProps) {
             "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[13px] font-medium transition-colors",
             previewMode === "widget"
               ? "border-[var(--widget-accent-border)] bg-[var(--widget-accent-muted)] text-[var(--widget-accent)]"
-              : "border-transparent text-[#344054] hover:bg-[#F2F4F7]",
+              : "border-transparent text-foreground hover:bg-muted",
           )}
         >
           <MessageCircle className="size-3.5" />
@@ -42,7 +42,7 @@ export function WidgetPreviewPanel({ liveConfig }: WidgetPreviewPanelProps) {
             "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[13px] font-medium transition-colors",
             previewMode === "full-chat"
               ? "border-[var(--widget-accent-border)] bg-[var(--widget-accent-muted)] text-[var(--widget-accent)]"
-              : "border-transparent text-[#344054] hover:bg-[#F2F4F7]",
+              : "border-transparent text-foreground hover:bg-muted",
           )}
         >
           <BotMessageSquare className="size-3.5" />
@@ -66,7 +66,7 @@ export function WidgetPreviewPanel({ liveConfig }: WidgetPreviewPanelProps) {
                 "inline-flex size-7 items-center justify-center rounded-md border transition-colors",
                 deviceMode === id
                   ? "border-[var(--widget-accent)] bg-[var(--widget-accent-muted)] text-[var(--widget-accent)]"
-                  : "border-[#D0D5DD] bg-transparent text-[#667085] hover:text-[#344054]",
+                  : "border-border bg-transparent text-muted-foreground hover:text-foreground",
               )}
             >
               <Icon className="size-3.5" />
@@ -86,10 +86,8 @@ export function WidgetPreviewPanel({ liveConfig }: WidgetPreviewPanelProps) {
           <div
             className={cn(
               "h-full w-full",
-              deviceMode === "mobile" &&
-                "rounded-[32px] border-2 border-[#E5E7EB] p-2 shadow-[0_8px_24px_rgba(0,0,0,0.06)]",
-              deviceMode === "tablet" &&
-                "rounded-[24px] border border-[#E5E7EB] p-2 shadow-[0_4px_16px_rgba(0,0,0,0.05)]",
+              deviceMode === "mobile" && "rounded-[32px] border-2 border-border p-2 shadow-lg",
+              deviceMode === "tablet" && "rounded-[24px] border border-border p-2 shadow-md",
             )}
           >
             <div

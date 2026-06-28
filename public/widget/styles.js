@@ -734,6 +734,27 @@ export function injectStyles() {
 			color: ${config.theme === "dark" ? "#71717a" : "#a1a1aa"};
 		}
 
+		.oc-upload-btn {
+			background: none;
+			border: none;
+			color: ${config.theme === "dark" ? "#a1a1aa" : "#71717a"};
+			cursor: pointer;
+			padding: 0;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			transition: color 0.15s ease;
+		}
+
+		.oc-upload-btn:hover {
+			color: ${config.theme === "dark" ? "#fafafa" : "#18181b"};
+		}
+
+		.oc-upload-btn svg {
+			width: 16px;
+			height: 16px;
+		}
+
 		.oc-send-btn {
 			background: none;
 			border: none;

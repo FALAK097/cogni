@@ -67,6 +67,14 @@ export type AppearanceConfig = {
   fontSize: string;
 };
 
+const FIELD_CLASS = cn("h-10 rounded-lg border border-border bg-card px-3 text-sm shadow-xs");
+const TEXTAREA_FIELD_CLASS = cn(
+  "resize-y rounded-lg border border-border bg-card px-3 py-2.5 text-sm shadow-xs",
+);
+const INPUT_NO_RING_CLASS = cn(
+  "h-8 flex-1 border-0 bg-transparent px-1 text-sm text-foreground shadow-none focus-visible:ring-0",
+);
+
 function SettingsPanelHeader({
   title,
   description,
@@ -77,10 +85,10 @@ function SettingsPanelHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="mb-8 flex items-start justify-between gap-4 border-b border-[#F2F4F7] pb-6">
+    <div className="mb-8 flex items-start justify-between gap-4 border-b border-border pb-6">
       <div>
-        <h2 className="text-base font-semibold text-[#101828]">{title}</h2>
-        <p className="mt-1 text-sm text-[#667085]">{description}</p>
+        <h2 className="text-base font-semibold text-foreground">{title}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
       </div>
       {action}
     </div>
@@ -102,13 +110,13 @@ function WidgetColorInput({
 }) {
   return (
     <div className={cn("space-y-1.5", className)}>
-      <Label htmlFor={id} className="text-sm font-medium text-[#344054]">
+      <Label htmlFor={id} className="text-sm font-medium text-foreground">
         {label}
       </Label>
-      <div className="flex h-10 items-center gap-2 rounded-lg border border-[#EAECF0] bg-white px-2 shadow-xs transition-colors focus-within:border-[var(--widget-accent)] focus-within:ring-2 focus-within:ring-[var(--widget-accent)]/20">
+      <div className="flex h-10 items-center gap-2 rounded-lg border border-border bg-card px-2 shadow-xs transition-colors focus-within:border-[var(--widget-accent)] focus-within:ring-2 focus-within:ring-[var(--widget-accent)]/20">
         <label htmlFor={`${id}-picker`} className="relative shrink-0 cursor-pointer">
           <span
-            className="block size-6 rounded border border-[#EAECF0]"
+            className="block size-6 rounded border border-border"
             style={{ backgroundColor: value }}
           />
           <input
@@ -124,7 +132,7 @@ function WidgetColorInput({
           id={id}
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className="h-8 flex-1 border-0 bg-transparent px-1 text-sm text-[#101828] shadow-none focus-visible:ring-0"
+          className={INPUT_NO_RING_CLASS}
         />
       </div>
     </div>
@@ -155,7 +163,7 @@ function WidgetSegmentedControl<T extends string>({
               "inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-medium transition-all duration-150",
               isActive
                 ? "border-[var(--widget-accent)] bg-[var(--widget-accent-muted)] text-[var(--widget-accent)] shadow-xs"
-                : "border-[#EAECF0] bg-white text-[#344054] hover:border-[#D1D5DB] hover:bg-[#F9FAFB]",
+                : "border-border bg-card text-foreground hover:bg-muted",
             )}
           >
             {option.icon}
@@ -222,7 +230,7 @@ export function WidgetAppearancePanel({
             variant="outline"
             size="sm"
             onClick={onReset}
-            className="h-8 shrink-0 gap-1.5 rounded-lg border-[#EAECF0] bg-white px-3 text-xs font-medium text-[#667085] shadow-none hover:bg-[#F9FAFB] hover:text-[#344054]"
+            className="h-8 shrink-0 gap-1.5 rounded-lg border-border bg-card px-3 text-xs font-medium text-muted-foreground shadow-none hover:bg-muted hover:text-foreground"
           >
             <RotateCcw className="size-3.5" />
             Reset to defaults
@@ -232,13 +240,13 @@ export function WidgetAppearancePanel({
 
       <div className="space-y-8">
         <section className="space-y-4">
-          <h3 className="text-sm font-medium text-[#101828]">Widget Design</h3>
+          <h3 className="text-sm font-medium text-foreground">Widget Design</h3>
 
           <div className="space-y-1.5">
-            <Label className="text-sm font-medium text-[#344054]">Widget Icon</Label>
+            <Label className="text-sm font-medium text-foreground">Widget Icon</Label>
             <div className="flex items-center gap-3">
               <div
-                className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#EAECF0]"
+                className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border"
                 style={{ backgroundColor: config.logoUrl ? "transparent" : config.primaryColor }}
               >
                 {config.logoUrl ? (
@@ -251,7 +259,11 @@ export function WidgetAppearancePanel({
                     className="size-full object-cover"
                   />
                 ) : (
-                  <svg viewBox="0 0 24 24" className="size-6 text-white" fill="currentColor">
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="size-6 text-primary-foreground"
+                    fill="currentColor"
+                  >
                     <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z" />
                   </svg>
                 )}
@@ -268,7 +280,7 @@ export function WidgetAppearancePanel({
                 variant="outline"
                 size="sm"
                 onClick={() => fileInputRef.current?.click()}
-                className="h-9 rounded-lg border-[#EAECF0] bg-white px-4 text-sm font-medium text-[#344054] shadow-xs"
+                className="h-9 rounded-lg border-border bg-card px-4 text-sm font-medium text-foreground shadow-xs"
               >
                 Change
               </Button>
@@ -278,7 +290,7 @@ export function WidgetAppearancePanel({
                 size="sm"
                 onClick={() => onUpdate("logoUrl", "")}
                 disabled={!config.logoUrl}
-                className="h-9 rounded-lg px-4 text-sm font-medium text-[#EF4444] hover:bg-[#FEF2F2] hover:text-[#DC2626]"
+                className="h-9 rounded-lg px-4 text-sm font-medium text-destructive hover:bg-destructive/10 hover:text-destructive"
               >
                 Remove
               </Button>
@@ -299,7 +311,7 @@ export function WidgetAppearancePanel({
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <div className="space-y-1.5">
-              <Label className="text-sm font-medium text-[#344054]">Position on screen</Label>
+              <Label className="text-sm font-medium text-foreground">Position on screen</Label>
               <WidgetSegmentedControl
                 value={config.position}
                 onChange={(value) => onUpdate("position", value)}
@@ -310,7 +322,7 @@ export function WidgetAppearancePanel({
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-sm font-medium text-[#344054]">Theme</Label>
+              <Label className="text-sm font-medium text-foreground">Theme</Label>
               <WidgetSegmentedControl
                 value={config.theme}
                 onChange={(value) => onUpdate("theme", value)}
@@ -323,8 +335,8 @@ export function WidgetAppearancePanel({
           </div>
         </section>
 
-        <section className="space-y-4 border-t border-[#F2F4F7] pt-8">
-          <h3 className="text-sm font-medium text-[#101828]">Customize Colors</h3>
+        <section className="space-y-4 border-t border-border pt-8">
+          <h3 className="text-sm font-medium text-foreground">Customize Colors</h3>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <WidgetColorInput
               id="bg-color"
@@ -380,16 +392,16 @@ export function WidgetAppearancePanel({
           </div>
         </section>
 
-        <section className="space-y-4 border-t border-[#F2F4F7] pt-8">
-          <h3 className="text-sm font-medium text-[#101828]">Typography</h3>
+        <section className="space-y-4 border-t border-border pt-8">
+          <h3 className="text-sm font-medium text-foreground">Typography</h3>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-1.5">
-              <Label className="text-sm font-medium text-[#344054]">Font family</Label>
+              <Label className="text-sm font-medium text-foreground">Font family</Label>
               <Select
                 value={config.fontFamily}
                 onValueChange={(value) => value && onUpdate("fontFamily", value)}
               >
-                <SelectTrigger className="h-10 w-full rounded-lg border-[#EAECF0] bg-white px-3 shadow-xs">
+                <SelectTrigger className={FIELD_CLASS}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="rounded-lg">
@@ -402,12 +414,12 @@ export function WidgetAppearancePanel({
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-sm font-medium text-[#344054]">Font size</Label>
+              <Label className="text-sm font-medium text-foreground">Font size</Label>
               <Select
                 value={config.fontSize}
                 onValueChange={(value) => value && onUpdate("fontSize", value)}
               >
-                <SelectTrigger className="h-10 w-full rounded-lg border-[#EAECF0] bg-white px-3 shadow-xs">
+                <SelectTrigger className={FIELD_CLASS}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="rounded-lg">
@@ -422,10 +434,10 @@ export function WidgetAppearancePanel({
           </div>
         </section>
 
-        <section className="flex items-center justify-between gap-4 rounded-lg border border-[#EAECF0] bg-[#FAFAFA] px-4 py-3.5">
+        <section className="flex items-center justify-between gap-4 rounded-lg border border-border bg-muted px-4 py-3.5">
           <div>
-            <p className="text-sm font-medium text-[#101828]">Remove branding</p>
-            <p className="mt-0.5 text-sm text-[#667085]">
+            <p className="text-sm font-medium text-foreground">Remove branding</p>
+            <p className="mt-0.5 text-sm text-muted-foreground">
               Remove &apos;Powered by Acme&apos; from the widget
             </p>
           </div>
@@ -436,11 +448,11 @@ export function WidgetAppearancePanel({
           />
         </section>
 
-        <section className="space-y-1.5 border-t border-[#F2F4F7] pt-8">
-          <Label htmlFor="welcome-message" className="text-sm font-medium text-[#344054]">
+        <section className="space-y-1.5 border-t border-border pt-8">
+          <Label htmlFor="welcome-message" className="text-sm font-medium text-foreground">
             Welcome Message
           </Label>
-          <p className="text-sm text-[#667085]">The first message users will see.</p>
+          <p className="text-sm text-muted-foreground">The first message users will see.</p>
           <div className="relative">
             <Textarea
               id="welcome-message"
@@ -449,9 +461,12 @@ export function WidgetAppearancePanel({
                 onUpdate("welcomeMessage", event.target.value.slice(0, WELCOME_MESSAGE_MAX))
               }
               rows={3}
-              className="min-h-[88px] resize-none rounded-lg border-[#EAECF0] bg-white px-3 py-2.5 text-sm shadow-xs focus-visible:border-[var(--widget-accent)] focus-visible:ring-2 focus-visible:ring-[var(--widget-accent)]/20"
+              className={cn(
+                TEXTAREA_FIELD_CLASS,
+                "min-h-[88px] resize-none focus-visible:border-[var(--widget-accent)] focus-visible:ring-2 focus-visible:ring-[var(--widget-accent)]/20",
+              )}
             />
-            <span className="absolute right-3 bottom-2.5 text-xs text-[#98A2B3]">
+            <span className="absolute right-3 bottom-2.5 text-xs text-muted-foreground">
               {config.welcomeMessage.length}/{WELCOME_MESSAGE_MAX}
             </span>
           </div>
@@ -480,7 +495,7 @@ export function WidgetAgentPanel({
       />
       <div className="space-y-6">
         <div className="space-y-1.5">
-          <Label htmlFor="agent-name" className="text-sm font-medium text-[#344054]">
+          <Label htmlFor="agent-name" className="text-sm font-medium text-foreground">
             Agent name
           </Label>
           <Input
@@ -488,14 +503,14 @@ export function WidgetAgentPanel({
             value={agentName}
             onChange={(event) => onUpdate("agentName", event.target.value)}
             placeholder="Acme Assistant"
-            className="h-10 rounded-lg border-[#EAECF0] bg-white px-3 text-sm shadow-xs"
+            className={FIELD_CLASS}
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="instructions" className="text-sm font-medium text-[#344054]">
+          <Label htmlFor="instructions" className="text-sm font-medium text-foreground">
             Instructions
           </Label>
-          <p className="text-sm text-[#667085]">
+          <p className="text-sm text-muted-foreground">
             System prompt that guides how your assistant responds.
           </p>
           <Textarea
@@ -503,14 +518,14 @@ export function WidgetAgentPanel({
             value={instructions}
             onChange={(event) => onUpdate("instructions", event.target.value)}
             rows={8}
-            className="min-h-[160px] resize-y rounded-lg border-[#EAECF0] bg-white px-3 py-2.5 text-sm leading-6 shadow-xs"
+            className={cn(TEXTAREA_FIELD_CLASS, "min-h-[160px] leading-6")}
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="escalation-keywords" className="text-sm font-medium text-[#344054]">
+          <Label htmlFor="escalation-keywords" className="text-sm font-medium text-foreground">
             Escalation keywords
           </Label>
-          <p className="text-sm text-[#667085]">
+          <p className="text-sm text-muted-foreground">
             Comma-separated keywords that trigger human handoff.
           </p>
           <Input
@@ -518,7 +533,7 @@ export function WidgetAgentPanel({
             value={escalationKeywords}
             onChange={(event) => onUpdate("escalationKeywords", event.target.value)}
             placeholder="human, agent, person, representative"
-            className="h-10 rounded-lg border-[#EAECF0] bg-white px-3 text-sm shadow-xs"
+            className={FIELD_CLASS}
           />
         </div>
       </div>
@@ -573,18 +588,18 @@ export function WidgetBehaviourPanel({
       <div className="space-y-6">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="space-y-1.5">
-            <Label htmlFor="input-placeholder" className="text-sm font-medium text-[#344054]">
+            <Label htmlFor="input-placeholder" className="text-sm font-medium text-foreground">
               Input placeholder
             </Label>
             <Input
               id="input-placeholder"
               value={inputPlaceholder}
               onChange={(event) => onUpdate("inputPlaceholder", event.target.value)}
-              className="h-10 rounded-lg border-[#EAECF0] bg-white px-3 text-sm shadow-xs"
+              className={FIELD_CLASS}
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="auto-show-delay" className="text-sm font-medium text-[#344054]">
+            <Label htmlFor="auto-show-delay" className="text-sm font-medium text-foreground">
               Auto show delay (ms)
             </Label>
             <Input
@@ -594,14 +609,14 @@ export function WidgetBehaviourPanel({
               onChange={(event) =>
                 onUpdate("autoShowPreviewDelay", parseInt(event.target.value, 10) || 0)
               }
-              className="h-10 rounded-lg border-[#EAECF0] bg-white px-3 text-sm shadow-xs"
+              className={FIELD_CLASS}
             />
           </div>
         </div>
-        <div className="flex items-center justify-between gap-4 rounded-lg border border-[#EAECF0] px-4 py-4">
+        <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-4 py-4">
           <div>
-            <p className="text-sm font-medium text-[#101828]">Hide suggestions on interact</p>
-            <p className="mt-0.5 text-sm text-[#667085]">
+            <p className="text-sm font-medium text-foreground">Hide suggestions on interact</p>
+            <p className="mt-0.5 text-sm text-muted-foreground">
               Hide suggested questions after the user sends a message
             </p>
           </div>
@@ -611,10 +626,10 @@ export function WidgetBehaviourPanel({
             className="data-checked:bg-[var(--widget-accent)]"
           />
         </div>
-        <div className="flex items-center justify-between gap-4 rounded-lg border border-[#EAECF0] px-4 py-4">
+        <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-4 py-4">
           <div>
-            <p className="text-sm font-medium text-[#101828]">Enable lead capture</p>
-            <p className="mt-0.5 text-sm text-[#667085]">
+            <p className="text-sm font-medium text-foreground">Enable lead capture</p>
+            <p className="mt-0.5 text-sm text-muted-foreground">
               Prompt visitors for contact info when they show buying intent
             </p>
           </div>
@@ -627,7 +642,7 @@ export function WidgetBehaviourPanel({
         {enableLeadCapture ? (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-1.5">
-              <Label className="text-sm font-medium text-[#344054]">
+              <Label className="text-sm font-medium text-foreground">
                 Session duration (minutes)
               </Label>
               <Input
@@ -638,11 +653,11 @@ export function WidgetBehaviourPanel({
                 onChange={(event) =>
                   onUpdate("leadCaptureMinutesThreshold", parseInt(event.target.value, 10) || 1)
                 }
-                className="h-10 rounded-lg border-[#EAECF0] bg-white px-3 text-sm shadow-xs"
+                className={FIELD_CLASS}
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-sm font-medium text-[#344054]">Message count threshold</Label>
+              <Label className="text-sm font-medium text-foreground">Message count threshold</Label>
               <Input
                 type="number"
                 min={1}
@@ -651,26 +666,26 @@ export function WidgetBehaviourPanel({
                 onChange={(event) =>
                   onUpdate("leadCaptureMessageThreshold", parseInt(event.target.value, 10) || 1)
                 }
-                className="h-10 rounded-lg border-[#EAECF0] bg-white px-3 text-sm shadow-xs"
+                className={FIELD_CLASS}
               />
             </div>
             <div className="space-y-1.5 md:col-span-2">
-              <Label className="text-sm font-medium text-[#344054]">
+              <Label className="text-sm font-medium text-foreground">
                 Trigger keywords (one per line)
               </Label>
               <Textarea
                 value={leadCaptureKeywords.join("\n")}
                 onChange={(event) => onKeywordsChange(event.target.value)}
                 rows={4}
-                className="min-h-[100px] resize-y rounded-lg border-[#EAECF0] bg-white px-3 py-2.5 text-sm shadow-xs"
+                className={cn(TEXTAREA_FIELD_CLASS, "min-h-[100px]")}
               />
             </div>
           </div>
         ) : null}
-        <div className="flex items-center justify-between gap-4 rounded-lg border border-[#EAECF0] px-4 py-4">
+        <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-4 py-4">
           <div>
-            <p className="text-sm font-medium text-[#101828]">Enable brochure feature</p>
-            <p className="mt-0.5 text-sm text-[#667085]">
+            <p className="text-sm font-medium text-foreground">Enable brochure feature</p>
+            <p className="mt-0.5 text-sm text-muted-foreground">
               Let visitors request downloadable documents in chat
             </p>
           </div>
@@ -682,23 +697,23 @@ export function WidgetBehaviourPanel({
         </div>
         {enableBrochure ? (
           <div className="space-y-1.5">
-            <Label className="text-sm font-medium text-[#344054]">Brochure button text</Label>
+            <Label className="text-sm font-medium text-foreground">Brochure button text</Label>
             <Input
               value={brochureSuggestionText}
               onChange={(event) => onUpdate("brochureSuggestionText", event.target.value)}
-              className="h-10 rounded-lg border-[#EAECF0] bg-white px-3 text-sm shadow-xs"
+              className={FIELD_CLASS}
             />
           </div>
         ) : null}
         <div className="space-y-1.5">
-          <Label htmlFor="privacy-url" className="text-sm font-medium text-[#344054]">
+          <Label htmlFor="privacy-url" className="text-sm font-medium text-foreground">
             Privacy policy URL
           </Label>
           <Input
             id="privacy-url"
             value={privacyPolicyUrl}
             onChange={(event) => onUpdate("privacyPolicyUrl", event.target.value)}
-            className="h-10 rounded-lg border-[#EAECF0] bg-white px-3 text-sm shadow-xs"
+            className={FIELD_CLASS}
           />
         </div>
       </div>
@@ -725,10 +740,10 @@ export function WidgetConversationStarterPanel({
       />
       <div className="space-y-6">
         <div className="space-y-1.5">
-          <Label htmlFor="starter-welcome" className="text-sm font-medium text-[#344054]">
+          <Label htmlFor="starter-welcome" className="text-sm font-medium text-foreground">
             Welcome message
           </Label>
-          <p className="text-sm text-[#667085]">The first message users will see.</p>
+          <p className="text-sm text-muted-foreground">The first message users will see.</p>
           <div className="relative">
             <Textarea
               id="starter-welcome"
@@ -737,18 +752,18 @@ export function WidgetConversationStarterPanel({
                 onUpdateWelcome(event.target.value.slice(0, WELCOME_MESSAGE_MAX))
               }
               rows={3}
-              className="min-h-[88px] resize-none rounded-lg border-[#EAECF0] bg-white px-3 py-2.5 text-sm shadow-xs"
+              className={cn(TEXTAREA_FIELD_CLASS, "min-h-[88px] resize-none")}
             />
-            <span className="absolute right-3 bottom-2.5 text-xs text-[#98A2B3]">
+            <span className="absolute right-3 bottom-2.5 text-xs text-muted-foreground">
               {welcomeMessage.length}/{WELCOME_MESSAGE_MAX}
             </span>
           </div>
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="preview-messages" className="text-sm font-medium text-[#344054]">
+          <Label htmlFor="preview-messages" className="text-sm font-medium text-foreground">
             Preview messages
           </Label>
-          <p className="text-sm text-[#667085]">
+          <p className="text-sm text-muted-foreground">
             One message per line, shown in the launcher preview.
           </p>
           <Textarea
@@ -757,7 +772,7 @@ export function WidgetConversationStarterPanel({
             onChange={(event) => onPreviewMessagesChange(event.target.value)}
             rows={4}
             placeholder={"Hi there! 👋\nNeed help with anything?"}
-            className="min-h-[120px] resize-y rounded-lg border-[#EAECF0] bg-white px-3 py-2.5 text-sm shadow-xs"
+            className={cn(TEXTAREA_FIELD_CLASS, "min-h-[120px]")}
           />
         </div>
       </div>
@@ -779,7 +794,7 @@ export function WidgetSuggestedQuestionsPanel({
         description="Quick-reply chips shown to help visitors start a conversation."
       />
       <div className="space-y-1.5">
-        <Label htmlFor="suggestions" className="text-sm font-medium text-[#344054]">
+        <Label htmlFor="suggestions" className="text-sm font-medium text-foreground">
           Questions (one per line)
         </Label>
         <Textarea
@@ -790,7 +805,7 @@ export function WidgetSuggestedQuestionsPanel({
           placeholder={
             "How do I reset my password?\nCan I schedule a demo?\nDo you offer a free trial?"
           }
-          className="min-h-[160px] resize-y rounded-lg border-[#EAECF0] bg-white px-3 py-2.5 text-sm shadow-xs"
+          className={cn(TEXTAREA_FIELD_CLASS, "min-h-[160px]")}
         />
       </div>
     </>
@@ -825,15 +840,15 @@ export function WidgetInstallationPanel({
       <div className="space-y-8">
         <section className="space-y-4">
           <div>
-            <h3 className="text-sm font-semibold text-[#101828]">Authorized domains</h3>
-            <p className="mt-1 text-sm text-[#667085]">
+            <h3 className="text-sm font-semibold text-foreground">Authorized domains</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
               Add each website domain where the widget is embedded (e.g.{" "}
-              <code className="rounded bg-[#F2F4F7] px-1 py-0.5 text-xs">acme.com</code>).
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">acme.com</code>).
             </p>
           </div>
           <div className="flex gap-2">
             <div className="relative flex-1">
-              <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-[#98A2B3]">
+              <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground">
                 https://
               </span>
               <Input
@@ -846,14 +861,14 @@ export function WidgetInstallationPanel({
                   }
                 }}
                 placeholder="example.com"
-                className="h-10 rounded-lg border-[#EAECF0] bg-white pl-[4.5rem] pr-3 text-sm shadow-xs"
+                className={cn(FIELD_CLASS, "pl-[4.5rem]")}
               />
             </div>
             <Button
               type="button"
               onClick={onAddDomain}
               disabled={!domainInput.trim()}
-              className="h-10 rounded-lg bg-[var(--widget-accent)] px-4 text-sm font-medium text-white hover:bg-[var(--widget-accent-hover)]"
+              className="h-10 rounded-lg bg-[var(--widget-accent)] px-4 text-sm font-medium text-primary-foreground hover:bg-[var(--widget-accent-hover)]"
             >
               Add
             </Button>
@@ -862,15 +877,15 @@ export function WidgetInstallationPanel({
             {allowedDomains.map((domain) => (
               <div
                 key={domain}
-                className="flex items-center justify-between rounded-lg border border-[#EAECF0] bg-[#F9FAFB] px-3 py-2.5"
+                className="flex items-center justify-between rounded-lg border border-border bg-muted px-3 py-2.5"
               >
-                <span className="text-sm font-medium text-[#101828]">{domain}</span>
+                <span className="text-sm font-medium text-foreground">{domain}</span>
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon-sm"
                   onClick={() => onRemoveDomain(domain)}
-                  className="size-8 text-[#667085] hover:text-[#EF4444]"
+                  className="size-8 text-muted-foreground hover:text-destructive"
                   aria-label={`Remove ${domain}`}
                 >
                   <Trash2 className="size-4" />
@@ -878,22 +893,22 @@ export function WidgetInstallationPanel({
               </div>
             ))}
             {allowedDomains.length === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-[#EAECF0] py-8">
-                <p className="text-sm text-[#667085]">No domains authorized yet</p>
+              <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border py-8">
+                <p className="text-sm text-muted-foreground">No domains authorized yet</p>
               </div>
             ) : null}
           </div>
         </section>
         <section className="space-y-4">
           <div>
-            <Label className="text-sm font-semibold text-[#101828]">Embed code</Label>
-            <p className="mt-1 text-sm text-[#667085]">
+            <Label className="text-sm font-semibold text-foreground">Embed code</Label>
+            <p className="mt-1 text-sm text-muted-foreground">
               Paste this before the closing{" "}
-              <code className="rounded bg-[#F2F4F7] px-1 py-0.5 text-xs">&lt;/body&gt;</code> tag.
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">&lt;/body&gt;</code> tag.
             </p>
           </div>
           <div className="relative">
-            <pre className="max-h-48 overflow-x-auto rounded-lg border border-[#EAECF0] bg-[#F9FAFB] p-4 font-mono text-xs leading-5 text-[#344054]">
+            <pre className="max-h-48 overflow-x-auto rounded-lg border border-border bg-muted p-4 font-mono text-xs leading-5 text-foreground">
               {embedScript}
             </pre>
             <Button
@@ -901,10 +916,10 @@ export function WidgetInstallationPanel({
               size="icon-sm"
               variant="outline"
               onClick={onCopyScript}
-              className="absolute top-2 right-2 size-8 rounded-lg border-[#EAECF0] bg-white"
+              className="absolute top-2 right-2 size-8 rounded-lg border-border bg-card"
               aria-label="Copy embed code"
             >
-              {copied ? <Check className="size-4 text-[#22C55E]" /> : <Copy className="size-4" />}
+              {copied ? <Check className="size-4 text-primary" /> : <Copy className="size-4" />}
             </Button>
           </div>
         </section>

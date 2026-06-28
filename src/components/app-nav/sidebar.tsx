@@ -36,7 +36,7 @@ export function Sidebar({ initialOpen = true }: { initialOpen?: boolean }) {
       <button
         type="button"
         aria-label="Close navigation"
-        className="fixed inset-0 z-30 bg-black/80 lg:hidden"
+        className="fixed inset-0 z-30 bg-foreground/80 lg:hidden"
         onClick={() => toggleOpen(false)}
         style={{
           opacity: openState ? 1 : 0,
