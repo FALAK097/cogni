@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useLayoutEffect } from "react";
 import { usePathname } from "next/navigation";
 
 import { AppTopbar } from "@/components/app-nav/app-topbar";
@@ -10,6 +11,7 @@ import { cn } from "@/lib/utils";
 
 type AdminPanelLayoutProps = {
   children: ReactNode;
+  initialSidebarOpen?: boolean;
   userData?: {
     avatar?: string;
     name?: string;
@@ -17,18 +19,30 @@ type AdminPanelLayoutProps = {
   };
 };
 
-export default function AdminPanelLayout({ children, userData }: AdminPanelLayoutProps) {
+export default function AdminPanelLayout({
+  children,
+  userData,
+  initialSidebarOpen = true,
+}: AdminPanelLayoutProps) {
   const pathname = usePathname();
   const hideTopbar = pathname === "/widget";
   const isOpen = useSidebar((state) => state.isOpen);
   const isHover = useSidebar((state) => state.isHover);
   const settings = useSidebar((state) => state.settings);
+  const hasHydrated = useSidebar((state) => state._hasHydrated);
+  const setHasHydrated = useSidebar((state) => state.setHasHydrated);
 
-  const openState = isOpen || (settings.isHoverOpen && isHover);
+  useLayoutEffect(() => {
+    useSidebar.setState({ isOpen: initialSidebarOpen });
+    setHasHydrated(true);
+  }, [initialSidebarOpen, setHasHydrated]);
+
+  const openState =
+    (hasHydrated ? isOpen : initialSidebarOpen) || (settings.isHoverOpen && isHover);
 
   return (
     <>
-      <Sidebar />
+      <Sidebar initialOpen={initialSidebarOpen} />
       <main
         className={cn(
           "bg-zinc-50 transition-[margin-left] ease-in-out duration-300 dark:bg-zinc-900",

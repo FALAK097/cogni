@@ -9,14 +9,15 @@ import { useSidebar } from "@/hooks/use-sidebar";
 import { SITE_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
-export function Sidebar() {
+export function Sidebar({ initialOpen = true }: { initialOpen?: boolean }) {
   const isOpen = useSidebar((state) => state.isOpen);
   const isHover = useSidebar((state) => state.isHover);
   const toggleOpen = useSidebar((state) => state.toggleOpen);
   const setIsHover = useSidebar((state) => state.setIsHover);
   const settings = useSidebar((state) => state.settings);
+  const hasHydrated = useSidebar((state) => state._hasHydrated);
 
-  const openState = isOpen || (settings.isHoverOpen && isHover);
+  const openState = (hasHydrated ? isOpen : initialOpen) || (settings.isHoverOpen && isHover);
 
   useEffect(() => {
     const handleResize = () => {
