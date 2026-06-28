@@ -2,16 +2,6 @@
 
 import { formatDistanceToNow } from "date-fns";
 import { useRef, useState } from "react";
-import {
-  type ColumnDef,
-  type SortingState,
-  functionalUpdate,
-  getCoreRowModel,
-  getSortedRowModel,
-  flexRender,
-  type RowData,
-  useReactTable,
-} from "@tanstack/react-table";
 import { parseAsStringLiteral, useQueryState } from "nuqs";
 
 import {
@@ -66,7 +56,6 @@ import {
   useKnowledgeBaseSources,
   useUploadRagDocument,
 } from "@/hooks/query";
-import { cn } from "@/lib/utils";
 
 import { KnowledgeBaseSkeleton } from "./knowledge-base-skeleton";
 
@@ -83,6 +72,7 @@ type KnowledgeBaseSourceRow = {
 };
 
 type SourceSortKey = "displayName" | "sourceType" | "status" | "chunkCount" | "updatedAt";
+type SortDirection = "asc" | "desc";
 
 const sortValues = [
   "displayName.asc",
@@ -98,13 +88,6 @@ const sortValues = [
 ] as const;
 
 const sortParser = parseAsStringLiteral(sortValues);
-
-declare module "@tanstack/react-table" {
-  // Keep column meta typed locally.
-  interface ColumnMeta<TData extends RowData, TValue> {
-    align?: "left" | "center" | "right";
-  }
-}
 
 function getSourceTypeMeta(sourceType: string) {
   switch (sourceType.toLowerCase()) {
@@ -189,12 +172,23 @@ function formatUpdatedAt(value: string) {
   }
 }
 
-function sortNextValue(columnId: SourceSortKey, current: string) {
-  const [activeColumn, direction] = current.split(".") as [SourceSortKey, "asc" | "desc"];
-  if (activeColumn !== columnId) {
-    return `${columnId}.asc` as const;
-  }
-  return direction === "asc" ? (`${columnId}.desc` as const) : (`${columnId}.asc` as const);
+function sortSources(
+  sources: KnowledgeBaseSourceRow[],
+  columnId: SourceSortKey,
+  direction: SortDirection,
+): KnowledgeBaseSourceRow[] {
+  const sorted = [...sources];
+  sorted.sort((a, b) => {
+    const av = a[columnId];
+    const bv = b[columnId];
+    if (typeof av === "number" && typeof bv === "number") {
+      return direction === "asc" ? av - bv : bv - av;
+    }
+    const as = String(av ?? "");
+    const bs = String(bv ?? "");
+    return direction === "asc" ? as.localeCompare(bs) : bs.localeCompare(as);
+  });
+  return sorted;
 }
 
 export function WidgetKnowledgeManager() {
@@ -217,162 +211,47 @@ export function WidgetKnowledgeManager() {
   const [pendingUpload, setPendingUpload] = useState(false);
   const [pendingManual, setPendingManual] = useState(false);
   const [pendingSitemap, setPendingSitemap] = useState(false);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+
+  const sources = (sourcesQuery.data?.sources as KnowledgeBaseSourceRow[] | undefined) ?? [];
+
+  const [sortColumn, sortDirection] = sortBy.split(".") as [SourceSortKey, SortDirection];
+  const sortedSources = sortSources(sources, sortColumn, sortDirection);
+
+  function toggleSort(columnId: SourceSortKey) {
+    const nextDirection: SortDirection =
+      sortColumn === columnId && sortDirection === "asc" ? "desc" : "asc";
+    void setSortBy(`${columnId}.${nextDirection}` as (typeof sortValues)[number]);
+  }
 
   function openAddDialog(opener: () => void) {
     setAddMenuOpen(false);
     queueMicrotask(opener);
   }
-  const [addMenuOpen, setAddMenuOpen] = useState(false);
 
-  const sources = (sourcesQuery.data?.sources as KnowledgeBaseSourceRow[] | undefined) ?? [];
-
-  const sorting: SortingState = (() => {
-    const [columnId, direction] = sortBy.split(".") as [SourceSortKey, "asc" | "desc"];
-    return [{ id: columnId, desc: direction === "desc" }];
-  })();
-
-  const tableColumns: ColumnDef<KnowledgeBaseSourceRow>[] = [
-    {
-      accessorKey: "displayName",
-      header: "Source",
-      cell: ({ row }) => {
-        const Icon = getSourceTypeIcon(row.original.sourceType);
-        const sourceType = row.original.sourceType.toLowerCase();
-        const fileName = getDocumentFileName(row.original.metadata?.storageKey);
-        const primaryLabel =
-          (sourceType === "file" || sourceType === "txt") && fileName
-            ? fileName
-            : row.original.displayName;
-        const secondaryLabel =
-          (sourceType === "file" || sourceType === "txt") &&
-          fileName &&
-          row.original.displayName !== fileName
-            ? row.original.displayName
-            : sourceType === "website" || sourceType === "sitemap"
-              ? (row.original.canonicalUrl ?? row.original.displayName)
-              : null;
-        return (
-          <div className="flex min-w-0 items-center gap-3.5">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 text-muted-foreground">
-              <Icon className="h-4 w-4" />
-            </div>
-            <div className="min-w-0 space-y-0.5">
-              <p className="truncate text-sm font-medium text-foreground">{primaryLabel}</p>
-              {secondaryLabel ? (
-                <p className="truncate text-[12px] text-muted-foreground">{secondaryLabel}</p>
-              ) : null}
-            </div>
-          </div>
-        );
-      },
-    },
-    {
-      accessorKey: "sourceType",
-      header: "Type",
-      cell: ({ row }) => {
-        const meta = getSourceTypeMeta(row.original.sourceType);
-        return (
-          <Badge
-            variant="secondary"
-            className={cn("h-7 rounded-full border px-3 text-[12px] font-medium", meta.className)}
-          >
-            {meta.label}
-          </Badge>
-        );
-      },
-    },
-    {
-      accessorKey: "status",
-      header: "Status",
-      cell: ({ row }) => {
-        const meta = getStatusMeta(row.original.status);
-        return (
-          <Badge
-            variant="secondary"
-            className={cn("h-7 rounded-full border px-3 text-[12px] font-medium", meta.className)}
-          >
-            <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-current" />
-            {meta.label}
-          </Badge>
-        );
-      },
-    },
-    {
-      accessorKey: "chunkCount",
-      header: "Indexed Pages",
-      cell: ({ getValue }) => (
-        <span className="text-sm text-foreground/80">
-          {getValue<number>() > 0 ? getValue<number>() : "—"}
-        </span>
-      ),
-    },
-    {
-      accessorKey: "updatedAt",
-      header: "Last Updated",
-      cell: ({ getValue }) => (
-        <span className="text-sm text-foreground/75">{formatUpdatedAt(getValue<string>())}</span>
-      ),
-    },
-    {
-      id: "actions",
-      header: "Actions",
-      cell: ({ row }) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="cursor-pointer text-muted-foreground hover:text-foreground"
-              >
-                <Ellipsis className="h-4 w-4" />
-              </Button>
-            }
-          />
-          <DropdownMenuContent align="end" sideOffset={8} className="w-44">
-            <DropdownMenuItem
-              className="cursor-pointer gap-2 text-destructive"
-              variant="destructive"
-              onClick={() => {
-                void deleteMutation.mutateAsync(row.original.id);
-              }}
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
-    },
-  ];
-
-  const table = useReactTable({
-    data: sources,
-    columns: tableColumns,
-    state: { sorting },
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    onSortingChange: (updater) => {
-      const nextSorting = functionalUpdate(updater, sorting);
-      const first = nextSorting[0];
-      const nextSortValue = first
-        ? (`${first.id as SourceSortKey}.${first.desc ? "desc" : "asc"}` as
-            | (typeof sortValues)[number]
-            | "updatedAt.desc")
-        : "updatedAt.desc";
-      void setSortBy(nextSortValue);
-    },
-  });
-
-  function getSortIndicator(columnId: SourceSortKey, current: string) {
-    const [activeColumn, direction] = current.split(".") as [SourceSortKey, "asc" | "desc"];
-    if (activeColumn !== columnId) {
+  function getSortIndicator(columnId: SourceSortKey) {
+    if (sortColumn !== columnId) {
       return <ArrowUpDown className="h-3.5 w-3.5 opacity-50" />;
     }
-    return direction === "asc" ? (
+    return sortDirection === "asc" ? (
       <ChevronUp className="h-3.5 w-3.5" />
     ) : (
       <ChevronDown className="h-3.5 w-3.5" />
+    );
+  }
+
+  function SortableHeader({ columnId, label }: { columnId: SourceSortKey; label: string }) {
+    return (
+      <TableHead className="h-auto px-5 py-4 text-[12px] font-medium text-foreground/60">
+        <button
+          type="button"
+          className="inline-flex cursor-pointer items-center gap-1.5 text-left transition-colors hover:text-foreground"
+          onClick={() => toggleSort(columnId)}
+        >
+          <span>{label}</span>
+          {getSortIndicator(columnId)}
+        </button>
+      </TableHead>
     );
   }
 
@@ -492,63 +371,112 @@ export function WidgetKnowledgeManager() {
             </colgroup>
             <TableHeader className="border-b border-border/60">
               <TableRow className="border-border/60 hover:bg-transparent">
-                {table.getAllLeafColumns().map((column) => {
-                  const header = column.columnDef.header;
-                  const headerLabel =
-                    typeof header === "string"
-                      ? header
-                      : column.id === "actions"
-                        ? "Actions"
-                        : column.id;
-                  const isSortable = column.id !== "actions";
-
-                  return (
-                    <TableHead
-                      key={column.id}
-                      className="h-auto px-5 py-4 text-[12px] font-medium text-foreground/60"
-                    >
-                      {isSortable ? (
-                        <button
-                          type="button"
-                          className="inline-flex cursor-pointer items-center gap-1.5 text-left transition-colors hover:text-foreground"
-                          onClick={() => {
-                            if (column.id === "actions") return;
-                            void setSortBy(sortNextValue(column.id as SourceSortKey, sortBy));
-                          }}
-                        >
-                          <span>{headerLabel}</span>
-                          {getSortIndicator(column.id as SourceSortKey, sortBy)}
-                        </button>
-                      ) : (
-                        <span>{headerLabel}</span>
-                      )}
-                    </TableHead>
-                  );
-                })}
+                <SortableHeader columnId="displayName" label="Source" />
+                <SortableHeader columnId="sourceType" label="Type" />
+                <SortableHeader columnId="status" label="Status" />
+                <SortableHeader columnId="chunkCount" label="Indexed Pages" />
+                <SortableHeader columnId="updatedAt" label="Last Updated" />
+                <TableHead className="h-auto px-5 py-4 text-[12px] font-medium text-foreground/60">
+                  Actions
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody className="text-[13px]">
-              {table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} className="border-border/60 hover:bg-muted/30">
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell
-                      key={cell.id}
-                      className={cn(
-                        "whitespace-normal px-5 py-4 align-middle",
-                        cell.column.id === "actions" && "text-right",
-                      )}
-                    >
-                      <div
-                        className={cn(
-                          cell.column.id === "actions" && "ml-auto flex w-full justify-end",
-                        )}
-                      >
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+              {sortedSources.map((source) => {
+                const Icon = getSourceTypeIcon(source.sourceType);
+                const sourceType = source.sourceType.toLowerCase();
+                const fileName = getDocumentFileName(source.metadata?.storageKey);
+                const primaryLabel =
+                  (sourceType === "file" || sourceType === "txt") && fileName
+                    ? fileName
+                    : source.displayName;
+                const secondaryLabel =
+                  (sourceType === "file" || sourceType === "txt") &&
+                  fileName &&
+                  source.displayName !== fileName
+                    ? source.displayName
+                    : sourceType === "website" || sourceType === "sitemap"
+                      ? (source.canonicalUrl ?? source.displayName)
+                      : null;
+                const typeMeta = getSourceTypeMeta(source.sourceType);
+                const statusMeta = getStatusMeta(source.status);
+
+                return (
+                  <TableRow key={source.id} className="border-border/60 hover:bg-muted/30">
+                    <TableCell className="whitespace-normal px-5 py-4 align-middle">
+                      <div className="flex min-w-0 items-center gap-3.5">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 text-muted-foreground">
+                          <Icon className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0 space-y-0.5">
+                          <p className="truncate text-sm font-medium text-foreground">
+                            {primaryLabel}
+                          </p>
+                          {secondaryLabel ? (
+                            <p className="truncate text-[12px] text-muted-foreground">
+                              {secondaryLabel}
+                            </p>
+                          ) : null}
+                        </div>
                       </div>
                     </TableCell>
-                  ))}
-                </TableRow>
-              ))}
+                    <TableCell className="whitespace-normal px-5 py-4 align-middle">
+                      <Badge
+                        variant="secondary"
+                        className={`h-7 rounded-full border px-3 text-[12px] font-medium ${typeMeta.className}`}
+                      >
+                        {typeMeta.label}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="whitespace-normal px-5 py-4 align-middle">
+                      <Badge
+                        variant="secondary"
+                        className={`h-7 rounded-full border px-3 text-[12px] font-medium ${statusMeta.className}`}
+                      >
+                        <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-current" />
+                        {statusMeta.label}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="whitespace-normal px-5 py-4 align-middle">
+                      <span className="text-sm text-foreground/80">
+                        {source.chunkCount > 0 ? source.chunkCount : "—"}
+                      </span>
+                    </TableCell>
+                    <TableCell className="whitespace-normal px-5 py-4 align-middle">
+                      <span className="text-sm text-foreground/75">
+                        {formatUpdatedAt(source.updatedAt)}
+                      </span>
+                    </TableCell>
+                    <TableCell className="whitespace-normal px-5 py-4 text-right align-middle">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          render={
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              className="cursor-pointer text-muted-foreground hover:text-foreground"
+                            >
+                              <Ellipsis className="h-4 w-4" />
+                            </Button>
+                          }
+                        />
+                        <DropdownMenuContent align="end" sideOffset={8} className="w-44">
+                          <DropdownMenuItem
+                            className="cursor-pointer gap-2 text-destructive"
+                            variant="destructive"
+                            onClick={() => {
+                              void deleteMutation.mutateAsync(source.id);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         )}
