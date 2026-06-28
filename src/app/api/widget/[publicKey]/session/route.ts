@@ -140,6 +140,16 @@ export async function POST(
     leadCaptureKeywords: parseJsonArray(widget.leadCaptureKeywords),
     enableBrochure: widget.enableBrochure,
     brochureSuggestionText: widget.brochureSuggestionText,
+    visitor: visitorSession
+      ? {
+          name: visitorSession.name,
+          email: visitorSession.email,
+          phone: visitorSession.phone,
+          leadCapturedAt: visitorSession.leadCapturedAt
+            ? new Date(visitorSession.leadCapturedAt).toISOString()
+            : null,
+        }
+      : null,
     messages: toWidgetHistoryMessages(messages),
   });
 
