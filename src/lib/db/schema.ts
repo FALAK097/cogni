@@ -85,7 +85,7 @@ export const workspace = sqliteTable(
     name: text().notNull(),
     slug: text().notNull(),
     logo: text(),
-    brandColor: text().default("#14805e").notNull(),
+    brandColor: text().default("#2563EB").notNull(),
     timezone: text().default("UTC").notNull(),
     createdAt: numeric()
       .default(sql`(CURRENT_TIMESTAMP)`)
@@ -216,7 +216,7 @@ export const widget = sqliteTable(
     displayName: text().default("Support").notNull(),
     welcomeMessage: text().default("Hi! How can we help?").notNull(),
     inputPlaceholder: text().default("Ask a question…").notNull(),
-    primaryColor: text().default("#14805e").notNull(),
+    primaryColor: text().default("#2563EB").notNull(),
     backgroundColor: text().default("#ffffff").notNull(),
     textColor: text().default("#171717").notNull(),
     position: text().default("bottom-right").notNull(),
@@ -236,11 +236,11 @@ export const widget = sqliteTable(
     modelName: text().default("gpt-5-mini").notNull(),
     isEnabled: integer({ mode: "boolean" }).default(true).notNull(),
     theme: text().default("light").notNull(),
-    userBubbleColor: text().default("#14805e").notNull(),
+    userBubbleColor: text().default("#2563EB").notNull(),
     userBubbleTextColor: text().default("#ffffff").notNull(),
     botBubbleColor: text().default("#f2f2f8").notNull(),
     botBubbleTextColor: text().default("#171717").notNull(),
-    headerGradientFrom: text().default("#14805e").notNull(),
+    headerGradientFrom: text().default("#2563EB").notNull(),
     headerGradientTo: text().default("#0f6b4e").notNull(),
     shadowSize: text().default("md").notNull(),
     suggestions: text()
