@@ -26,7 +26,6 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useKnowledgeBases } from "@/hooks/query";
 import { useSidebar } from "@/hooks/use-sidebar";
-import { getDashboardHref } from "@/lib/deployment-urls";
 import { cn } from "@/lib/utils";
 
 type AppTopbarProps = {
@@ -45,7 +44,6 @@ const LABELS: Record<string, string> = {
   dashboard: "Dashboard",
   widget: "Widget",
   integrations: "Integrations",
-  leads: "Leads",
   settings: "Settings",
   usage: "Usage",
   whatsapp: "WhatsApp",
@@ -120,7 +118,7 @@ function Breadcrumbs() {
     };
   });
 
-  const crumbs: Crumb[] = [{ href: getDashboardHref(), label: "Home" }, ...routeCrumbs];
+  const crumbs: Crumb[] = [{ href: "/dashboard", label: "Home" }, ...routeCrumbs];
   const isCompact = crumbs.length > 2;
   const { visible, hidden } = getVisibleCrumbs(crumbs);
 
@@ -128,7 +126,7 @@ function Breadcrumbs() {
     <Breadcrumb className="min-w-0">
       <BreadcrumbList className="flex-nowrap gap-1 text-sm sm:text-base">
         {visible.map((crumb, index) => {
-          const isHome = crumb.href === getDashboardHref();
+          const isHome = crumb.href === "/dashboard";
           return (
             <div
               className={cn(
@@ -192,7 +190,7 @@ function Breadcrumbs() {
                   <BreadcrumbLink
                     render={<Link href={crumb.href} className="flex min-w-0 items-center gap-2" />}
                   >
-                    {crumb.href === getDashboardHref() && <Home className="size-4 shrink-0" />}
+                    {crumb.href === "/dashboard" && <Home className="size-4 shrink-0" />}
                     <span className="truncate">{crumb.label}</span>
                   </BreadcrumbLink>
                 )}

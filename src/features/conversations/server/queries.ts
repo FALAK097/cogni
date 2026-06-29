@@ -61,7 +61,6 @@ export type ParsedConversation = Omit<
         include: { user: true };
       };
       visitorSession: true;
-      widget: true;
     };
   }>,
   "messages"

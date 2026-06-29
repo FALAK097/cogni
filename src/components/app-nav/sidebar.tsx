@@ -7,10 +7,9 @@ import { WorkspaceSwitcher } from "@/components/app-nav/workspace-switcher";
 import { ThemeLogo } from "@/components/theme-logo";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { SITE_NAME } from "@/lib/constants";
-import { getDashboardHref } from "@/lib/deployment-urls";
 import { cn } from "@/lib/utils";
 
-export function Sidebar() {
+export function Sidebar({ initialOpen = true }: { initialOpen?: boolean }) {
   const isOpen = useSidebar((state) => state.isOpen);
   const isHover = useSidebar((state) => state.isHover);
   const hasHydrated = useSidebar((state) => state.hasHydrated);
@@ -18,8 +17,7 @@ export function Sidebar() {
   const setIsHover = useSidebar((state) => state.setIsHover);
   const settings = useSidebar((state) => state.settings);
 
-  const openState = isOpen || (settings.isHoverOpen && isHover);
-  const canAnimate = hasHydrated;
+  const openState = (hasHydrated ? isOpen : initialOpen) || (settings.isHoverOpen && isHover);
 
   useEffect(() => {
     const handleResize = () => {
@@ -38,7 +36,7 @@ export function Sidebar() {
       <button
         type="button"
         aria-label="Close navigation"
-        className="fixed inset-0 z-30 bg-black/80 lg:hidden"
+        className="fixed inset-0 z-30 bg-foreground/80 lg:hidden"
         onClick={() => toggleOpen(false)}
         style={{
           opacity: openState ? 1 : 0,
@@ -62,7 +60,7 @@ export function Sidebar() {
           <div className="flex-none px-4 pt-4 pb-2">
             <div className="flex items-center justify-between">
               <Link
-                href={getDashboardHref()}
+                href="/dashboard"
                 className={cn(
                   "flex items-center gap-2.5",
                   openState ? "px-2.5" : "w-full justify-center",

@@ -2,11 +2,11 @@
 
 # dependencies
 /node_modules
-/src/generated/prisma
-/prisma/dev.db
-/prisma/dev.db-journal
+/.pnpm-store/
 /.uploads
 /.tmp
+dev.db
+dev.db-*
 /.pnp
 .pnp.*
 .yarn/*
@@ -21,6 +21,11 @@
 # next.js
 /.next/
 /out/
+/.open-next/
+/.wrangler/
+cloudflare-env.d.ts
+.dev.vars
+.dev.vars.*
 
 # production
 /build

@@ -1,4 +1,3 @@
-import { getDocsHref } from "@/lib/deployment-urls";
 import type { IntegrationCategory, IntegrationManifest } from "./types";
 
 export const INTEGRATION_MANIFESTS: IntegrationManifest[] = [
@@ -17,9 +16,7 @@ export const INTEGRATION_MANIFESTS: IntegrationManifest[] = [
     content: {
       whatItDoes: ["Send email from approved agent actions."],
       useCases: ["Draft and send follow-up emails."],
-      setupGuideUrl: getDocsHref("/integrations/gmail"),
     },
-    docsUrl: getDocsHref("/integrations/gmail"),
   },
   {
     id: "google_calendar",
@@ -36,9 +33,7 @@ export const INTEGRATION_MANIFESTS: IntegrationManifest[] = [
     content: {
       whatItDoes: ["Create and update calendar events."],
       useCases: ["Schedule meetings from conversations."],
-      setupGuideUrl: getDocsHref("/integrations/google-calendar"),
     },
-    docsUrl: getDocsHref("/integrations/google-calendar"),
   },
   {
     id: "slack",
@@ -55,9 +50,7 @@ export const INTEGRATION_MANIFESTS: IntegrationManifest[] = [
     content: {
       whatItDoes: ["Notify your team in Slack."],
       useCases: ["Escalation and assignment alerts."],
-      setupGuideUrl: getDocsHref("/integrations/slack"),
     },
-    docsUrl: getDocsHref("/integrations/slack"),
   },
 ];
 

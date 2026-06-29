@@ -1,9 +1,10 @@
-import "server-only";
-
+import { randomUUID } from "node:crypto";
+import type { Db } from "@/lib/db/client";
+import { eq } from "drizzle-orm";
+import { documentChunk as documentChunkTable } from "@/lib/db/schema";
 import { readObject } from "@/lib/storage/index";
 import { chunkText, stripHtml } from "@/features/knowledge/server/chunk";
-import { embedText } from "@/lib/ai/embeddings";
-import { upsertVectorizeVectors } from "@/lib/cloudflare/vectorize";
+import { uploadCloudflareSearchDocument } from "@/lib/search/cloudflare-search";
 
 export async function extractDocumentText({
   sourceType,
@@ -54,7 +55,7 @@ export async function extractDocumentText({
 }
 
 export async function indexDocumentContent(
-  db: import("@/generated/prisma/client").PrismaClient,
+  db: Db,
   documentId: string,
   text: string,
   workspaceId: string,
@@ -64,42 +65,25 @@ export async function indexDocumentContent(
     throw new Error("No extractable text found.");
   }
 
-  const document = await db.document.findUnique({
-    where: { id: documentId },
-    select: { title: true },
+  const document = await db.query.document.findFirst({
+    where: (fields, { eq }) => eq(fields.id, documentId),
+    columns: { title: true },
   });
 
-  await db.documentChunk.deleteMany({ where: { documentId } });
-  await db.documentChunk.createMany({
-    data: chunks.map((content, position) => ({
-      documentId,
-      content,
-      position,
-    })),
+  await db.delete(documentChunkTable).where(eq(documentChunkTable.documentId, documentId));
+
+  const chunkValues = chunks.map((content, position) => ({
+    id: randomUUID(),
+    documentId,
+    content,
+    position,
+  }));
+  await db.insert(documentChunkTable).values(chunkValues);
+
+  await uploadCloudflareSearchDocument({
+    documentId,
+    workspaceId,
+    title: document?.title ?? "Document",
+    text,
   });
-
-  const created = await db.documentChunk.findMany({
-    where: { documentId },
-    orderBy: { position: "asc" },
-  });
-
-  const vectors = [];
-  for (const chunk of created) {
-    const embedding = await embedText(chunk.content);
-    if (!embedding) continue;
-
-    vectors.push({
-      id: chunk.id,
-      values: embedding,
-      metadata: {
-        workspaceId,
-        documentId,
-        title: document?.title ?? "Document",
-      },
-    });
-  }
-
-  if (vectors.length > 0) {
-    await upsertVectorizeVectors(vectors);
-  }
 }

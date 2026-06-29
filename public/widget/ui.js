@@ -10,10 +10,9 @@ import {
   callWidgetChatAPI,
   fetchSessionHistory,
   fetchRecentSessions,
-  fetchSessionForResume,
   uploadFile,
 } from "./api.js";
-import { ICONS, WIDGET_LOGO } from "./constants.js";
+import { ICONS } from "./constants.js";
 import { DEFAULT_CONFIG } from "./constants.js";
 import {
   checkBrochureKeywords,
@@ -36,6 +35,7 @@ import { injectStyles } from "./styles.js";
 import {
   escapeHtml,
   formatTimestamp,
+  formatRelativeTime,
   scrollToBottom,
   formatBotMessage,
   getCurrentTime,
@@ -45,6 +45,20 @@ import {
 /**
  * Create the widget DOM structure
  */
+function renderAvatarMarkup(logoUrl) {
+  if (logoUrl) {
+    return `<img src="${escapeHtml(logoUrl)}" alt="Logo" />`;
+  }
+  return `<span class="oc-avatar-icon">${ICONS.chat}</span>`;
+}
+
+function renderBotAvatarMarkup(logoUrl) {
+  if (logoUrl) {
+    return `<img src="${escapeHtml(logoUrl)}" alt="Logo" />`;
+  }
+  return `<span class="oc-bot-avatar-icon">${ICONS.sparkle}</span>`;
+}
+
 export function createWidget() {
   const config = state.config;
 
@@ -58,7 +72,7 @@ export function createWidget() {
 		<div class="oc-header">
 			<div class="oc-header-left">
 				<div class="oc-avatar">
-					<img src="${config.logoUrl || WIDGET_LOGO || ""}" alt="Logo" />
+					${renderAvatarMarkup(config.logoUrl)}
 					<div class="oc-status-dot"></div>
 				</div>
 				<div class="oc-agent-info">
@@ -77,6 +91,14 @@ export function createWidget() {
 				<button class="oc-menu-item" data-action="recent_chats">
 					${ICONS.historyCircle}
 					<span>Recent chats</span>
+				</button>
+				<button class="oc-menu-item" data-action="recent_chats">
+					${ICONS.history}
+					<span>Recent chats</span>
+				</button>
+				<button class="oc-menu-item" data-action="view_tickets">
+					${ICONS.ticket}
+					<span>View tickets</span>
 				</button>
 				<button class="oc-menu-item" data-action="end_chat">
 					${ICONS.x}
@@ -196,10 +218,13 @@ export function attachEvents() {
 function handleMenuAction(action) {
   switch (action) {
     case "new_chat":
-      void resetChat();
+      resetChat();
       break;
     case "recent_chats":
-      void loadRecentChats();
+      void showRecentChats();
+      break;
+    case "view_tickets":
+      showTickets();
       break;
     case "end_chat":
       endChat();
@@ -208,137 +233,227 @@ function handleMenuAction(action) {
 }
 
 function endChat() {
-  hidePanelView();
+  exitPanelView();
   stopMessagePolling();
   if (state.isOpen) {
     toggleChat();
   }
 }
 
-function showPanelView(panelName) {
-  state.activePanel = panelName;
+function truncatePreview(text, maxLength = 80) {
+  if (!text || text.length <= maxLength) return text || "No messages yet";
+  return `${text.slice(0, maxLength).trim()}…`;
+}
+
+function enterPanelView(panel) {
+  state.activePanel = panel;
   state.windowEl.classList.add("is-panel-view");
   state.windowEl.querySelector(".oc-header")?.classList.add("is-hidden");
   state.windowEl.querySelector(".oc-footer")?.classList.add("is-hidden");
 }
 
-function hidePanelView() {
+function exitPanelView() {
   state.activePanel = null;
   state.windowEl.classList.remove("is-panel-view");
   state.windowEl.querySelector(".oc-header")?.classList.remove("is-hidden");
   state.windowEl.querySelector(".oc-footer")?.classList.remove("is-hidden");
 }
 
-function truncatePreview(text, max = 80) {
-  if (!text || text.length <= max) return text || "No messages yet";
-  return `${text.slice(0, max).trim()}…`;
-}
-
-function formatRelativeTime(isoString) {
-  if (!isoString) return "";
-  const date = new Date(isoString);
-  const diffMs = Date.now() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60_000);
-  if (diffMins < 1) return "Just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  return date.toLocaleDateString();
-}
-
-function renderPanel({ title, titleIcon, bodyHtml, footerHtml = "" }) {
+function renderPanelShell({ title, titleIcon, bodyHtml, footerHtml = "" }) {
   return `
-    <div class="oc-panel-view">
-      <div class="oc-panel-header">
-        <button type="button" class="oc-panel-back" aria-label="Back">${ICONS.chevronLeft}</button>
-        <div class="oc-panel-title">
-          <span class="oc-panel-title-icon">${titleIcon}</span>
-          <span>${escapeHtml(title)}</span>
-        </div>
-        <button type="button" class="oc-panel-close" aria-label="Close">${ICONS.x}</button>
-      </div>
-      <div class="oc-panel-body">${bodyHtml}</div>
-      ${footerHtml ? `<div class="oc-panel-footer">${footerHtml}</div>` : ""}
-    </div>
-  `;
+		<div class="oc-panel-view">
+			<div class="oc-panel-header">
+				<button type="button" class="oc-panel-back" aria-label="Back">${ICONS.chevronLeft}</button>
+				<div class="oc-panel-title">
+					<span class="oc-panel-title-icon">${titleIcon}</span>
+					<span>${escapeHtml(title)}</span>
+				</div>
+				<button type="button" class="oc-panel-close" aria-label="Close">${ICONS.x}</button>
+			</div>
+			<div class="oc-panel-body">${bodyHtml}</div>
+			${footerHtml ? `<div class="oc-panel-footer">${footerHtml}</div>` : ""}
+		</div>
+	`;
 }
 
-function attachPanelHandlers(container, { onBack, onAttach }) {
-  container.querySelector(".oc-panel-back")?.addEventListener("click", () => onBack?.());
-  container.querySelector(".oc-panel-close")?.addEventListener("click", () => onBack?.());
-  onAttach?.(container);
+function attachPanelHandlers(container, handlers = {}) {
+  container.querySelector(".oc-panel-back")?.addEventListener("click", () => {
+    void handlers.onBack?.();
+  });
+  container.querySelector(".oc-panel-close")?.addEventListener("click", () => {
+    void handlers.onBack?.();
+  });
+  handlers.onAttach?.(container);
 }
 
-function renderRecentChatsPanel(bodyHtml, showStartNew = false) {
-  const footerHtml = showStartNew
+function renderRecentChatsEmptyState() {
+  return `
+		<div class="oc-panel-empty">
+			<div class="oc-panel-empty-icon">${ICONS.emptyChats}</div>
+			<div class="oc-panel-empty-title">No chats</div>
+			<div class="oc-panel-empty-subtitle">Chats with AI and team will be shown here</div>
+		</div>
+	`;
+}
+
+function renderTicketsEmptyState() {
+  return `
+		<div class="oc-panel-empty">
+			<div class="oc-panel-empty-icon">${ICONS.emptyTickets}</div>
+			<div class="oc-panel-empty-title">No tickets</div>
+			<div class="oc-panel-empty-subtitle">Your tickets will be shown here</div>
+		</div>
+	`;
+}
+
+function renderRecentChatsList(sessions) {
+  const listHtml = sessions
+    .map(
+      (session) => `
+		<button
+			type="button"
+			class="oc-panel-list-item${session.isCurrent ? " is-current" : ""}"
+			data-session-id="${escapeHtml(session.id)}"
+		>
+			<div class="oc-panel-list-preview">${escapeHtml(truncatePreview(session.preview))}</div>
+			<div class="oc-panel-list-meta">
+				<span>${escapeHtml(formatRelativeTime(session.lastActivityAt))}</span>
+				${session.isCurrent ? '<span class="oc-panel-list-badge">Current</span>' : ""}
+			</div>
+		</button>
+	`,
+    )
+    .join("");
+
+  return `<div class="oc-panel-list">${listHtml}</div>`;
+}
+
+function renderRecentChatsPanel(contentHtml, showNewChatButton = false) {
+  const footerHtml = showNewChatButton
     ? `<button type="button" class="oc-panel-primary-btn" data-action="start_new_chat">${ICONS.plus}<span>Start a new chat</span></button>`
     : "";
 
-  state.messagesContainer.innerHTML = renderPanel({
+  state.messagesContainer.innerHTML = renderPanelShell({
     title: "Recent chats",
     titleIcon: ICONS.historyCircle,
-    bodyHtml,
+    bodyHtml: contentHtml,
     footerHtml,
   });
 
   attachPanelHandlers(state.messagesContainer, {
-    onBack: () => {
-      hidePanelView();
-      void refreshCurrentChatView();
-    },
+    onBack: exitRecentChats,
     onAttach: (container) => {
-      container
-        .querySelector('[data-action="start_new_chat"]')
-        ?.addEventListener("click", () => resetChat());
+      container.querySelector('[data-action="start_new_chat"]')?.addEventListener("click", () => {
+        void resetChat();
+      });
     },
   });
 }
 
-function renderRecentChatList(sessions) {
-  return `<div class="oc-panel-list">${sessions
-    .map(
-      (session) => `
-    <button
-      type="button"
-      class="oc-panel-list-item${session.isCurrent ? " is-current" : ""}"
-      data-session-id="${escapeHtml(session.id)}"
-    >
-      <div class="oc-panel-list-preview">${escapeHtml(truncatePreview(session.preview))}</div>
-      <div class="oc-panel-list-meta">
-        <span>${escapeHtml(formatRelativeTime(session.lastActivityAt))}</span>
-        ${session.isCurrent ? '<span class="oc-panel-list-badge">Current</span>' : ""}
-      </div>
-    </button>
-  `,
-    )
-    .join("")}</div>`;
+function bindRecentChatItems(sessions) {
+  const items = state.messagesContainer.querySelectorAll(".oc-panel-list-item");
+  items.forEach((item) => {
+    item.addEventListener("click", () => {
+      const sessionId = item.getAttribute("data-session-id");
+      const session = sessions.find((entry) => entry.id === sessionId);
+      if (session) {
+        void switchToSession(session);
+      }
+    });
+  });
 }
 
-async function refreshCurrentChatView() {
-  if (!state.sessionDbId) {
-    state.messagesContainer.innerHTML = "";
-    addBotMessage(state.config.welcomeMessage);
+function renderRecentChatsContent(sessions) {
+  if (!sessions.length) {
+    renderRecentChatsPanel(renderRecentChatsEmptyState(), true);
     return;
   }
 
+  renderRecentChatsPanel(renderRecentChatsList(sessions), false);
+  bindRecentChatItems(sessions);
+}
+
+async function showRecentChats() {
+  enterPanelView("recent-chats");
+  renderRecentChatsPanel(`<div class="oc-panel-loading">Loading recent chats…</div>`, false);
+
   try {
-    const data = await fetchSessionForResume(state.sessionDbId);
+    const data = await fetchRecentSessions();
+    renderRecentChatsContent(data.sessions || []);
+  } catch (error) {
+    console.error("widget: failed to load recent chats", error);
+    renderRecentChatsPanel(
+      `<div class="oc-panel-empty"><div class="oc-panel-empty-title">Unable to load recent chats</div></div>`,
+      true,
+    );
+  }
+}
+
+function renderTicketsTabs() {
+  const isOpen = state.ticketsTab === "open";
+  return `
+		<div class="oc-panel-tabs">
+			<button type="button" class="oc-panel-tab${isOpen ? " is-active" : ""}" data-tab="open">Open</button>
+			<button type="button" class="oc-panel-tab${!isOpen ? " is-active" : ""}" data-tab="closed">Closed</button>
+		</div>
+	`;
+}
+
+function renderTicketsPanel() {
+  state.messagesContainer.innerHTML = renderPanelShell({
+    title: "Tickets",
+    titleIcon: ICONS.ticket,
+    bodyHtml: `${renderTicketsTabs()}${renderTicketsEmptyState()}`,
+  });
+
+  attachPanelHandlers(state.messagesContainer, {
+    onBack: exitTickets,
+    onAttach: (container) => {
+      container.querySelectorAll(".oc-panel-tab").forEach((tab) => {
+        tab.addEventListener("click", () => {
+          state.ticketsTab = tab.getAttribute("data-tab") === "closed" ? "closed" : "open";
+          renderTicketsPanel();
+        });
+      });
+    },
+  });
+}
+
+function showTickets() {
+  state.ticketsTab = "open";
+  enterPanelView("tickets");
+  renderTicketsPanel();
+}
+
+function exitTickets() {
+  exitPanelView();
+  void restoreChatView();
+}
+
+async function restoreChatView() {
+  state.messagesContainer.innerHTML = "";
+
+  try {
+    const data = await fetchSessionHistory(state.sessionDbId);
     if (data?.messages?.length) {
       restoreMessages(data.messages);
       return;
     }
   } catch (error) {
-    console.error("widget: failed to refresh current chat", error);
+    console.error("widget: failed to restore current chat", error);
   }
 
-  state.messagesContainer.innerHTML = "";
   addBotMessage(state.config.welcomeMessage);
 }
 
-async function openRecentChat(session) {
+async function exitRecentChats() {
+  exitPanelView();
+  await restoreChatView();
+}
+
+async function switchToSession(session) {
   if (session.isCurrent) {
-    hidePanelView();
-    await refreshCurrentChatView();
+    await exitRecentChats();
     return;
   }
 
@@ -351,12 +466,12 @@ async function openRecentChat(session) {
     storeSessionToken(state.sessionToken, scopeKey);
   }
 
-  hidePanelView();
+  exitPanelView();
   resetChatState();
   state.messagesContainer.innerHTML = "";
 
   try {
-    const data = await fetchSessionForResume(session.id);
+    const data = await fetchSessionHistory(session.id);
     if (data?.messages?.length) {
       restoreMessages(data.messages);
       return;
@@ -366,38 +481,6 @@ async function openRecentChat(session) {
   }
 
   addBotMessage(state.config.welcomeMessage);
-}
-
-async function loadRecentChats() {
-  showPanelView("recent-chats");
-  renderRecentChatsPanel('<div class="oc-panel-loading">Loading recent chats…</div>');
-
-  try {
-    const data = await fetchRecentSessions();
-    const sessions = data.sessions || [];
-    if (!sessions.length) {
-      renderRecentChatsPanel(
-        `<div class="oc-panel-empty"><div class="oc-panel-empty-title">No recent chats yet</div></div>`,
-        true,
-      );
-      return;
-    }
-
-    renderRecentChatsPanel(renderRecentChatList(sessions));
-    state.messagesContainer.querySelectorAll(".oc-panel-list-item").forEach((item) => {
-      item.addEventListener("click", () => {
-        const sessionId = item.getAttribute("data-session-id");
-        const session = sessions.find((entry) => entry.id === sessionId);
-        if (session) void openRecentChat(session);
-      });
-    });
-  } catch (error) {
-    console.error("widget: failed to load recent chats", error);
-    renderRecentChatsPanel(
-      `<div class="oc-panel-empty"><div class="oc-panel-empty-title">Unable to load recent chats</div></div>`,
-      true,
-    );
-  }
 }
 
 /**
@@ -415,6 +498,9 @@ export function toggleChat() {
     state.windowEl.classList.remove("is-open");
     state.launcher.classList.remove("is-open");
     stopMessagePolling();
+    if (state.preview && state.config.previewMessages?.length) {
+      showPreviewMessages();
+    }
   }
 }
 
@@ -435,7 +521,7 @@ function stopMessagePolling() {
 }
 
 async function refreshMessagesFromServer() {
-  if (!state.sessionDbId) return;
+  if (!state.sessionDbId || state.activePanel) return;
   try {
     const data = await fetchSessionHistory(state.sessionDbId);
     if (data?.messages?.length) {
@@ -605,7 +691,6 @@ export function addBotMessage(
 ) {
   const msg = document.createElement("div");
   msg.className = "oc-message bot";
-  const logoSrc = state.config.logoUrl || WIDGET_LOGO;
 
   // Only show feedback buttons if messageId exists (not welcome message)
   const feedbackHtml = messageId ? createFeedbackButtons(messageId, existingFeedback) : "";
@@ -613,7 +698,7 @@ export function addBotMessage(
   msg.innerHTML = `
 		<div class="oc-bot-header">
 			<div class="oc-bot-avatar">
-				<img src="${logoSrc}" alt="Logo" />
+				${renderBotAvatarMarkup(state.config.logoUrl)}
 			</div>
 			<span class="oc-bot-name">${escapeHtml(state.config.agentName)}</span>
 		</div>
@@ -683,11 +768,10 @@ export function showTypingIndicator() {
   const indicator = document.createElement("div");
   indicator.id = "oc-typing-indicator";
   indicator.className = "oc-message bot";
-  const logoSrc = state.config.logoUrl || WIDGET_LOGO;
   indicator.innerHTML = `
 		<div class="oc-bot-header">
 			<div class="oc-bot-avatar">
-				<img src="${logoSrc}" alt="Logo" />
+				${renderBotAvatarMarkup(state.config.logoUrl)}
 			</div>
 			<span class="oc-bot-name">${escapeHtml(state.config.agentName)}</span>
 		</div>
@@ -776,11 +860,10 @@ async function callWidgetChat(userMessage, interactionId) {
     // Create streaming message container
     const msg = document.createElement("div");
     msg.className = "oc-message bot";
-    const logoSrc = state.config.logoUrl || WIDGET_LOGO;
     msg.innerHTML = `
 			<div class="oc-bot-header">
 				<div class="oc-bot-avatar">
-					<img src="${logoSrc}" alt="Logo" />
+					${renderBotAvatarMarkup(state.config.logoUrl)}
 				</div>
 				<span class="oc-bot-name">${escapeHtml(state.config.agentName)}</span>
 			</div>
@@ -924,6 +1007,8 @@ export function destroyWidget() {
   state.sessionDbId = null;
   state.sessionToken = null;
   state.preview = false;
+  state.activePanel = null;
+  state.ticketsTab = "open";
   state.leadCaptureFormShown = false;
   state.leadCaptureEnabled = false;
   state.leadCaptureStep = 0;
@@ -939,8 +1024,7 @@ export async function resetChat() {
   const scopeKey = state.publicKey || state.config.publicKey || state.config.workspaceId;
 
   stopMessagePolling();
-  hidePanelView();
-
+  exitPanelView();
   state.messagesContainer.innerHTML = "";
   resetChatState();
   const privacyEl = state.windowEl.querySelector(".oc-privacy");

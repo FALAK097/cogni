@@ -27,14 +27,28 @@ export async function GET(
     return Response.json({ error: "sessionId is required." }, { status: 400 });
   }
 
-  const session = await db.visitorSession.findFirst({
-    where: {
-      id: sessionId,
-      token: authorized.session.token,
-      widgetId: access.widget.id,
-      messageCount: { gt: 0 },
-      conversations: { some: { channel: "WIDGET" } },
-      expiresAt: { gt: new Date() },
+  const visitorId = authorized.session.visitorId;
+
+  const nowIso = new Date().toISOString();
+  const session = await db.query.visitorSession.findFirst({
+    where: (fields, { eq, and, gt, sql }) => {
+      const conds = [
+        eq(fields.id, sessionId),
+        eq(fields.widgetId, access.widget.id),
+        gt(fields.messageCount, 0),
+        gt(fields.expiresAt, nowIso),
+        sql`exists (
+          select 1 from conversation 
+          where conversation.visitor_session_id = ${fields.id} 
+          and conversation.channel = 'WIDGET'
+        )`,
+      ];
+      if (visitorId) {
+        conds.push(eq(fields.visitorId, visitorId));
+      } else {
+        conds.push(eq(fields.token, authorized.session.token));
+      }
+      return and(...conds);
     },
   });
   if (!session) {

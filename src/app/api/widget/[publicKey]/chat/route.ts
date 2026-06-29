@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import { eq } from "drizzle-orm";
 
 import {
   recordAiMessage,
@@ -26,6 +27,7 @@ import {
 import { buildAgentMemoryContext } from "@/lib/ai/memory";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { getDb } from "@/lib/db/client";
+import { conversation as conversationTable } from "@/lib/db/schema";
 import { emitDomainEvent } from "@/lib/events/domain-events";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { notifyWorkspaceMembers } from "@/lib/notifications/create-notification";
@@ -255,9 +257,9 @@ export async function POST(
   const { visitorSession, conversation, visitorMessageId, replayed } = started;
   const widget = visitorSession.widget;
   if (replayed) {
-    const conv = await db.conversation.findUnique({
-      where: { id: conversation.id },
-      select: { messages: true },
+    const conv = await db.query.conversation.findFirst({
+      where: (fields, { eq }) => eq(fields.id, conversation.id),
+      columns: { messages: true },
     });
     const list = JSON.parse(conv?.messages || "[]") as MessageJson[];
     const existingReply = list.find((m) => m.replyToMessageId === visitorMessageId);
@@ -278,17 +280,21 @@ export async function POST(
     }
   }
 
-  const activeConversation = await db.conversation.findUnique({
-    where: { id: conversation.id },
-    select: { aiPaused: true, status: true },
+  const activeConversation = await db.query.conversation.findFirst({
+    where: (fields, { eq }) => eq(fields.id, conversation.id),
+    columns: { aiPaused: true, status: true },
   });
   const shouldEscalate = matchesEscalationKeywords(body.message, widget.escalationKeywords);
 
   if (shouldEscalate && activeConversation?.status !== "ESCALATED") {
-    await db.conversation.update({
-      where: { id: conversation.id },
-      data: { status: "ESCALATED", aiPaused: true },
-    });
+    await db
+      .update(conversationTable)
+      .set({
+        status: "ESCALATED",
+        aiPaused: true,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(conversationTable.id, conversation.id));
     await notifyWorkspaceMembers({
       db,
       workspaceId: widget.workspace.id,
@@ -406,18 +412,27 @@ async function getAuthorizedBootstrapRetry(
   browserSessionId: string,
   interactionId: string,
 ) {
-  const session = await db.visitorSession.findFirst({
-    where: { widgetId, browserSessionId, expiresAt: { gt: new Date() } },
-    include: {
+  const nowIso = new Date().toISOString();
+  const session = await db.query.visitorSession.findFirst({
+    where: (fields, { eq, and, gt }) =>
+      and(
+        eq(fields.widgetId, widgetId),
+        eq(fields.browserSessionId, browserSessionId),
+        gt(fields.expiresAt, nowIso),
+      ),
+    with: {
       widget: {
-        include: {
-          workspace: { select: { id: true, name: true } },
+        with: {
+          workspace: {
+            columns: { id: true, name: true },
+          },
         },
       },
       conversations: {
-        where: { channel: "WIDGET", status: { not: "CLOSED" } },
-        orderBy: { updatedAt: "desc" },
-        take: 1,
+        where: (fields, { eq, and, ne }) =>
+          and(eq(fields.channel, "WIDGET"), ne(fields.status, "CLOSED")),
+        orderBy: (fields, { desc }) => [desc(fields.updatedAt)],
+        limit: 1,
       },
     },
   });

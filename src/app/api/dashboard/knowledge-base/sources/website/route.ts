@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-
+import { randomUUID } from "node:crypto";
 import { processDocument } from "@/features/knowledge/server/process-document";
 import { emitDomainEvent } from "@/lib/events/domain-events";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
+import { document as documentTable } from "@/lib/db/schema";
 
 export async function POST(request: Request) {
   const { db, workspace } = await requireDashboardContext();
@@ -16,15 +17,18 @@ export async function POST(request: Request) {
   const created = [];
 
   for (const sourceUrl of urls) {
-    const document = await db.document.create({
-      data: {
+    const [document] = await db
+      .insert(documentTable)
+      .values({
+        id: randomUUID(),
         workspaceId: workspace.id,
         title: sourceUrl,
         sourceType: "URL",
         sourceUrl,
         status: "PROCESSING",
-      },
-    });
+        updatedAt: new Date().toISOString(),
+      })
+      .returning();
 
     try {
       await processDocument({

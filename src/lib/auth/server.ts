@@ -1,11 +1,12 @@
 import "server-only";
 
-import { prismaAdapter } from "better-auth/adapters/prisma";
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { betterAuth } from "better-auth";
 
 import { ensureDefaultWorkspace } from "@/lib/auth/provision-workspace";
 import { getDb } from "@/lib/db/client";
 import { env } from "@/lib/env/server";
+import * as schema from "@/lib/db/schema";
 
 function createAuth() {
   const db = getDb();
@@ -14,8 +15,9 @@ function createAuth() {
     appName: "widget",
     baseURL: env.BETTER_AUTH_URL ?? "http://localhost:3000",
     secret: env.BETTER_AUTH_SECRET ?? "build-only-secret-not-valid-at-runtime",
-    database: prismaAdapter(db, {
+    database: drizzleAdapter(db, {
       provider: "sqlite",
+      schema: schema,
     }),
     socialProviders: {
       google: {

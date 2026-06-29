@@ -1,4 +1,5 @@
-import type { PrismaClient } from "@/generated/prisma/client";
+import type { Db } from "@/lib/db/client";
+import { workspace, workspaceMember } from "@/lib/db/schema";
 
 function workspaceSlug(name: string, userId: string) {
   const base = name
@@ -11,10 +12,10 @@ function workspaceSlug(name: string, userId: string) {
   return `${base || "workspace"}-${userId.slice(0, 8)}`;
 }
 
-export async function ensureDefaultWorkspace(db: PrismaClient, user: { id: string; name: string }) {
-  const existingMembership = await db.workspaceMember.findFirst({
-    where: { userId: user.id },
-    include: { workspace: true },
+export async function ensureDefaultWorkspace(db: Db, user: { id: string; name: string }) {
+  const existingMembership = await db.query.workspaceMember.findFirst({
+    where: (member, { eq }) => eq(member.userId, user.id),
+    with: { workspace: true },
   });
 
   if (existingMembership) {
@@ -22,29 +23,43 @@ export async function ensureDefaultWorkspace(db: PrismaClient, user: { id: strin
   }
 
   const slug = workspaceSlug(user.name, user.id);
-  const workspace = await db.workspace.upsert({
-    where: { slug },
-    update: {},
-    create: {
+  const now = new Date().toISOString();
+
+  const workspaces = await db
+    .insert(workspace)
+    .values({
+      id: crypto.randomUUID(),
       name: `${user.name}'s workspace`,
       slug,
-    },
-  });
-
-  await db.workspaceMember.upsert({
-    where: {
-      userId_workspaceId: {
-        userId: user.id,
-        workspaceId: workspace.id,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: workspace.slug,
+      set: {
+        name: `${user.name}'s workspace`,
+        updatedAt: now,
       },
-    },
-    update: { role: "OWNER" },
-    create: {
-      userId: user.id,
-      workspaceId: workspace.id,
-      role: "OWNER",
-    },
-  });
+    })
+    .returning();
 
-  return workspace;
+  const createdWorkspace = workspaces[0];
+
+  await db
+    .insert(workspaceMember)
+    .values({
+      id: crypto.randomUUID(),
+      userId: user.id,
+      workspaceId: createdWorkspace.id,
+      role: "OWNER",
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: [workspaceMember.userId, workspaceMember.workspaceId],
+      set: {
+        role: "OWNER",
+        updatedAt: now,
+      },
+    });
+
+  return createdWorkspace;
 }

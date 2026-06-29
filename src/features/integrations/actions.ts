@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import { randomUUID } from "node:crypto";
+import { integration as integrationTable } from "@/lib/db/schema";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 
 const providerSchema = z.enum(["GMAIL", "GOOGLE_CALENDAR", "SLACK"]);
@@ -15,22 +17,22 @@ async function updateIntegrationStatus(providerValue: FormDataEntryValue | null,
   }
 
   const { db, workspace } = await requireDashboardContext();
-  await db.integration.upsert({
-    where: {
-      workspaceId_provider: {
-        workspaceId: workspace.id,
-        provider: parsed.data,
-      },
-    },
-    create: {
+  await db
+    .insert(integrationTable)
+    .values({
+      id: randomUUID(),
       workspaceId: workspace.id,
       provider: parsed.data,
       status,
-    },
-    update: {
-      status,
-    },
-  });
+      updatedAt: new Date().toISOString(),
+    })
+    .onConflictDoUpdate({
+      target: [integrationTable.workspaceId, integrationTable.provider],
+      set: {
+        status,
+        updatedAt: new Date().toISOString(),
+      },
+    });
 
   revalidatePath("/integrations");
 }

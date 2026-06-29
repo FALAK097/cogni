@@ -3,11 +3,12 @@ import type { Metadata } from "next";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { SITE_NAME } from "@/lib/constants";
 import {
-  engagedVisitorSessionWhere,
-  widgetConversationWhere,
-  widgetLeadWhere,
+  getEngagedVisitorSessionCond,
+  getWidgetConversationCond,
 } from "@/features/widget/server/widget-data-filters";
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
+import { and, eq, count, sql } from "drizzle-orm";
+import { conversation, contact, document, visitorSession, widget } from "@/lib/db/schema";
 
 export const metadata: Metadata = {
   title: `Dashboard | ${SITE_NAME}`,
@@ -20,42 +21,67 @@ export default async function DashboardHomePage() {
 
   const [
     statusCounts,
-    contactCount,
-    documentCount,
-    escalationCount,
-    widgetSessions,
-    widgetLeads,
+    contactCountResult,
+    documentCountResult,
+    escalationCountResult,
+    widgetSessionsResult,
     conversations,
   ] = await Promise.all([
-    db.conversation.groupBy({
-      by: ["status"],
-      where: widgetConversationWhere(workspace.id),
-      _count: { _all: true },
-    }),
-    db.contact.count({
-      where: {
-        workspaceId: workspace.id,
-        conversations: { some: { channel: "WIDGET", visitorSessionId: { not: null } } },
-      },
-    }),
-    db.document.count({
-      where: { workspaceId: workspace.id },
-    }),
-    db.conversation.count({
-      where: { ...widgetConversationWhere(workspace.id), status: "ESCALATED" },
-    }),
-    db.visitorSession.count({
-      where: {
-        widget: { workspaceId: workspace.id },
-        ...engagedVisitorSessionWhere,
-      },
-    }),
-    db.lead.count({ where: widgetLeadWhere(workspace.id) }),
-    db.conversation.findMany({
-      where: widgetConversationWhere(workspace.id),
-      select: { messages: true },
-    }),
+    (db as any)
+      .select({
+        status: conversation.status,
+        _count: { _all: count() },
+      })
+      .from(conversation)
+      .where(getWidgetConversationCond(conversation as any, workspace.id))
+      .groupBy(conversation.status),
+    (db as any)
+      .select({ val: count() })
+      .from(contact)
+      .where(
+        and(
+          eq(contact.workspaceId, workspace.id),
+          sql`exists (
+            select 1 from conversation 
+            where conversation.contactId = ${contact.id} 
+              and conversation.channel = 'WIDGET' 
+              and conversation.visitorSessionId is not null
+          )`,
+        ),
+      ),
+    (db as any)
+      .select({ val: count() })
+      .from(document)
+      .where(eq(document.workspaceId, workspace.id)),
+    (db as any)
+      .select({ val: count() })
+      .from(conversation)
+      .where(
+        and(
+          getWidgetConversationCond(conversation as any, workspace.id),
+          eq(conversation.status, "ESCALATED"),
+        ),
+      ),
+    (db as any)
+      .select({ val: count() })
+      .from(visitorSession)
+      .innerJoin(widget, eq(visitorSession.widgetId, widget.id))
+      .where(
+        and(
+          eq(widget.workspaceId, workspace.id),
+          getEngagedVisitorSessionCond(visitorSession as any),
+        ),
+      ),
+    (db as any)
+      .select({ messages: conversation.messages })
+      .from(conversation)
+      .where(getWidgetConversationCond(conversation as any, workspace.id)),
   ]);
+
+  const contactCount = contactCountResult[0]?.val ?? 0;
+  const documentCount = documentCountResult[0]?.val ?? 0;
+  const escalationCount = escalationCountResult[0]?.val ?? 0;
+  const widgetSessions = widgetSessionsResult[0]?.val ?? 0;
 
   let messageCount = 0;
   let aiMessageCount = 0;
@@ -94,7 +120,6 @@ export default async function DashboardHomePage() {
     { label: "AI messages", value: aiMessageCount },
     { label: "Escalations", value: escalationCount },
     { label: "Engaged visitors", value: widgetSessions },
-    { label: "Widget leads", value: widgetLeads },
     { label: "Helpful responses", value: feedbackUp },
     { label: "Unhelpful responses", value: feedbackDown },
   ];

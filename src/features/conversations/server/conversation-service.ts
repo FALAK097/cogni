@@ -1,12 +1,12 @@
-import "server-only";
-
 import { randomUUID } from "node:crypto";
-
-import type { Prisma, PrismaClient, VisitorSession, Widget } from "@/generated/prisma/client";
+import type { Db } from "@/lib/db/client";
+import { conversation, visitorSession as visitorSessionTable, contact } from "@/lib/db/schema";
+import type { widget as widgetTable } from "@/lib/db/schema";
+import { eq, sql } from "drizzle-orm";
 
 const visitorSessionDurationMs = 1000 * 60 * 60 * 24 * 90;
 
-type VisitorSessionContext = VisitorSession & {
+type VisitorSessionContext = typeof visitorSessionTable.$inferSelect & {
   widget: {
     id: string;
     workspace: {
@@ -28,7 +28,14 @@ type VisitorMetadata = {
   screenSize: string | null;
 };
 
-type WidgetContext = Widget & {
+type WidgetContext = {
+  id: typeof widgetTable.$inferSelect.id;
+  displayName: typeof widgetTable.$inferSelect.displayName;
+  instructions: typeof widgetTable.$inferSelect.instructions;
+  escalationKeywords: typeof widgetTable.$inferSelect.escalationKeywords;
+  modelProvider: typeof widgetTable.$inferSelect.modelProvider;
+  modelName: typeof widgetTable.$inferSelect.modelName;
+  workspaceId: typeof widgetTable.$inferSelect.workspaceId;
   workspace: {
     id: string;
     name: string;
@@ -54,21 +61,26 @@ export type MessageJson = {
   feedbackAt?: string | null;
 };
 
+type TransactionDb = Parameters<Parameters<Db["transaction"]>[0]>[0];
+type ConversationDb = Db | TransactionDb;
+
 async function appendVisitorMessage(
-  tx: Prisma.TransactionClient,
+  tx: ConversationDb,
   visitorSession: VisitorSessionContext,
   text: string,
   clientMessageId: string,
 ) {
   const now = new Date();
+  const nowIso = now.toISOString();
 
-  const existingConversation = await tx.conversation.findFirst({
-    where: {
-      visitorSessionId: visitorSession.id,
-      status: { not: "CLOSED" },
-      channel: "WIDGET",
-    },
-    orderBy: { updatedAt: "desc" },
+  const existingConversation = await tx.query.conversation.findFirst({
+    where: (convo, { eq, and, ne }) =>
+      and(
+        eq(convo.visitorSessionId, visitorSession.id),
+        ne(convo.status, "CLOSED"),
+        eq(convo.channel, "WIDGET"),
+      ),
+    orderBy: (convo, { desc }) => [desc(convo.updatedAt)],
   });
 
   if (existingConversation) {
@@ -88,29 +100,33 @@ async function appendVisitorMessage(
       authorType: "VISITOR",
       visibility: "PUBLIC",
       clientId: clientMessageId,
-      createdAt: now.toISOString(),
+      createdAt: nowIso,
     };
 
     const updatedMessages = [...messagesList, newMessage];
-    const conversation = await tx.conversation.update({
-      where: { id: existingConversation.id },
-      data: {
-        lastMessageAt: now,
+    const results = await tx
+      .update(conversation)
+      .set({
+        lastMessageAt: nowIso,
         messages: JSON.stringify(updatedMessages),
-      },
-    });
+        updatedAt: nowIso,
+      })
+      .where(eq(conversation.id, existingConversation.id))
+      .returning();
 
-    await tx.visitorSession.update({
-      where: { id: visitorSession.id },
-      data: {
-        lastSeenAt: now,
-        expiresAt: new Date(now.getTime() + visitorSessionDurationMs),
-        messageCount: { increment: 1 },
-      },
-    });
+    const updatedConvo = results[0];
+
+    await tx
+      .update(visitorSessionTable)
+      .set({
+        lastSeenAt: nowIso,
+        expiresAt: new Date(now.getTime() + visitorSessionDurationMs).toISOString(),
+        messageCount: sql`${visitorSessionTable.messageCount} + 1`,
+      })
+      .where(eq(visitorSessionTable.id, visitorSession.id));
 
     return {
-      conversation,
+      conversation: updatedConvo,
       visitorMessageId: newMessage.id,
       replayed: false,
     };
@@ -118,18 +134,21 @@ async function appendVisitorMessage(
 
   let contactId = visitorSession.contactId;
   if (!contactId) {
-    const contact = await tx.contact.create({
-      data: {
+    const contactResults = await tx
+      .insert(contact)
+      .values({
+        id: randomUUID(),
         workspaceId: visitorSession.widget.workspace.id,
         name: "Website visitor",
-        lastSeenAt: now,
-      },
-    });
-    contactId = contact.id;
-    await tx.visitorSession.update({
-      where: { id: visitorSession.id },
-      data: { contactId },
-    });
+        lastSeenAt: nowIso,
+        updatedAt: nowIso,
+      })
+      .returning();
+    contactId = contactResults[0].id;
+    await tx
+      .update(visitorSessionTable)
+      .set({ contactId })
+      .where(eq(visitorSessionTable.id, visitorSession.id));
   }
 
   const newMessage: MessageJson = {
@@ -138,11 +157,13 @@ async function appendVisitorMessage(
     authorType: "VISITOR",
     visibility: "PUBLIC",
     clientId: clientMessageId,
-    createdAt: now.toISOString(),
+    createdAt: nowIso,
   };
 
-  const conversation = await tx.conversation.create({
-    data: {
+  const conversationResults = await tx
+    .insert(conversation)
+    .values({
+      id: randomUUID(),
       workspaceId: visitorSession.widget.workspace.id,
       contactId,
       visitorSessionId: visitorSession.id,
@@ -150,27 +171,29 @@ async function appendVisitorMessage(
       channel: "WIDGET",
       subject: text.slice(0, 100),
       messages: JSON.stringify([newMessage]),
-    },
-  });
+      updatedAt: nowIso,
+    })
+    .returning();
+  const createdConvo = conversationResults[0];
 
-  await tx.visitorSession.update({
-    where: { id: visitorSession.id },
-    data: {
-      lastSeenAt: now,
-      expiresAt: new Date(now.getTime() + visitorSessionDurationMs),
-      messageCount: { increment: 1 },
-    },
-  });
+  await tx
+    .update(visitorSessionTable)
+    .set({
+      lastSeenAt: nowIso,
+      expiresAt: new Date(now.getTime() + visitorSessionDurationMs).toISOString(),
+      messageCount: sql`${visitorSessionTable.messageCount} + 1`,
+    })
+    .where(eq(visitorSessionTable.id, visitorSession.id));
 
   console.info("conversation.created", {
     workspaceId: visitorSession.widget.workspace.id,
     widgetId: visitorSession.widget.id,
-    conversationId: conversation.id,
+    conversationId: createdConvo.id,
     channel: "WIDGET",
   });
 
   return {
-    conversation,
+    conversation: createdConvo,
     visitorMessageId: newMessage.id,
     replayed: false,
   };
@@ -182,17 +205,17 @@ export async function recordVisitorMessage({
   text,
   clientMessageId,
 }: {
-  db: PrismaClient;
+  db: Db;
   visitorSession: VisitorSessionContext;
   text: string;
   clientMessageId: string;
 }) {
-  return db.$transaction((tx) => appendVisitorMessage(tx, visitorSession, text, clientMessageId));
+  return db.transaction((tx) => appendVisitorMessage(tx, visitorSession, text, clientMessageId));
 }
 
 export async function startVisitorConversation({
   db,
-  widget,
+  widget: widgetContext,
   hostname,
   browserSessionId,
   visitorId,
@@ -201,7 +224,7 @@ export async function startVisitorConversation({
   text,
   clientMessageId,
 }: {
-  db: PrismaClient;
+  db: Db;
   widget: WidgetContext;
   hostname: string;
   browserSessionId: string;
@@ -211,42 +234,72 @@ export async function startVisitorConversation({
   text: string;
   clientMessageId: string;
 }) {
-  return db.$transaction(async (tx) => {
+  return db.transaction(async (tx) => {
     const now = new Date();
-    const existing = await tx.visitorSession.findFirst({
-      where: {
-        widgetId: widget.id,
-        browserSessionId,
-        expiresAt: { gt: now },
-      },
+    const nowIso = now.toISOString();
+    const existing = await tx.query.visitorSession.findFirst({
+      where: (s, { eq, and, gt }) =>
+        and(
+          eq(s.widgetId, widgetContext.id),
+          eq(s.browserSessionId, browserSessionId),
+          gt(s.expiresAt, nowIso),
+        ),
     });
+
     let contactId = existing?.contactId ?? null;
-    if (!contactId && identity.email) {
-      const contact = await tx.contact.findFirst({
-        where: {
-          workspaceId: widget.workspace.id,
-          email: identity.email,
-        },
+    const visitorEmail = identity.email;
+    if (!contactId && visitorEmail) {
+      const existingContact = await tx.query.contact.findFirst({
+        where: (c, { eq, and }) =>
+          and(eq(c.workspaceId, widgetContext.workspace.id), eq(c.email, visitorEmail)),
+        columns: { id: true },
       });
-      contactId = contact?.id ?? null;
+      contactId = existingContact?.id ?? null;
     }
     if (!contactId && (identity.name || identity.email)) {
-      const contact = await tx.contact.create({
-        data: {
-          workspaceId: widget.workspace.id,
+      const contactResults = await tx
+        .insert(contact)
+        .values({
+          id: randomUUID(),
+          workspaceId: widgetContext.workspace.id,
           name: identity.name ?? identity.email?.split("@")[0] ?? "Website visitor",
           email: identity.email,
-          lastSeenAt: now,
-        },
-      });
-      contactId = contact.id;
+          lastSeenAt: nowIso,
+          updatedAt: nowIso,
+        })
+        .returning();
+      contactId = contactResults[0].id;
     }
 
-    const visitorSession =
-      existing ??
-      (await tx.visitorSession.create({
-        data: {
-          widgetId: widget.id,
+    let visitorSessionData: typeof visitorSessionTable.$inferSelect;
+
+    if (existing) {
+      const results = await tx
+        .update(visitorSessionTable)
+        .set({
+          visitorId: visitorId ?? existing.visitorId,
+          hostname,
+          pageUrl: metadata.pageUrl ?? existing.pageUrl,
+          referrer: metadata.referrer ?? existing.referrer,
+          browser: metadata.browser ?? existing.browser,
+          deviceType: metadata.deviceType ?? existing.deviceType,
+          os: metadata.os ?? existing.os,
+          country: metadata.country ?? existing.country,
+          city: metadata.city ?? existing.city,
+          timezone: metadata.timezone ?? existing.timezone,
+          language: metadata.language ?? existing.language,
+          screenSize: metadata.screenSize ?? existing.screenSize,
+          contactId: contactId ?? existing.contactId,
+        })
+        .where(eq(visitorSessionTable.id, existing.id))
+        .returning();
+      visitorSessionData = results[0];
+    } else {
+      const results = await tx
+        .insert(visitorSessionTable)
+        .values({
+          id: randomUUID(),
+          widgetId: widgetContext.id,
           token: randomUUID(),
           browserSessionId,
           visitorId,
@@ -262,37 +315,19 @@ export async function startVisitorConversation({
           language: metadata.language,
           screenSize: metadata.screenSize,
           contactId,
-          expiresAt: new Date(now.getTime() + visitorSessionDurationMs),
-        },
-      }));
-
-    if (existing) {
-      await tx.visitorSession.update({
-        where: { id: existing.id },
-        data: {
-          visitorId: visitorId ?? existing.visitorId,
-          hostname,
-          pageUrl: metadata.pageUrl ?? existing.pageUrl,
-          referrer: metadata.referrer ?? existing.referrer,
-          browser: metadata.browser ?? existing.browser,
-          deviceType: metadata.deviceType ?? existing.deviceType,
-          os: metadata.os ?? existing.os,
-          country: metadata.country ?? existing.country,
-          city: metadata.city ?? existing.city,
-          timezone: metadata.timezone ?? existing.timezone,
-          language: metadata.language ?? existing.language,
-          screenSize: metadata.screenSize ?? existing.screenSize,
-          contactId: contactId ?? existing.contactId,
-        },
-      });
+          expiresAt: new Date(now.getTime() + visitorSessionDurationMs).toISOString(),
+          updatedAt: nowIso,
+        })
+        .returning();
+      visitorSessionData = results[0];
     }
 
     const sessionContext: VisitorSessionContext = {
-      ...visitorSession,
-      contactId: contactId ?? visitorSession.contactId,
+      ...visitorSessionData,
+      contactId: contactId ?? visitorSessionData.contactId,
       widget: {
-        id: widget.id,
-        workspace: { id: widget.workspace.id },
+        id: widgetContext.id,
+        workspace: { id: widgetContext.workspace.id },
       },
     };
     const messageResult = await appendVisitorMessage(tx, sessionContext, text, clientMessageId);
@@ -300,8 +335,8 @@ export async function startVisitorConversation({
     return {
       ...messageResult,
       visitorSession: {
-        ...visitorSession,
-        widget,
+        ...visitorSessionData,
+        widget: widgetContext,
       },
     };
   });
@@ -311,20 +346,18 @@ export async function getVisitorConversationMessages({
   db,
   visitorSessionId,
 }: {
-  db: PrismaClient;
+  db: Db;
   visitorSessionId: string;
 }) {
-  const conversation = await db.conversation.findFirst({
-    where: {
-      visitorSessionId,
-      status: { not: "CLOSED" },
-    },
-    orderBy: { updatedAt: "desc" },
+  const conversationData = await db.query.conversation.findFirst({
+    where: (convo, { eq, and, ne }) =>
+      and(eq(convo.visitorSessionId, visitorSessionId), ne(convo.status, "CLOSED")),
+    orderBy: (convo, { desc }) => [desc(convo.updatedAt)],
   });
 
-  if (!conversation) return [];
+  if (!conversationData) return [];
 
-  const list = JSON.parse(conversation.messages || "[]") as MessageJson[];
+  const list = JSON.parse(conversationData.messages || "[]") as MessageJson[];
   return list.filter((m) => m.visibility === "PUBLIC" || !m.visibility);
 }
 
@@ -334,22 +367,22 @@ export async function recordAiMessage({
   text,
   replyToMessageId,
 }: {
-  db: PrismaClient;
+  db: Db;
   conversationId: string;
   text: string;
   replyToMessageId: string;
 }) {
-  return db.$transaction(async (tx) => {
-    const conversation = await tx.conversation.findUnique({
-      where: { id: conversationId },
+  return (db as any).transaction(async (tx: any) => {
+    const conversationData = await tx.query.conversation.findFirst({
+      where: (convo: any, { eq }: any) => eq(convo.id, conversationId),
     });
 
-    if (!conversation) {
+    if (!conversationData) {
       throw new Error("Conversation not found");
     }
 
     const now = new Date();
-    const list = JSON.parse(conversation.messages || "[]") as MessageJson[];
+    const list = JSON.parse(conversationData.messages || "[]") as MessageJson[];
     const existing = list.find((m) => m.replyToMessageId === replyToMessageId);
     if (existing) {
       return existing;
@@ -365,13 +398,14 @@ export async function recordAiMessage({
     };
 
     const updatedMessages = [...list, aiMessage];
-    await tx.conversation.update({
-      where: { id: conversationId },
-      data: {
-        lastMessageAt: now,
+    await tx
+      .update(conversation)
+      .set({
+        lastMessageAt: now.toISOString(),
         messages: JSON.stringify(updatedMessages),
-      },
-    });
+        updatedAt: now.toISOString(),
+      })
+      .where(eq(conversation.id, conversationId));
 
     return aiMessage;
   });

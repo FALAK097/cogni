@@ -43,7 +43,7 @@ export async function streamWidgetAgent({
     sources.length > 0
       ? sources
           .map(
-            (source, index) =>
+            (source: { title: string; content: string }, index: number) =>
               `[Source ${index + 1}: ${source.title}]\n${source.content.slice(0, 1200)}`,
           )
           .join("\n\n")
@@ -68,7 +68,7 @@ export async function streamWidgetAgent({
     onFinish: async ({ text, totalUsage }) => {
       const citationSuffix =
         sources.length > 0
-          ? `\n\nSources:\n${sources.map((source) => `- ${source.title}`).join("\n")}`
+          ? `\n\nSources:\n${sources.map((source: { title: string }) => `- ${source.title}`).join("\n")}`
           : "";
       const finalText = text.includes("Sources:") ? text : `${text}${citationSuffix}`;
 
@@ -76,7 +76,7 @@ export async function streamWidgetAgent({
         text: finalText,
         inputTokens: totalUsage.inputTokens ?? null,
         outputTokens: totalUsage.outputTokens ?? null,
-        sources: sources.map((source) => ({
+        sources: sources.map((source: { documentId: string; title: string }) => ({
           documentId: source.documentId,
           title: source.title,
         })),

@@ -107,32 +107,45 @@ export async function POST(
 
   const { widget, origin, allowedDomains } = access;
   const token = bearerToken(request);
+  const nowIso = new Date().toISOString();
+
   const visitorSession =
     parsed.data.sessionId && token
-      ? await db.visitorSession.findFirst({
-          where: {
-            widgetId: widget.id,
-            browserSessionId: parsed.data.sessionId,
-            token,
-            messageCount: { gt: 0 },
-            expiresAt: { gt: new Date() },
-            ...(parsed.data.visitorId ? { visitorId: parsed.data.visitorId } : {}),
-            conversations: {
-              some: {
-                channel: "WIDGET",
-                messages: { contains: '"authorType":"VISITOR"' },
-              },
-            },
+      ? await db.query.visitorSession.findFirst({
+          where: (fields, { eq, and, gt, sql }) => {
+            const conds = [
+              eq(fields.widgetId, widget.id),
+              eq(fields.browserSessionId, parsed.data.sessionId!),
+              eq(fields.token, token),
+              gt(fields.messageCount, 0),
+              gt(fields.expiresAt, nowIso),
+              sql`exists (
+                select 1 from conversation 
+                where conversation.visitor_session_id = ${fields.id} 
+                and conversation.channel = 'WIDGET' 
+                and conversation.messages like '%"authorType":"VISITOR"%'
+              )`,
+            ];
+            if (parsed.data.visitorId) {
+              conds.push(eq(fields.visitorId, parsed.data.visitorId));
+            }
+            return and(...conds);
           },
         })
       : null;
+
   const browserSessionExists =
     !visitorSession && parsed.data.sessionId
-      ? await db.visitorSession.findFirst({
-          where: { widgetId: widget.id, browserSessionId: parsed.data.sessionId },
-          select: { id: true },
+      ? await db.query.visitorSession.findFirst({
+          where: (fields, { eq, and }) =>
+            and(
+              eq(fields.widgetId, widget.id),
+              eq(fields.browserSessionId, parsed.data.sessionId!),
+            ),
+          columns: { id: true },
         })
       : null;
+
   const browserSessionId = browserSessionExists ? randomUUID() : parsed.data.sessionId;
 
   const messages = visitorSession

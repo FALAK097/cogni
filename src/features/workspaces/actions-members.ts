@@ -5,6 +5,11 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
+import { eq } from "drizzle-orm";
+import {
+  workspaceMember as workspaceMemberTable,
+  workspaceInvite as workspaceInviteTable,
+} from "@/lib/db/schema";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { getAuth } from "@/lib/auth/server";
 import { getDb } from "@/lib/db/client";
@@ -87,18 +92,22 @@ export async function inviteMemberAction(
   }
 
   const { db, workspace } = context;
-  const existingMembership = await db.workspaceMember.findFirst({
-    where: {
-      workspaceId: workspace.id,
-      user: {
-        email: parsed.data.email,
-      },
-    },
-    select: { id: true },
+
+  const targetUser = await db.query.user.findFirst({
+    where: (u, { eq }) => eq(u.email, parsed.data.email),
+    columns: { id: true },
   });
 
-  if (existingMembership) {
-    return { error: "This email is already a member of the workspace." };
+  if (targetUser) {
+    const existingMembership = await db.query.workspaceMember.findFirst({
+      where: (member, { eq, and }) =>
+        and(eq(member.workspaceId, workspace.id), eq(member.userId, targetUser.id)),
+      columns: { id: true },
+    });
+
+    if (existingMembership) {
+      return { error: "This email is already a member of the workspace." };
+    }
   }
 
   await upsertWorkspaceInvite(db, {
@@ -128,12 +137,10 @@ export async function updateMemberRoleAction(formData: FormData) {
   }
 
   const { db, membership, workspace } = context;
-  const targetMembership = await db.workspaceMember.findFirst({
-    where: {
-      id: parsed.data.membershipId,
-      workspaceId: workspace.id,
-    },
-    select: {
+  const targetMembership = await db.query.workspaceMember.findFirst({
+    where: (member, { eq, and }) =>
+      and(eq(member.id, parsed.data.membershipId), eq(member.workspaceId, workspace.id)),
+    columns: {
       id: true,
       role: true,
     },
@@ -148,22 +155,24 @@ export async function updateMemberRoleAction(formData: FormData) {
   }
 
   if (targetMembership.role === "OWNER" && parsed.data.role !== "OWNER") {
-    const ownerCount = await db.workspaceMember.count({
-      where: {
-        workspaceId: workspace.id,
-        role: "OWNER",
-      },
+    const owners = await db.query.workspaceMember.findMany({
+      where: (member, { eq, and }) =>
+        and(eq(member.workspaceId, workspace.id), eq(member.role, "OWNER")),
+      columns: { id: true },
     });
 
-    if (ownerCount <= 1) {
+    if (owners.length <= 1) {
       return;
     }
   }
 
-  await db.workspaceMember.update({
-    where: { id: targetMembership.id },
-    data: { role: parsed.data.role },
-  });
+  await db
+    .update(workspaceMemberTable)
+    .set({
+      role: parsed.data.role,
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(workspaceMemberTable.id, targetMembership.id));
 
   revalidatePath("/dashboard/settings");
   revalidatePath("/dashboard/settings/members");
@@ -189,12 +198,10 @@ export async function removeMemberAction(formData: FormData) {
     return;
   }
 
-  const targetMembership = await db.workspaceMember.findFirst({
-    where: {
-      id: parsed.data.membershipId,
-      workspaceId: workspace.id,
-    },
-    select: {
+  const targetMembership = await db.query.workspaceMember.findFirst({
+    where: (member, { eq, and }) =>
+      and(eq(member.id, parsed.data.membershipId), eq(member.workspaceId, workspace.id)),
+    columns: {
       id: true,
       role: true,
     },
@@ -205,21 +212,18 @@ export async function removeMemberAction(formData: FormData) {
   }
 
   if (targetMembership.role === "OWNER") {
-    const ownerCount = await db.workspaceMember.count({
-      where: {
-        workspaceId: workspace.id,
-        role: "OWNER",
-      },
+    const owners = await db.query.workspaceMember.findMany({
+      where: (member, { eq, and }) =>
+        and(eq(member.workspaceId, workspace.id), eq(member.role, "OWNER")),
+      columns: { id: true },
     });
 
-    if (ownerCount <= 1) {
+    if (owners.length <= 1) {
       return;
     }
   }
 
-  await db.workspaceMember.delete({
-    where: { id: targetMembership.id },
-  });
+  await db.delete(workspaceMemberTable).where(eq(workspaceMemberTable.id, targetMembership.id));
 
   revalidatePath("/dashboard/settings");
   revalidatePath("/dashboard/settings/members");
@@ -257,7 +261,7 @@ export async function acceptInviteAction(
     return { error: "This invite has already been accepted." };
   }
 
-  if (invite.expiresAt <= now) {
+  if (invite.expiresAt <= now.toISOString()) {
     return { error: "This invite has expired." };
   }
 
@@ -265,26 +269,31 @@ export async function acceptInviteAction(
     return { error: "This invite belongs to a different email address." };
   }
 
-  await db.$transaction([
-    db.workspaceMember.upsert({
-      where: {
-        userId_workspaceId: {
-          userId: session.user.id,
-          workspaceId: invite.workspaceId,
-        },
-      },
-      update: {},
-      create: {
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(workspaceMemberTable)
+      .values({
+        id: crypto.randomUUID(),
         userId: session.user.id,
         workspaceId: invite.workspaceId,
         role: invite.role,
-      },
-    }),
-    db.workspaceInvite.update({
-      where: { id: invite.id },
-      data: { acceptedAt: now },
-    }),
-  ]);
+        updatedAt: now.toISOString(),
+      })
+      .onConflictDoUpdate({
+        target: [workspaceMemberTable.userId, workspaceMemberTable.workspaceId],
+        set: {
+          role: invite.role,
+          updatedAt: now.toISOString(),
+        },
+      });
+
+    await tx
+      .update(workspaceInviteTable)
+      .set({
+        acceptedAt: now.toISOString(),
+      })
+      .where(eq(workspaceInviteTable.id, invite.id));
+  });
 
   const cookieStore = await cookies();
   cookieStore.set("active_workspace_id", invite.workspaceId, activeWorkspaceCookieOptions());
@@ -311,28 +320,36 @@ export async function transferOwnershipAction(formData: FormData) {
   }
 
   const { db, membership, workspace } = context;
-  const target = await db.workspaceMember.findFirst({
-    where: {
-      id: parsed.data.membershipId,
-      workspaceId: workspace.id,
+  const target = await db.query.workspaceMember.findFirst({
+    where: (member, { eq, and }) =>
+      and(eq(member.id, parsed.data.membershipId), eq(member.workspaceId, workspace.id)),
+    columns: {
+      id: true,
+      userId: true,
     },
-    select: { id: true, userId: true },
   });
 
   if (!target || target.id === membership.id) {
     return;
   }
 
-  await db.$transaction([
-    db.workspaceMember.update({
-      where: { id: membership.id },
-      data: { role: "MEMBER" },
-    }),
-    db.workspaceMember.update({
-      where: { id: target.id },
-      data: { role: "OWNER" },
-    }),
-  ]);
+  await db.transaction(async (tx) => {
+    await tx
+      .update(workspaceMemberTable)
+      .set({
+        role: "MEMBER",
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(workspaceMemberTable.id, membership.id));
+
+    await tx
+      .update(workspaceMemberTable)
+      .set({
+        role: "OWNER",
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(workspaceMemberTable.id, target.id));
+  });
 
   revalidatePath("/dashboard/settings/members");
 }
@@ -348,12 +365,12 @@ export async function switchWorkspaceAction(formData: FormData) {
   }
 
   const { db, session } = await requireDashboardContext();
-  const membership = await db.workspaceMember.findFirst({
-    where: {
-      userId: session.user.id,
-      workspaceId: parsed.data.workspaceId,
+  const membership = await db.query.workspaceMember.findFirst({
+    where: (member, { eq, and }) =>
+      and(eq(member.userId, session.user.id), eq(member.workspaceId, parsed.data.workspaceId)),
+    columns: {
+      id: true,
     },
-    select: { id: true },
   });
 
   if (!membership) {

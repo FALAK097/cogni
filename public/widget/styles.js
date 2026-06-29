@@ -10,6 +10,14 @@ import { state } from "./state.js";
  */
 export function injectStyles() {
   const config = state.config;
+  const panelBg = config.backgroundColor || (config.theme === "dark" ? "#09090b" : "#ffffff");
+  const panelText = config.textColor || (config.theme === "dark" ? "#fafafa" : "#18181b");
+  const panelMuted = config.theme === "dark" ? "#a1a1aa" : "#71717a";
+  const panelBorder = config.theme === "dark" ? "#27272a" : "#e4e4e7";
+  const panelSubtleBg = config.theme === "dark" ? "#27272a" : "#f4f4f5";
+  const panelHoverBg = config.theme === "dark" ? "#3f3f46" : "#fafafa";
+  const panelCurrentBg =
+    config.theme === "dark" ? `${config.primaryColor}26` : `${config.primaryColor}14`;
 
   const style = document.createElement("style");
   style.id = "widget-styles";
@@ -143,6 +151,20 @@ export function injectStyles() {
 		.oc-avatar svg {
 			width: 24px;
 			height: 24px;
+		}
+
+		.oc-avatar-icon {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			width: 24px;
+			height: 24px;
+			color: #ffffff;
+		}
+
+		.oc-avatar-icon svg {
+			width: 20px;
+			height: 20px;
 		}
 
 		.oc-status-dot {
@@ -712,6 +734,27 @@ export function injectStyles() {
 			color: ${config.theme === "dark" ? "#71717a" : "#a1a1aa"};
 		}
 
+		.oc-upload-btn {
+			background: none;
+			border: none;
+			color: ${config.theme === "dark" ? "#a1a1aa" : "#71717a"};
+			cursor: pointer;
+			padding: 0;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			transition: color 0.15s ease;
+		}
+
+		.oc-upload-btn:hover {
+			color: ${config.theme === "dark" ? "#fafafa" : "#18181b"};
+		}
+
+		.oc-upload-btn svg {
+			width: 16px;
+			height: 16px;
+		}
+
 		.oc-send-btn {
 			background: none;
 			border: none;
@@ -896,6 +939,257 @@ export function injectStyles() {
 			width: 16px;
 			height: 16px;
 			opacity: 0.7;
+		}
+
+		.oc-window.is-panel-view .oc-header.is-hidden,
+		.oc-window.is-panel-view .oc-footer.is-hidden {
+			display: none !important;
+		}
+
+		.oc-window.is-panel-view .oc-body {
+			flex: 1;
+			display: flex;
+			flex-direction: column;
+			padding: 0;
+			overflow: hidden;
+			min-height: 0;
+		}
+
+		.oc-panel-view {
+			display: flex;
+			flex-direction: column;
+			height: 100%;
+			min-height: 0;
+			background: ${panelBg};
+		}
+
+		.oc-panel-header {
+			background: linear-gradient(to right, ${config.headerGradientFrom}, ${config.headerGradientTo});
+			color: #ffffff;
+			display: flex;
+			align-items: center;
+			padding: 14px 12px;
+			gap: 4px;
+			flex-shrink: 0;
+		}
+
+		.oc-panel-back,
+		.oc-panel-close {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			width: 32px;
+			height: 32px;
+			border: none;
+			border-radius: 8px;
+			background: transparent;
+			color: #ffffff;
+			cursor: pointer;
+			flex-shrink: 0;
+			transition: background 0.15s;
+		}
+
+		.oc-panel-back:hover,
+		.oc-panel-close:hover {
+			background: rgba(255, 255, 255, 0.15);
+		}
+
+		.oc-panel-back svg,
+		.oc-panel-close svg {
+			width: 18px;
+			height: 18px;
+		}
+
+		.oc-panel-title {
+			flex: 1;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 8px;
+			font-weight: 600;
+			font-size: 15px;
+			line-height: 1.2;
+			color: #ffffff;
+		}
+
+		.oc-panel-title-icon {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			color: #ffffff;
+		}
+
+		.oc-panel-title-icon svg {
+			width: 18px;
+			height: 18px;
+		}
+
+		.oc-panel-body {
+			flex: 1;
+			display: flex;
+			flex-direction: column;
+			overflow-y: auto;
+			min-height: 0;
+			background: ${panelBg};
+		}
+
+		.oc-panel-loading {
+			flex: 1;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			padding: 32px 16px;
+			font-size: 14px;
+			color: ${panelMuted};
+		}
+
+		.oc-panel-empty {
+			flex: 1;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			padding: 32px 24px;
+			text-align: center;
+		}
+
+		.oc-panel-empty-icon {
+			color: ${panelMuted};
+			margin-bottom: 16px;
+		}
+
+		.oc-panel-empty-icon svg {
+			width: 48px;
+			height: 48px;
+		}
+
+		.oc-panel-empty-title {
+			font-size: 18px;
+			font-weight: 700;
+			color: ${panelText};
+			margin-bottom: 8px;
+		}
+
+		.oc-panel-empty-subtitle {
+			font-size: 14px;
+			color: ${panelMuted};
+			max-width: 260px;
+			line-height: 1.5;
+		}
+
+		.oc-panel-footer {
+			padding: 16px;
+			flex-shrink: 0;
+			border-top: 1px solid ${panelBorder};
+			background: ${panelBg};
+		}
+
+		.oc-panel-primary-btn {
+			width: 100%;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 8px;
+			padding: 14px 20px;
+			background: linear-gradient(135deg, ${config.primaryColor}, ${config.primaryColor}dd);
+			color: ${config.userBubbleTextColor || "#ffffff"};
+			border: none;
+			border-radius: 999px;
+			font-size: 15px;
+			font-weight: 500;
+			cursor: pointer;
+			transition: opacity 0.15s, box-shadow 0.15s;
+			box-shadow: 0 2px 8px ${config.primaryColor}40;
+		}
+
+		.oc-panel-primary-btn:hover {
+			opacity: 0.95;
+			box-shadow: 0 4px 12px ${config.primaryColor}50;
+		}
+
+		.oc-panel-primary-btn svg {
+			width: 16px;
+			height: 16px;
+		}
+
+		.oc-panel-tabs {
+			display: flex;
+			margin: 16px 16px 0;
+			padding: 4px;
+			background: ${panelSubtleBg};
+			border-radius: 999px;
+			flex-shrink: 0;
+		}
+
+		.oc-panel-tab {
+			flex: 1;
+			padding: 8px 16px;
+			border: none;
+			background: transparent;
+			border-radius: 999px;
+			font-size: 14px;
+			font-weight: 500;
+			color: ${panelMuted};
+			cursor: pointer;
+			transition: all 0.15s;
+		}
+
+		.oc-panel-tab.is-active {
+			background: ${panelBg};
+			box-shadow: ${config.shadowSize === "none" ? "none" : "0 1px 3px rgba(0, 0, 0, 0.1)"};
+			color: ${panelText};
+		}
+
+		.oc-panel-list {
+			display: flex;
+			flex-direction: column;
+		}
+
+		.oc-panel-list-item {
+			display: flex;
+			flex-direction: column;
+			align-items: flex-start;
+			gap: 4px;
+			width: 100%;
+			padding: 16px;
+			border: none;
+			border-bottom: 1px solid ${panelBorder};
+			background: transparent;
+			text-align: left;
+			cursor: pointer;
+			transition: background 0.15s;
+		}
+
+		.oc-panel-list-item:hover {
+			background: ${panelHoverBg};
+		}
+
+		.oc-panel-list-item.is-current {
+			background: ${panelCurrentBg};
+		}
+
+		.oc-panel-list-preview {
+			font-size: 14px;
+			line-height: 1.45;
+			color: ${panelText};
+			display: -webkit-box;
+			-webkit-line-clamp: 2;
+			-webkit-box-orient: vertical;
+			overflow: hidden;
+		}
+
+		.oc-panel-list-meta {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			font-size: 12px;
+			color: ${panelMuted};
+		}
+
+		.oc-panel-list-badge {
+			font-size: 11px;
+			font-weight: 600;
+			color: ${config.primaryColor};
 		}
 
 		.oc-header-actions {

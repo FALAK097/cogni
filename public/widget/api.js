@@ -136,6 +136,18 @@ export async function submitFeedback(messageId, feedback, reason = null) {
 }
 
 export async function fetchSessionHistory(sessionDbId) {
+  if (state.preview) {
+    const data = await requestJson(
+      `/api/dashboard/widget/sessions/${encodeURIComponent(sessionDbId)}`,
+    );
+    return {
+      sessionId: data.id,
+      browserSessionId: data.id,
+      token: null,
+      messages: data.messages || [],
+    };
+  }
+
   return requestJson(`${widgetKeyPath("/history")}?sessionId=${encodeURIComponent(sessionDbId)}`);
 }
 
