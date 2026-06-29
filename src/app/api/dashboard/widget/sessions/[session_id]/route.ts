@@ -1,13 +1,15 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
-import { eq, and } from "drizzle-orm";
-import { requireDashboardContext } from "@/lib/auth/dashboard-context";
+import { and, eq } from "drizzle-orm";
+
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
+import { getDashboardEngagedVisitorSessionCond } from "@/features/widget/server/widget-data-filters";
+import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import {
-  visitorSession as visitorSessionTable,
-  lead as leadTable,
   conversation as conversationTable,
   contact as contactTable,
+  lead as leadTable,
+  visitorSession as visitorSessionTable,
 } from "@/lib/db/schema";
 
 type RouteContext = { params: Promise<{ session_id: string }> };
@@ -51,37 +53,38 @@ export async function GET(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Widget not found." }, { status: 404 });
   }
 
-  const session = await db.visitorSession.findFirst({
-    where: {
-      id: sessionId,
-      widgetId: widget.id,
-      ...dashboardEngagedVisitorSessionWhere,
-    },
-    include: {
+  const session = await db.query.visitorSession.findFirst({
+    where: (fields, { eq, and }) =>
+      and(
+        eq(fields.id, sessionId),
+        eq(fields.widgetId, widget.id),
+        getDashboardEngagedVisitorSessionCond(fields),
+      ),
+    with: {
       contact: {
-        include: {
-          notes: {
-            orderBy: { createdAt: "desc" },
-            take: 10,
-            include: {
-              authorUser: {
-                select: { id: true, name: true },
+        with: {
+          contactNotes: {
+            orderBy: (fields, { desc }) => [desc(fields.createdAt)],
+            limit: 10,
+            with: {
+              user: {
+                columns: { id: true, name: true },
               },
             },
           },
         },
       },
-      leadCapture: { select: { leadId: true } },
+      widgetLeadCaptures: {
+        columns: { leadId: true },
+      },
       conversations: {
-        where: {
-          channel: "WIDGET",
-          messages: { contains: '"authorType":"VISITOR"' },
-        },
-        orderBy: { lastMessageAt: "desc" },
-        take: 1,
-        include: {
-          assignedMember: {
-            include: { user: true },
+        where: (fields, { eq, and, like }) =>
+          and(eq(fields.channel, "WIDGET"), like(fields.messages, '%"authorType":"VISITOR"%')),
+        orderBy: (fields, { desc }) => [desc(fields.lastMessageAt)],
+        limit: 1,
+        with: {
+          workspaceMember: {
+            with: { user: true },
           },
         },
       },
@@ -99,6 +102,41 @@ export async function GET(_request: Request, context: RouteContext) {
   const publicMessages = messagesList
     .filter((message) => message.visibility === "PUBLIC" || !message.visibility)
     .map((message) => mapMessageToClient(message, agentName));
+
+  const internalNotes = messagesList
+    .filter((message) => message.authorType === "TEAM" && message.visibility === "INTERNAL")
+    .map((message) => ({
+      id: message.id,
+      body: message.body,
+      createdAt: message.createdAt,
+    }));
+
+  const previousConversations = session.contactId
+    ? (
+        await db.query.conversation.findMany({
+          where: (fields, { eq, and, ne }) =>
+            and(
+              eq(fields.contactId, session.contactId!),
+              eq(fields.workspaceId, workspace.id),
+              conversation?.id ? ne(fields.id, conversation.id) : undefined,
+              eq(fields.channel, "WIDGET"),
+            ),
+          orderBy: (fields, { desc }) => [desc(fields.lastMessageAt)],
+          limit: 5,
+          columns: {
+            id: true,
+            subject: true,
+            status: true,
+            lastMessageAt: true,
+          },
+        })
+      ).map((entry) => ({
+        id: entry.id,
+        subject: entry.subject,
+        status: entry.status,
+        lastMessageAt: new Date(entry.lastMessageAt).toISOString(),
+      }))
+    : [];
 
   const createdAtIso = session.createdAt
     ? new Date(session.createdAt).toISOString()
@@ -126,24 +164,29 @@ export async function GET(_request: Request, context: RouteContext) {
     contactEmail: session.contact?.email,
     contactId: session.contact?.id ?? null,
     contactExternalId: session.contact?.externalId ?? null,
-    contactCreatedAt: session.contact?.createdAt?.toISOString() ?? null,
-    contactLastSeenAt: session.contact?.lastSeenAt?.toISOString() ?? null,
+    contactCreatedAt: session.contact?.createdAt
+      ? new Date(session.contact.createdAt).toISOString()
+      : null,
+    contactLastSeenAt: session.contact?.lastSeenAt
+      ? new Date(session.contact.lastSeenAt).toISOString()
+      : null,
     conversationId: conversation?.id ?? null,
     conversationStatus: conversation?.status ?? "OPEN",
     conversationChannel: conversation?.channel ?? "WIDGET",
-    conversationStartedAt:
-      conversation?.createdAt?.toISOString() ?? session.createdAt.toISOString(),
-    assigneeName: conversation?.assignedMember?.user.name ?? null,
+    conversationStartedAt: conversation?.createdAt
+      ? new Date(conversation.createdAt).toISOString()
+      : createdAtIso,
+    assigneeName: conversation?.workspaceMember?.user.name ?? null,
     assigneeId: conversation?.assignedMemberId ?? null,
     agentName,
     currentMembershipId: membership.id,
     previousConversations,
     contactNotes:
-      session.contact?.notes.map((note) => ({
+      session.contact?.contactNotes.map((note) => ({
         id: note.id,
         body: note.body,
-        createdAt: note.createdAt.toISOString(),
-        authorName: note.authorUser.name,
+        createdAt: new Date(note.createdAt).toISOString(),
+        authorName: note.user.name,
       })) ?? [],
     internalNotes,
   });
@@ -160,22 +203,25 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const widget = await db.widget.findUnique({ where: { workspaceId: workspace.id } });
+  const widget = await db.query.widget.findFirst({
+    where: (fields, { eq }) => eq(fields.workspaceId, workspace.id),
+  });
   if (!widget) {
     return NextResponse.json({ error: "Widget not found." }, { status: 404 });
   }
 
-  const session = await db.visitorSession.findFirst({
-    where: {
-      id: sessionId,
-      widgetId: widget.id,
-      ...dashboardEngagedVisitorSessionWhere,
-    },
-    include: {
+  const session = await db.query.visitorSession.findFirst({
+    where: (fields, { eq, and }) =>
+      and(
+        eq(fields.id, sessionId),
+        eq(fields.widgetId, widget.id),
+        getDashboardEngagedVisitorSessionCond(fields),
+      ),
+    with: {
       conversations: {
-        where: { channel: "WIDGET" },
-        orderBy: { lastMessageAt: "desc" },
-        take: 1,
+        where: (fields, { eq }) => eq(fields.channel, "WIDGET"),
+        orderBy: (fields, { desc }) => [desc(fields.lastMessageAt)],
+        limit: 1,
       },
     },
   });
@@ -190,13 +236,15 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   if (body.action === "assign") {
-    await db.conversation.update({
-      where: { id: conversation.id },
-      data: {
+    const nowIso = new Date().toISOString();
+    await db
+      .update(conversationTable)
+      .set({
         assignedMemberId: membership.id,
         status: "ASSIGNED",
-      },
-    });
+        updatedAt: nowIso,
+      })
+      .where(eq(conversationTable.id, conversation.id));
     return NextResponse.json({ ok: true });
   }
 
@@ -207,22 +255,23 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     const messagesList = parseMessages(conversation.messages);
-    const now = new Date();
+    const nowIso = new Date().toISOString();
     const newMessage: MessageJson = {
       id: randomUUID(),
       body: message,
       authorType: "TEAM",
       visibility: "PUBLIC",
-      createdAt: now.toISOString(),
+      createdAt: nowIso,
     };
 
-    await db.conversation.update({
-      where: { id: conversation.id },
-      data: {
-        lastMessageAt: now,
+    await db
+      .update(conversationTable)
+      .set({
+        lastMessageAt: nowIso,
+        updatedAt: nowIso,
         messages: JSON.stringify([...messagesList, newMessage]),
-      },
-    });
+      })
+      .where(eq(conversationTable.id, conversation.id));
 
     return NextResponse.json({ ok: true });
   }
@@ -234,20 +283,22 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     const messagesList = parseMessages(conversation.messages);
+    const nowIso = new Date().toISOString();
     const newMessage: MessageJson = {
       id: randomUUID(),
       body: message,
       authorType: "TEAM",
       visibility: "INTERNAL",
-      createdAt: new Date().toISOString(),
+      createdAt: nowIso,
     };
 
-    await db.conversation.update({
-      where: { id: conversation.id },
-      data: {
+    await db
+      .update(conversationTable)
+      .set({
+        updatedAt: nowIso,
         messages: JSON.stringify([...messagesList, newMessage]),
-      },
-    });
+      })
+      .where(eq(conversationTable.id, conversation.id));
 
     return NextResponse.json({ ok: true });
   }
@@ -266,14 +317,17 @@ export async function DELETE(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Widget not found." }, { status: 404 });
   }
 
-  const session = await db.visitorSession.findFirst({
-    where: {
-      id: sessionId,
-      widgetId: widget.id,
-      ...dashboardEngagedVisitorSessionWhere,
-    },
-    include: {
-      leadCapture: { select: { leadId: true } },
+  const session = await db.query.visitorSession.findFirst({
+    where: (fields, { eq, and }) =>
+      and(
+        eq(fields.id, sessionId),
+        eq(fields.widgetId, widget.id),
+        getDashboardEngagedVisitorSessionCond(fields),
+      ),
+    with: {
+      widgetLeadCaptures: {
+        columns: { leadId: true },
+      },
     },
   });
 
@@ -292,15 +346,15 @@ export async function DELETE(_request: Request, context: RouteContext) {
 
   if (session.contactId) {
     const hasConvos = await db.query.conversation.findFirst({
-      where: (fields: any, { eq }: any) => eq(fields.contactId, session.contactId!),
+      where: (fields, { eq }) => eq(fields.contactId, session.contactId!),
       columns: { id: true },
     });
     const hasLeads = await db.query.lead.findFirst({
-      where: (fields: any, { eq }: any) => eq(fields.contactId, session.contactId!),
+      where: (fields, { eq }) => eq(fields.contactId, session.contactId!),
       columns: { id: true },
     });
     const hasSessions = await db.query.visitorSession.findFirst({
-      where: (fields: any, { eq }: any) => eq(fields.contactId, session.contactId!),
+      where: (fields, { eq }) => eq(fields.contactId, session.contactId!),
       columns: { id: true },
     });
 

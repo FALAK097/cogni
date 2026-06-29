@@ -1,10 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
+import { eq } from "drizzle-orm";
 
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
 import { getConversation, markConversationAsRead } from "@/features/conversations/server/queries";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
-import { getDb } from "@/lib/db/client";
+import {
+  conversation as conversationTable,
+  visitorSession as visitorSessionTable,
+} from "@/lib/db/schema";
 
 type RouteContext = { params: Promise<{ conversation_id: string }> };
 
@@ -28,7 +32,7 @@ function mapMessageToClient(message: MessageJson, agentName: string) {
 }
 
 export async function GET(_request: Request, context: RouteContext) {
-  const { workspace, membership } = await requireDashboardContext();
+  const { db, workspace, membership } = await requireDashboardContext();
   const { conversation_id: conversationId } = await context.params;
 
   const conversation = await getConversation(workspace.id, conversationId);
@@ -51,17 +55,17 @@ export async function GET(_request: Request, context: RouteContext) {
       createdAt: message.createdAt,
     }));
 
-  const db = getDb();
-  const previous = await db.conversation.findMany({
-    where: {
-      contactId: conversation.contactId,
-      workspaceId: workspace.id,
-      id: { not: conversation.id },
-      channel: "WIDGET",
-    },
-    orderBy: { lastMessageAt: "desc" },
-    take: 5,
-    select: {
+  const previous = await db.query.conversation.findMany({
+    where: (fields, { eq, and, ne }) =>
+      and(
+        eq(fields.contactId, conversation.contactId),
+        eq(fields.workspaceId, workspace.id),
+        ne(fields.id, conversation.id),
+        eq(fields.channel, "WIDGET"),
+      ),
+    orderBy: (fields, { desc }) => [desc(fields.lastMessageAt)],
+    limit: 5,
+    columns: {
       id: true,
       subject: true,
       status: true,
@@ -72,17 +76,8 @@ export async function GET(_request: Request, context: RouteContext) {
     id: entry.id,
     subject: entry.subject,
     status: entry.status,
-    lastMessageAt: entry.lastMessageAt.toISOString(),
+    lastMessageAt: new Date(entry.lastMessageAt).toISOString(),
   }));
-
-  const contactWithNotes = conversation.contact as typeof conversation.contact & {
-    notes?: Array<{
-      id: string;
-      body: string;
-      createdAt: Date;
-      authorUser: { name: string };
-    }>;
-  };
 
   return NextResponse.json({
     id: conversation.id,
@@ -96,30 +91,32 @@ export async function GET(_request: Request, context: RouteContext) {
     pageUrl: session?.pageUrl ?? null,
     referrer: session?.referrer ?? null,
     timezone: session?.timezone ?? null,
-    createdAt: conversation.createdAt.toISOString(),
-    lastActivityAt: conversation.lastMessageAt.toISOString(),
+    createdAt: new Date(conversation.createdAt).toISOString(),
+    lastActivityAt: new Date(conversation.lastMessageAt).toISOString(),
     ipData: session?.ipData ? JSON.parse(session.ipData) : null,
     messages: publicMessages,
     contactName: conversation.contact.name,
     contactEmail: conversation.contact.email,
     contactId: conversation.contact.id,
     contactExternalId: conversation.contact.externalId,
-    contactCreatedAt: conversation.contact.createdAt.toISOString(),
-    contactLastSeenAt: conversation.contact.lastSeenAt?.toISOString() ?? null,
+    contactCreatedAt: new Date(conversation.contact.createdAt).toISOString(),
+    contactLastSeenAt: conversation.contact.lastSeenAt
+      ? new Date(conversation.contact.lastSeenAt).toISOString()
+      : null,
     conversationId: conversation.id,
     conversationStatus: conversation.status,
     conversationChannel: conversation.channel,
-    conversationStartedAt: conversation.createdAt.toISOString(),
+    conversationStartedAt: new Date(conversation.createdAt).toISOString(),
     assigneeName: conversation.assignedMember?.user.name ?? null,
     assigneeId: conversation.assignedMemberId,
     agentName,
     currentMembershipId: membership.id,
     previousConversations,
     contactNotes:
-      contactWithNotes.notes?.map((note) => ({
+      conversation.contact.notes?.map((note) => ({
         id: note.id,
         body: note.body,
-        createdAt: note.createdAt.toISOString(),
+        createdAt: new Date(note.createdAt).toISOString(),
         authorName: note.authorUser.name,
       })) ?? [],
     internalNotes,
@@ -137,8 +134,9 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const conversation = await db.conversation.findFirst({
-    where: { id: conversationId, workspaceId: workspace.id },
+  const conversation = await db.query.conversation.findFirst({
+    where: (fields, { eq, and }) =>
+      and(eq(fields.id, conversationId), eq(fields.workspaceId, workspace.id)),
   });
 
   if (!conversation) {
@@ -146,10 +144,10 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   if (body.action === "assign") {
-    await db.conversation.update({
-      where: { id: conversation.id },
-      data: { assignedMemberId: membership.id, status: "ASSIGNED" },
-    });
+    await db
+      .update(conversationTable)
+      .set({ assignedMemberId: membership.id, status: "ASSIGNED" })
+      .where(eq(conversationTable.id, conversation.id));
     return NextResponse.json({ ok: true });
   }
 
@@ -166,21 +164,23 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     const messagesList = JSON.parse(conversation.messages || "[]") as MessageJson[];
     const now = new Date();
+    const nowIso = now.toISOString();
     const newMessage: MessageJson = {
       id: randomUUID(),
       body: message,
       authorType: "TEAM",
       visibility: body.action === "note" ? "INTERNAL" : "PUBLIC",
-      createdAt: now.toISOString(),
+      createdAt: nowIso,
     };
 
-    await db.conversation.update({
-      where: { id: conversation.id },
-      data: {
-        ...(body.action === "reply" ? { lastMessageAt: now } : {}),
+    await db
+      .update(conversationTable)
+      .set({
+        ...(body.action === "reply" ? { lastMessageAt: nowIso, updatedAt: nowIso } : {}),
         messages: JSON.stringify([...messagesList, newMessage]),
-      },
-    });
+        updatedAt: nowIso,
+      })
+      .where(eq(conversationTable.id, conversation.id));
 
     return NextResponse.json({ ok: true });
   }
@@ -192,9 +192,10 @@ export async function DELETE(_request: Request, context: RouteContext) {
   const { db, workspace } = await requireDashboardContext();
   const { conversation_id: conversationId } = await context.params;
 
-  const conversation = await db.conversation.findFirst({
-    where: { id: conversationId, workspaceId: workspace.id },
-    include: { visitorSession: true },
+  const conversation = await db.query.conversation.findFirst({
+    where: (fields, { eq, and }) =>
+      and(eq(fields.id, conversationId), eq(fields.workspaceId, workspace.id)),
+    with: { visitorSession: true },
   });
 
   if (!conversation) {
@@ -202,12 +203,14 @@ export async function DELETE(_request: Request, context: RouteContext) {
   }
 
   if (conversation.visitorSessionId) {
-    await db.conversation.deleteMany({
-      where: { visitorSessionId: conversation.visitorSessionId },
-    });
-    await db.visitorSession.deleteMany({ where: { id: conversation.visitorSessionId } });
+    await db
+      .delete(conversationTable)
+      .where(eq(conversationTable.visitorSessionId, conversation.visitorSessionId));
+    await db
+      .delete(visitorSessionTable)
+      .where(eq(visitorSessionTable.id, conversation.visitorSessionId));
   } else {
-    await db.conversation.delete({ where: { id: conversation.id } });
+    await db.delete(conversationTable).where(eq(conversationTable.id, conversation.id));
   }
 
   return NextResponse.json({ ok: true });

@@ -52,20 +52,22 @@ export async function POST(
 
       const browserSessionId = parsed.data.sessionId ?? randomUUID();
       const visitorId = parsed.data.visitorId ?? randomUUID();
-      const visitorSession = await db.visitorSession.findFirst({
-        where: {
-          widgetId: widget.id,
-          browserSessionId,
-          hostname: PREVIEW_HOSTNAME,
-          messageCount: { gt: 0 },
-          expiresAt: { gt: new Date() },
-          conversations: {
-            some: {
-              channel: "WIDGET",
-              messages: { contains: '"authorType":"VISITOR"' },
-            },
-          },
-        },
+      const nowIso = new Date().toISOString();
+      const visitorSession = await db.query.visitorSession.findFirst({
+        where: (fields, { eq, and, gt, sql }) =>
+          and(
+            eq(fields.widgetId, widget.id),
+            eq(fields.browserSessionId, browserSessionId),
+            eq(fields.hostname, PREVIEW_HOSTNAME),
+            gt(fields.messageCount, 0),
+            gt(fields.expiresAt, nowIso),
+            sql`exists (
+              select 1 from conversation
+              where conversation.visitorSessionId = ${fields.id}
+                and conversation.channel = 'WIDGET'
+                and conversation.messages like '%"authorType":"VISITOR"%'
+            )`,
+          ),
       });
 
       const messages = visitorSession
@@ -121,7 +123,7 @@ export async function POST(
               gt(fields.expiresAt, nowIso),
               sql`exists (
                 select 1 from conversation 
-                where conversation.visitor_session_id = ${fields.id} 
+                where conversation.visitorSessionId = ${fields.id} 
                 and conversation.channel = 'WIDGET' 
                 and conversation.messages like '%"authorType":"VISITOR"%'
               )`,

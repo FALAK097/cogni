@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getInboxSummary } from "@/features/conversations/server/queries";
+import { getInboxSummary, type ParsedConversation } from "@/features/conversations/server/queries";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 
 export async function GET(request: Request) {

@@ -18,6 +18,7 @@ export function Sidebar({ initialOpen = true }: { initialOpen?: boolean }) {
   const settings = useSidebar((state) => state.settings);
 
   const openState = (hasHydrated ? isOpen : initialOpen) || (settings.isHoverOpen && isHover);
+  const canAnimate = hasHydrated;
 
   useEffect(() => {
     const handleResize = () => {

@@ -32,31 +32,31 @@ export async function GET(
 
   const currentSessionId = new URL(request.url).searchParams.get("currentSessionId");
   const token = bearerToken(request);
+  const nowIso = new Date().toISOString();
 
-  const sessions = await db.visitorSession.findMany({
-    where: {
-      widgetId: access.widget.id,
-      visitorId,
-      messageCount: { gt: 0 },
-      expiresAt: { gt: new Date() },
+  const sessions = await db.query.visitorSession.findMany({
+    where: (fields, { eq, and, gt, sql }) =>
+      and(
+        eq(fields.widgetId, access.widget.id),
+        eq(fields.visitorId, visitorId),
+        gt(fields.messageCount, 0),
+        gt(fields.expiresAt, nowIso),
+        sql`exists (
+          select 1 from conversation
+          where conversation.visitorSessionId = ${fields.id}
+            and conversation.channel = 'WIDGET'
+            and conversation.messages like '%"authorType":"VISITOR"%'
+        )`,
+      ),
+    orderBy: (fields, { desc }) => [desc(fields.lastSeenAt)],
+    limit: 20,
+    with: {
       conversations: {
-        some: {
-          channel: "WIDGET",
-          messages: { contains: '"authorType":"VISITOR"' },
-        },
-      },
-    },
-    orderBy: { lastSeenAt: "desc" },
-    take: 20,
-    include: {
-      conversations: {
-        where: {
-          channel: "WIDGET",
-          messages: { contains: '"authorType":"VISITOR"' },
-        },
-        orderBy: { lastMessageAt: "desc" },
-        take: 1,
-        select: {
+        where: (fields, { eq, and, like }) =>
+          and(eq(fields.channel, "WIDGET"), like(fields.messages, '%"authorType":"VISITOR"%')),
+        orderBy: (fields, { desc }) => [desc(fields.lastMessageAt)],
+        limit: 1,
+        columns: {
           messages: true,
           subject: true,
         },
@@ -75,7 +75,7 @@ export async function GET(
           id: session.id,
           browserSessionId: session.browserSessionId,
           token: token && session.id === currentSessionId ? session.token : null,
-          lastActivityAt: session.lastSeenAt.toISOString(),
+          lastActivityAt: new Date(session.lastSeenAt).toISOString(),
           messageCount: session.messageCount,
           preview: lastMessage?.body ?? conversation?.subject ?? "No messages yet",
           isCurrent: currentSessionId ? session.id === currentSessionId : false,

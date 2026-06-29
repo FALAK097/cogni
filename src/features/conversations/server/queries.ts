@@ -1,71 +1,94 @@
 import "server-only";
 
-import type { Prisma } from "@/generated/prisma/client";
+import { and, eq, isNull, like, ne, or, sql } from "drizzle-orm";
+
 import { getDb } from "@/lib/db/client";
+import {
+  contact as contactTable,
+  conversation as conversationTable,
+  type contact,
+  type contactNote,
+  type conversation,
+  type user,
+  type visitorSession,
+  type widget,
+  type workspaceMember,
+} from "@/lib/db/schema";
 import type { MessageJson } from "./conversation-service";
 
-const widgetConversationBase = {
-  channel: "WIDGET",
-  messages: { contains: '"authorType":"VISITOR"' },
-} satisfies Prisma.ConversationWhereInput;
+function getWidgetConversationBaseCond(c: typeof conversationTable) {
+  return and(eq(c.channel, "WIDGET"), like(c.messages, '%"authorType":"VISITOR"%'));
+}
 
-function conversationFilterWhere(
+function conversationFilterCond(
+  c: typeof conversationTable,
   filter: string | undefined,
   membershipId: string | undefined,
-): Prisma.ConversationWhereInput {
+) {
+  const base = getWidgetConversationBaseCond(c);
+
   switch (filter) {
     case "unassigned":
-      return { ...widgetConversationBase, assignedMemberId: null, status: { not: "CLOSED" } };
+      return and(base, isNull(c.assignedMemberId), ne(c.status, "CLOSED"));
     case "mine":
-      return membershipId
-        ? { ...widgetConversationBase, assignedMemberId: membershipId }
-        : { ...widgetConversationBase, id: { in: [] } };
+      return membershipId ? and(base, eq(c.assignedMemberId, membershipId)) : sql`1 = 0`;
     case "open":
-      return { ...widgetConversationBase, status: "OPEN" };
+      return and(base, eq(c.status, "OPEN"));
     case "closed":
-      return { ...widgetConversationBase, status: "CLOSED" };
+      return and(base, eq(c.status, "CLOSED"));
     default:
-      return widgetConversationBase;
+      return base;
   }
 }
 
-function conversationWhere(
+function conversationWhereCond(
+  c: typeof conversationTable,
   workspaceId: string,
   query?: string,
   filter?: string,
   membershipId?: string,
-): Prisma.ConversationWhereInput {
+) {
   const normalizedQuery = query?.trim();
+  const conds = [eq(c.workspaceId, workspaceId), conversationFilterCond(c, filter, membershipId)];
 
-  return {
-    workspaceId,
-    ...conversationFilterWhere(filter, membershipId),
-    ...(normalizedQuery
-      ? {
-          OR: [
-            { subject: { contains: normalizedQuery } },
-            { contact: { name: { contains: normalizedQuery } } },
-            { contact: { email: { contains: normalizedQuery } } },
-            { messages: { contains: normalizedQuery } },
-          ],
-        }
-      : {}),
-  };
+  if (normalizedQuery) {
+    const pattern = `%${normalizedQuery}%`;
+    conds.push(
+      or(
+        like(c.subject, pattern),
+        like(c.messages, pattern),
+        sql`exists (
+          select 1 from contact
+          where contact.id = ${c.contactId}
+            and (contact.name like ${pattern} or contact.email like ${pattern})
+        )`,
+      )!,
+    );
+  }
+
+  return and(...conds);
 }
 
-export type ParsedConversation = Omit<
-  Prisma.ConversationGetPayload<{
-    include: {
-      contact: true;
-      assignedMember: {
-        include: { user: true };
-      };
-      visitorSession: true;
-    };
-  }>,
-  "messages"
-> & {
+type ContactNoteWithAuthor = typeof contactNote.$inferSelect & {
+  user: Pick<typeof user.$inferSelect, "id" | "name">;
+};
+
+export type ParsedConversation = Omit<typeof conversation.$inferSelect, "messages"> & {
   messages: MessageJson[];
+  contact: typeof contact.$inferSelect & {
+    notes?: Array<
+      typeof contactNote.$inferSelect & {
+        authorUser: Pick<typeof user.$inferSelect, "id" | "name">;
+      }
+    >;
+  };
+  assignedMember:
+    | (typeof workspaceMember.$inferSelect & {
+        user: typeof user.$inferSelect;
+      })
+    | null;
+  visitorSession: typeof visitorSession.$inferSelect | null;
+  widget?: typeof widget.$inferSelect | null;
 };
 
 function parseMessages(messagesJson: string): MessageJson[] {
@@ -74,6 +97,38 @@ function parseMessages(messagesJson: string): MessageJson[] {
   } catch {
     return [];
   }
+}
+
+function mapConversationRow(
+  row: typeof conversationTable.$inferSelect & {
+    contact: typeof contactTable.$inferSelect & {
+      contactNotes?: ContactNoteWithAuthor[];
+    };
+    workspaceMember:
+      | (typeof workspaceMember.$inferSelect & {
+          user: typeof user.$inferSelect;
+        })
+      | null;
+    visitorSession: typeof visitorSession.$inferSelect | null;
+    widget?: typeof widget.$inferSelect | null;
+  },
+): ParsedConversation {
+  const { workspaceMember, contact: contactRow, messages, ...conversationRow } = row;
+
+  return {
+    ...conversationRow,
+    messages: parseMessages(messages),
+    assignedMember: workspaceMember,
+    contact: {
+      ...contactRow,
+      notes: contactRow.contactNotes?.map((note) => ({
+        ...note,
+        authorUser: note.user,
+      })),
+    },
+    visitorSession: row.visitorSession,
+    widget: row.widget,
+  };
 }
 
 function countUnreadMessages(messages: MessageJson[]): number {
@@ -123,9 +178,10 @@ function computeUnreadTabCounts(
 
 export async function markConversationAsRead(workspaceId: string, conversationId: string) {
   const db = getDb();
-  const conversation = await db.conversation.findFirst({
-    where: { id: conversationId, workspaceId },
-    select: { messages: true },
+  const conversation = await db.query.conversation.findFirst({
+    where: (fields, { eq, and }) =>
+      and(eq(fields.id, conversationId), eq(fields.workspaceId, workspaceId)),
+    columns: { messages: true },
   });
 
   if (!conversation) return false;
@@ -143,10 +199,10 @@ export async function markConversationAsRead(workspaceId: string, conversationId
 
   if (!changed) return true;
 
-  await db.conversation.update({
-    where: { id: conversationId },
-    data: { messages: JSON.stringify(updatedMessages) },
-  });
+  await db
+    .update(conversationTable)
+    .set({ messages: JSON.stringify(updatedMessages) })
+    .where(eq(conversationTable.id, conversationId));
 
   return true;
 }
@@ -165,35 +221,46 @@ export async function getInboxSummary(
   membershipId?: string,
 ) {
   const db = getDb();
-  const where = conversationWhere(workspaceId, query, filter, membershipId);
-  const countBase = { workspaceId, ...widgetConversationBase };
 
   const [countConversations, rawConversations] = await Promise.all([
-    db.conversation.findMany({
-      where: countBase,
-      select: {
+    db.query.conversation.findMany({
+      where: (fields, { eq, and }) =>
+        and(
+          eq(fields.workspaceId, workspaceId),
+          getWidgetConversationBaseCond(fields as typeof conversationTable),
+        ),
+      columns: {
         messages: true,
         assignedMemberId: true,
         status: true,
       },
     }),
-    db.conversation.findMany({
-      where,
-      orderBy: { lastMessageAt: "desc" },
-      include: {
+    db.query.conversation.findMany({
+      where: (fields) =>
+        conversationWhereCond(
+          fields as typeof conversationTable,
+          workspaceId,
+          query,
+          filter,
+          membershipId,
+        ),
+      orderBy: (fields, { desc }) => [desc(fields.lastMessageAt)],
+      with: {
         contact: true,
-        assignedMember: {
-          include: { user: true },
+        workspaceMember: {
+          with: { user: true },
         },
         visitorSession: true,
       },
     }),
   ]);
 
-  const conversations: ParsedConversation[] = rawConversations.map((conversation) => ({
-    ...conversation,
-    messages: parseMessages(conversation.messages),
-  }));
+  const conversations = rawConversations.map((conversation) =>
+    mapConversationRow({
+      ...conversation,
+      contact: { ...conversation.contact, contactNotes: undefined },
+    }),
+  );
 
   return {
     counts: computeUnreadTabCounts(countConversations, membershipId),
@@ -206,28 +273,29 @@ export async function getConversation(
   conversationId: string,
 ): Promise<ParsedConversation | null> {
   const db = getDb();
-  const conversation = await db.conversation.findFirst({
-    where: {
-      id: conversationId,
-      workspaceId,
-      ...widgetConversationBase,
-    },
-    include: {
+  const conversation = await db.query.conversation.findFirst({
+    where: (fields, { eq, and }) =>
+      and(
+        eq(fields.id, conversationId),
+        eq(fields.workspaceId, workspaceId),
+        getWidgetConversationBaseCond(fields as typeof conversationTable),
+      ),
+    with: {
       contact: {
-        include: {
-          notes: {
-            orderBy: { createdAt: "desc" },
-            take: 10,
-            include: {
-              authorUser: {
-                select: { id: true, name: true },
+        with: {
+          contactNotes: {
+            orderBy: (fields, { desc }) => [desc(fields.createdAt)],
+            limit: 10,
+            with: {
+              user: {
+                columns: { id: true, name: true },
               },
             },
           },
         },
       },
-      assignedMember: {
-        include: { user: true },
+      workspaceMember: {
+        with: { user: true },
       },
       visitorSession: true,
       widget: true,
@@ -236,10 +304,7 @@ export async function getConversation(
 
   if (!conversation) return null;
 
-  return {
-    ...conversation,
-    messages: parseMessages(conversation.messages),
-  };
+  return mapConversationRow(conversation);
 }
 
 export function mapConversationToListItem(conversation: ParsedConversation) {
@@ -256,7 +321,7 @@ export function mapConversationToListItem(conversation: ParsedConversation) {
     assigneeId: conversation.assignedMemberId,
     unreadCount: countUnreadMessages(conversation.messages),
     preview: lastMessage?.body ?? conversation.subject,
-    lastMessageAt: conversation.lastMessageAt.toISOString(),
+    lastMessageAt: new Date(conversation.lastMessageAt).toISOString(),
     country: conversation.visitorSession?.country ?? null,
     city: conversation.visitorSession?.city ?? null,
   };
