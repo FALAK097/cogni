@@ -2,6 +2,7 @@ import { assertPublicWidgetAccess } from "@/features/widget/server/widget-public
 import { getRequestOrigin, withWidgetCors } from "@/features/widget/server/widget-utils";
 import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
 import { getDb } from "@/lib/db/client";
+import type { SQL } from "drizzle-orm";
 
 export async function POST(
   request: Request,
@@ -15,19 +16,26 @@ export async function POST(
   const body = (await request.json()) as { searchQuery?: string | null };
   const query = body.searchQuery?.trim() ?? "";
 
-  const documents = await db.document.findMany({
-    where: {
-      workspaceId: access.widget.workspaceId,
-      status: "READY",
-      ...(query
-        ? {
-            OR: [{ title: { contains: query } }, { sourceUrl: { contains: query } }],
-          }
-        : {}),
+  const documents = await db.query.document.findMany({
+    where: (fields, { eq, and, or, like }) => {
+      const conds: SQL[] = [
+        eq(fields.workspaceId, access.widget.workspaceId),
+        eq(fields.status, "READY"),
+      ];
+      if (query) {
+        const searchCond = or(
+          like(fields.title, `%${query}%`),
+          like(fields.sourceUrl, `%${query}%`),
+        );
+        if (searchCond) {
+          conds.push(searchCond);
+        }
+      }
+      return and(...conds);
     },
-    orderBy: { updatedAt: "desc" },
-    take: 10,
-    select: {
+    orderBy: (fields, { desc }) => [desc(fields.updatedAt)],
+    limit: 10,
+    columns: {
       id: true,
       title: true,
       sourceUrl: true,
@@ -38,7 +46,7 @@ export async function POST(
   const origin = getRequestOrigin(request);
   return withWidgetCors(
     Response.json({
-      documents: documents.map((document) => ({
+      documents: documents.map((document: any) => ({
         id: document.id,
         title: document.title,
         url: document.sourceUrl,

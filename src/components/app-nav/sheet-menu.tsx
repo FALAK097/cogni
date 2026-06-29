@@ -6,7 +6,6 @@ import { ThemeLogo } from "@/components/theme-logo";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTrigger } from "@/components/ui/sheet";
 import { SITE_NAME } from "@/lib/constants";
-import { getDashboardHref } from "@/lib/deployment-urls";
 import { cn } from "@/lib/utils";
 
 export function SheetMenu() {
@@ -27,7 +26,7 @@ export function SheetMenu() {
       >
         <SheetHeader>
           <div className="flex items-center justify-center">
-            <Link href={getDashboardHref()} className="flex items-center gap-2">
+            <Link href="/dashboard" className="flex items-center gap-2">
               <ThemeLogo className="flex-shrink-0 w-6 h-6" />
               <h1
                 className={cn(

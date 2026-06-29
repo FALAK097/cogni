@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { eq } from "drizzle-orm";
+import { user } from "@/lib/db/schema";
 
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 
@@ -24,10 +26,10 @@ export async function updateProfileAction(
   }
 
   const { db, session } = await requireDashboardContext();
-  await db.user.update({
-    where: { id: session.user.id },
-    data: { name: parsed.data.name },
-  });
+  await db
+    .update(user)
+    .set({ name: parsed.data.name, updatedAt: new Date() })
+    .where(eq(user.id, session.user.id));
 
   revalidatePath("/dashboard/settings");
   return { savedAt: Date.now() };

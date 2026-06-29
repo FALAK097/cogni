@@ -31,7 +31,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
           <p className="mt-4 text-sm text-destructive">This invite does not exist.</p>
         ) : invite.acceptedAt ? (
           <p className="mt-4 text-sm text-destructive">This invite has already been accepted.</p>
-        ) : invite.expiresAt <= now ? (
+        ) : new Date(invite.expiresAt) <= now ? (
           <p className="mt-4 text-sm text-destructive">This invite has expired.</p>
         ) : (
           <>
@@ -40,7 +40,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
               <strong>{invite.workspace.name}</strong> as <strong>{invite.role}</strong>.
             </p>
             <p className="mt-2 text-xs text-muted-foreground">
-              Expires on {invite.expiresAt.toLocaleString()}.
+              Expires on {new Date(invite.expiresAt).toLocaleString()}.
             </p>
             {!session ? (
               <p className="mt-5 text-sm text-muted-foreground">

@@ -1,6 +1,6 @@
-import "server-only";
-
-import type { PrismaClient } from "@/generated/prisma/client";
+import type { Db } from "@/lib/db/client";
+import { eq } from "drizzle-orm";
+import { document as documentTable } from "@/lib/db/schema";
 
 import { extractDocumentText, indexDocumentContent } from "@/features/knowledge/server/extract";
 import { logError } from "@/lib/logging/logger";
@@ -12,13 +12,14 @@ export async function processDocument({
   documentId,
   idempotencyKey,
 }: {
-  db: PrismaClient;
+  db: Db;
   workspaceId: string;
   documentId: string;
   idempotencyKey: string;
 }) {
-  const document = await db.document.findFirst({
-    where: { id: documentId, workspaceId },
+  const document = await db.query.document.findFirst({
+    where: (fields, { eq, and }) =>
+      and(eq(fields.id, documentId), eq(fields.workspaceId, workspaceId)),
   });
 
   if (!document) {
@@ -43,10 +44,14 @@ export async function processDocument({
 
     await indexDocumentContent(db, document.id, text, workspaceId);
 
-    await db.document.update({
-      where: { id: document.id },
-      data: { status: "READY", errorMessage: null },
-    });
+    await db
+      .update(documentTable)
+      .set({
+        status: "READY",
+        errorMessage: null,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(documentTable.id, document.id));
 
     await completeWorkflowRun({
       db,
@@ -56,10 +61,14 @@ export async function processDocument({
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Processing failed.";
-    await db.document.update({
-      where: { id: document.id },
-      data: { status: "FAILED", errorMessage: message },
-    });
+    await db
+      .update(documentTable)
+      .set({
+        status: "FAILED",
+        errorMessage: message,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(documentTable.id, document.id));
     await failWorkflowRun({
       db,
       workspaceId,

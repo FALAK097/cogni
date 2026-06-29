@@ -1,5 +1,5 @@
 import { parseJsonArray } from "@/features/widget/domain";
-import { detectLeadCaptureTrigger } from "@/features/leads/server/lead-service";
+import { detectLeadCaptureTrigger } from "@/features/widget/server/lead-capture";
 import {
   assertPublicWidgetAccess,
   requireAuthorizedVisitorSession,
@@ -43,7 +43,7 @@ export async function POST(
     leadCaptureMessageThreshold: access.widget.leadCaptureMessageThreshold,
     currentMessage: body.currentMessage,
     messageCount: body.messageCount ?? authorized.session.messageCount,
-    sessionStartedAt: authorized.session.createdAt,
+    sessionStartedAt: new Date(authorized.session.createdAt),
   });
 
   const origin = getRequestOrigin(request);

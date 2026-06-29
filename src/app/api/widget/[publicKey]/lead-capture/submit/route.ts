@@ -1,4 +1,4 @@
-import { submitWidgetLeadCapture } from "@/features/leads/server/lead-service";
+import { submitWidgetLeadCapture } from "@/features/widget/server/lead-capture";
 import {
   assertPublicWidgetAccess,
   requireAuthorizedVisitorSession,

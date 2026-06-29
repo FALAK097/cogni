@@ -10,8 +10,9 @@ import {
 } from "date-fns";
 
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
-import { widgetConversationWhere } from "@/features/widget/server/widget-data-filters";
-import type { PrismaClient } from "@/generated/prisma/client";
+import { getWidgetConversationCond } from "@/features/widget/server/widget-data-filters";
+import type { Db } from "@/lib/db/client";
+import { conversation } from "@/lib/db/schema";
 import type {
   BreakdownItem,
   DashboardAnalytics,
@@ -293,8 +294,51 @@ function buildSatisfactionSeries(
   });
 }
 
+async function fetchWidgetConversations(
+  db: Db,
+  workspaceId: string,
+  start: Date,
+  end: Date,
+): Promise<ConversationRow[]> {
+  const startIso = start.toISOString();
+  const endIso = end.toISOString();
+
+  const rows = await db.query.conversation.findMany({
+    where: (fields, { and, gte, lte }) =>
+      and(
+        getWidgetConversationCond(fields as typeof conversation, workspaceId),
+        gte(fields.createdAt, startIso),
+        lte(fields.createdAt, endIso),
+      ),
+    columns: {
+      id: true,
+      status: true,
+      createdAt: true,
+      visitorSessionId: true,
+      messages: true,
+    },
+    with: {
+      visitorSession: {
+        columns: {
+          referrer: true,
+          hostname: true,
+        },
+      },
+    },
+  });
+
+  return rows.map((row) => ({
+    id: row.id,
+    status: row.status,
+    createdAt: new Date(row.createdAt),
+    visitorSessionId: row.visitorSessionId,
+    messages: row.messages,
+    visitorSession: row.visitorSession,
+  }));
+}
+
 export async function getDashboardAnalytics(
-  db: PrismaClient,
+  db: Db,
   workspaceId: string,
   startDateInput?: string | null,
   endDateInput?: string | null,
@@ -306,47 +350,9 @@ export async function getDashboardAnalytics(
   const previousEnd = endOfDay(subDays(start, 1));
   const previousStart = startOfDay(subDays(previousEnd, rangeDays - 1));
 
-  const baseWhere = widgetConversationWhere(workspaceId);
-
   const [currentConversations, previousConversations] = await Promise.all([
-    db.conversation.findMany({
-      where: {
-        ...baseWhere,
-        createdAt: { gte: start, lte: end },
-      },
-      select: {
-        id: true,
-        status: true,
-        createdAt: true,
-        visitorSessionId: true,
-        messages: true,
-        visitorSession: {
-          select: {
-            referrer: true,
-            hostname: true,
-          },
-        },
-      },
-    }),
-    db.conversation.findMany({
-      where: {
-        ...baseWhere,
-        createdAt: { gte: previousStart, lte: previousEnd },
-      },
-      select: {
-        id: true,
-        status: true,
-        createdAt: true,
-        visitorSessionId: true,
-        messages: true,
-        visitorSession: {
-          select: {
-            referrer: true,
-            hostname: true,
-          },
-        },
-      },
-    }),
+    fetchWidgetConversations(db, workspaceId, start, end),
+    fetchWidgetConversations(db, workspaceId, previousStart, previousEnd),
   ]);
 
   const current = aggregatePeriod(currentConversations);

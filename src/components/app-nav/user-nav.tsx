@@ -2,7 +2,7 @@
 
 import type { ReactElement } from "react";
 import { useState } from "react";
-import { Book, ExternalLink, LogOut } from "@/components/icons";
+import { LogOut } from "@/components/icons";
 
 import { AvatarDialog } from "@/components/avatar-dialog";
 import { ModeToggle } from "@/components/mode-toggle";
@@ -17,7 +17,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useLogout } from "@/hooks/use-auth";
-import { getDocsHref } from "@/lib/deployment-urls";
 
 type UserNavProps = {
   userData: { avatar?: string; name: string; email?: string };
@@ -78,15 +77,6 @@ export function UserNav({ userData, trigger, isSidebarOpen }: UserNavProps) {
               <div className="flex-shrink-0">{!isSidebarOpen && <ModeToggle />}</div>
             </div>
           </DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            className="cursor-pointer"
-            onClick={() => window.open(getDocsHref(), "_blank")}
-          >
-            <Book className="mr-3 w-4 h-4 text-muted-foreground" />
-            Documentation
-            <ExternalLink className="ml-auto w-3 h-3" />
-          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className="text-red-500 cursor-pointer"

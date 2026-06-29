@@ -34,7 +34,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { toast } from "@/components/ui/use-toast";
 import { useCreateWorkspaceWorkspace, useWorkspaces } from "@/hooks/query";
 import { useAuthMe, useSwitchWorkspace } from "@/hooks/use-auth";
-import { getDashboardHref } from "@/lib/deployment-urls";
 import { getPlanLimits, isUnlimited, WORKSPACE_LIMIT_REACHED_MESSAGE } from "@/lib/plan-limits";
 import { cn } from "@/lib/utils";
 
@@ -128,7 +127,7 @@ export function WorkspaceSwitcher({ isOpen }: WorkspaceSwitcherProps) {
     try {
       await switchWorkspace.mutateAsync(workspaceId);
       window.dispatchEvent(new CustomEvent("workspace-switched"));
-      window.location.assign(getDashboardHref());
+      window.location.assign("/dashboard");
     } catch (error) {
       console.error("Failed to switch workspace:", error);
     }
@@ -158,7 +157,7 @@ export function WorkspaceSwitcher({ isOpen }: WorkspaceSwitcherProps) {
           setCreateDialogOpen(false);
           form.reset();
           window.dispatchEvent(new CustomEvent("workspace-switched"));
-          window.location.assign(getDashboardHref());
+          window.location.assign("/dashboard");
         },
         onError: (error) => {
           const errorMessage = getWorkspaceErrorMessage(error);

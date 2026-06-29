@@ -6,6 +6,8 @@ import { z } from "zod";
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
 import { executeIntegrationAction } from "@/features/integrations/server/execute-action";
 import { getIntegrationTool } from "@/features/integrations/server/tool-registry";
+import { eq } from "drizzle-orm";
+import { conversation as conversationTable } from "@/lib/db/schema";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 
 export type IntegrationRunState = {
@@ -39,12 +41,10 @@ export async function runIntegrationToolAction(
   }
 
   const { db, session, workspace } = await requireDashboardContext();
-  const conversation = await db.conversation.findFirst({
-    where: {
-      id: parsed.data.conversationId,
-      workspaceId: workspace.id,
-    },
-    include: { contact: true },
+  const conversation = await db.query.conversation.findFirst({
+    where: (fields, { eq, and }) =>
+      and(eq(fields.id, parsed.data.conversationId), eq(fields.workspaceId, workspace.id)),
+    with: { contact: true },
   });
 
   if (!conversation) {
@@ -64,13 +64,14 @@ export async function runIntegrationToolAction(
       return { error: "Select a teammate to assign." };
     }
 
-    await db.conversation.update({
-      where: { id: conversation.id },
-      data: {
+    await db
+      .update(conversationTable)
+      .set({
         assignedMemberId: membershipId,
         status: "ASSIGNED",
-      },
-    });
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(conversationTable.id, conversation.id));
 
     revalidatePath("/conversations");
     return { savedAt: Date.now() };
@@ -82,9 +83,9 @@ export async function runIntegrationToolAction(
       return { error: "Enter a note before saving." };
     }
 
-    const conv = await db.conversation.findUnique({
-      where: { id: conversation.id },
-      select: { messages: true },
+    const conv = await db.query.conversation.findFirst({
+      where: (fields, { eq }) => eq(fields.id, conversation.id),
+      columns: { messages: true },
     });
 
     if (conv) {
@@ -96,12 +97,13 @@ export async function runIntegrationToolAction(
         visibility: "INTERNAL",
         createdAt: new Date().toISOString(),
       };
-      await db.conversation.update({
-        where: { id: conversation.id },
-        data: {
+      await db
+        .update(conversationTable)
+        .set({
           messages: JSON.stringify([...messagesList, newMessage]),
-        },
-      });
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(conversationTable.id, conversation.id));
     }
 
     revalidatePath("/conversations");

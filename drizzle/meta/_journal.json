@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1782465783042,
+      "tag": "0000_dapper_mauler",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1782541257729,
+      "tag": "0001_better_auth_date_types",
+      "breakpoints": true
+    }
+  ]
+}

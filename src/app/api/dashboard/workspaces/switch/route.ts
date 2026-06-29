@@ -16,11 +16,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid workspace id." }, { status: 400 });
   }
 
-  const hasMembership = await db.workspaceMember.findFirst({
-    where: {
-      userId: session.user.id,
-      workspaceId: body.data.workspaceId,
-    },
+  const hasMembership = await db.query.workspaceMember.findFirst({
+    where: (fields, { eq, and }) =>
+      and(eq(fields.userId, session.user.id), eq(fields.workspaceId, body.data.workspaceId)),
   });
 
   if (!hasMembership) {

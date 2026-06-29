@@ -38,15 +38,19 @@ export async function updateWorkspaceSettingsAction(
     return { error: "Only workspace owners can change these settings." };
   }
 
-  await db.workspace.update({
-    where: { id: workspace.id },
-    data: {
+  const { workspace: workspaceTable } = await import("@/lib/db/schema");
+  const { eq } = await import("drizzle-orm");
+
+  await db
+    .update(workspaceTable)
+    .set({
       name: parsed.data.name,
       timezone: parsed.data.timezone,
       logo: parsed.data.logo || null,
       brandColor: parsed.data.brandColor,
-    },
-  });
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(workspaceTable.id, workspace.id));
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/settings");

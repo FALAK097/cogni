@@ -1,8 +1,8 @@
 import "server-only";
 
-import type { PrismaClient } from "@/generated/prisma/client";
-
 import { randomUUID } from "node:crypto";
+import type { Db } from "@/lib/db/client";
+import { integrationAction as integrationActionTable } from "@/lib/db/schema";
 
 export async function executeIntegrationAction({
   db,
@@ -13,7 +13,7 @@ export async function executeIntegrationAction({
   requestedById,
   idempotencyKey = randomUUID(),
 }: {
-  db: PrismaClient;
+  db: Db;
   workspaceId: string;
   provider: string;
   actionType: string;
@@ -21,21 +21,21 @@ export async function executeIntegrationAction({
   requestedById?: string;
   idempotencyKey?: string;
 }) {
-  const existing = await db.integrationAction.findUnique({ where: { idempotencyKey } });
+  const existing = await db.query.integrationAction.findFirst({
+    where: (fields, { eq }) => eq(fields.idempotencyKey, idempotencyKey),
+  });
   if (existing) return existing;
 
-  const integration = await db.integration.findUnique({
-    where: {
-      workspaceId_provider: {
-        workspaceId,
-        provider,
-      },
-    },
+  const integration = await db.query.integration.findFirst({
+    where: (fields, { eq, and }) =>
+      and(eq(fields.workspaceId, workspaceId), eq(fields.provider, provider)),
   });
 
   if (!integration || integration.status !== "CONNECTED") {
-    return db.integrationAction.create({
-      data: {
+    const [failedAction] = await db
+      .insert(integrationActionTable)
+      .values({
+        id: randomUUID(),
         workspaceId,
         provider,
         actionType,
@@ -44,12 +44,16 @@ export async function executeIntegrationAction({
         status: "FAILED",
         payload: JSON.stringify(payload),
         errorMessage: `${provider} is not connected.`,
-      },
-    });
+        updatedAt: new Date().toISOString(),
+      })
+      .returning();
+    return failedAction;
   }
 
-  const action = await db.integrationAction.create({
-    data: {
+  const [action] = await db
+    .insert(integrationActionTable)
+    .values({
+      id: randomUUID(),
       workspaceId,
       provider,
       actionType,
@@ -61,8 +65,9 @@ export async function executeIntegrationAction({
         message: `${actionType} queued for ${provider}.`,
         simulated: true,
       }),
-    },
-  });
+      updatedAt: new Date().toISOString(),
+    })
+    .returning();
 
   return action;
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useLayoutEffect } from "react";
 
 import { AppTopbar } from "@/components/app-nav/app-topbar";
 import { Sidebar } from "@/components/app-nav/sidebar";
@@ -9,6 +10,7 @@ import { cn } from "@/lib/utils";
 
 type AdminPanelLayoutProps = {
   children: ReactNode;
+  initialSidebarOpen?: boolean;
   userData?: {
     avatar?: string;
     name?: string;
@@ -16,25 +18,37 @@ type AdminPanelLayoutProps = {
   };
 };
 
-export default function AdminPanelLayout({ children, userData }: AdminPanelLayoutProps) {
+export default function AdminPanelLayout({
+  children,
+  userData,
+  initialSidebarOpen = true,
+}: AdminPanelLayoutProps) {
   const isOpen = useSidebar((state) => state.isOpen);
   const isHover = useSidebar((state) => state.isHover);
   const settings = useSidebar((state) => state.settings);
+  const hasHydrated = useSidebar((state) => state._hasHydrated);
+  const setHasHydrated = useSidebar((state) => state.setHasHydrated);
 
-  const openState = isOpen || (settings.isHoverOpen && isHover);
+  useLayoutEffect(() => {
+    useSidebar.setState({ isOpen: initialSidebarOpen });
+    setHasHydrated(true);
+  }, [initialSidebarOpen, setHasHydrated]);
+
+  const openState =
+    (hasHydrated ? isOpen : initialSidebarOpen) || (settings.isHoverOpen && isHover);
 
   return (
     <>
-      <Sidebar />
+      <Sidebar initialOpen={initialSidebarOpen} />
       <main
         className={cn(
-          "min-h-screen bg-zinc-50 dark:bg-zinc-900 transition-[margin-left] ease-in-out duration-300",
+          "bg-background transition-[margin-left] ease-in-out duration-300 min-h-screen",
           !settings.disabled && (!openState ? "lg:ml-[90px]" : "lg:ml-56"),
           "print:ml-0 print:w-full print:overflow-visible",
         )}
       >
         <AppTopbar userData={userData} />
-        <div>{children}</div>
+        {children}
       </main>
     </>
   );

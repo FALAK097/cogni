@@ -1,12 +1,14 @@
 import { z } from "zod";
-
+import { randomUUID } from "node:crypto";
+import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { checkRateLimit } from "@/lib/rate-limit/memory";
+import { contact as contactTable, visitorSession as visitorSessionTable } from "@/lib/db/schema";
 
 const identifySchema = z.object({
   id: z.string().trim().min(1).max(200).optional(),
   name: z.string().trim().min(1).max(100).optional(),
-  email: z.email().optional(),
+  email: z.string().email().optional(),
 });
 
 function bearerToken(request: Request) {
@@ -30,23 +32,21 @@ export async function POST(
 
   const { publicKey } = await params;
   const db = getDb();
-  const visitorSession = await db.visitorSession.findFirst({
-    where: {
-      token,
-      expiresAt: { gt: new Date() },
-      widget: {
-        publicKey,
-        isEnabled: true,
-      },
-    },
-    include: {
-      widget: {
-        select: { workspaceId: true },
-      },
+  const nowIso = new Date().toISOString();
+
+  const visitorSession = await db.query.visitorSession.findFirst({
+    where: (fields, { eq, and, gt }) => and(eq(fields.token, token), gt(fields.expiresAt, nowIso)),
+    with: {
+      widget: true,
     },
   });
 
-  if (!visitorSession) {
+  if (
+    !visitorSession ||
+    !visitorSession.widget ||
+    visitorSession.widget.publicKey !== publicKey ||
+    !visitorSession.widget.isEnabled
+  ) {
     return Response.json({ error: "Widget session is invalid or expired." }, { status: 401 });
   }
 
@@ -63,45 +63,58 @@ export async function POST(
     );
   }
 
-  const contact = await db.contact.findFirst({
-    where: {
-      workspaceId: visitorSession.widget.workspaceId,
-      OR: [
-        ...(parsed.data.id ? [{ externalId: parsed.data.id }] : []),
-        ...(parsed.data.email ? [{ email: parsed.data.email }] : []),
-      ],
+  const contact = await db.query.contact.findFirst({
+    where: (fields, { eq, and, or }) => {
+      const orConds = [];
+      if (parsed.data.id) orConds.push(eq(fields.externalId, parsed.data.id));
+      if (parsed.data.email) orConds.push(eq(fields.email, parsed.data.email));
+      return and(eq(fields.workspaceId, visitorSession.widget.workspaceId), or(...orConds));
     },
   });
+
   const name =
     parsed.data.name ?? parsed.data.email?.split("@")[0] ?? contact?.name ?? "Website visitor";
-  const resolvedContact = contact
-    ? await db.contact.update({
-        where: { id: contact.id },
-        data: {
-          name,
-          email: parsed.data.email ?? contact.email,
-          externalId: parsed.data.id ?? contact.externalId,
-          lastSeenAt: new Date(),
-        },
-      })
-    : await db.contact.create({
-        data: {
-          workspaceId: visitorSession.widget.workspaceId,
-          name,
-          email: parsed.data.email,
-          externalId: parsed.data.id,
-          lastSeenAt: new Date(),
-        },
-      });
+  const now = new Date().toISOString();
 
-  await db.visitorSession.update({
-    where: { id: visitorSession.id },
-    data: {
+  let resolvedContact;
+  if (contact) {
+    const results = await db
+      .update(contactTable)
+      .set({
+        name,
+        email: parsed.data.email ?? contact.email,
+        externalId: parsed.data.id ?? contact.externalId,
+        lastSeenAt: now,
+        updatedAt: now,
+      })
+      .where(eq(contactTable.id, contact.id))
+      .returning();
+    resolvedContact = results[0];
+  } else {
+    const results = await db
+      .insert(contactTable)
+      .values({
+        id: randomUUID(),
+        workspaceId: visitorSession.widget.workspaceId,
+        name,
+        email: parsed.data.email ?? null,
+        externalId: parsed.data.id ?? null,
+        lastSeenAt: now,
+        updatedAt: now,
+      })
+      .returning();
+    resolvedContact = results[0];
+  }
+
+  await db
+    .update(visitorSessionTable)
+    .set({
       contactId: resolvedContact.id,
-      externalId: parsed.data.id,
-      lastSeenAt: new Date(),
-    },
-  });
+      externalId: parsed.data.id ?? null,
+      lastSeenAt: now,
+      updatedAt: now,
+    })
+    .where(eq(visitorSessionTable.id, visitorSession.id));
 
   console.info("widget.visitor.identified", {
     workspaceId: visitorSession.widget.workspaceId,

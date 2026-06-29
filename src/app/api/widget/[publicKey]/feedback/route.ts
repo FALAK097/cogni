@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { eq } from "drizzle-orm";
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
 import {
   assertPublicWidgetAccess,
@@ -7,6 +8,7 @@ import {
 import { getRequestOrigin, withWidgetCors } from "@/features/widget/server/widget-utils";
 import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
 import { getDb } from "@/lib/db/client";
+import { conversation as conversationTable } from "@/lib/db/schema";
 
 const feedbackSchema = z.object({
   messageId: z.string().min(1),
@@ -36,11 +38,9 @@ export async function POST(
     return Response.json({ error: "Session not found." }, { status: 404 });
   }
 
-  const conversation = await db.conversation.findFirst({
-    where: {
-      visitorSessionId: authorized.session.id,
-      status: { not: "CLOSED" },
-    },
+  const conversation = await db.query.conversation.findFirst({
+    where: (fields, { eq, and, ne }) =>
+      and(eq(fields.visitorSessionId, authorized.session.id), ne(fields.status, "CLOSED")),
   });
 
   if (!conversation) {
@@ -61,12 +61,13 @@ export async function POST(
     feedbackAt: new Date().toISOString(),
   };
 
-  await db.conversation.update({
-    where: { id: conversation.id },
-    data: {
+  await db
+    .update(conversationTable)
+    .set({
       messages: JSON.stringify(list),
-    },
-  });
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(conversationTable.id, conversation.id));
 
   const origin = getRequestOrigin(request);
   return withWidgetCors(

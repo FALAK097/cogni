@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { eq } from "drizzle-orm";
 
 import {
   normalizeHostname,
@@ -8,6 +9,7 @@ import {
 } from "@/features/widget/domain";
 import { ensureWorkspaceWidget, toWidgetSettings } from "@/features/widget/server/widget-service";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
+import { widget as widgetTable } from "@/lib/db/schema";
 
 async function saveWidgetConfig(body: Record<string, unknown>) {
   const { db, workspace } = await requireDashboardContext();
@@ -34,15 +36,18 @@ async function saveWidgetConfig(body: Record<string, unknown>) {
     ? body.leadCaptureKeywords.filter((item): item is string => typeof item === "string")
     : current.leadCaptureKeywords;
 
-  const updated = await db.widget.update({
-    where: { id: widget.id },
-    data: {
+  const results = await db
+    .update(widgetTable)
+    .set({
       displayName: typeof body.agentName === "string" ? body.agentName : current.displayName,
       welcomeMessage:
         typeof body.welcomeMessage === "string" ? body.welcomeMessage : current.welcomeMessage,
       logoUrl: typeof body.logoUrl === "string" ? body.logoUrl || null : current.logoUrl,
       primaryColor:
         typeof body.primaryColor === "string" ? body.primaryColor : current.primaryColor,
+      backgroundColor:
+        typeof body.backgroundColor === "string" ? body.backgroundColor : current.backgroundColor,
+      textColor: typeof body.textColor === "string" ? body.textColor : current.textColor,
       userBubbleColor:
         typeof body.userBubbleColor === "string" ? body.userBubbleColor : current.userBubbleColor,
       userBubbleTextColor:
@@ -123,9 +128,12 @@ async function saveWidgetConfig(body: Record<string, unknown>) {
       instructions:
         typeof body.instructions === "string" ? body.instructions : current.instructions,
       authorizedDomains: JSON.stringify(domains),
-    },
-  });
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(widgetTable.id, widget.id))
+    .returning();
 
+  const updated = results[0];
   const settings = toWidgetSettings(updated);
   return {
     ...settings,

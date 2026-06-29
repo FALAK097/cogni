@@ -7,10 +7,6 @@ export const queryKeys = {
     all: ["workspaces"] as const,
     list: () => [...queryKeys.workspaces.all, "list"] as const,
   },
-  leads: {
-    all: ["leads"] as const,
-    list: (workspaceId: string) => [...queryKeys.leads.all, "list", workspaceId] as const,
-  },
   analytics: {
     all: ["analytics"] as const,
     widget: () => [...queryKeys.analytics.all, "widget"] as const,

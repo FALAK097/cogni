@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { randomUUID } from "node:crypto";
 
 import {
   recordVisitorMessage,
@@ -14,6 +15,7 @@ import { verifyWidgetBootstrapToken } from "@/features/widget/server/widget-boot
 import { getRequestOrigin, withWidgetCors } from "@/features/widget/server/widget-utils";
 import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
 import { getDb } from "@/lib/db/client";
+import { attachment as attachmentTable } from "@/lib/db/schema";
 import { checkRateLimit } from "@/lib/rate-limit/memory";
 import { deleteObject, isAllowedUpload, saveObject, uploadPublicPath } from "@/lib/storage/index";
 
@@ -100,23 +102,23 @@ export async function POST(
     return Response.json({ error: "Widget session is invalid or expired." }, { status: 401 });
   }
   if (bootstrapClaims) {
-    const existingSession = await db.visitorSession.findFirst({
-      where: { widgetId: access.widget.id, browserSessionId: sessionId },
-      select: { id: true, token: true },
+    const existingSession = await db.query.visitorSession.findFirst({
+      where: (fields, { eq, and }) =>
+        and(eq(fields.widgetId, access.widget.id), eq(fields.browserSessionId, sessionId)),
+      columns: { id: true, token: true },
     });
     if (existingSession) {
-      const conversation = await db.conversation.findFirst({
-        where: { visitorSessionId: existingSession.id, channel: "WIDGET" },
+      const conversation = await db.query.conversation.findFirst({
+        where: (fields, { eq, and }) =>
+          and(eq(fields.visitorSessionId, existingSession.id), eq(fields.channel, "WIDGET")),
       });
       if (conversation) {
         const messagesList = JSON.parse(conversation.messages || "[]") as MessageJson[];
         const existingMsg = messagesList.find((m) => m.clientId === interactionId);
         const existingAttachment = existingMsg
-          ? await db.attachment.findFirst({
-              where: {
-                conversationId: conversation.id,
-                filename: file.name,
-              },
+          ? await db.query.attachment.findFirst({
+              where: (fields, { eq, and }) =>
+                and(eq(fields.conversationId, conversation.id), eq(fields.filename, file.name)),
             })
           : null;
 
@@ -145,18 +147,17 @@ export async function POST(
     }
   }
   if (authorizedSession) {
-    const conversation = await db.conversation.findFirst({
-      where: { visitorSessionId: authorizedSession.id, channel: "WIDGET" },
+    const conversation = await db.query.conversation.findFirst({
+      where: (fields, { eq, and }) =>
+        and(eq(fields.visitorSessionId, authorizedSession.id), eq(fields.channel, "WIDGET")),
     });
     if (conversation) {
       const messagesList = JSON.parse(conversation.messages || "[]") as MessageJson[];
       const existingMsg = messagesList.find((m) => m.clientId === interactionId);
       const existingAttachment = existingMsg
-        ? await db.attachment.findFirst({
-            where: {
-              conversationId: conversation.id,
-              filename: file.name,
-            },
+        ? await db.query.attachment.findFirst({
+            where: (fields, { eq, and }) =>
+              and(eq(fields.conversationId, conversation.id), eq(fields.filename, file.name)),
           })
         : null;
 
@@ -221,16 +222,18 @@ export async function POST(
           clientMessageId: interactionId,
         });
 
-    const attachment = await db.attachment.create({
-      data: {
+    const [attachment] = await db
+      .insert(attachmentTable)
+      .values({
+        id: randomUUID(),
         workspaceId: access.widget.workspaceId,
         conversationId: started.conversation.id,
         filename: saved.filename,
         mimeType: saved.mimeType,
         size: saved.size,
         storageKey: saved.storageKey,
-      },
-    });
+      })
+      .returning();
 
     const origin = getRequestOrigin(request);
     return withWidgetCors(

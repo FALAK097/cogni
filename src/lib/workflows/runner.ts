@@ -1,6 +1,6 @@
-import "server-only";
-
-import type { PrismaClient } from "@/generated/prisma/client";
+import type { Db } from "@/lib/db/client";
+import { workflowRun } from "@/lib/db/schema";
+import { eq, and } from "drizzle-orm";
 
 import { emitDomainEvent } from "@/lib/events/domain-events";
 import { notifyWorkspaceMembers } from "@/lib/notifications/create-notification";
@@ -13,25 +13,31 @@ export async function startWorkflowRun({
   input,
   idempotencyKey,
 }: {
-  db: PrismaClient;
+  db: Db;
   workspaceId: string;
   name: string;
   input?: Record<string, unknown>;
   idempotencyKey?: string;
 }) {
   if (idempotencyKey) {
-    const existing = await db.workflowRun.findUnique({ where: { idempotencyKey } });
+    const existing = await db.query.workflowRun.findFirst({
+      where: (run, { eq }) => eq(run.idempotencyKey, idempotencyKey),
+    });
     if (existing) return existing;
   }
 
-  const run = await db.workflowRun.create({
-    data: {
+  const results = await db
+    .insert(workflowRun)
+    .values({
+      id: crypto.randomUUID(),
       workspaceId,
       name,
       idempotencyKey,
       input: JSON.stringify(input ?? {}),
-    },
-  });
+    })
+    .returning();
+
+  const run = results[0];
 
   await emitDomainEvent({
     db,
@@ -50,19 +56,22 @@ export async function completeWorkflowRun({
   runId,
   output,
 }: {
-  db: PrismaClient;
+  db: Db;
   workspaceId: string;
   runId: string;
   output?: Record<string, unknown>;
 }) {
-  const run = await db.workflowRun.update({
-    where: { id: runId, workspaceId },
-    data: {
+  const results = await db
+    .update(workflowRun)
+    .set({
       status: "COMPLETED",
       output: JSON.stringify(output ?? {}),
-      finishedAt: new Date(),
-    },
-  });
+      finishedAt: new Date().toISOString(),
+    })
+    .where(and(eq(workflowRun.id, runId), eq(workflowRun.workspaceId, workspaceId)))
+    .returning();
+
+  const run = results[0];
 
   await emitDomainEvent({
     db,
@@ -89,13 +98,13 @@ export async function failWorkflowRun({
   runId,
   errorMessage,
 }: {
-  db: PrismaClient;
+  db: Db;
   workspaceId: string;
   runId: string;
   errorMessage: string;
 }) {
-  const current = await db.workflowRun.findFirst({
-    where: { id: runId, workspaceId },
+  const current = await db.query.workflowRun.findFirst({
+    where: (run, { eq, and }) => and(eq(run.id, runId), eq(run.workspaceId, workspaceId)),
   });
 
   if (!current) return null;
@@ -104,15 +113,18 @@ export async function failWorkflowRun({
   const terminal = attempts >= current.maxAttempts;
   const status = terminal ? "DEAD" : "FAILED";
 
-  const run = await db.workflowRun.update({
-    where: { id: runId },
-    data: {
+  const results = await db
+    .update(workflowRun)
+    .set({
       attempts,
       status,
       errorMessage,
-      finishedAt: terminal ? new Date() : null,
-    },
-  });
+      finishedAt: terminal ? new Date().toISOString() : null,
+    })
+    .where(eq(workflowRun.id, runId))
+    .returning();
+
+  const run = results[0];
 
   await emitDomainEvent({
     db,

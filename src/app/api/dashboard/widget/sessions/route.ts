@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-
+import { eq, and, or, like, count } from "drizzle-orm";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { ensureWorkspaceWidget } from "@/features/widget/server/widget-service";
-import { engagedVisitorSessionWhere } from "@/features/widget/server/widget-data-filters";
+import { getEngagedVisitorSessionCond } from "@/features/widget/server/widget-data-filters";
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
+import { visitorSession as visitorSessionTable } from "@/lib/db/schema";
 
 export async function GET(request: Request) {
   const { db, workspace } = await requireDashboardContext();
@@ -15,45 +16,49 @@ export async function GET(request: Request) {
   const search = searchParams.get("search")?.trim();
   const status = searchParams.get("status");
 
-  const where = {
-    widgetId: widget.id,
-    ...engagedVisitorSessionWhere,
-    ...(status && status !== "all" ? { status } : {}),
-    ...(search
-      ? {
-          OR: [
-            { visitorId: { contains: search } },
-            { hostname: { contains: search } },
-            { country: { contains: search } },
-            { city: { contains: search } },
-          ],
-        }
-      : {}),
+  const getWhereClause = (fields: any, { eq, and, or, like }: any) => {
+    const conds = [eq(fields.widgetId, widget.id), getEngagedVisitorSessionCond(fields as any)];
+    if (status && status !== "all") {
+      conds.push(eq(fields.status, status));
+    }
+    if (search) {
+      conds.push(
+        or(
+          like(fields.visitorId, `%${search}%`),
+          like(fields.hostname, `%${search}%`),
+          like(fields.country, `%${search}%`),
+          like(fields.city, `%${search}%`),
+        ),
+      );
+    }
+    return and(...conds);
   };
 
-  const [total, sessions] = await Promise.all([
-    db.visitorSession.count({ where }),
-    db.visitorSession.findMany({
-      where,
-      orderBy: { lastSeenAt: "desc" },
-      skip: (page - 1) * limit,
-      take: limit,
-      include: {
+  const [totalResult, sessions] = await Promise.all([
+    (db as any)
+      .select({ val: count() })
+      .from(visitorSessionTable)
+      .where(getWhereClause(visitorSessionTable, { eq, and, or, like })),
+    db.query.visitorSession.findMany({
+      where: (fields, ops) => getWhereClause(fields, ops),
+      orderBy: (fields, { desc }) => [desc(fields.lastSeenAt)],
+      offset: (page - 1) * limit,
+      limit,
+      with: {
         contact: true,
         conversations: {
-          where: {
-            channel: "WIDGET",
-            messages: { contains: '"authorType":"VISITOR"' },
-          },
-          orderBy: { lastMessageAt: "desc" },
-          take: 1,
+          where: (fields, { eq, and, like }) =>
+            and(eq(fields.channel, "WIDGET"), like(fields.messages, '%"authorType":"VISITOR"%')),
+          orderBy: (fields, { desc }) => [desc(fields.lastMessageAt)],
+          limit: 1,
         },
       },
     }),
   ]);
+  const total = totalResult[0]?.val ?? 0;
 
   return NextResponse.json({
-    sessions: sessions.map((session) => ({
+    sessions: sessions.map((session: any) => ({
       id: session.id,
       visitorId: session.visitorId,
       status: session.status,
@@ -64,8 +69,12 @@ export async function GET(request: Request) {
       browser: session.browser,
       os: session.os,
       hostname: session.hostname,
-      lastActivityAt: session.lastSeenAt.toISOString(),
-      createdAt: session.createdAt.toISOString(),
+      lastActivityAt: session.lastSeenAt
+        ? new Date(session.lastSeenAt).toISOString()
+        : new Date().toISOString(),
+      createdAt: session.createdAt
+        ? new Date(session.createdAt).toISOString()
+        : new Date().toISOString(),
       contactName: session.contact?.name ?? "Visitor",
       contactEmail: session.contact?.email,
       preview: (() => {

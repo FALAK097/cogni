@@ -1,32 +1,55 @@
 import "server-only";
 
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
-import { PrismaD1 } from "@prisma/adapter-d1";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
+import type { D1Database } from "@cloudflare/workers-types";
+import { drizzle as drizzleD1 } from "drizzle-orm/d1";
+import { drizzle as drizzleBetterSqlite3 } from "drizzle-orm/better-sqlite3";
+import type { BaseSQLiteDatabase } from "drizzle-orm/sqlite-core/db";
+import Database from "better-sqlite3";
 
-import { PrismaClient } from "@/generated/prisma/client";
+import * as schema from "./schema";
+import * as relations from "./relations";
 import { env } from "@/lib/env/server";
 
-let prisma: PrismaClient | undefined;
+const fullSchema = { ...schema, ...relations };
 
-export function getDb() {
-  if (prisma) {
-    return prisma;
+type DrizzleDb = BaseSQLiteDatabase<"sync" | "async", unknown, typeof fullSchema>;
+
+let db: DrizzleDb | undefined;
+
+export type Db = DrizzleDb;
+
+type CloudflareD1Env = {
+  DB?: D1Database;
+};
+
+function getD1Binding() {
+  if (env.ENV !== "production") {
+    return null;
   }
 
-  const accountId = env.CLOUDFLARE_ACCOUNT_ID;
-  const apiToken = env.CLOUDFLARE_API_TOKEN;
-  const databaseId = env.D1_DATABASE_ID;
-  const useD1 =
-    env.ENV === "production" && Boolean(accountId) && Boolean(apiToken) && Boolean(databaseId);
-  const adapter =
-    useD1 && accountId && apiToken && databaseId
-      ? new PrismaD1({
-          CLOUDFLARE_ACCOUNT_ID: accountId,
-          CLOUDFLARE_D1_TOKEN: apiToken,
-          CLOUDFLARE_DATABASE_ID: databaseId,
-        })
-      : new PrismaBetterSqlite3({ url: env.DATABASE_URL });
+  try {
+    return (getCloudflareContext().env as CloudflareD1Env).DB ?? null;
+  } catch {
+    return null;
+  }
+}
 
-  prisma = new PrismaClient({ adapter });
-  return prisma;
+export function getDb(): Db {
+  if (db) {
+    return db;
+  }
+
+  const d1Binding = getD1Binding();
+  if (d1Binding) {
+    db = drizzleD1(d1Binding, { schema: fullSchema });
+  } else {
+    // Local SQLite development using better-sqlite3
+    const databaseUrl = env.DATABASE_URL || "file:./dev.db";
+    const dbPath = databaseUrl.replace(/^file:/, "");
+    const sqlite = new Database(dbPath);
+    db = drizzleBetterSqlite3(sqlite, { schema: fullSchema }) as DrizzleDb;
+  }
+
+  return db;
 }

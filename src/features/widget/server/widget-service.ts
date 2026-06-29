@@ -1,6 +1,8 @@
 import "server-only";
 
-import type { PrismaClient } from "@/generated/prisma/client";
+import { randomUUID } from "node:crypto";
+import type { Db } from "@/lib/db/client";
+import { widget as widgetTable } from "@/lib/db/schema";
 import {
   hostnameMatches,
   normalizeLauncherSize,
@@ -19,14 +21,23 @@ import {
 
 type WidgetRecord = Awaited<ReturnType<typeof ensureWorkspaceWidget>>;
 
-export async function ensureWorkspaceWidget(db: PrismaClient, workspaceId: string) {
-  return db.widget.upsert({
-    where: { workspaceId },
-    update: {},
-    create: {
-      workspaceId,
-    },
+export async function ensureWorkspaceWidget(db: Db, workspaceId: string) {
+  const existing = await db.query.widget.findFirst({
+    where: (fields, { eq }) => eq(fields.workspaceId, workspaceId),
   });
+  if (existing) return existing;
+
+  const [created] = await db
+    .insert(widgetTable)
+    .values({
+      id: randomUUID(),
+      publicKey: randomUUID().replace(/-/g, ""),
+      workspaceId,
+      updatedAt: new Date().toISOString(),
+    })
+    .returning();
+
+  return created;
 }
 
 export function toWidgetSettings(widget: WidgetRecord): WidgetSettings {
@@ -119,12 +130,12 @@ export function toWidgetPublicConfig(
   };
 }
 
-export async function getPublicWidget(db: PrismaClient, publicKey: string) {
-  return db.widget.findUnique({
-    where: { publicKey },
-    include: {
+export async function getPublicWidget(db: Db, publicKey: string) {
+  return db.query.widget.findFirst({
+    where: (fields, { eq }) => eq(fields.publicKey, publicKey),
+    with: {
       workspace: {
-        select: {
+        columns: {
           id: true,
           name: true,
         },
