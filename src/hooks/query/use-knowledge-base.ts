@@ -78,7 +78,7 @@ export function useKnowledgeBaseSources(
     queryKey: queryKeys.knowledgeBase.sources(workspaceId, knowledgeBaseId),
     queryFn: async () => {
       const { data, error } = await api.GET<KnowledgeBaseSourcesResponse>(
-        "/api/knowledge-base/sources",
+        "/api/dashboard/knowledge-base/sources",
         {
           params: {
             query: {
