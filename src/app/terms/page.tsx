@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import { LegalDocument } from "@/components/marketing/legal-document";
 
 export const metadata = {
@@ -243,13 +241,13 @@ export default function TermsPage() {
           title: "15. Contact",
           content: (
             <p>
-              Questions about these Terms can be sent through our{" "}
-              <Link
-                href="/contact"
-                className="text-primary underline underline-offset-4 hover:text-foreground"
+              Questions about these Terms can be sent to{" "}
+              <a
+                href="mailto:hi@falakgala.dev"
+                className="text-primary underline underline-offset-4 hover:opacity-80"
               >
-                contact page
-              </Link>
+                hi@falakgala.dev
+              </a>
               .
             </p>
           ),

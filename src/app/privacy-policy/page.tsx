@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import { LegalDocument } from "@/components/marketing/legal-document";
 
 export const metadata = {
@@ -171,13 +169,13 @@ export default function PrivacyPolicyPage() {
               </ul>
               <p>
                 Account holders can manage much of their information through the dashboard. Other
-                requests can be submitted through our{" "}
-                <Link
-                  href="/contact"
-                  className="text-primary underline underline-offset-4 hover:text-foreground"
+                requests can be submitted by emailing{" "}
+                <a
+                  href="mailto:hi@falakgala.dev"
+                  className="text-primary underline underline-offset-4 hover:opacity-80"
                 >
-                  contact page
-                </Link>
+                  hi@falakgala.dev
+                </a>
                 . We may need to verify your identity before responding.
               </p>
             </>
@@ -220,13 +218,13 @@ export default function PrivacyPolicyPage() {
           title: "13. Contact us",
           content: (
             <p>
-              For privacy questions or requests, contact us through our{" "}
-              <Link
-                href="/contact"
-                className="text-primary underline underline-offset-4 hover:text-foreground"
+              For privacy questions or requests, email{" "}
+              <a
+                href="mailto:hi@falakgala.dev"
+                className="text-primary underline underline-offset-4 hover:opacity-80"
               >
-                contact page
-              </Link>
+                hi@falakgala.dev
+              </a>
               .
             </p>
           ),
