@@ -151,6 +151,32 @@ function valuesEqual(a: unknown, b: unknown) {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
+function getPendingConfigOverrides(
+  current: Partial<WidgetCustomizerConfig>,
+  saved: Partial<WidgetCustomizerConfig>,
+): Partial<WidgetCustomizerConfig> {
+  const next: Partial<WidgetCustomizerConfig> = {};
+
+  for (const key of Object.keys(current) as (keyof WidgetCustomizerConfig)[]) {
+    const savedValue = saved[key];
+    const currentValue = current[key];
+
+    if (savedValue === undefined || !valuesEqual(currentValue, savedValue)) {
+      setConfigOverride(next, key, currentValue);
+    }
+  }
+
+  return next;
+}
+
+function setConfigOverride<K extends keyof WidgetCustomizerConfig>(
+  target: Partial<WidgetCustomizerConfig>,
+  key: K,
+  value: WidgetCustomizerConfig[K] | undefined,
+) {
+  target[key] = value;
+}
+
 function toSavePayload(config: WidgetCustomizerConfig) {
   return {
     agentName: config.agentName,
@@ -450,20 +476,9 @@ export function WidgetCustomizer({
         {
           onSuccess: () => {
             isSavingRef.current = false;
-            setConfigOverrides((current) => {
-              const next: Partial<WidgetCustomizerConfig> = {};
-              for (const key of Object.keys(current) as (keyof WidgetCustomizerConfig)[]) {
-                const savedValue = savedOverridesRef.current[key];
-                if (savedValue === undefined) {
-                  next[key] = current[key];
-                  continue;
-                }
-                if (!valuesEqual(current[key], savedValue)) {
-                  next[key] = current[key];
-                }
-              }
-              return next;
-            });
+            setConfigOverrides((current) =>
+              getPendingConfigOverrides(current, savedOverridesRef.current),
+            );
             if (pendingSaveRef.current) {
               pendingSaveRef.current = false;
               persistConfig({ silent: true });
