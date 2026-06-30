@@ -182,33 +182,47 @@ function computeUnreadTabCounts(
 
 export async function markConversationAsRead(workspaceId: string, conversationId: string) {
   const db = getDb();
-  const conversation = await db.query.conversation.findFirst({
-    where: (fields, { eq, and }) =>
-      and(eq(fields.id, conversationId), eq(fields.workspaceId, workspaceId)),
-    columns: { messages: true },
-  });
-
-  if (!conversation) return false;
-
-  const messages = parseMessages(conversation.messages);
   const now = new Date().toISOString();
-  let changed = false;
-  const updatedMessages = messages.map((message) => {
-    if (message.authorType === "VISITOR" && !message.readAt) {
-      changed = true;
-      return { ...message, readAt: now };
-    }
-    return message;
-  });
 
-  if (!changed) return true;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const conversation = await db.query.conversation.findFirst({
+      where: (fields, { eq, and }) =>
+        and(eq(fields.id, conversationId), eq(fields.workspaceId, workspaceId)),
+      columns: { messages: true, updatedAt: true },
+    });
 
-  await db
-    .update(conversationTable)
-    .set({ messages: JSON.stringify(updatedMessages) })
-    .where(eq(conversationTable.id, conversationId));
+    if (!conversation) return false;
 
-  return true;
+    const messages = parseMessages(conversation.messages);
+    let changed = false;
+    const updatedMessages = messages.map((message) => {
+      if (message.authorType === "VISITOR" && !message.readAt) {
+        changed = true;
+        return { ...message, readAt: now };
+      }
+      return message;
+    });
+
+    if (!changed) return true;
+
+    const result = await db
+      .update(conversationTable)
+      .set({
+        messages: JSON.stringify(updatedMessages),
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(conversationTable.id, conversationId),
+          eq(conversationTable.updatedAt, conversation.updatedAt),
+        ),
+      )
+      .returning({ id: conversationTable.id });
+
+    if (result.length > 0) return true;
+  }
+
+  return false;
 }
 
 function getLastPublicMessage(messages: MessageJson[]) {

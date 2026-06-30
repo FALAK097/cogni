@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useConversations } from "@/hooks/query";
@@ -62,21 +62,22 @@ export function WidgetConversations({ initialConversationId = null }: WidgetConv
     initialConversationId,
   );
   const [filter, setFilter] = useState<ConversationFilter>("all");
+  const [prevInitialConversationId, setPrevInitialConversationId] = useState(initialConversationId);
+  const [prevFilter, setPrevFilter] = useState(filter);
 
-  const { data: conversationsData } = useConversations({ page: 1, limit: 20, filter });
-
-  useEffect(() => {
+  if (initialConversationId !== prevInitialConversationId) {
+    setPrevInitialConversationId(initialConversationId);
     if (initialConversationId) {
       setSelectedConversationId(initialConversationId);
     }
-  }, [initialConversationId]);
+  }
 
-  const prevFilterRef = useRef<ConversationFilter>(filter);
-  useEffect(() => {
-    if (prevFilterRef.current === filter) return;
-    prevFilterRef.current = filter;
+  if (filter !== prevFilter) {
+    setPrevFilter(filter);
     setSelectedConversationId(null);
-  }, [filter]);
+  }
+
+  const { data: conversationsData } = useConversations({ page: 1, limit: 20, filter });
 
   const counts = useMemo(() => {
     const baseCounts = conversationsData?.counts ?? EMPTY_COUNTS;
@@ -94,7 +95,7 @@ export function WidgetConversations({ initialConversationId = null }: WidgetConv
   }, [conversationsData, selectedConversationId]);
 
   return (
-    <div className="flex h-screen flex-col bg-[#f9fafb] dark:bg-zinc-900">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#f9fafb] dark:bg-zinc-900">
       <header className="shrink-0 bg-[#f9fafb] px-4 pt-4 dark:bg-zinc-900 sm:px-5">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">Conversations</h1>
 

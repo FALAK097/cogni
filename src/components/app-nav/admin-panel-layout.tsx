@@ -38,7 +38,7 @@ export default function AdminPanelLayout({
   const openState =
     (hasHydrated ? isOpen : initialSidebarOpen) || (settings.isHoverOpen && isHover);
   const pathname = usePathname();
-  const isWidgetPage = pathname === "/widget";
+  const isFullBleedPage = pathname === "/widget" || pathname === "/conversations";
 
   return (
     <>
@@ -48,11 +48,11 @@ export default function AdminPanelLayout({
           "bg-background transition-[margin-left] ease-in-out duration-300",
           !settings.disabled && (!openState ? "lg:ml-[90px]" : "lg:ml-56"),
           "print:ml-0 print:w-full print:overflow-visible",
-          isWidgetPage ? "flex h-svh flex-col overflow-hidden" : "min-h-screen",
+          isFullBleedPage ? "flex h-svh flex-col overflow-hidden" : "min-h-screen",
         )}
       >
-        {!isWidgetPage ? <AppTopbar userData={userData} /> : null}
-        <div className={cn(isWidgetPage && "flex min-h-0 flex-1 flex-col overflow-hidden")}>
+        {!isFullBleedPage ? <AppTopbar userData={userData} /> : null}
+        <div className={cn(isFullBleedPage && "flex min-h-0 flex-1 flex-col overflow-hidden")}>
           {children}
         </div>
       </main>

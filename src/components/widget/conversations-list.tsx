@@ -64,13 +64,17 @@ export function ConversationsList({
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [accumulatedConversations, setAccumulatedConversations] = useState<ConversationSummary[]>(
-    [],
-  );
-  const prevFilterRef = useRef(filter);
-  const prevDebouncedSearchRef = useRef("");
+  const listKey = `${filter}:${debouncedSearch}`;
+  const [trackedListKey, setTrackedListKey] = useState(listKey);
+  const pagesCacheRef = useRef<Map<number, ConversationSummary[]>>(new Map());
   const { mutate: markConversationRead } = useMarkConversationRead();
   const markedReadRef = useRef<string | null>(null);
+
+  if (listKey !== trackedListKey) {
+    setTrackedListKey(listKey);
+    setPage(1);
+    pagesCacheRef.current = new Map();
+  }
 
   useEffect(() => {
     if (!selectedConversationId) {
@@ -87,24 +91,11 @@ export function ConversationsList({
     return () => clearTimeout(timer);
   }, [search]);
 
-  useEffect(() => {
-    if (prevFilterRef.current === filter) return;
-    prevFilterRef.current = filter;
-    setPage(1);
-    setAccumulatedConversations([]);
-  }, [filter]);
-
-  useEffect(() => {
-    if (prevDebouncedSearchRef.current === debouncedSearch) return;
-    prevDebouncedSearchRef.current = debouncedSearch;
-    setPage(1);
-    setAccumulatedConversations([]);
-  }, [debouncedSearch]);
-
   const {
     data: conversationsData,
     isLoading,
     isFetching,
+    isPlaceholderData,
   } = useConversations({
     page,
     limit: PAGE_SIZE,
@@ -112,32 +103,29 @@ export function ConversationsList({
     filter,
   });
 
-  useEffect(() => {
-    if (!conversationsData) return;
-
-    if (page === 1) {
-      setAccumulatedConversations(conversationsData.conversations);
-      return;
-    }
-
-    setAccumulatedConversations((current) => {
-      const existingIds = new Set(current.map((conversation) => conversation.id));
-      const next = conversationsData.conversations.filter(
-        (conversation) => !existingIds.has(conversation.id),
-      );
-      return [...current, ...next];
-    });
-  }, [conversationsData, page]);
+  if (conversationsData && !isPlaceholderData) {
+    pagesCacheRef.current.set(page, conversationsData.conversations);
+  }
 
   const totalPages = conversationsData?.pagination.pages ?? 1;
   const hasMore = page < totalPages;
-  const conversations = useMemo(
-    () =>
-      accumulatedConversations.length > 0
-        ? accumulatedConversations
-        : (conversationsData?.conversations ?? []),
-    [accumulatedConversations, conversationsData?.conversations],
-  );
+  const conversations = useMemo(() => {
+    if (page === 1) {
+      return conversationsData?.conversations ?? [];
+    }
+
+    const seen = new Set<string>();
+    const result: ConversationSummary[] = [];
+    for (let currentPage = 1; currentPage <= page; currentPage++) {
+      for (const conversation of pagesCacheRef.current.get(currentPage) ?? []) {
+        if (!seen.has(conversation.id)) {
+          seen.add(conversation.id);
+          result.push(conversation);
+        }
+      }
+    }
+    return result;
+  }, [conversationsData, page]);
   const firstConversationId = conversations[0]?.id ?? null;
 
   useEffect(() => {

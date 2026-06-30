@@ -140,20 +140,22 @@ export function ConversationDetail({
   const assignMutation = useAssignConversation();
   const sendMessageMutation = useSendConversationMessage();
 
+  const messages = session?.messages;
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [session?.messages]);
+  }, [messages]);
 
   const displayName = session ? getDisplayName(session) : "";
   const online = session ? isOnline(session.lastActivityAt) : false;
 
   const groupedMessages = useMemo(() => {
-    if (!session?.messages) return [];
+    if (!messages) return [];
 
     const groups: Array<{ date: string; messages: WidgetMessage[] }> = [];
-    for (const message of session.messages) {
+    for (const message of messages) {
       const dateKey = format(new Date(message.timestamp), "yyyy-MM-dd");
       const lastGroup = groups[groups.length - 1];
       if (
@@ -166,7 +168,7 @@ export function ConversationDetail({
       }
     }
     return groups;
-  }, [session?.messages]);
+  }, [messages]);
 
   const handleDelete = () => {
     deleteConversationMutation.mutate(conversationId, {

@@ -1,8 +1,7 @@
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
 import {
   assertPublicWidgetAccess,
-  bearerToken,
-  getAuthorizedVisitorSession,
+  requireAuthorizedVisitorSession,
 } from "@/features/widget/server/widget-public";
 import { getRequestOrigin, withWidgetCors } from "@/features/widget/server/widget-utils";
 import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
@@ -29,16 +28,24 @@ export async function GET(
   const access = await assertPublicWidgetAccess(db, publicKey, request);
   if ("error" in access) return access.error;
 
-  const visitorId = new URL(request.url).searchParams.get("visitorId");
+  const authorized = await requireAuthorizedVisitorSession(db, publicKey, request);
+  if ("error" in authorized) return authorized.error;
+
+  const queryVisitorId = new URL(request.url).searchParams.get("visitorId");
+  const visitorId = authorized.session.visitorId;
   if (!visitorId) {
-    return Response.json({ error: "visitorId is required." }, { status: 400 });
+    const origin = getRequestOrigin(request);
+    return withWidgetCors(
+      Response.json({ sessions: [] }),
+      origin,
+      validateEmbedOrigin(origin, access.allowedDomains),
+    );
+  }
+  if (queryVisitorId && queryVisitorId !== visitorId) {
+    return Response.json({ error: "visitorId does not match session." }, { status: 403 });
   }
 
   const currentSessionId = new URL(request.url).searchParams.get("currentSessionId");
-  const bearer = bearerToken(request);
-  const authorizedSession = bearer
-    ? await getAuthorizedVisitorSession(db, publicKey, bearer)
-    : null;
   const nowIso = new Date().toISOString();
 
   const sessions = await db.query.visitorSession.findMany({
@@ -81,7 +88,7 @@ export async function GET(
         return {
           id: session.id,
           browserSessionId: session.browserSessionId,
-          token: authorizedSession && session.id === authorizedSession.id ? session.token : null,
+          token: session.id === authorized.session.id ? authorized.session.token : null,
           lastActivityAt: new Date(session.lastSeenAt).toISOString(),
           messageCount: session.messageCount,
           preview: lastMessage?.body ?? conversation?.subject ?? "No messages yet",
