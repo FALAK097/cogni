@@ -3,13 +3,16 @@
 import { formatDistanceToNow } from "date-fns";
 import { parseAsStringLiteral, useQueryState } from "nuqs";
 import {
-  type ComponentType,
-  type FormEvent,
-  type RefObject,
-  useReducer,
-  useRef,
-  useState,
-} from "react";
+  type ColumnDef,
+  flexRender,
+  getCoreRowModel,
+  getSortedRowModel,
+  type Header,
+  useReactTable,
+  type SortingState,
+} from "@tanstack/react-table";
+import { type ComponentType, type FormEvent, type RefObject, useRef, useState } from "react";
+import { create } from "zustand";
 import { z } from "zod";
 
 import {
@@ -86,7 +89,6 @@ const SORT_VALUES = [
 
 type SortValue = (typeof SORT_VALUES)[number];
 type SortColumn = "displayName" | "sourceType" | "status" | "chunkCount" | "updatedAt";
-type SortState = { id: SortColumn; desc: boolean };
 type AddDialog = "url" | "upload" | "manual" | "sitemap" | null;
 
 const sortParser = parseAsStringLiteral(SORT_VALUES).withDefault("updatedAt.desc");
@@ -165,58 +167,35 @@ const FALLBACK_STATUS = {
   className: "border-slate-500/15 bg-slate-500/10 text-slate-700 dark:text-slate-300",
 };
 
-const TABLE_COLUMNS: Array<{ id: SortColumn | "actions"; label: string; className?: string }> = [
-  { id: "displayName", label: "Source" },
-  { id: "sourceType", label: "Type" },
-  { id: "status", label: "Status" },
-  { id: "chunkCount", label: "Indexed Pages" },
-  { id: "updatedAt", label: "Last Updated" },
-  { id: "actions", label: "Actions", className: "text-right" },
-];
-
-type ManagerState = {
+type KnowledgeManagerState = {
   addDialog: AddDialog;
   addMenuOpen: boolean;
   deleteTarget: KnowledgeBaseSource | null;
   deleteError: string | null;
   addError: string | null;
+  setAddDialog: (value: AddDialog) => void;
+  setAddMenuOpen: (value: boolean) => void;
+  setDeleteTarget: (value: KnowledgeBaseSource | null) => void;
+  setDeleteError: (value: string | null) => void;
+  setAddError: (value: string | null) => void;
+  startAddDialog: (value: Exclude<AddDialog, null>) => void;
+  closeDeleteDialog: () => void;
 };
 
-type ManagerAction =
-  | { type: "setAddDialog"; value: AddDialog }
-  | { type: "setAddMenuOpen"; value: boolean }
-  | { type: "setDeleteTarget"; value: KnowledgeBaseSource | null }
-  | { type: "setDeleteError"; value: string | null }
-  | { type: "setAddError"; value: string | null }
-  | { type: "startAddDialog"; value: Exclude<AddDialog, null> }
-  | { type: "closeDeleteDialog" };
-
-const initialManagerState: ManagerState = {
+const useKnowledgeManagerStore = create<KnowledgeManagerState>((set) => ({
   addDialog: null,
   addMenuOpen: false,
   deleteTarget: null,
   deleteError: null,
   addError: null,
-};
-
-function managerReducer(state: ManagerState, action: ManagerAction): ManagerState {
-  switch (action.type) {
-    case "setAddDialog":
-      return { ...state, addDialog: action.value };
-    case "setAddMenuOpen":
-      return { ...state, addMenuOpen: action.value };
-    case "setDeleteTarget":
-      return { ...state, deleteTarget: action.value };
-    case "setDeleteError":
-      return { ...state, deleteError: action.value };
-    case "setAddError":
-      return { ...state, addError: action.value };
-    case "startAddDialog":
-      return { ...state, addDialog: action.value, addMenuOpen: false, addError: null };
-    case "closeDeleteDialog":
-      return { ...state, deleteTarget: null, deleteError: null };
-  }
-}
+  setAddDialog: (value) => set({ addDialog: value }),
+  setAddMenuOpen: (value) => set({ addMenuOpen: value }),
+  setDeleteTarget: (value) => set({ deleteTarget: value }),
+  setDeleteError: (value) => set({ deleteError: value }),
+  setAddError: (value) => set({ addError: value }),
+  startAddDialog: (value) => set({ addDialog: value, addMenuOpen: false, addError: null }),
+  closeDeleteDialog: () => set({ deleteTarget: null, deleteError: null }),
+}));
 
 function getSourceTypeMeta(sourceType: string): SourceTypeMeta {
   return SOURCE_TYPE_META[sourceType.toLowerCase()] ?? FALLBACK_SOURCE_TYPE;
@@ -245,44 +224,33 @@ function formatUpdatedAt(value: string) {
   }
 }
 
-function parseSortValue(value: SortValue): SortState {
+function parseSortValue(value: SortValue): SortingState {
   const [id, dir] = value.split(".") as [SortColumn, "asc" | "desc"];
-  return { id, desc: dir === "desc" };
+  return [{ id, desc: dir === "desc" }];
 }
 
-function formatSortValue(state: SortState): SortValue {
-  return `${state.id}.${state.desc ? "desc" : "asc"}` as SortValue;
-}
-
-function compareStrings(left: string | null | undefined, right: string | null | undefined) {
-  return (left ?? "").localeCompare(right ?? "", undefined, { sensitivity: "base" });
-}
-
-function compareSources(left: KnowledgeBaseSource, right: KnowledgeBaseSource, sort: SortState) {
-  if (sort.id === "chunkCount") return left.chunkCount - right.chunkCount;
-  if (sort.id === "updatedAt") {
-    return new Date(left.updatedAt).getTime() - new Date(right.updatedAt).getTime();
-  }
-  return compareStrings(left[sort.id], right[sort.id]);
-}
-
-function sortSources(sources: KnowledgeBaseSource[], sort: SortState) {
-  return sources.toSorted((left, right) => {
-    const result = compareSources(left, right, sort);
-    return sort.desc ? -result : result;
-  });
-}
-
-function nextSortState(current: SortState, columnId: SortColumn): SortState {
-  if (current.id === columnId) return { id: columnId, desc: !current.desc };
-  return { id: columnId, desc: false };
+function formatSortValue(state: SortingState): SortValue {
+  const first = state[0];
+  if (!first) return "updatedAt.desc";
+  return `${first.id}.${first.desc ? "desc" : "asc"}` as SortValue;
 }
 
 export function WidgetKnowledgeManager() {
   const sourcesQuery = useKnowledgeBaseSources("default");
   const deleteMutation = useDeleteKnowledgeBaseSource();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [state, dispatch] = useReducer(managerReducer, initialManagerState);
+  const addDialog = useKnowledgeManagerStore((store) => store.addDialog);
+  const addMenuOpen = useKnowledgeManagerStore((store) => store.addMenuOpen);
+  const deleteTarget = useKnowledgeManagerStore((store) => store.deleteTarget);
+  const deleteError = useKnowledgeManagerStore((store) => store.deleteError);
+  const addError = useKnowledgeManagerStore((store) => store.addError);
+  const setAddDialog = useKnowledgeManagerStore((store) => store.setAddDialog);
+  const setAddMenuOpen = useKnowledgeManagerStore((store) => store.setAddMenuOpen);
+  const setDeleteTarget = useKnowledgeManagerStore((store) => store.setDeleteTarget);
+  const setDeleteError = useKnowledgeManagerStore((store) => store.setDeleteError);
+  const setAddError = useKnowledgeManagerStore((store) => store.setAddError);
+  const startAddDialog = useKnowledgeManagerStore((store) => store.startAddDialog);
+  const closeDeleteDialog = useKnowledgeManagerStore((store) => store.closeDeleteDialog);
   const [sortBy, setSortBy] = useQueryState("kbSort", sortParser);
 
   const sources = sourcesQuery.data?.sources ?? [];
@@ -291,44 +259,37 @@ export function WidgetKnowledgeManager() {
   const sorting = parseSortValue(sortBy);
 
   async function handleDeleteConfirm() {
-    if (!state.deleteTarget) return;
-    dispatch({ type: "setDeleteError", value: null });
+    if (!deleteTarget) return;
+    setDeleteError(null);
     try {
-      await deleteMutation.mutateAsync(state.deleteTarget.id);
-      dispatch({ type: "setDeleteTarget", value: null });
+      await deleteMutation.mutateAsync(deleteTarget.id);
+      setDeleteTarget(null);
     } catch (err) {
-      dispatch({
-        type: "setDeleteError",
-        value: err instanceof Error ? err.message : "Failed to delete source",
-      });
+      setDeleteError(err instanceof Error ? err.message : "Failed to delete source");
     }
   }
 
-  function handleSortChange(columnId: SortColumn) {
-    void setSortBy(formatSortValue(nextSortState(sorting, columnId)));
+  function handleSortChange(updater: SortingState | ((old: SortingState) => SortingState)) {
+    const nextSorting = typeof updater === "function" ? updater(sorting) : updater;
+    void setSortBy(formatSortValue(nextSorting));
   }
 
   function handleSourceError(message: string) {
-    dispatch({ type: "setAddError", value: message });
+    setAddError(message);
   }
 
   return (
     <div className="space-y-6 pb-10">
       <KnowledgeToolbar
-        addMenuOpen={state.addMenuOpen}
+        addMenuOpen={addMenuOpen}
         isRefetching={isRefetching}
         showRetry={sourcesQuery.isError && !isInitialLoading}
-        onAddMenuOpenChange={(open) => dispatch({ type: "setAddMenuOpen", value: open })}
+        onAddMenuOpenChange={setAddMenuOpen}
         onRetry={() => sourcesQuery.refetch()}
-        onSelectAddDialog={(dialog) => dispatch({ type: "startAddDialog", value: dialog })}
+        onSelectAddDialog={startAddDialog}
       />
 
-      {state.addError ? (
-        <ErrorBanner
-          message={state.addError}
-          onDismiss={() => dispatch({ type: "setAddError", value: null })}
-        />
-      ) : null}
+      {addError ? <ErrorBanner message={addError} onDismiss={() => setAddError(null)} /> : null}
 
       <KnowledgeSourcesPanel
         isInitialLoading={isInitialLoading}
@@ -337,20 +298,20 @@ export function WidgetKnowledgeManager() {
         sources={sources}
         sorting={sorting}
         onRetry={() => sourcesQuery.refetch()}
-        onAddFirstSource={() => dispatch({ type: "setAddDialog", value: "url" })}
+        onAddFirstSource={() => setAddDialog("url")}
         onSortChange={handleSortChange}
-        onDeleteSource={(source) => dispatch({ type: "setDeleteTarget", value: source })}
+        onDeleteSource={setDeleteTarget}
       />
 
       <KnowledgeDialogs
-        addDialog={state.addDialog}
-        deleteTarget={state.deleteTarget}
-        deleteError={state.deleteError}
+        addDialog={addDialog}
+        deleteTarget={deleteTarget}
+        deleteError={deleteError}
         deletePending={deleteMutation.isPending}
         fileInputRef={fileInputRef}
-        onAddDialogChange={(dialog) => dispatch({ type: "setAddDialog", value: dialog })}
+        onAddDialogChange={setAddDialog}
         onDeleteOpenChange={(open) => {
-          if (!open) dispatch({ type: "closeDeleteDialog" });
+          if (!open) closeDeleteDialog();
         }}
         onDeleteConfirm={() => {
           void handleDeleteConfirm();
@@ -426,14 +387,12 @@ function KnowledgeSourcesPanel({
   isError: boolean;
   isRefetching: boolean;
   sources: KnowledgeBaseSource[];
-  sorting: SortState;
+  sorting: SortingState;
   onRetry: () => void;
   onAddFirstSource: () => void;
-  onSortChange: (columnId: SortColumn) => void;
+  onSortChange: (updater: SortingState | ((old: SortingState) => SortingState)) => void;
   onDeleteSource: (source: KnowledgeBaseSource) => void;
 }) {
-  const sortedSources = sortSources(sources, sorting);
-
   return (
     <div className="overflow-hidden rounded-[20px] border border-border/60 bg-transparent shadow-none [--card-spacing:0rem]">
       {isInitialLoading ? (
@@ -444,7 +403,7 @@ function KnowledgeSourcesPanel({
         <KnowledgeEmptyState onAddFirstSource={onAddFirstSource} />
       ) : (
         <KnowledgeSourcesTable
-          sources={sortedSources}
+          sources={sources}
           sourceCount={sources.length}
           sorting={sorting}
           isRefetching={isRefetching}
@@ -483,11 +442,71 @@ function KnowledgeSourcesTable({
 }: {
   sources: KnowledgeBaseSource[];
   sourceCount: number;
-  sorting: SortState;
+  sorting: SortingState;
   isRefetching: boolean;
-  onSortChange: (columnId: SortColumn) => void;
+  onSortChange: (updater: SortingState | ((old: SortingState) => SortingState)) => void;
   onDeleteSource: (source: KnowledgeBaseSource) => void;
 }) {
+  "use no memo";
+
+  const columns: ColumnDef<KnowledgeBaseSource>[] = [
+    {
+      id: "displayName",
+      accessorKey: "displayName",
+      header: "Source",
+      cell: ({ row }) => <SourceIdentity source={row.original} />,
+    },
+    {
+      id: "sourceType",
+      accessorKey: "sourceType",
+      header: "Type",
+      cell: ({ row }) => <SourceTypeBadge sourceType={row.original.sourceType} />,
+    },
+    {
+      id: "status",
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => <StatusBadge status={row.original.status} />,
+    },
+    {
+      id: "chunkCount",
+      accessorKey: "chunkCount",
+      header: "Indexed Pages",
+      cell: ({ row }) => (
+        <span className="text-sm text-foreground/80">
+          {row.original.chunkCount > 0 ? row.original.chunkCount : "-"}
+        </span>
+      ),
+    },
+    {
+      id: "updatedAt",
+      accessorKey: "updatedAt",
+      header: "Last Updated",
+      cell: ({ row }) => (
+        <span className="text-sm text-foreground/75">
+          {formatUpdatedAt(row.original.updatedAt)}
+        </span>
+      ),
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      enableSorting: false,
+      cell: ({ row }) => <SourceActions source={row.original} onDeleteSource={onDeleteSource} />,
+    },
+  ];
+
+  // react-doctor-disable-next-line react-hooks-js/incompatible-library -- TanStack Table owns row/header model functions here by design.
+  const table = useReactTable({
+    data: sources,
+    columns,
+    state: { sorting },
+    onSortingChange: onSortChange,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  });
+  const rows = table.getRowModel().rows;
+
   return (
     <>
       <Table className="table-fixed">
@@ -500,34 +519,31 @@ function KnowledgeSourcesTable({
           <col className="w-[10%]" />
         </colgroup>
         <TableHeader className="border-b border-border/60">
-          <TableRow className="border-border/60 hover:bg-transparent">
-            {TABLE_COLUMNS.map((column) => (
-              <TableHead
-                key={column.id}
-                className={cn(
-                  "h-auto px-5 py-4 text-[12px] font-medium text-foreground/60",
-                  column.className,
-                )}
-              >
-                {column.id === "actions" ? (
-                  <span>{column.label}</span>
-                ) : (
-                  <SortHeader
-                    columnId={column.id}
-                    label={column.label}
-                    sorting={sorting}
-                    onSortChange={onSortChange}
-                  />
-                )}
-              </TableHead>
-            ))}
-          </TableRow>
+          {table.getHeaderGroups().map((headerGroup) => (
+            <TableRow key={headerGroup.id} className="border-border/60 hover:bg-transparent">
+              {headerGroup.headers.map((header) => (
+                <TableHead
+                  key={header.id}
+                  className={cn(
+                    "h-auto px-5 py-4 text-[12px] font-medium text-foreground/60",
+                    header.column.id === "actions" && "text-right",
+                  )}
+                >
+                  {header.isPlaceholder ? null : header.column.getCanSort() ? (
+                    <SortHeader header={header} />
+                  ) : (
+                    <span>{flexRender(header.column.columnDef.header, header.getContext())}</span>
+                  )}
+                </TableHead>
+              ))}
+            </TableRow>
+          ))}
         </TableHeader>
         <TableBody className="text-[13px]">
-          {sources.length === 0 ? (
+          {rows.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={TABLE_COLUMNS.length}
+                colSpan={columns.length}
                 className="h-32 text-center text-muted-foreground"
               >
                 <span className="inline-flex items-center gap-2">
@@ -537,15 +553,27 @@ function KnowledgeSourcesTable({
               </TableCell>
             </TableRow>
           ) : (
-            sources.map((source) => (
-              <SourceRow key={source.id} source={source} onDeleteSource={onDeleteSource} />
+            rows.map((row) => (
+              <TableRow key={row.id} className="border-border/60 hover:bg-muted/30">
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell
+                    key={cell.id}
+                    className={cn(
+                      "whitespace-normal px-5 py-4 align-middle",
+                      cell.column.id === "actions" && "text-right",
+                    )}
+                  >
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                ))}
+              </TableRow>
             ))
           )}
         </TableBody>
       </Table>
       <div className="flex items-center justify-between border-t border-border/60 px-5 py-4 text-sm text-muted-foreground">
         <span>
-          Showing {sources.length} of {sourceCount} source{sourceCount === 1 ? "" : "s"}
+          Showing {rows.length} of {sourceCount} source{sourceCount === 1 ? "" : "s"}
         </span>
         {isRefetching ? (
           <span className="inline-flex items-center gap-1.5 text-xs">
@@ -558,67 +586,24 @@ function KnowledgeSourcesTable({
   );
 }
 
-function SortHeader({
-  columnId,
-  label,
-  sorting,
-  onSortChange,
-}: {
-  columnId: SortColumn;
-  label: string;
-  sorting: SortState;
-  onSortChange: (columnId: SortColumn) => void;
-}) {
-  const active = sorting.id === columnId;
+function SortHeader({ header }: { header: Header<KnowledgeBaseSource, unknown> }) {
+  const sortDirection = header.column.getIsSorted();
 
   return (
     <button
       type="button"
       className="inline-flex cursor-pointer items-center gap-1.5 text-left transition-colors hover:text-foreground"
-      onClick={() => onSortChange(columnId)}
+      onClick={header.column.getToggleSortingHandler()}
     >
-      {label}
-      {active && !sorting.desc ? (
+      {flexRender(header.column.columnDef.header, header.getContext())}
+      {sortDirection === "asc" ? (
         <ChevronUp className="h-3.5 w-3.5" />
-      ) : active && sorting.desc ? (
+      ) : sortDirection === "desc" ? (
         <ChevronDown className="h-3.5 w-3.5" />
       ) : (
         <ArrowUpDown className="h-3.5 w-3.5 opacity-50" />
       )}
     </button>
-  );
-}
-
-function SourceRow({
-  source,
-  onDeleteSource,
-}: {
-  source: KnowledgeBaseSource;
-  onDeleteSource: (source: KnowledgeBaseSource) => void;
-}) {
-  return (
-    <TableRow className="border-border/60 hover:bg-muted/30">
-      <TableCell className="whitespace-normal px-5 py-4 align-middle">
-        <SourceIdentity source={source} />
-      </TableCell>
-      <TableCell className="whitespace-normal px-5 py-4 align-middle">
-        <SourceTypeBadge sourceType={source.sourceType} />
-      </TableCell>
-      <TableCell className="whitespace-normal px-5 py-4 align-middle">
-        <StatusBadge status={source.status} />
-      </TableCell>
-      <TableCell className="whitespace-normal px-5 py-4 align-middle">
-        <span className="text-sm text-foreground/80">
-          {source.chunkCount > 0 ? source.chunkCount : "-"}
-        </span>
-      </TableCell>
-      <TableCell className="whitespace-normal px-5 py-4 align-middle">
-        <span className="text-sm text-foreground/75">{formatUpdatedAt(source.updatedAt)}</span>
-      </TableCell>
-      <TableCell className="whitespace-normal px-5 py-4 align-middle text-right">
-        <SourceActions source={source} onDeleteSource={onDeleteSource} />
-      </TableCell>
-    </TableRow>
   );
 }
 
