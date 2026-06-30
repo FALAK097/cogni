@@ -1,60 +1,68 @@
 import Link from "next/link";
+import Image from "next/image";
+import { Sparkles } from "@/components/icons";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="grid h-svh overflow-hidden bg-background lg:grid-cols-2">
-      <div className="flex h-full flex-col px-6 py-8 sm:px-10 lg:px-16">
-        <Link href="/" className="flex shrink-0 items-center gap-2.5 font-semibold">
-          <span className="flex size-8 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm shadow-primary/30">
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
-            </svg>
+    <div className="grid h-svh overflow-hidden bg-white lg:grid-cols-2">
+      {/* ── Left: form panel ── */}
+      <div className="flex h-full flex-col bg-white px-6 py-8 sm:px-10 lg:px-16">
+        {/* Logo */}
+        <Link href="/" className="flex shrink-0 items-center gap-2.5">
+          <span className="flex size-8 items-center justify-center rounded-xl bg-primary text-white shadow-sm shadow-primary/30">
+            <Sparkles className="size-4" />
           </span>
-          <span className="tracking-tight text-foreground">widget</span>
+          <span className="text-[15px] font-semibold tracking-tight text-gray-900">widget</span>
         </Link>
 
+        {/* Centered form */}
         <div className="flex flex-1 items-center justify-center">
-          <div className="w-full max-w-[400px]">{children}</div>
+          <div className="w-full max-w-[380px]">{children}</div>
         </div>
 
-        <p className="shrink-0 pb-2 text-center text-xs text-muted-foreground">
+        {/* Copyright */}
+        <p className="shrink-0 pb-2 text-center text-xs text-gray-400">
           &copy; {new Date().getFullYear()} Widget Inc. All rights reserved.
         </p>
       </div>
 
-      <div className="relative hidden overflow-hidden bg-muted/30 lg:flex lg:flex-col lg:justify-center">
-        <div className="absolute -top-24 -right-24 h-[500px] w-[500px] rounded-full bg-primary/15 blur-[100px]" />
-        <div className="absolute -bottom-20 -left-20 h-[400px] w-[400px] rounded-full bg-violet-500/10 blur-[80px]" />
+      {/* ── Right: marketing panel ── */}
+      <div className="relative hidden overflow-hidden lg:flex lg:flex-col lg:justify-center">
+        {/* Background landscape image with dark overlay */}
+        <Image
+          src="/assets/widget-bg.png"
+          alt=""
+          fill
+          unoptimized
+          className="object-cover object-center"
+          priority
+          aria-hidden
+        />
+        <div className="pointer-events-none absolute inset-0 bg-indigo-900/70" />
+
+        {/* Subtle dot grid */}
         <div
-          className="absolute inset-0 opacity-[0.04]"
+          className="pointer-events-none absolute inset-0 opacity-[0.07]"
           style={{
-            backgroundImage:
-              "linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)",
-            backgroundSize: "48px 48px",
+            backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)",
+            backgroundSize: "28px 28px",
           }}
         />
 
+        {/* Content */}
         <div className="relative z-10 mx-auto max-w-md px-12">
-          <p className="mb-4 text-sm font-semibold uppercase tracking-[0.15em] text-primary">
-            AI support
+          <p className="mb-5 text-xs font-bold uppercase tracking-[0.2em] text-indigo-300">
+            AI Support
           </p>
-          <h2 className="text-3xl font-semibold leading-tight tracking-tight text-foreground">
-            Customer support that knows when to answer — and when to hand off.
+          <h2 className="text-3xl font-bold leading-tight tracking-tight text-white sm:text-4xl">
+            Customer support that knows when to answer and when to hand off.
           </h2>
-          <p className="mt-4 text-base leading-relaxed text-muted-foreground">
+          <p className="mt-5 text-base leading-relaxed text-indigo-200/80">
             Deploy a branded widget, ground AI in your knowledge base, and keep every conversation
             in one inbox.
           </p>
 
+          {/* Metric cards */}
           <div className="mt-10 grid grid-cols-3 gap-3">
             {[
               { label: "Ticket deflection", value: "94%" },
@@ -63,10 +71,10 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             ].map((metric) => (
               <div
                 key={metric.label}
-                className="rounded-xl border border-border/50 bg-background/60 p-4 backdrop-blur-sm"
+                className="rounded-xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm"
               >
-                <p className="text-xl font-bold text-foreground">{metric.value}</p>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">{metric.label}</p>
+                <p className="text-xl font-bold text-white">{metric.value}</p>
+                <p className="mt-0.5 text-[11px] text-indigo-300">{metric.label}</p>
               </div>
             ))}
           </div>
