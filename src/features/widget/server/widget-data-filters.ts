@@ -3,7 +3,9 @@ import "server-only";
 import { and, eq, ne, gt, like, sql } from "drizzle-orm";
 import type { conversation, visitorSession } from "@/lib/db/schema";
 
-export function getEngagedVisitorSessionCond(s: typeof visitorSession) {
+export function getEngagedVisitorSessionCond(
+  s: Pick<typeof visitorSession, "id" | "messageCount" | "hostname">,
+) {
   return and(
     ne(s.hostname, "dashboard-preview"),
     gt(s.messageCount, 0),
@@ -17,7 +19,9 @@ export function getEngagedVisitorSessionCond(s: typeof visitorSession) {
 }
 
 /** Dashboard inbox lists every engaged session, including dashboard preview chats. */
-export function getDashboardEngagedVisitorSessionCond(s: typeof visitorSession) {
+export function getDashboardEngagedVisitorSessionCond(
+  s: Pick<typeof visitorSession, "id" | "messageCount">,
+) {
   return and(
     gt(s.messageCount, 0),
     sql`exists (
@@ -29,7 +33,10 @@ export function getDashboardEngagedVisitorSessionCond(s: typeof visitorSession) 
   );
 }
 
-export function getWidgetConversationCond(c: typeof conversation, workspaceId: string) {
+export function getWidgetConversationCond(
+  c: Pick<typeof conversation, "workspaceId" | "channel" | "messages" | "visitorSessionId">,
+  workspaceId: string,
+) {
   return and(
     eq(c.workspaceId, workspaceId),
     eq(c.channel, "WIDGET"),

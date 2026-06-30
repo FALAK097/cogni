@@ -451,15 +451,11 @@ export function WidgetCustomizer({
           onSuccess: () => {
             isSavingRef.current = false;
             setConfigOverrides((current) => {
-              const next: Partial<WidgetCustomizerConfig> = {};
+              const next = { ...current };
               for (const key of Object.keys(current) as (keyof WidgetCustomizerConfig)[]) {
                 const savedValue = savedOverridesRef.current[key];
-                if (savedValue === undefined) {
-                  next[key] = current[key];
-                  continue;
-                }
-                if (!valuesEqual(current[key], savedValue)) {
-                  next[key] = current[key];
+                if (savedValue !== undefined && valuesEqual(current[key], savedValue)) {
+                  delete next[key];
                 }
               }
               return next;
