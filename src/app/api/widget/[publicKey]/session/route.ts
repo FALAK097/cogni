@@ -1,5 +1,5 @@
-import { z } from "zod";
 import { randomUUID } from "node:crypto";
+import { z } from "zod";
 
 import { getVisitorConversationMessages } from "@/features/conversations/server/conversation-service";
 import { parseJsonArray } from "@/features/widget/domain";
@@ -9,6 +9,8 @@ import { getPublicWidget, validateEmbedOrigin } from "@/features/widget/server/w
 import { toWidgetHistoryMessages, withWidgetCors } from "@/features/widget/server/widget-utils";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { getDb } from "@/lib/db/client";
+
+const PREVIEW_HOSTNAME = "dashboard-preview";
 
 const sessionRequestSchema = z.object({
   sessionId: z.string().uuid().nullable().default(null),
@@ -34,9 +36,11 @@ export async function POST(
 
   const { publicKey } = await params;
   const db = getDb();
-  const hostname = (parsed.data.metadata.hostname ?? parsed.data.hostname ?? "unknown")
-    .toLowerCase()
-    .replace(/\.$/, "");
+  const hostname = parsed.data.preview
+    ? PREVIEW_HOSTNAME
+    : (parsed.data.metadata.hostname ?? parsed.data.hostname ?? "unknown")
+        .toLowerCase()
+        .replace(/\.$/, "");
 
   if (parsed.data.preview) {
     try {
@@ -46,19 +50,54 @@ export async function POST(
         return Response.json({ error: "Preview access denied." }, { status: 403 });
       }
 
+      const browserSessionId = parsed.data.sessionId ?? randomUUID();
+      const visitorId = parsed.data.visitorId ?? randomUUID();
+      const nowIso = new Date().toISOString();
+      const visitorSession = await db.query.visitorSession.findFirst({
+        where: (fields, { eq, and, gt, sql }) =>
+          and(
+            eq(fields.widgetId, widget.id),
+            eq(fields.browserSessionId, browserSessionId),
+            eq(fields.hostname, PREVIEW_HOSTNAME),
+            gt(fields.messageCount, 0),
+            gt(fields.expiresAt, nowIso),
+            sql`exists (
+              select 1 from conversation
+              where conversation.visitorSessionId = ${fields.id}
+                and conversation.channel = 'WIDGET'
+                and conversation.messages like '%"authorType":"VISITOR"%'
+            )`,
+          ),
+      });
+
+      const messages = visitorSession
+        ? await getVisitorConversationMessages({
+            db,
+            visitorSessionId: visitorSession.id,
+          })
+        : [];
+
       return Response.json({
-        sessionId: null,
-        browserSessionId: parsed.data.sessionId,
-        token: null,
+        sessionId: visitorSession?.id ?? null,
+        browserSessionId,
+        token:
+          visitorSession?.token ??
+          createWidgetBootstrapToken({
+            widgetId: widget.id,
+            publicKey: widget.publicKey,
+            browserSessionId,
+            visitorId,
+            hostname: PREVIEW_HOSTNAME,
+          }),
         workspaceId: widget.workspaceId,
         publicKey: widget.publicKey,
-        isNew: true,
+        isNew: visitorSession === null,
         preview: true,
         enableLeadCapture: false,
         leadCaptureKeywords: [],
         enableBrochure: widget.enableBrochure,
         brochureSuggestionText: widget.brochureSuggestionText,
-        messages: [],
+        messages: toWidgetHistoryMessages(messages),
       });
     } catch {
       return Response.json({ error: "Preview access denied." }, { status: 403 });
@@ -84,7 +123,7 @@ export async function POST(
               gt(fields.expiresAt, nowIso),
               sql`exists (
                 select 1 from conversation 
-                where conversation.visitor_session_id = ${fields.id} 
+                where conversation.visitorSessionId = ${fields.id} 
                 and conversation.channel = 'WIDGET' 
                 and conversation.messages like '%"authorType":"VISITOR"%'
               )`,

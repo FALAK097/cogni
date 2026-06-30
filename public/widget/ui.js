@@ -78,6 +78,10 @@ export function createWidget() {
 					<span>Start a new chat</span>
 				</button>
 				<button class="oc-menu-item" data-action="recent_chats">
+					${ICONS.historyCircle}
+					<span>Recent chats</span>
+				</button>
+				<button class="oc-menu-item" data-action="recent_chats">
 					${ICONS.history}
 					<span>Recent chats</span>
 				</button>
@@ -213,8 +217,16 @@ function handleMenuAction(action) {
       showTickets();
       break;
     case "end_chat":
-      toggleChat();
+      endChat();
       break;
+  }
+}
+
+function endChat() {
+  exitPanelView();
+  stopMessagePolling();
+  if (state.isOpen) {
+    toggleChat();
   }
 }
 
@@ -513,7 +525,8 @@ async function refreshMessagesFromServer() {
 /**
  * Initialize session with backend
  */
-export async function initSession() {
+export async function initSession(options = {}) {
+  const forceNew = options.forceNew === true;
   const config = state.config;
   const scopeKey = state.publicKey || config.publicKey || config.workspaceId;
 
@@ -523,19 +536,51 @@ export async function initSession() {
   }
 
   if (state.preview) {
-    state.sessionId = generateUUID();
-    state.visitorId = null;
+    state.visitorId = getOrCreateVisitorId();
+    state.sessionId = forceNew ? generateUUID() : getStoredSessionId(scopeKey) || generateUUID();
+    if (forceNew) {
+      state.sessionDbId = null;
+      state.sessionToken = null;
+      storeSessionToken(null, scopeKey);
+    }
     state.sessionStartTime = Date.now();
     state.leadCaptureEnabled = false;
     state.brochureEnabled = config.enableBrochure || false;
     state.brochureSuggestionText = config.brochureSuggestionText || "Receive Brochure";
-    addBotMessage(config.welcomeMessage);
+    storeSessionId(state.sessionId, scopeKey);
+
+    try {
+      const data = await initSessionAPI(state.publicKey, state.sessionId, state.visitorId, true);
+      state.sessionDbId = data.sessionId;
+      state.sessionToken = data.token || null;
+      storeSessionToken(state.sessionToken, scopeKey);
+
+      if (data.browserSessionId) {
+        state.sessionId = data.browserSessionId;
+        storeSessionId(state.sessionId, scopeKey);
+      }
+
+      if (!data.isNew && data.messages && data.messages.length > 0) {
+        restoreMessages(data.messages);
+      } else {
+        addBotMessage(config.welcomeMessage);
+      }
+    } catch (error) {
+      console.error("widget: Preview session init error", error);
+      addBotMessage(config.welcomeMessage);
+    }
     return;
   }
 
   state.visitorId = getOrCreateVisitorId();
-  state.sessionId = getStoredSessionId(scopeKey) || generateUUID();
-  state.sessionToken = getStoredSessionToken(scopeKey);
+  state.sessionId = forceNew ? generateUUID() : getStoredSessionId(scopeKey) || generateUUID();
+  if (forceNew) {
+    state.sessionDbId = null;
+    state.sessionToken = null;
+    storeSessionToken(null, scopeKey);
+  } else {
+    state.sessionToken = getStoredSessionToken(scopeKey);
+  }
   storeSessionId(state.sessionId, scopeKey);
   state.sessionStartTime = Date.now();
 
@@ -1047,6 +1092,9 @@ export function destroyWidget() {
  * Reset chat to initial state
  */
 export async function resetChat() {
+  const scopeKey = state.publicKey || state.config.publicKey || state.config.workspaceId;
+
+  stopMessagePolling();
   exitPanelView();
   state.messagesContainer.innerHTML = "";
   resetChatState();
@@ -1054,12 +1102,15 @@ export async function resetChat() {
   if (privacyEl) privacyEl.style.display = "";
 
   state.sessionId = generateUUID();
-  storeSessionId(state.sessionId, state.config.workspaceId);
   state.sessionDbId = null;
   state.sessionToken = null;
-  storeSessionToken(null, state.publicKey || state.config.workspaceId);
 
-  await initSession();
+  if (scopeKey) {
+    storeSessionId(state.sessionId, scopeKey);
+    storeSessionToken(null, scopeKey);
+  }
+
+  await initSession({ forceNew: true });
 }
 
 /**

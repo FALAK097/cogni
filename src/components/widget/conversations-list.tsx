@@ -1,256 +1,258 @@
 "use client";
 
-import { formatDistanceToNow } from "date-fns";
-import { useEffect, useState } from "react";
-import {
-  ArrowUpDown,
-  ChevronLeft,
-  ChevronRight,
-  MessageSquare,
-  Monitor,
-  Search,
-  Smartphone,
-  User,
-} from "@/components/icons";
+import { format, isToday, isYesterday } from "date-fns";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Filter, Search } from "@/components/icons";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { CountryFlag } from "@/components/ui/country-flag";
-import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { useWidgetSessions } from "@/hooks/query";
-import type { WidgetSessionSummary } from "@/hooks/query";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useConversations, useMarkConversationRead } from "@/hooks/query";
+import type { ConversationFilter, ConversationSummary } from "@/hooks/query";
 import { generateAvatarUrl } from "@/lib/avatar-generator";
-import { getVisitorName } from "@/lib/constants";
+import { cn } from "@/lib/utils";
 
-import { ConversationsListSkeleton } from "./conversations-list-skeleton";
+import { hideScrollbarClassName } from "./conversation-layout";
 
 interface ConversationsListProps {
-  onSelectSession: (sessionId: string) => void;
+  filter: ConversationFilter;
+  selectedConversationId: string | null;
+  onSelectConversation: (conversationId: string) => void;
 }
 
-const PAGE_SIZE = 10;
-const VISITOR_LABEL_SEARCH_LIMIT = 100;
+const PAGE_SIZE = 20;
 
-function isVisitorLabelSearch(search: string) {
-  return search.trim().toLowerCase().startsWith("visitor");
+function getDisplayName(conversation: ConversationSummary) {
+  if (
+    conversation.contactName &&
+    conversation.contactName !== "Visitor" &&
+    conversation.contactName !== "Website visitor"
+  ) {
+    return conversation.contactName;
+  }
+  if (conversation.visitorId) {
+    return `Visitor ${conversation.visitorId.slice(0, 6)}`;
+  }
+  return "Visitor";
 }
 
-function getSessionSearchText(session: WidgetSessionSummary) {
-  return [
-    getVisitorName(session.visitorId),
-    session.visitorId,
-    session.country,
-    session.city,
-    session.browser,
-    // Note: os is not directly on WidgetSessionSummary, but is part of device type or available context
-    session.deviceType,
-    ...(session.messages ?? []).map((message) => message.content ?? ""),
-  ]
-    .join(" ")
-    .toLowerCase();
+function getInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[0]?.[0] ?? ""}${parts[1]?.[0] ?? ""}`.toUpperCase();
+  }
+  return name.slice(0, 2).toUpperCase();
 }
 
-export function ConversationsList({ onSelectSession }: ConversationsListProps) {
+function isOnline(lastActivityAt: string) {
+  return Date.now() - new Date(lastActivityAt).getTime() < 5 * 60 * 1000;
+}
+
+function formatListTime(timestamp: string) {
+  const date = new Date(timestamp);
+  if (isToday(date)) return format(date, "h:mm a");
+  if (isYesterday(date)) return "Yesterday";
+  return format(date, "MMM d");
+}
+
+export function ConversationsList({
+  filter,
+  selectedConversationId,
+  onSelectConversation,
+}: ConversationsListProps) {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [sort, setSort] = useState("lastActivityAt");
-  const [order, setOrder] = useState("desc");
+  const listKey = `${filter}:${debouncedSearch}`;
+  const [trackedListKey, setTrackedListKey] = useState(listKey);
+  const [pagesCache, setPagesCache] = useState<Record<number, ConversationSummary[]>>({});
+  const { mutate: markConversationRead } = useMarkConversationRead();
+  const markedReadRef = useRef<string | null>(null);
+
+  if (listKey !== trackedListKey) {
+    setTrackedListKey(listKey);
+    setPage(1);
+    setPagesCache({});
+  }
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search);
-      setPage(1);
-    }, 500);
+    if (!selectedConversationId) {
+      markedReadRef.current = null;
+      return;
+    }
+    if (markedReadRef.current === selectedConversationId) return;
+    markedReadRef.current = selectedConversationId;
+    markConversationRead(selectedConversationId);
+  }, [selectedConversationId, markConversationRead]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 400);
     return () => clearTimeout(timer);
   }, [search]);
 
-  const shouldClientFilterVisitorLabel = isVisitorLabelSearch(debouncedSearch);
-  const { data: sessionsData, isLoading: loading } = useWidgetSessions({
+  const {
+    data: conversationsData,
+    isLoading,
+    isFetching,
+    isPlaceholderData,
+  } = useConversations({
     page,
-    limit: shouldClientFilterVisitorLabel ? VISITOR_LABEL_SEARCH_LIMIT : PAGE_SIZE,
-    sort,
-    order,
-    search: shouldClientFilterVisitorLabel ? "" : debouncedSearch,
+    limit: PAGE_SIZE,
+    search: debouncedSearch,
+    filter,
   });
 
-  const fetchedSessions = sessionsData?.sessions || [];
-  const filteredSessions = shouldClientFilterVisitorLabel
-    ? fetchedSessions.filter((session) =>
-        getSessionSearchText(session).includes(debouncedSearch.trim().toLowerCase()),
-      )
-    : fetchedSessions;
-  const sessions = shouldClientFilterVisitorLabel
-    ? filteredSessions.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-    : filteredSessions;
+  const effectivePagesCache = useMemo(() => {
+    if (!conversationsData || isPlaceholderData) return pagesCache;
+    return { ...pagesCache, [page]: conversationsData.conversations };
+  }, [pagesCache, conversationsData, page, isPlaceholderData]);
 
-  const total = shouldClientFilterVisitorLabel
-    ? filteredSessions.length
-    : (sessionsData?.pagination?.total ?? 0);
-  const totalPages = shouldClientFilterVisitorLabel
-    ? Math.max(1, Math.ceil(total / PAGE_SIZE))
-    : (sessionsData?.pagination?.pages ?? 1);
-
-  const handleSort = (key: string) => {
-    if (sort === key) {
-      setOrder(order === "asc" ? "desc" : "asc");
-    } else {
-      setSort(key);
-      setOrder("asc");
+  const totalPages = conversationsData?.pagination.pages ?? 1;
+  const hasMore = page < totalPages;
+  const conversations = useMemo(() => {
+    if (page === 1) {
+      return effectivePagesCache[1] ?? conversationsData?.conversations ?? [];
     }
-    setPage(1);
-  };
 
-  const getDeviceIcon = (deviceType: string | null) => {
-    if (deviceType?.toLowerCase().includes("mobile"))
-      return <Smartphone className="w-4 h-4 text-muted-foreground" />;
-    return <Monitor className="w-4 h-4 text-muted-foreground" />;
+    const seen = new Set<string>();
+    const result: ConversationSummary[] = [];
+    for (let currentPage = 1; currentPage <= page; currentPage++) {
+      for (const conversation of effectivePagesCache[currentPage] ?? []) {
+        if (!seen.has(conversation.id)) {
+          seen.add(conversation.id);
+          result.push(conversation);
+        }
+      }
+    }
+    return result;
+  }, [effectivePagesCache, page, conversationsData?.conversations]);
+
+  const handleLoadMore = () => {
+    if (conversationsData && !isPlaceholderData) {
+      setPagesCache((current) => ({ ...current, [page]: conversationsData.conversations }));
+    }
+    setPage((current) => current + 1);
   };
+  const firstConversationId = conversations[0]?.id ?? null;
+
+  useEffect(() => {
+    if (selectedConversationId || !firstConversationId) return;
+    const isDesktop = window.matchMedia("(min-width: 1024px)").matches;
+    if (isDesktop) {
+      onSelectConversation(firstConversationId);
+    }
+  }, [firstConversationId, selectedConversationId, onSelectConversation]);
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header / Filters */}
-      <div className="p-4 border-b">
-        <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by visitor ID or content..."
-            className="pl-8"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+    <div className="flex h-full flex-col">
+      <div className="shrink-0 p-4">
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search conversations..."
+              className="h-9 rounded-lg border-border/50 bg-white pl-9 text-sm shadow-none dark:bg-zinc-950"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </div>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-9 w-9 shrink-0 rounded-lg border-border/50 bg-white shadow-none dark:bg-zinc-950"
+            aria-label="Filter conversations"
+          >
+            <Filter className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
-      {/* List */}
-      <div className="flex-1 overflow-auto custom-scrollbar">
-        {loading ? (
-          <ConversationsListSkeleton />
-        ) : sessions.length === 0 ? (
-          <div className="p-6">
-            <EmptyState
-              icon={MessageSquare}
-              title="No conversations yet"
-              description={
-                debouncedSearch
-                  ? `No conversations match "${debouncedSearch}". Try a different search.`
-                  : "Once visitors start chatting with your widget, their conversations will appear here."
-              }
-            />
+      <div className={cn("min-h-0 flex-1", hideScrollbarClassName)}>
+        {isLoading && conversations.length === 0 ? (
+          <div className="space-y-1 px-2 pb-2">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div key={index} className="flex items-start gap-3 rounded-lg px-3 py-3">
+                <Skeleton className="h-10 w-10 rounded-full" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-28" />
+                  <Skeleton className="h-3 w-full" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : conversations.length === 0 ? (
+          <div className="flex h-full items-center justify-center p-6 text-center">
+            <p className="text-sm text-muted-foreground">No conversations found</p>
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Visitor</TableHead>
-                <TableHead>Last Message</TableHead>
-                <TableHead>Device</TableHead>
-                <TableHead
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => handleSort("lastActivityAt")}
+          <div className="px-2 pb-2">
+            {conversations.map((conversation) => {
+              const displayName = getDisplayName(conversation);
+              const selected = selectedConversationId === conversation.id;
+              const online = isOnline(conversation.lastMessageAt);
+              const unreadCount = selected ? 0 : conversation.unreadCount;
+
+              return (
+                <button
+                  key={conversation.id}
+                  type="button"
+                  onClick={() => onSelectConversation(conversation.id)}
+                  className={cn(
+                    "flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left transition-colors",
+                    selected ? "bg-primary/5" : "hover:bg-muted/40",
+                  )}
                 >
-                  <div className="flex items-center gap-1">
-                    Activity
-                    <ArrowUpDown className="w-3 h-3" />
+                  <Avatar className="h-10 w-10">
+                    <AvatarImage
+                      src={generateAvatarUrl(conversation.visitorId)}
+                      alt={displayName}
+                    />
+                    <AvatarFallback className="bg-primary/10 text-xs font-medium text-primary">
+                      {getInitials(displayName)}
+                    </AvatarFallback>
+                    {online ? (
+                      <AvatarBadge className="size-2.5 bg-emerald-500 ring-2 ring-background" />
+                    ) : null}
+                  </Avatar>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="truncate text-sm font-semibold text-foreground">
+                        {displayName}
+                      </span>
+                      <span className="shrink-0 text-[11px] text-muted-foreground">
+                        {formatListTime(conversation.lastMessageAt)}
+                      </span>
+                    </div>
+                    <div className="mt-0.5 flex items-end justify-between gap-2">
+                      <p className="line-clamp-1 text-xs text-muted-foreground">
+                        {conversation.preview}
+                      </p>
+                      {unreadCount > 0 ? (
+                        <span className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">
+                          {unreadCount}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
-                </TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sessions.map((session) => (
-                <TableRow
-                  key={session.id}
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => onSelectSession(session.id)}
-                >
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Avatar className="w-8 h-8">
-                        <AvatarImage src={generateAvatarUrl(session.visitorId)} />
-                        <AvatarFallback>
-                          <User className="w-4 h-4" />
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium">
-                          {getVisitorName(session.visitorId)}
-                        </span>
-                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <CountryFlag countryCode={session.ipData?.countryCode ?? ""} size="sm" />{" "}
-                          {session.country || "Unknown Location"}
-                        </span>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="max-w-[300px] truncate text-sm text-muted-foreground">
-                      {session.messages?.[0]?.content || "No messages"}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2" title={session.os || ""}>
-                      {getDeviceIcon(session.deviceType)}
-                      <span className="text-sm capitalize text-muted-foreground">
-                        {session.browser || "Unknown"}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col text-sm">
-                      <span>
-                        {formatDistanceToNow(new Date(session.lastActivityAt), { addSuffix: true })}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {session._count?.messages || 0} messages
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="sm">
-                      View
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                </button>
+              );
+            })}
+          </div>
         )}
       </div>
 
-      {/* Pagination */}
-      {!loading && sessions.length > 0 ? (
-        <div className="flex items-center justify-between p-4 border-t">
-          <div className="text-sm text-muted-foreground">
-            Page {page} of {totalPages}
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
-            >
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
+      {hasMore ? (
+        <div className="shrink-0 p-3 pt-0">
+          <Button
+            variant="ghost"
+            className="h-8 w-full text-sm text-muted-foreground hover:text-foreground"
+            onClick={handleLoadMore}
+            disabled={isFetching}
+          >
+            {isFetching ? "Loading..." : "+ Load more conversations"}
+          </Button>
         </div>
       ) : null}
     </div>

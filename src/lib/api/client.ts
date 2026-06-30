@@ -60,8 +60,8 @@ function mapPath(path: string) {
     return "/api/dashboard/knowledge-base/sources/website";
   }
   if (path === "/api/conversations") return "/api/dashboard/conversations";
-  if (path.startsWith("/api/conversations/{conversation_id}")) {
-    return path.replace("/api/conversations/{conversation_id}", "/api/dashboard/conversations");
+  if (path.startsWith("/api/conversations/")) {
+    return path.replace("/api/conversations/", "/api/dashboard/conversations/");
   }
   return path;
 }

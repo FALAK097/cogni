@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { eq, and, or, like, count } from "drizzle-orm";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { ensureWorkspaceWidget } from "@/features/widget/server/widget-service";
-import { getEngagedVisitorSessionCond } from "@/features/widget/server/widget-data-filters";
+import { getDashboardEngagedVisitorSessionCond } from "@/features/widget/server/widget-data-filters";
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
 import { visitorSession as visitorSessionTable } from "@/lib/db/schema";
 
@@ -17,7 +17,10 @@ export async function GET(request: Request) {
   const status = searchParams.get("status");
 
   const getWhereClause = (fields: any, { eq, and, or, like }: any) => {
-    const conds = [eq(fields.widgetId, widget.id), getEngagedVisitorSessionCond(fields as any)];
+    const conds = [
+      eq(fields.widgetId, widget.id),
+      getDashboardEngagedVisitorSessionCond(fields as any),
+    ];
     if (status && status !== "all") {
       conds.push(eq(fields.status, status));
     }
@@ -58,42 +61,39 @@ export async function GET(request: Request) {
   const total = totalResult[0]?.val ?? 0;
 
   return NextResponse.json({
-    sessions: sessions.map((session: any) => ({
-      id: session.id,
-      visitorId: session.visitorId,
-      status: session.status,
-      messageCount: session.messageCount,
-      country: session.country,
-      city: session.city,
-      deviceType: session.deviceType,
-      browser: session.browser,
-      os: session.os,
-      hostname: session.hostname,
-      lastActivityAt: session.lastSeenAt
-        ? new Date(session.lastSeenAt).toISOString()
-        : new Date().toISOString(),
-      createdAt: session.createdAt
-        ? new Date(session.createdAt).toISOString()
-        : new Date().toISOString(),
-      contactName: session.name ?? session.contact?.name ?? "Visitor",
-      contactEmail: session.email ?? session.contact?.email,
-      preview: (() => {
-        const convo = session.conversations[0];
-        if (!convo) return "No messages yet";
-        const list = JSON.parse(convo.messages || "[]") as MessageJson[];
-        const last = list[list.length - 1];
-        return last?.body ?? convo.subject ?? "No messages yet";
-      })(),
-      messages: (() => {
-        const convo = session.conversations[0];
-        if (!convo) return [];
-        const list = JSON.parse(convo.messages || "[]") as MessageJson[];
-        const last = list[list.length - 1];
-        return last ? [{ content: last.body }] : [];
-      })(),
-      ipData: session.ipData ? JSON.parse(session.ipData) : null,
-      _count: { messages: session.messageCount },
-    })),
+    sessions: sessions.map((session: any) => {
+      const convo = session.conversations[0];
+      const list = convo ? (JSON.parse(convo.messages || "[]") as MessageJson[]) : [];
+      const publicMessages = list.filter(
+        (message) => message.visibility === "PUBLIC" || !message.visibility,
+      );
+      const last = publicMessages[publicMessages.length - 1];
+
+      return {
+        id: session.id,
+        visitorId: session.visitorId,
+        status: session.status,
+        messageCount: session.messageCount,
+        country: session.country,
+        city: session.city,
+        deviceType: session.deviceType,
+        browser: session.browser,
+        os: session.os,
+        hostname: session.hostname,
+        lastActivityAt: session.lastSeenAt
+          ? new Date(session.lastSeenAt).toISOString()
+          : new Date().toISOString(),
+        createdAt: session.createdAt
+          ? new Date(session.createdAt).toISOString()
+          : new Date().toISOString(),
+        contactName: session.name ?? session.contact?.name ?? "Visitor",
+        contactEmail: session.email ?? session.contact?.email,
+        preview: last?.body ?? convo?.subject ?? "No messages yet",
+        messages: last ? [{ content: last.body }] : [],
+        ipData: session.ipData ? JSON.parse(session.ipData) : null,
+        _count: { messages: session.messageCount },
+      };
+    }),
     pagination: {
       page,
       limit,

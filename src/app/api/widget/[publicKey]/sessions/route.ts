@@ -1,23 +1,21 @@
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
-import { getEngagedVisitorSessionCond } from "@/features/widget/server/widget-data-filters";
 import {
   assertPublicWidgetAccess,
   requireAuthorizedVisitorSession,
 } from "@/features/widget/server/widget-public";
-import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
 import { getRequestOrigin, withWidgetCors } from "@/features/widget/server/widget-utils";
+import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
 import { getDb } from "@/lib/db/client";
 
-function sessionPreview(conversations: { messages: string; subject: string }[]) {
-  const convo = conversations[0];
-  if (!convo) return "No messages yet";
-
+function getLastPublicMessage(messagesJson: string) {
   try {
-    const list = JSON.parse(convo.messages || "[]") as MessageJson[];
-    const last = list[list.length - 1];
-    return last?.body ?? convo.subject ?? "No messages yet";
+    const messages = JSON.parse(messagesJson || "[]") as MessageJson[];
+    const publicMessages = messages.filter(
+      (message) => message.visibility === "PUBLIC" || !message.visibility,
+    );
+    return publicMessages[publicMessages.length - 1] ?? null;
   } catch {
-    return convo.subject ?? "No messages yet";
+    return null;
   }
 }
 
@@ -33,6 +31,7 @@ export async function GET(
   const authorized = await requireAuthorizedVisitorSession(db, publicKey, request);
   if ("error" in authorized) return authorized.error;
 
+  const queryVisitorId = new URL(request.url).searchParams.get("visitorId");
   const visitorId = authorized.session.visitorId;
   if (!visitorId) {
     const origin = getRequestOrigin(request);
@@ -42,20 +41,29 @@ export async function GET(
       validateEmbedOrigin(origin, access.allowedDomains),
     );
   }
+  if (queryVisitorId && queryVisitorId !== visitorId) {
+    return Response.json({ error: "visitorId does not match session." }, { status: 403 });
+  }
 
-  const limit = Math.min(Number(new URL(request.url).searchParams.get("limit") ?? "20"), 20);
+  const currentSessionId = new URL(request.url).searchParams.get("currentSessionId");
   const nowIso = new Date().toISOString();
 
   const sessions = await db.query.visitorSession.findMany({
-    where: (fields, { eq, and, gt }) =>
+    where: (fields, { eq, and, gt, sql }) =>
       and(
         eq(fields.widgetId, access.widget.id),
         eq(fields.visitorId, visitorId),
+        gt(fields.messageCount, 0),
         gt(fields.expiresAt, nowIso),
-        getEngagedVisitorSessionCond(fields as any),
+        sql`exists (
+          select 1 from conversation
+          where conversation.visitorSessionId = ${fields.id}
+            and conversation.channel = 'WIDGET'
+            and conversation.messages like '%"authorType":"VISITOR"%'
+        )`,
       ),
     orderBy: (fields, { desc }) => [desc(fields.lastSeenAt)],
-    limit,
+    limit: 20,
     with: {
       conversations: {
         where: (fields, { eq, and, like }) =>
@@ -73,15 +81,20 @@ export async function GET(
   const origin = getRequestOrigin(request);
   return withWidgetCors(
     Response.json({
-      sessions: sessions.map((session: any) => ({
-        id: session.id,
-        browserSessionId: session.browserSessionId,
-        token: session.token,
-        preview: sessionPreview(session.conversations),
-        lastActivityAt: session.lastSeenAt || new Date().toISOString(),
-        messageCount: session.messageCount,
-        isCurrent: session.id === authorized.session.id,
-      })),
+      sessions: sessions.map((session) => {
+        const conversation = session.conversations[0];
+        const lastMessage = conversation ? getLastPublicMessage(conversation.messages) : null;
+
+        return {
+          id: session.id,
+          browserSessionId: session.browserSessionId,
+          token: session.id === authorized.session.id ? authorized.session.token : null,
+          lastActivityAt: new Date(session.lastSeenAt).toISOString(),
+          messageCount: session.messageCount,
+          preview: lastMessage?.body ?? conversation?.subject ?? "No messages yet",
+          isCurrent: currentSessionId ? session.id === currentSessionId : false,
+        };
+      }),
     }),
     origin,
     validateEmbedOrigin(origin, access.allowedDomains),

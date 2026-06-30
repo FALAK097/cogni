@@ -9,6 +9,7 @@ import {
   saveLeadToStorage,
   storeSessionId,
   storeSessionToken,
+  getOrCreateVisitorId,
 } from "./storage.js";
 import { generateUUID, getBrowserMetadata } from "./utils.js";
 
@@ -166,7 +167,28 @@ export async function fetchRecentSessions() {
     };
   }
 
-  return requestJson(widgetKeyPath("/sessions"));
+  const visitorId = state.visitorId || getOrCreateVisitorId();
+  const query = new URLSearchParams({ visitorId });
+  if (state.sessionDbId) {
+    query.set("currentSessionId", state.sessionDbId);
+  }
+  return requestJson(`${widgetKeyPath("/sessions")}?${query.toString()}`);
+}
+
+export async function fetchSessionForResume(sessionDbId) {
+  if (state.preview) {
+    const data = await requestJson(
+      `/api/dashboard/widget/sessions/${encodeURIComponent(sessionDbId)}`,
+    );
+    return {
+      sessionId: data.id,
+      browserSessionId: data.id,
+      token: null,
+      messages: data.messages || [],
+    };
+  }
+
+  return fetchSessionHistory(sessionDbId);
 }
 
 export async function detectLeadCaptureAPI(currentMessage, messageCount, sessionDurationMinutes) {
