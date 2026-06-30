@@ -1,4 +1,4 @@
-ALTER TABLE `visitor_session` ADD `name` text;--> statement-breakpoint
-ALTER TABLE `visitor_session` ADD `email` text;--> statement-breakpoint
-ALTER TABLE `visitor_session` ADD `phone` text;--> statement-breakpoint
-ALTER TABLE `visitor_session` ADD `leadCapturedAt` numeric;
+-- Renamed from 0002_visitor_identity.sql. Production already applied these ALTERs
+-- under the legacy filename; repeating them causes "duplicate column name: name".
+-- Fresh databases receive these columns from 0000_dapper_mauler.sql.
+SELECT 1;
