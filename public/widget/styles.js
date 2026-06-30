@@ -72,15 +72,56 @@ export function injectStyles() {
   style.id = "widget-styles";
   const existing = document.getElementById("widget-styles");
   if (existing) existing.remove();
+  const containerPositioning = state.preview
+    ? `position: absolute;
+			inset: 0;
+			width: 100%;
+			height: 100%;
+			bottom: auto;
+			right: auto;
+			left: auto;`
+    : `position: fixed;
+			${config.position === "bottom-left" ? "left: 20px;" : "right: 20px;"}
+			bottom: 20px;`;
+
+  const previewWindowStyles = state.preview
+    ? `position: relative;
+			bottom: auto;
+			right: auto;
+			left: auto;
+			width: 100%;
+			max-width: 100%;
+			height: auto;
+			max-height: calc(100% - 64px);`
+    : `position: absolute;
+			bottom: ${config.launcherSize === "lg" ? "72px" : config.launcherSize === "sm" ? "52px" : "62px"};
+			${config.position === "bottom-left" ? "left: 0;" : "right: 0;"}
+			width: 350px;
+			max-width: calc(100vw - 40px);
+			height: 600px;
+			max-height: calc(100vh - 100px);`;
+
+  const previewBubbleStyles = state.preview
+    ? `position: relative;
+			bottom: auto;
+			right: auto;
+			left: auto;
+			width: 288px;
+			max-width: 100%;
+			${config.position === "bottom-left" ? "align-items: flex-start;" : "align-items: flex-end;"}`
+    : `position: absolute;
+			bottom: ${config.launcherSize === "lg" ? "72px" : config.launcherSize === "sm" ? "52px" : "62px"};
+			${config.position === "bottom-left" ? "left: 0;" : "right: 0;"}
+			width: 288px;
+			${config.position === "bottom-left" ? "align-items: flex-start;" : "align-items: flex-end;"}`;
+
   style.innerHTML = `
 		#widget-container {
 			--oc-font-family: ${resolveFontFamily(config.fontFamily || "Inter")};
 			--oc-font-size: ${baseFontSize};
 			font-family: var(--oc-font-family);
 			font-size: var(--oc-font-size);
-			position: fixed;
-			${config.position === "bottom-left" ? "left: 20px;" : "right: 20px;"}
-			bottom: 20px;
+			${containerPositioning}
 			z-index: 999999;
 		}
 
@@ -150,13 +191,7 @@ export function injectStyles() {
 		}
 
 		.oc-window {
-			position: absolute;
-			bottom: ${config.launcherSize === "lg" ? "72px" : config.launcherSize === "sm" ? "52px" : "62px"};
-			${config.position === "bottom-left" ? "left: 0;" : "right: 0;"}
-			width: 350px;
-			max-width: calc(100vw - 40px);
-			height: 600px;
-			max-height: calc(100vh - 100px);
+			${previewWindowStyles}
 			background: ${config.theme === "dark" ? "#09090b" : "#ffffff"};
 			border-radius: ${config.borderRadius === "full" ? "24px" : config.borderRadius === "none" ? "0" : "16px"};
 			box-shadow: ${config.shadowSize === "lg" ? "0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)" : config.shadowSize === "none" ? "none" : "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1)"};
@@ -905,15 +940,11 @@ export function injectStyles() {
 		}
 
 		.oc-preview-container {
-			position: absolute;
-			bottom: ${config.launcherSize === "lg" ? "72px" : config.launcherSize === "sm" ? "52px" : "62px"};
-			${config.position === "bottom-left" ? "left: 0;" : "right: 0;"}
+			${previewBubbleStyles}
 			display: flex;
 			flex-direction: column;
 			gap: 8px;
-			width: 288px;
 			z-index: 10;
-			${config.position === "bottom-left" ? "align-items: flex-start;" : "align-items: flex-end;"}
 		}
 
 		#widget-container:has(.oc-window.is-open) .oc-preview-container {

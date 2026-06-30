@@ -5,8 +5,9 @@ import { useEffect, useMemo, useRef } from "react";
 import { getBackendOrigin } from "@/lib/api/client";
 
 const WIDGET_SCRIPT_ID = "widget-widget-preview";
-const WIDGET_BUNDLE_VERSION = "9";
+const WIDGET_BUNDLE_VERSION = "13";
 const REMOUNT_DEBOUNCE_MS = 300;
+const CONFIG_SYNC_DEBOUNCE_MS = 50;
 
 export type WidgetLivePreviewConfig = Record<string, unknown> & {
   workspaceId?: string;
@@ -49,6 +50,8 @@ declare global {
       hide: () => void;
       open: () => void;
       close: () => void;
+      on: (event: string, listener: (event: Event) => void) => void;
+      off: (event: string, listener: (event: Event) => void) => void;
     };
   }
 }
@@ -112,38 +115,59 @@ function buildWidgetConfig(config: WidgetLivePreviewConfig): Record<string, unkn
 
 function mountWidgetInHost(host: HTMLElement | null) {
   if (!host) return false;
+
   const widgetContainer = document.getElementById("widget-container");
   if (!widgetContainer) return false;
+
   if (widgetContainer.parentElement !== host) {
     host.appendChild(widgetContainer);
   }
+
   return true;
 }
 
-function keepPreviewOpen() {
-  window.Widget?.show();
+async function syncWidgetConfig(config: Record<string, unknown>) {
+  if (!window.Widget?.updateAppearance) return;
+  await window.Widget.updateAppearance(config);
 }
 
-function appearanceSnapshot(config: WidgetLivePreviewConfig) {
-  const built = buildWidgetConfig(config);
-  return JSON.stringify({
-    fontFamily: built.fontFamily,
-    fontSize: built.fontSize,
-    primaryColor: built.primaryColor,
-    backgroundColor: built.backgroundColor,
-    textColor: built.textColor,
-    borderColor: built.borderColor,
-    userBubbleColor: built.userBubbleColor,
-    userBubbleTextColor: built.userBubbleTextColor,
-    botBubbleColor: built.botBubbleColor,
-    botBubbleTextColor: built.botBubbleTextColor,
-    headerGradientFrom: built.headerGradientFrom,
-    headerGradientTo: built.headerGradientTo,
-    theme: built.theme,
-    position: built.position,
-    launcherSize: built.launcherSize,
-    borderRadius: built.borderRadius,
-    shadowSize: built.shadowSize,
+async function ensureWidgetInitialized(config: Record<string, unknown>) {
+  await loadWidgetScript();
+
+  window.Widget?.destroy?.();
+  await window.Widget?.init(config);
+
+  if (!document.getElementById("widget-container")) {
+    window.Widget?.destroy?.();
+    await window.Widget?.init(config);
+  }
+}
+
+function waitForWidgetContainer() {
+  return new Promise<HTMLElement>((resolve) => {
+    const existing = document.getElementById("widget-container");
+    if (existing) {
+      resolve(existing);
+      return;
+    }
+
+    let attempts = 0;
+    const check = () => {
+      const container = document.getElementById("widget-container");
+      if (container) {
+        resolve(container);
+        return;
+      }
+
+      attempts += 1;
+      if (attempts >= 60) {
+        throw new Error("Widget preview container was not created");
+      }
+
+      window.requestAnimationFrame(check);
+    };
+
+    check();
   });
 }
 
@@ -158,10 +182,25 @@ export function WidgetLiveWidgetPreview({
 }) {
   const mountedRef = useRef(false);
   const configSnapshotRef = useRef("");
-  const appearanceSnapshotRef = useRef("");
+  const credentialsRef = useRef("");
+  const initRunRef = useRef(0);
+  const userClosedRef = useRef(false);
+  const previewModeRef = useRef(previewMode);
+
+  previewModeRef.current = previewMode;
 
   const builtConfig = useMemo(() => buildWidgetConfig(config), [config]);
-  const appearanceKey = useMemo(() => appearanceSnapshot(config), [config]);
+  const configKey = useMemo(() => JSON.stringify(builtConfig), [builtConfig]);
+
+  const openPreview = (force = false) => {
+    if (previewModeRef.current === "full-chat") {
+      window.Widget?.show();
+      return;
+    }
+
+    if (!force && userClosedRef.current) return;
+    window.Widget?.show();
+  };
 
   useEffect(() => {
     const host = mountRef.current;
@@ -172,96 +211,155 @@ export function WidgetLiveWidgetPreview({
 
   useEffect(() => {
     if (!mountedRef.current || !window.Widget?.updateAppearance) return;
-    if (appearanceKey === appearanceSnapshotRef.current) return;
+    if (configKey === configSnapshotRef.current) return;
 
-    appearanceSnapshotRef.current = appearanceKey;
-    void window.Widget.updateAppearance(builtConfig).then(() => {
-      keepPreviewOpen();
-    });
-  }, [appearanceKey, builtConfig]);
+    const timer = window.setTimeout(() => {
+      void syncWidgetConfig(builtConfig).then(() => {
+        configSnapshotRef.current = configKey;
+        mountWidgetInHost(mountRef.current);
+      });
+    }, CONFIG_SYNC_DEBOUNCE_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [configKey, builtConfig, mountRef]);
 
   useEffect(() => {
     const workspaceId = config.workspaceId;
     const publicKey = config.publicKey;
+    const credentialsKey = `${workspaceId ?? ""}:${publicKey ?? ""}`;
+
     if (!workspaceId || !publicKey || workspaceId === "your-workspace-id") {
       window.Widget?.destroy?.();
       mountedRef.current = false;
       configSnapshotRef.current = "";
-      appearanceSnapshotRef.current = "";
+      credentialsRef.current = "";
+      userClosedRef.current = false;
       return;
     }
 
-    const snapshot = JSON.stringify(builtConfig);
+    const credentialsChanged = credentialsRef.current !== credentialsKey;
+    credentialsRef.current = credentialsKey;
 
-    const finalizeMount = () => {
-      if (!mountWidgetInHost(mountRef.current)) return false;
-      keepPreviewOpen();
-      return true;
+    if (credentialsChanged) {
+      window.Widget?.destroy?.();
+      mountedRef.current = false;
+      configSnapshotRef.current = "";
+    }
+
+    if (mountedRef.current) return;
+
+    const runId = ++initRunRef.current;
+    let disposed = false;
+
+    const bootstrap = async () => {
+      try {
+        if (!credentialsChanged) {
+          userClosedRef.current = false;
+        }
+
+        await ensureWidgetInitialized(builtConfig);
+        if (disposed || runId !== initRunRef.current) return;
+
+        await waitForWidgetContainer();
+        if (disposed || runId !== initRunRef.current) return;
+
+        if (!mountWidgetInHost(mountRef.current)) return;
+        mountedRef.current = true;
+        configSnapshotRef.current = configKey;
+        openPreview(true);
+      } catch (error) {
+        console.error("Widget preview failed to load", error);
+      }
     };
 
-    if (snapshot === configSnapshotRef.current && mountedRef.current) {
-      finalizeMount();
-      return;
-    }
-
-    if (mountedRef.current && window.Widget?.updateAppearance) {
-      void window.Widget.updateAppearance(builtConfig).then(() => {
-        configSnapshotRef.current = snapshot;
-        appearanceSnapshotRef.current = appearanceKey;
-        finalizeMount();
-      });
-      return;
-    }
-
-    let cancelled = false;
     const timer = window.setTimeout(() => {
-      void (async () => {
-        try {
-          await loadWidgetScript();
-          if (cancelled) return;
-
-          window.Widget?.destroy?.();
-          await window.Widget?.init(builtConfig);
-          if (cancelled) return;
-
-          let attempts = 0;
-          const tryMount = () => {
-            if (cancelled) return;
-            const mounted = finalizeMount();
-            if (!mounted && attempts < 10) {
-              attempts += 1;
-              requestAnimationFrame(tryMount);
-            } else if (mounted) {
-              mountedRef.current = true;
-              configSnapshotRef.current = snapshot;
-              appearanceSnapshotRef.current = appearanceKey;
-            }
-          };
-          tryMount();
-        } catch (error) {
-          console.error("Widget preview failed to load", error);
-        }
-      })();
+      void bootstrap();
     }, REMOUNT_DEBOUNCE_MS);
 
     return () => {
-      cancelled = true;
+      disposed = true;
       window.clearTimeout(timer);
     };
-  }, [builtConfig, appearanceKey, config, mountRef]);
+  }, [builtConfig, config.publicKey, config.workspaceId, configKey, mountRef]);
 
   useEffect(() => {
-    if (!document.getElementById("widget-container")) return;
-    mountWidgetInHost(mountRef.current);
-    keepPreviewOpen();
-  }, [previewMode, mountRef]);
+    if (previewMode === "full-chat") {
+      openPreview(true);
+      return;
+    }
+
+    if (!userClosedRef.current) {
+      openPreview(true);
+    }
+  }, [previewMode]);
+
+  useEffect(() => {
+    const syncMount = () => {
+      if (!document.getElementById("widget-container")) return;
+      mountWidgetInHost(mountRef.current);
+    };
+
+    const trackWindowState = () => {
+      const windowEl = document.querySelector("#widget-container .oc-window");
+      if (!windowEl) return;
+
+      let wasOpen = windowEl.classList.contains("is-open");
+
+      const observer = new MutationObserver(() => {
+        const isOpen = windowEl.classList.contains("is-open");
+        if (wasOpen && !isOpen) {
+          userClosedRef.current = true;
+        }
+        if (isOpen) {
+          userClosedRef.current = false;
+        }
+        wasOpen = isOpen;
+      });
+
+      observer.observe(windowEl, { attributes: true, attributeFilter: ["class"] });
+      return observer;
+    };
+
+    syncMount();
+
+    const mountObserver = new MutationObserver(syncMount);
+    mountObserver.observe(document.body, { childList: true, subtree: true });
+
+    let windowObserver: MutationObserver | undefined;
+    const windowStateTimer = window.setInterval(() => {
+      if (windowObserver) return;
+      windowObserver = trackWindowState();
+      if (windowObserver) {
+        window.clearInterval(windowStateTimer);
+      }
+    }, 100);
+
+    const handleWidgetClose = () => {
+      userClosedRef.current = true;
+    };
+
+    const handleWidgetOpen = () => {
+      userClosedRef.current = false;
+    };
+
+    window.Widget?.on("close", handleWidgetClose);
+    window.Widget?.on("open", handleWidgetOpen);
+
+    return () => {
+      mountObserver.disconnect();
+      windowObserver?.disconnect();
+      window.clearInterval(windowStateTimer);
+      window.Widget?.off("close", handleWidgetClose);
+      window.Widget?.off("open", handleWidgetOpen);
+    };
+  }, [mountRef]);
 
   useEffect(() => {
     return () => {
       window.Widget?.destroy?.();
       mountedRef.current = false;
       configSnapshotRef.current = "";
-      appearanceSnapshotRef.current = "";
+      userClosedRef.current = false;
     };
   }, []);
 

@@ -258,12 +258,13 @@
   flex-direction: column !important;
   justify-content: flex-end !important;
   align-items: flex-end !important;
-  padding: 16px !important;
-  gap: 12px !important;
+  padding: 12px !important;
+  gap: 8px !important;
   width: 100% !important;
   height: 100% !important;
   z-index: 1 !important;
   pointer-events: none !important;
+  box-sizing: border-box !important;
 }
 
 .widget-preview-host.widget-preview-mode-widget[data-position="bottom-left"] #widget-container {
@@ -274,12 +275,21 @@
 .widget-preview-host.widget-preview-mode-widget #widget-container .oc-window,
 .widget-preview-host.widget-preview-mode-widget #widget-container .oc-preview-container {
   pointer-events: auto !important;
+  box-sizing: border-box !important;
 }
 
 .widget-preview-host.widget-preview-mode-widget #widget-container .oc-launcher {
   display: flex !important;
   position: relative !important;
   flex-shrink: 0 !important;
+  order: 2 !important;
+  align-self: flex-end !important;
+}
+
+.widget-preview-host.widget-preview-mode-widget[data-position="bottom-left"]
+  #widget-container
+  .oc-launcher {
+  align-self: flex-start !important;
 }
 
 .widget-preview-host.widget-preview-mode-widget #widget-container .oc-window {
@@ -289,14 +299,42 @@
   right: auto !important;
   left: auto !important;
   top: auto !important;
+  order: 0 !important;
   flex: 1 1 auto !important;
   width: 100% !important;
-  max-width: 340px !important;
-  min-height: 280px !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  min-height: 320px !important;
   height: auto !important;
-  max-height: calc(100% - 64px) !important;
+  max-height: calc(100% - 56px) !important;
   display: none !important;
   animation: none !important;
+}
+
+.widget-preview-host.widget-preview-mode-widget #widget-container .oc-preview-container {
+  position: relative !important;
+  inset: auto !important;
+  bottom: auto !important;
+  right: auto !important;
+  left: auto !important;
+  order: 1 !important;
+  width: 288px !important;
+  max-width: calc(100% - 24px) !important;
+  min-width: 0 !important;
+  align-items: flex-end !important;
+  align-self: auto !important;
+  margin-bottom: 0 !important;
+}
+
+.widget-preview-host.widget-preview-mode-widget[data-position="bottom-left"]
+  #widget-container
+  .oc-preview-container {
+  align-items: flex-start !important;
+}
+
+.widget-preview-host.widget-preview-mode-widget #widget-container .oc-preview-message {
+  width: auto !important;
+  max-width: 100% !important;
 }
 
 .widget-preview-host.widget-preview-mode-widget #widget-container .oc-window.is-open {

@@ -921,7 +921,7 @@ export function showPreviewMessages() {
     previewContainer.appendChild(msgEl);
   });
 
-  state.container.appendChild(previewContainer);
+  state.container.insertBefore(previewContainer, state.launcher);
 }
 
 /**
@@ -935,10 +935,71 @@ export function hidePreviewMessages() {
 /**
  * Update appearance-related config and refresh injected styles (dashboard preview).
  */
+function refreshPreviewDom() {
+  if (!state.preview || !state.windowEl) return;
+
+  const config = state.config;
+  const agentNameEl = state.windowEl.querySelector(".oc-agent-name");
+  if (agentNameEl) {
+    agentNameEl.textContent = config.agentName || "Support";
+  }
+
+  const avatar = state.windowEl.querySelector(".oc-header .oc-avatar");
+  if (avatar) {
+    avatar.innerHTML = `${renderAvatarMarkup(config.logoUrl)}<div class="oc-status-dot"></div>`;
+    attachAvatarImageFallbacks(avatar);
+  }
+
+  if (state.input) {
+    state.input.placeholder = config.inputPlaceholder || "Ask a question...";
+  }
+
+  const privacyLink = state.windowEl.querySelector(".oc-privacy a");
+  if (privacyLink) {
+    privacyLink.href = config.privacyPolicyUrl || "/privacy-policy";
+  }
+
+  const branding = state.windowEl.querySelector(".oc-branding");
+  if (branding) {
+    branding.style.display = config.showBranding ? "" : "none";
+  }
+
+  if (state.messagesContainer) {
+    const messageCount = state.messagesContainer.querySelectorAll(".oc-message").length;
+    const shouldRefreshWelcome = !state.hasInteracted && messageCount <= 1;
+
+    if (shouldRefreshWelcome) {
+      state.messagesContainer.innerHTML = "";
+      state.conversationHistory = [];
+      addBotMessage(config.welcomeMessage);
+    } else {
+      state.messagesContainer.querySelectorAll(".oc-bot-name").forEach((element) => {
+        element.textContent = config.agentName || "Support";
+      });
+      state.messagesContainer.querySelectorAll(".oc-bot-avatar").forEach((element) => {
+        element.innerHTML = renderBotAvatarMarkup(config.logoUrl);
+      });
+      attachAvatarImageFallbacks(state.messagesContainer);
+
+      const existingSuggestions = state.messagesContainer.querySelector(".oc-suggestions");
+      if (existingSuggestions) existingSuggestions.remove();
+      if (!config.hideSuggestionsOnInteract || !state.hasInteracted) {
+        addSuggestedQuestions();
+      }
+    }
+  }
+
+  hidePreviewMessages();
+  if (!state.isOpen && config.previewMessages?.length) {
+    showPreviewMessages();
+  }
+}
+
 export async function updateAppearance(userConfig = {}) {
   if (!state.isInitialized) return;
   state.config = { ...state.config, ...userConfig };
   await applyWidgetStyles();
+  refreshPreviewDom();
 }
 
 function openPreviewWidget() {
