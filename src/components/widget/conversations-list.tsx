@@ -6,6 +6,7 @@ import {
   ArrowUpDown,
   ChevronLeft,
   ChevronRight,
+  MessageSquare,
   Monitor,
   Search,
   Smartphone,
@@ -13,9 +14,9 @@ import {
 } from "@/components/icons";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CountryFlag } from "@/components/ui/country-flag";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -29,6 +30,8 @@ import { useWidgetSessions } from "@/hooks/query";
 import type { WidgetSessionSummary } from "@/hooks/query";
 import { generateAvatarUrl } from "@/lib/avatar-generator";
 import { getVisitorName } from "@/lib/constants";
+
+import { ConversationsListSkeleton } from "./conversations-list-skeleton";
 
 interface ConversationsListProps {
   onSelectSession: (sessionId: string) => void;
@@ -58,8 +61,6 @@ function getSessionSearchText(session: WidgetSessionSummary) {
 
 export function ConversationsList({ onSelectSession }: ConversationsListProps) {
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalSessions, setTotalSessions] = useState(0);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [sort, setSort] = useState("lastActivityAt");
@@ -92,19 +93,12 @@ export function ConversationsList({ onSelectSession }: ConversationsListProps) {
     ? filteredSessions.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
     : filteredSessions;
 
-  useEffect(() => {
-    if (sessionsData) {
-      const total = shouldClientFilterVisitorLabel
-        ? filteredSessions.length
-        : (sessionsData.pagination?.total ?? 0);
-      setTotalPages(
-        shouldClientFilterVisitorLabel
-          ? Math.max(1, Math.ceil(total / PAGE_SIZE))
-          : (sessionsData.pagination?.pages ?? 1),
-      );
-      setTotalSessions(total);
-    }
-  }, [sessionsData, filteredSessions.length, shouldClientFilterVisitorLabel]);
+  const total = shouldClientFilterVisitorLabel
+    ? filteredSessions.length
+    : (sessionsData?.pagination?.total ?? 0);
+  const totalPages = shouldClientFilterVisitorLabel
+    ? Math.max(1, Math.ceil(total / PAGE_SIZE))
+    : (sessionsData?.pagination?.pages ?? 1);
 
   const handleSort = (key: string) => {
     if (sort === key) {
@@ -125,61 +119,55 @@ export function ConversationsList({ onSelectSession }: ConversationsListProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header / Filters */}
-      <div className="p-4 space-y-4 border-b">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Conversations</h2>
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary">{totalSessions} total</Badge>
-          </div>
-        </div>
-        <div className="flex flex-col gap-4 sm:flex-row">
-          <div className="relative flex-1">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by visitor ID or content..."
-              className="pl-8"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
+      <div className="p-4 border-b">
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by visitor ID or content..."
+            className="pl-8"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
       </div>
 
       {/* List */}
-      <div className="flex-1 overflow-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Visitor</TableHead>
-              <TableHead>Last Message</TableHead>
-              <TableHead>Device</TableHead>
-              <TableHead
-                className="cursor-pointer hover:bg-muted/50"
-                onClick={() => handleSort("lastActivityAt")}
-              >
-                <div className="flex items-center gap-1">
-                  Activity
-                  <ArrowUpDown className="w-3 h-3" />
-                </div>
-              </TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
+      <div className="flex-1 overflow-auto custom-scrollbar">
+        {loading ? (
+          <ConversationsListSkeleton />
+        ) : sessions.length === 0 ? (
+          <div className="p-6">
+            <EmptyState
+              icon={MessageSquare}
+              title="No conversations yet"
+              description={
+                debouncedSearch
+                  ? `No conversations match "${debouncedSearch}". Try a different search.`
+                  : "Once visitors start chatting with your widget, their conversations will appear here."
+              }
+            />
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={6} className="py-8 text-center">
-                  Loading conversations...
-                </TableCell>
+                <TableHead>Visitor</TableHead>
+                <TableHead>Last Message</TableHead>
+                <TableHead>Device</TableHead>
+                <TableHead
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => handleSort("lastActivityAt")}
+                >
+                  <div className="flex items-center gap-1">
+                    Activity
+                    <ArrowUpDown className="w-3 h-3" />
+                  </div>
+                </TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
-            ) : sessions.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
-                  No conversations found
-                </TableCell>
-              </TableRow>
-            ) : (
-              sessions.map((session) => (
+            </TableHeader>
+            <TableBody>
+              {sessions.map((session) => (
                 <TableRow
                   key={session.id}
                   className="cursor-pointer hover:bg-muted/50"
@@ -233,36 +221,38 @@ export function ConversationsList({ onSelectSession }: ConversationsListProps) {
                     </Button>
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </div>
 
       {/* Pagination */}
-      <div className="flex items-center justify-between p-4 border-t">
-        <div className="text-sm text-muted-foreground">
-          Page {page} of {totalPages}
+      {!loading && sessions.length > 0 ? (
+        <div className="flex items-center justify-between p-4 border-t">
+          <div className="text-sm text-muted-foreground">
+            Page {page} of {totalPages}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1}
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
-          >
-            <ChevronRight className="w-4 h-4" />
-          </Button>
-        </div>
-      </div>
+      ) : null}
     </div>
   );
 }

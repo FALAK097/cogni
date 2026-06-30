@@ -94,8 +94,8 @@ export function IntegrationCard({ integration, isConnected, onClick }: Integrati
         ) : (
           <span
             className={cn(
-              buttonVariants({ variant: "outline", size: "sm" }),
-              "w-full text-primary border-border/70 group-hover:bg-primary/5 group-hover:text-primary group-hover:border-primary/40 font-medium",
+              buttonVariants({ size: "sm" }),
+              "w-full bg-primary text-primary-foreground hover:bg-primary/90 font-medium shadow-sm",
             )}
           >
             Connect

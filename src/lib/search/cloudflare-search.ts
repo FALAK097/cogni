@@ -42,7 +42,7 @@ function getCloudflareSearchBinding() {
   }
 
   try {
-    return (getCloudflareContext().env as CloudflareSearchEnv).AI_SEARCH ?? null;
+    return (getCloudflareContext().env as unknown as CloudflareSearchEnv).AI_SEARCH ?? null;
   } catch {
     return null;
   }

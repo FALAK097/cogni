@@ -303,6 +303,10 @@ export const visitorSession = sqliteTable(
     ipData: text(),
     status: text().default("active").notNull(),
     messageCount: integer().default(0).notNull(),
+    name: text(),
+    email: text(),
+    phone: text(),
+    leadCapturedAt: numeric(),
     createdAt: numeric()
       .default(sql`(CURRENT_TIMESTAMP)`)
       .notNull(),

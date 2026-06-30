@@ -83,8 +83,8 @@ export async function GET(_request: Request, context: RouteContext) {
     lastActivityAt: lastSeenAtIso,
     ipData: session.ipData ? JSON.parse(session.ipData) : null,
     messages,
-    contactName: session.contact?.name,
-    contactEmail: session.contact?.email,
+    contactName: session.name ?? session.contact?.name ?? null,
+    contactEmail: session.email ?? session.contact?.email ?? null,
   });
 }
 

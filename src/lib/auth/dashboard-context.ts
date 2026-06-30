@@ -1,8 +1,8 @@
 import "server-only";
 
 import { cookies, headers } from "next/headers";
-import { redirect } from "next/navigation";
 import { cache } from "react";
+import { redirect } from "next/navigation";
 
 import { ensureDefaultWorkspace } from "@/lib/auth/provision-workspace";
 import { getAuth } from "@/lib/auth/server";
@@ -18,7 +18,7 @@ export async function listUserWorkspaces(userId: string) {
   });
 }
 
-export const requireDashboardContext = cache(async function requireDashboardContext() {
+export const requireAuth = cache(async function requireAuth() {
   const session = await getAuth().api.getSession({
     headers: await headers(),
   });
@@ -26,6 +26,12 @@ export const requireDashboardContext = cache(async function requireDashboardCont
   if (!session) {
     redirect("/");
   }
+
+  return session;
+});
+
+export const requireDashboardContext = cache(async function requireDashboardContext() {
+  const session = await requireAuth();
 
   const db = getDb();
   await ensureDefaultWorkspace(db, session.user);

@@ -5,7 +5,7 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { user } from "@/lib/db/schema";
 
-import { requireDashboardContext } from "@/lib/auth/dashboard-context";
+import { requireAuth, requireDashboardContext } from "@/lib/auth/dashboard-context";
 
 export type ProfileActionState = {
   error?: string;
@@ -20,12 +20,14 @@ export async function updateProfileAction(
   _previousState: ProfileActionState,
   formData: FormData,
 ): Promise<ProfileActionState> {
+  await requireAuth();
+  const { db, session } = await requireDashboardContext();
+
   const parsed = profileSchema.safeParse({ name: formData.get("name") });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Enter a valid name." };
   }
 
-  const { db, session } = await requireDashboardContext();
   await db
     .update(user)
     .set({ name: parsed.data.name, updatedAt: new Date() })
