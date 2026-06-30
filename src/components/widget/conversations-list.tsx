@@ -6,6 +6,7 @@ import {
   ArrowUpDown,
   ChevronLeft,
   ChevronRight,
+  MessageSquare,
   Monitor,
   Search,
   Smartphone,

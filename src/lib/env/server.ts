@@ -16,7 +16,7 @@ const runtimeEnv = new Proxy({} as Record<string, string | undefined>, {
 
     // 2. Check Cloudflare context env (for the production worker at request time)
     try {
-      const cfEnv = getCloudflareContext().env as Record<string, unknown>;
+      const cfEnv = getCloudflareContext().env as unknown as Record<string, unknown>;
       if (cfEnv && cfEnv[prop] !== undefined) {
         return String(cfEnv[prop]);
       }

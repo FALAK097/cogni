@@ -1,9 +1,24 @@
+import "server-only";
+
 import { and, eq, ne, gt, like, sql } from "drizzle-orm";
 import type { conversation, visitorSession } from "@/lib/db/schema";
 
 export function getEngagedVisitorSessionCond(s: typeof visitorSession) {
   return and(
     ne(s.hostname, "dashboard-preview"),
+    gt(s.messageCount, 0),
+    sql`exists (
+      select 1 from conversation 
+      where conversation.visitorSessionId = ${s.id} 
+        and conversation.channel = 'WIDGET' 
+        and conversation.messages like '%"authorType":"VISITOR"%'
+    )`,
+  );
+}
+
+/** Dashboard inbox lists every engaged session, including dashboard preview chats. */
+export function getDashboardEngagedVisitorSessionCond(s: typeof visitorSession) {
+  return and(
     gt(s.messageCount, 0),
     sql`exists (
       select 1 from conversation 

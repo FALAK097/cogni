@@ -21,7 +21,7 @@ function getUploadsBinding() {
   }
 
   try {
-    return (getCloudflareContext().env as CloudflareR2Env).UPLOADS ?? null;
+    return (getCloudflareContext().env as unknown as CloudflareR2Env).UPLOADS ?? null;
   } catch {
     return null;
   }
