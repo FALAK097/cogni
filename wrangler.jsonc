@@ -3,6 +3,7 @@
   "name": "widget-prod",
   "account_id": "598a393819cd44e21ef2145dabea9a2f",
   "main": ".open-next/worker.js",
+  "minify": true,
   "compatibility_date": "2026-06-26",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
