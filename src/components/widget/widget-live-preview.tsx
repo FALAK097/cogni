@@ -73,7 +73,7 @@ function normalizeLogoUrl(logoUrl: unknown): string | null {
   return trimmed || null;
 }
 
-function buildWidgetConfig(config: WidgetLivePreviewConfig) {
+function buildWidgetConfig(config: WidgetLivePreviewConfig): Record<string, unknown> {
   const previewMessages = (config.previewMessages || []).filter((item) => item.trim());
 
   return {
@@ -142,9 +142,6 @@ export function WidgetLiveWidgetPreview({
   const mountedRef = useRef(false);
   const configSnapshotRef = useRef("");
   const appearanceSnapshotRef = useRef("");
-  const previewModeRef = useRef(previewMode);
-
-  previewModeRef.current = previewMode;
 
   const builtConfig = useMemo(() => buildWidgetConfig(config), [config]);
   const appearanceKey = useMemo(() => appearanceSnapshot(config), [config]);

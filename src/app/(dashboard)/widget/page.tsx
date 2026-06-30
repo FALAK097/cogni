@@ -1,4 +1,5 @@
 import { WidgetCustomizer } from "@/components/widget/widget-customizer";
+import { ContentLayout } from "@/components/app-nav/content-layout";
 import { SITE_NAME } from "@/lib/constants";
 import { Suspense } from "react";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
@@ -16,10 +17,12 @@ export default async function WidgetPage({
   const [{ workspace }, { subtab }] = await Promise.all([requireDashboardContext(), searchParams]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-      <Suspense>
-        <WidgetCustomizer workspaceId={workspace.id} initialSubtab={subtab} key={workspace.id} />
-      </Suspense>
-    </div>
+    <ContentLayout className="overflow-hidden p-0">
+      <div className="flex h-full min-h-0 flex-col overflow-hidden">
+        <Suspense>
+          <WidgetCustomizer workspaceId={workspace.id} initialSubtab={subtab} key={workspace.id} />
+        </Suspense>
+      </div>
+    </ContentLayout>
   );
 }

@@ -8,7 +8,7 @@ import { executeIntegrationAction } from "@/features/integrations/server/execute
 import { getIntegrationTool } from "@/features/integrations/server/tool-registry";
 import { eq } from "drizzle-orm";
 import { conversation as conversationTable } from "@/lib/db/schema";
-import { requireDashboardContext } from "@/lib/auth/dashboard-context";
+import { requireAuth, requireDashboardContext } from "@/lib/auth/dashboard-context";
 
 export type IntegrationRunState = {
   error?: string;
@@ -25,6 +25,9 @@ export async function runIntegrationToolAction(
   _previousState: IntegrationRunState,
   formData: FormData,
 ): Promise<IntegrationRunState> {
+  await requireAuth();
+  const { db, session, workspace } = await requireDashboardContext();
+
   const parsed = runToolSchema.safeParse({
     actionType: formData.get("actionType"),
     conversationId: formData.get("conversationId"),
@@ -40,7 +43,6 @@ export async function runIntegrationToolAction(
     return { error: "Unknown integration action." };
   }
 
-  const { db, session, workspace } = await requireDashboardContext();
   const conversation = await db.query.conversation.findFirst({
     where: (fields, { eq, and }) =>
       and(eq(fields.id, parsed.data.conversationId), eq(fields.workspaceId, workspace.id)),

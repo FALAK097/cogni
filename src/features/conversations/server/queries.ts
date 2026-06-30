@@ -135,22 +135,26 @@ function countUnreadMessages(messages: MessageJson[]): number {
   return messages.filter((message) => message.authorType === "VISITOR" && !message.readAt).length;
 }
 
-function conversationHasUnread(messages: MessageJson[]): boolean {
-  return messages.some((message) => message.authorType === "VISITOR" && !message.readAt);
+function hasUnreadVisitorMessagesSql(c: typeof conversationTable) {
+  return sql`exists (
+    select 1 from json_each(${c.messages})
+    where json_extract(value, '$.authorType') = 'VISITOR'
+      and json_extract(value, '$.readAt') is null
+  )`;
 }
 
 function computeUnreadTabCounts(
   conversations: Array<{
-    messages: string;
     assignedMemberId: string | null;
     status: string;
+    hasUnread: boolean;
   }>,
   membershipId?: string,
 ) {
   const withUnread = conversations.map((conversation) => ({
     assignedMemberId: conversation.assignedMemberId,
     status: conversation.status,
-    hasUnread: conversationHasUnread(parseMessages(conversation.messages)),
+    hasUnread: conversation.hasUnread,
   }));
 
   return {
@@ -223,18 +227,19 @@ export async function getInboxSummary(
   const db = getDb();
 
   const [countConversations, rawConversations] = await Promise.all([
-    db.query.conversation.findMany({
-      where: (fields, { eq, and }) =>
+    db
+      .select({
+        assignedMemberId: conversationTable.assignedMemberId,
+        status: conversationTable.status,
+        hasUnread: hasUnreadVisitorMessagesSql(conversationTable).mapWith(Boolean),
+      })
+      .from(conversationTable)
+      .where(
         and(
-          eq(fields.workspaceId, workspaceId),
-          getWidgetConversationBaseCond(fields as typeof conversationTable),
+          eq(conversationTable.workspaceId, workspaceId),
+          getWidgetConversationBaseCond(conversationTable),
         ),
-      columns: {
-        messages: true,
-        assignedMemberId: true,
-        status: true,
-      },
-    }),
+      ),
     db.query.conversation.findMany({
       where: (fields) =>
         conversationWhereCond(

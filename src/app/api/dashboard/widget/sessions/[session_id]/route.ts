@@ -160,8 +160,8 @@ export async function GET(_request: Request, context: RouteContext) {
     lastActivityAt: lastSeenAtIso,
     ipData: session.ipData ? JSON.parse(session.ipData) : null,
     messages: publicMessages,
-    contactName: session.contact?.name,
-    contactEmail: session.contact?.email,
+    contactName: session.name ?? session.contact?.name ?? null,
+    contactEmail: session.email ?? session.contact?.email ?? null,
     contactId: session.contact?.id ?? null,
     contactExternalId: session.contact?.externalId ?? null,
     contactCreatedAt: session.contact?.createdAt
@@ -341,7 +341,14 @@ export async function DELETE(_request: Request, context: RouteContext) {
       .delete(leadTable)
       .where(and(eq(leadTable.id, leadId), eq(leadTable.workspaceId, workspace.id)));
   }
-  await db.delete(conversationTable).where(eq(conversationTable.visitorSessionId, session.id));
+  await db
+    .delete(conversationTable)
+    .where(
+      and(
+        eq(conversationTable.visitorSessionId, session.id),
+        eq(conversationTable.workspaceId, workspace.id),
+      ),
+    );
   await db.delete(visitorSessionTable).where(eq(visitorSessionTable.id, session.id));
 
   if (session.contactId) {

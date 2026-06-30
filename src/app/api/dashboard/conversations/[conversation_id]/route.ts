@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
 import { getConversation, markConversationAsRead } from "@/features/conversations/server/queries";
@@ -92,7 +92,9 @@ export async function GET(_request: Request, context: RouteContext) {
     referrer: session?.referrer ?? null,
     timezone: session?.timezone ?? null,
     createdAt: new Date(conversation.createdAt).toISOString(),
-    lastActivityAt: new Date(conversation.lastMessageAt).toISOString(),
+    lastActivityAt: conversation.lastMessageAt
+      ? new Date(conversation.lastMessageAt).toISOString()
+      : new Date().toISOString(),
     ipData: session?.ipData ? JSON.parse(session.ipData) : null,
     messages: publicMessages,
     contactName: conversation.contact.name,
@@ -205,7 +207,12 @@ export async function DELETE(_request: Request, context: RouteContext) {
   if (conversation.visitorSessionId) {
     await db
       .delete(conversationTable)
-      .where(eq(conversationTable.visitorSessionId, conversation.visitorSessionId));
+      .where(
+        and(
+          eq(conversationTable.visitorSessionId, conversation.visitorSessionId),
+          eq(conversationTable.workspaceId, workspace.id),
+        ),
+      );
     await db
       .delete(visitorSessionTable)
       .where(eq(visitorSessionTable.id, conversation.visitorSessionId));

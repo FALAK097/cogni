@@ -1,5 +1,9 @@
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
-import { assertPublicWidgetAccess, bearerToken } from "@/features/widget/server/widget-public";
+import {
+  assertPublicWidgetAccess,
+  bearerToken,
+  getAuthorizedVisitorSession,
+} from "@/features/widget/server/widget-public";
 import { getRequestOrigin, withWidgetCors } from "@/features/widget/server/widget-utils";
 import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
 import { getDb } from "@/lib/db/client";
@@ -31,7 +35,10 @@ export async function GET(
   }
 
   const currentSessionId = new URL(request.url).searchParams.get("currentSessionId");
-  const token = bearerToken(request);
+  const bearer = bearerToken(request);
+  const authorizedSession = bearer
+    ? await getAuthorizedVisitorSession(db, publicKey, bearer)
+    : null;
   const nowIso = new Date().toISOString();
 
   const sessions = await db.query.visitorSession.findMany({
@@ -74,7 +81,7 @@ export async function GET(
         return {
           id: session.id,
           browserSessionId: session.browserSessionId,
-          token: token && session.id === currentSessionId ? session.token : null,
+          token: authorizedSession && session.id === authorizedSession.id ? session.token : null,
           lastActivityAt: new Date(session.lastSeenAt).toISOString(),
           messageCount: session.messageCount,
           preview: lastMessage?.body ?? conversation?.subject ?? "No messages yet",

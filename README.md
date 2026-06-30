@@ -74,7 +74,6 @@ pnpm db:studio       # Open Drizzle Studio
 Deployment is configured using Cloudflare's native **Git Integration (Workers Builds)**:
 
 - **Production**: Pushes and merges to `main` automatically deploy to the `widget-prod` worker using production database and assets.
-- **PR Previews**: Open Pull Requests automatically trigger builds that deploy to the `widget-preview` worker (with isolated preview databases and R2 buckets) and post a live preview URL comment on your PR.
 
 ### Environment & Secret Setup
 
