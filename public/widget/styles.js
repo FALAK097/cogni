@@ -5,15 +5,64 @@
 
 import { state } from "./state.js";
 
+const FONT_STYLESHEETS = {
+  Inter: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap",
+  Roboto: "https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600&display=swap",
+  "Open Sans": "https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600&display=swap",
+};
+
+function resolveFontFamily(fontFamily) {
+  const stacks = {
+    Inter: "'Inter', ui-sans-serif, system-ui, sans-serif",
+    Geist: "'Geist', 'Geist Fallback', ui-sans-serif, system-ui, sans-serif",
+    "System UI": "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    Roboto: "'Roboto', ui-sans-serif, system-ui, sans-serif",
+    "Open Sans": "'Open Sans', ui-sans-serif, system-ui, sans-serif",
+  };
+  return stacks[fontFamily] || stacks.Inter;
+}
+
+function ensureWidgetFont(fontFamily) {
+  const href = FONT_STYLESHEETS[fontFamily];
+  if (!href) return Promise.resolve();
+
+  const id = `widget-font-${fontFamily.replace(/\s+/g, "-").toLowerCase()}`;
+  const existing = document.getElementById(id);
+  if (existing) {
+    return document.fonts?.ready ?? Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    const link = document.createElement("link");
+    link.id = id;
+    link.rel = "stylesheet";
+    link.href = href;
+    link.onload = () => {
+      void (document.fonts?.ready ?? Promise.resolve()).then(resolve).catch(() => resolve());
+    };
+    link.onerror = () => resolve();
+    document.head.appendChild(link);
+  });
+}
+
+/**
+ * Load webfonts (when needed) and inject widget CSS.
+ */
+export async function applyWidgetStyles() {
+  await ensureWidgetFont(state.config.fontFamily || "Inter");
+  injectStyles();
+}
+
 /**
  * Inject all widget CSS styles
  */
 export function injectStyles() {
   const config = state.config;
+  const baseFontSize = config.fontSize || "14px";
   const panelBg = config.backgroundColor || (config.theme === "dark" ? "#09090b" : "#ffffff");
   const panelText = config.textColor || (config.theme === "dark" ? "#fafafa" : "#18181b");
   const panelMuted = config.theme === "dark" ? "#a1a1aa" : "#71717a";
-  const panelBorder = config.theme === "dark" ? "#27272a" : "#e4e4e7";
+  const panelBorder = config.borderColor || (config.theme === "dark" ? "#27272a" : "#e4e4e7");
   const panelSubtleBg = config.theme === "dark" ? "#27272a" : "#f4f4f5";
   const panelHoverBg = config.theme === "dark" ? "#3f3f46" : "#fafafa";
   const panelCurrentBg =
@@ -21,9 +70,14 @@ export function injectStyles() {
 
   const style = document.createElement("style");
   style.id = "widget-styles";
+  const existing = document.getElementById("widget-styles");
+  if (existing) existing.remove();
   style.innerHTML = `
 		#widget-container {
-			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+			--oc-font-family: ${resolveFontFamily(config.fontFamily || "Inter")};
+			--oc-font-size: ${baseFontSize};
+			font-family: var(--oc-font-family);
+			font-size: var(--oc-font-size);
 			position: fixed;
 			${config.position === "bottom-left" ? "left: 20px;" : "right: 20px;"}
 			bottom: 20px;
@@ -32,6 +86,12 @@ export function injectStyles() {
 
 		#widget-container * {
 			box-sizing: border-box;
+		}
+
+		#widget-container .oc-window,
+		#widget-container .oc-preview-container {
+			font-family: inherit;
+			font-size: inherit;
 		}
 
 		.oc-launcher {
@@ -140,6 +200,11 @@ export function injectStyles() {
 			align-items: center;
 			justify-content: center;
 			position: relative;
+			background: rgba(255, 255, 255, 0.16);
+		}
+
+		.oc-avatar:has(img) {
+			background: transparent;
 		}
 
 		.oc-avatar img {
@@ -185,11 +250,11 @@ export function injectStyles() {
 
 		.oc-agent-name {
 			font-weight: 600;
-			font-size: 15px;
+			font-size: 1.07em;
 		}
 
 		.oc-agent-status {
-			font-size: 12px;
+			font-size: 0.857em;
 			opacity: 0.8;
 		}
 
@@ -237,7 +302,8 @@ export function injectStyles() {
 		.oc-bubble {
 			padding: 12px 16px;
 			border-radius: 12px;
-			font-size: 14px;
+			font-family: inherit;
+			font-size: 1em;
 			line-height: 1.625;
 			box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 		}
@@ -352,6 +418,20 @@ export function injectStyles() {
 		}
 
 		.oc-bot-avatar svg {
+			width: 12px;
+			height: 12px;
+			color: ${config.primaryColor};
+		}
+
+		.oc-bot-avatar-icon {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			width: 100%;
+			height: 100%;
+		}
+
+		.oc-bot-avatar-icon svg {
 			width: 12px;
 			height: 12px;
 			color: ${config.primaryColor};
@@ -551,7 +631,8 @@ export function injectStyles() {
 			border: 1px solid ${config.theme === "dark" ? "#27272a" : "#e4e4e7"};
 			background: ${config.theme === "dark" ? "#18181b" : "#ffffff"};
 			color: ${config.theme === "dark" ? "#d4d4d8" : "#3f3f46"};
-			font-size: 12px;
+			font-family: inherit;
+			font-size: 0.857em;
 			cursor: pointer;
 			transition: all 0.15s ease;
 		}
@@ -725,7 +806,8 @@ export function injectStyles() {
 			flex: 1;
 			border: none;
 			background: transparent;
-			font-size: 14px;
+			font-family: inherit;
+			font-size: 1em;
 			outline: none;
 			color: ${config.theme === "dark" ? "#fafafa" : "#18181b"};
 		}
@@ -834,13 +916,18 @@ export function injectStyles() {
 			${config.position === "bottom-left" ? "align-items: flex-start;" : "align-items: flex-end;"}
 		}
 
+		#widget-container:has(.oc-window.is-open) .oc-preview-container {
+			display: none !important;
+		}
+
 		.oc-preview-message {
 			max-width: 100%;
 			background: ${config.theme === "dark" ? "#18181b" : "#ffffff"};
 			border: 1px solid ${config.theme === "dark" ? "#27272a" : "#e4e4e7"};
 			border-radius: ${config.borderRadius === "full" ? "16px" : config.borderRadius === "none" ? "0" : "12px"};
 			padding: 16px;
-			font-size: 14px;
+			font-family: inherit;
+			font-size: 1em;
 			color: ${config.theme === "dark" ? "#e4e4e7" : "#18181b"};
 			box-shadow: ${config.shadowSize === "lg" ? "0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)" : config.shadowSize === "none" ? "none" : "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1)"};
 			cursor: pointer;

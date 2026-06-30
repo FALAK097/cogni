@@ -4,7 +4,8 @@
  */
 
 import { detectLeadCaptureAPI, submitLeadCaptureAPI } from "./api.js";
-import { ICONS, WIDGET_LOGO } from "./constants.js";
+import { renderBotAvatarMarkup } from "./utils.js";
+import { ICONS } from "./constants.js";
 import { state } from "./state.js";
 import { saveLeadToStorage } from "./storage.js";
 import {
@@ -77,15 +78,13 @@ export function startConversationalLeadCapture(triggerType, triggerValue) {
  * Ask for user's name
  */
 function askForName() {
-  const logoSrc = state.config.logoUrl || WIDGET_LOGO;
-
   const questionDiv = document.createElement("div");
   questionDiv.className = "oc-message bot oc-lead-question";
   questionDiv.id = "oc-lead-step-1";
   questionDiv.innerHTML = `
 		<div class="oc-bot-header">
 			<div class="oc-bot-avatar">
-				<img src="${logoSrc}" alt="Logo" />
+				${renderBotAvatarMarkup(state.config.logoUrl)}
 			</div>
 			<span class="oc-bot-name">${escapeHtml(state.config.agentName)}</span>
 		</div>
@@ -143,15 +142,13 @@ function handleNameSubmit() {
  * Ask for user's email
  */
 function askForEmail() {
-  const logoSrc = state.config.logoUrl || WIDGET_LOGO;
-
   const questionDiv = document.createElement("div");
   questionDiv.className = "oc-message bot oc-lead-question";
   questionDiv.id = "oc-lead-step-2";
   questionDiv.innerHTML = `
 		<div class="oc-bot-header">
 			<div class="oc-bot-avatar">
-				<img src="${logoSrc}" alt="Logo" />
+				${renderBotAvatarMarkup(state.config.logoUrl)}
 			</div>
 			<span class="oc-bot-name">${escapeHtml(state.config.agentName)}</span>
 		</div>
@@ -209,15 +206,13 @@ function handleEmailSubmit() {
  * Ask for user's phone
  */
 function askForPhone() {
-  const logoSrc = state.config.logoUrl || WIDGET_LOGO;
-
   const questionDiv = document.createElement("div");
   questionDiv.className = "oc-message bot oc-lead-question";
   questionDiv.id = "oc-lead-step-3";
   questionDiv.innerHTML = `
 		<div class="oc-bot-header">
 			<div class="oc-bot-avatar">
-				<img src="${logoSrc}" alt="Logo" />
+				${renderBotAvatarMarkup(state.config.logoUrl)}
 			</div>
 			<span class="oc-bot-name">${escapeHtml(state.config.agentName)}</span>
 		</div>
@@ -302,8 +297,6 @@ function handlePhoneSubmit() {
  * Submit lead capture data to backend
  */
 async function submitLeadCapture() {
-  const logoSrc = state.config.logoUrl || WIDGET_LOGO;
-
   // Generate conversation summary
   const conversationSummary = state.conversationHistory
     .slice(-10)
@@ -336,7 +329,7 @@ async function submitLeadCapture() {
       thankYouDiv.innerHTML = `
 				<div class="oc-bot-header">
 					<div class="oc-bot-avatar">
-						<img src="${logoSrc}" alt="Logo" />
+						${renderBotAvatarMarkup(state.config.logoUrl)}
 					</div>
 					<span class="oc-bot-name">${escapeHtml(state.config.agentName)}</span>
 				</div>

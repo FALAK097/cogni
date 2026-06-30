@@ -19,8 +19,15 @@
     {
       "idx": 2,
       "version": "6",
-      "when": 1782638740174,
-      "tag": "0002_visitor_identity",
+      "when": 1782801814531,
+      "tag": "0002_brand_color_purple",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1782802180788,
+      "tag": "0003_widget_typography",
       "breakpoints": true
     }
   ]

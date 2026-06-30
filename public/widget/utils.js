@@ -3,6 +3,7 @@
  * Common helper functions used across the widget
  */
 
+import { ICONS } from "./constants.js";
 import { state } from "./state.js";
 
 /**
@@ -283,4 +284,60 @@ export function convertToPCM16(float32Array) {
     pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
   }
   return pcm16;
+}
+
+export function resolveLogoUrl(logoUrl) {
+  if (logoUrl == null) return null;
+  if (typeof logoUrl !== "string") return null;
+  const trimmed = logoUrl.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith("data:image/")) return trimmed;
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+      return trimmed;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+export function renderAvatarMarkup(logoUrl) {
+  const resolved = resolveLogoUrl(logoUrl);
+  if (resolved) {
+    return `<img src="${escapeHtml(resolved)}" alt="" class="oc-avatar-image" />`;
+  }
+  return `<span class="oc-avatar-icon">${ICONS.chat}</span>`;
+}
+
+export function renderBotAvatarMarkup(logoUrl) {
+  const resolved = resolveLogoUrl(logoUrl);
+  if (resolved) {
+    return `<img src="${escapeHtml(resolved)}" alt="" class="oc-bot-avatar-image" />`;
+  }
+  return `<span class="oc-bot-avatar-icon">${ICONS.sparkle}</span>`;
+}
+
+export function attachAvatarImageFallbacks(root) {
+  if (!root) return;
+
+  root.querySelectorAll(".oc-avatar-image, .oc-bot-avatar-image").forEach((img) => {
+    if (!(img instanceof HTMLImageElement)) return;
+    if (img.dataset.fallbackAttached === "true") return;
+    img.dataset.fallbackAttached = "true";
+
+    const useBotIcon = img.classList.contains("oc-bot-avatar-image");
+    const showFallback = () => {
+      const span = document.createElement("span");
+      span.className = useBotIcon ? "oc-bot-avatar-icon" : "oc-avatar-icon";
+      span.innerHTML = useBotIcon ? ICONS.sparkle : ICONS.chat;
+      img.replaceWith(span);
+    };
+
+    img.addEventListener("error", showFallback, { once: true });
+    if (img.complete && img.naturalWidth === 0) {
+      showFallback();
+    }
+  });
 }

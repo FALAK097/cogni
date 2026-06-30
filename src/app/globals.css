@@ -212,6 +212,10 @@
   pointer-events: auto !important;
 }
 
+.widget-preview-host #widget-container:has(.oc-window.is-open) .oc-preview-container {
+  display: none !important;
+}
+
 .widget-preview-host #widget-container .oc-body {
   scrollbar-width: none !important;
   -ms-overflow-style: none !important;
@@ -298,44 +302,4 @@
 .widget-preview-host.widget-preview-mode-widget #widget-container .oc-window.is-open {
   display: flex !important;
   flex-direction: column !important;
-}
-
-.widget-preview-host[data-device="mobile"] #widget-container,
-.widget-preview-host[data-device="tablet"] #widget-container {
-  position: absolute !important;
-  inset: 0 !important;
-  display: flex !important;
-  flex-direction: column !important;
-  justify-content: stretch !important;
-  align-items: stretch !important;
-  padding: 0 !important;
-  gap: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-  pointer-events: auto !important;
-}
-
-.widget-preview-host[data-device="mobile"] #widget-container .oc-launcher,
-.widget-preview-host[data-device="tablet"] #widget-container .oc-launcher {
-  display: none !important;
-}
-
-.widget-preview-host[data-device="mobile"] #widget-container .oc-window,
-.widget-preview-host[data-device="tablet"] #widget-container .oc-window {
-  position: relative !important;
-  inset: auto !important;
-  flex: 1 1 auto !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  min-height: 0 !important;
-  height: 100% !important;
-  max-height: 100% !important;
-  display: flex !important;
-  flex-direction: column !important;
-  border-radius: inherit !important;
-  animation: none !important;
-}
-
-.widget-preview-host[data-device="mobile"] #widget-container .oc-window .oc-header {
-  border-radius: 0 !important;
 }

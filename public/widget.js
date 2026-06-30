@@ -4,7 +4,7 @@
 
 import { closeLeadForm } from "./widget/lead-capture.js";
 import { state } from "./widget/state.js";
-import { destroyWidget, init, toggleChat, getScriptInfo } from "./widget/ui.js";
+import { destroyWidget, init, toggleChat, getScriptInfo, updateAppearance } from "./widget/ui.js";
 
 const events = new EventTarget();
 
@@ -46,6 +46,7 @@ function toggle() {
 window.Widget = {
   init,
   destroy: destroyWidget,
+  updateAppearance,
   show,
   hide,
   toggle,
