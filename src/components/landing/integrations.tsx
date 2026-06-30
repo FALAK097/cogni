@@ -1,82 +1,92 @@
-import Image from "next/image";
+"use client";
 
-const integrations = [
-  {
-    name: "Gmail",
-    img: "https://upload.wikimedia.org/wikipedia/commons/7/7e/Gmail_icon_%282020%29.svg",
-    invertInDark: false,
-  },
-  {
-    name: "Slack",
-    img: "https://upload.wikimedia.org/wikipedia/commons/d/d5/Slack_icon_2019.svg",
-    invertInDark: false,
-  },
-  {
-    name: "HubSpot",
-    img: "https://cdn.simpleicons.org/hubspot/FF7A59",
-    invertInDark: false,
-  },
-  {
-    name: "Notion",
-    img: "https://upload.wikimedia.org/wikipedia/commons/e/e9/Notion-logo.svg",
-    invertInDark: true, // Notion logo is black
-  },
-  {
-    name: "GitHub",
-    img: "https://upload.wikimedia.org/wikipedia/commons/9/91/Octicons-mark-github.svg",
-    invertInDark: true, // GitHub logo is black
-  },
-  {
-    name: "Discord",
-    img: "https://cdn.simpleicons.org/discord/5865F2",
-    invertInDark: false,
-  },
-  {
-    name: "Google Calendar",
-    img: "https://upload.wikimedia.org/wikipedia/commons/a/a5/Google_Calendar_icon_%282020%29.svg",
-    invertInDark: false,
-  },
-];
+import Image from "next/image";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { SectionLayout } from "./section-layout";
+
+/**
+ * All icons sourced from /public/assets/icons/.
+ * Light-variant files (cal-com-light, pipedrive-light, resend-light, typeform-light)
+ * are excluded: they render invisibly on a white background.
+ */
+const INTEGRATIONS = [
+  { name: "Gmail", src: "/assets/icons/gmail.svg" },
+  { name: "Slack", src: "/assets/icons/slack.svg" },
+  { name: "HubSpot", src: "/assets/icons/hubspot.png" },
+  { name: "Salesforce", src: "/assets/icons/salesforce.svg" },
+  { name: "Stripe", src: "/assets/icons/stripe.svg" },
+  { name: "Zapier", src: "/assets/icons/zapier.webp" },
+  { name: "WhatsApp", src: "/assets/icons/whatsapp.svg" },
+  { name: "Telegram", src: "/assets/icons/telegram.svg" },
+  { name: "Facebook", src: "/assets/icons/facebook.png" },
+  { name: "Meta", src: "/assets/icons/meta.png" },
+  { name: "Messenger", src: "/assets/icons/messenger.webp" },
+  { name: "Dropbox", src: "/assets/icons/dropbox.svg" },
+  { name: "Microsoft Teams", src: "/assets/icons/microsoft-teams.svg" },
+  { name: "Microsoft OneDrive", src: "/assets/icons/microsoft-onedrive.svg" },
+  { name: "Google", src: "/assets/icons/google.svg" },
+  { name: "Google Calendar", src: "/assets/icons/google-calendar.svg" },
+  { name: "Google Drive", src: "/assets/icons/drive.svg" },
+  { name: "Calendly", src: "/assets/icons/calendly.png" },
+  { name: "Cal.com", src: "/assets/icons/cal-com.svg" },
+  { name: "Brevo", src: "/assets/icons/brevo.svg" },
+  { name: "Mailchimp", src: "/assets/icons/mailchimp.jpeg" },
+  { name: "Resend", src: "/assets/icons/resend-dark.svg" },
+  { name: "SendGrid", src: "/assets/icons/sendgrid.webp" },
+  { name: "Typeform", src: "/assets/icons/typeform.svg" },
+  { name: "Tally", src: "/assets/icons/tally.jpeg" },
+  { name: "Jotform", src: "/assets/icons/jotform.svg" },
+  { name: "Pipedrive", src: "/assets/icons/pipedrive.png" },
+  { name: "Polar", src: "/assets/icons/polar.svg" },
+  { name: "Razorpay", src: "/assets/icons/razorpay.png" },
+  { name: "Zoho", src: "/assets/icons/zoho.png" },
+] as const;
 
 export function Integrations() {
   return (
-    <section id="integrations" className="bg-background py-28 md:py-36">
-      <div className="mx-auto max-w-7xl px-5">
-        <div className="mx-auto mb-16 max-w-2xl text-center">
-          <p className="mb-4 text-sm font-semibold uppercase tracking-[0.15em] text-primary">
+    <SectionLayout id="integrations">
+      <div className="flex flex-col gap-12 lg:flex-row lg:items-center lg:gap-16">
+        {/* ── Left: text content ── */}
+        <div className="flex-shrink-0 lg:w-[36%]">
+          <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-primary">
             Integrations
           </p>
-          <h2 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-            Works where your team works
+          <h2 className="text-3xl font-bold tracking-[-0.025em] text-gray-900 sm:text-4xl lg:text-[2.5rem] lg:leading-[1.15]">
+            Explore integrations
+            <br />
+            for your stack.
           </h2>
-          <p className="mt-4 text-lg text-muted-foreground">
-            Connect your existing tools with one click — no engineering required.
+          <p className="mt-5 text-lg leading-relaxed text-gray-500">
+            Save time and start faster with pre-built integrations for every tool your support team
+            already uses.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center justify-center gap-4 md:gap-6">
-          {integrations.map((item) => (
-            <div
-              key={item.name}
-              className="group flex flex-col items-center gap-3 rounded-2xl border border-border/60 bg-card p-5 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-border hover:shadow-md sm:p-7"
-            >
-              <div className="flex size-12 items-center justify-center">
-                <Image
-                  src={item.img}
-                  alt={`${item.name} logo`}
-                  width={32}
-                  height={32}
-                  unoptimized
-                  className={`size-8 object-contain ${item.invertInDark ? "dark:invert" : ""}`}
-                />
-              </div>
-              <span className="text-xs font-medium text-muted-foreground transition-colors group-hover:text-foreground">
-                {item.name}
-              </span>
-            </div>
-          ))}
+        {/* ── Right: icon grid with tooltips ── */}
+        <div className="flex-1">
+          <div className="grid grid-cols-5 gap-3 sm:grid-cols-6 lg:grid-cols-5 xl:grid-cols-6">
+            {INTEGRATIONS.map((item) => (
+              <Tooltip key={item.name}>
+                <TooltipTrigger
+                  render={
+                    <div className="group flex aspect-square cursor-default items-center justify-center rounded-2xl border border-gray-100 bg-white p-3 shadow-sm transition-all duration-200 ease-out hover:-translate-y-1 hover:border-gray-200 hover:shadow-[0_8px_20px_rgba(0,0,0,0.08)]" />
+                  }
+                >
+                  <Image
+                    src={item.src}
+                    alt={item.name}
+                    width={36}
+                    height={36}
+                    unoptimized
+                    className="size-full max-h-8 max-w-8 object-contain transition-transform duration-200 group-hover:scale-110"
+                  />
+                </TooltipTrigger>
+                <TooltipContent side="top">{item.name}</TooltipContent>
+              </Tooltip>
+            ))}
+          </div>
         </div>
       </div>
-    </section>
+    </SectionLayout>
   );
 }
