@@ -4,37 +4,38 @@ import { useState } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
+import { SectionLayout, SectionHeader } from "./section-layout";
 
-const faqs = [
+const FAQS = [
   {
     question: "How long does it take to train the AI?",
     answer:
-      "Training typically takes less than 5 minutes. As soon as you connect your knowledge base, website, or upload PDFs, our system automatically processes and indexes the content to provide accurate answers.",
+      "Less than 5 minutes. As soon as you connect your knowledge base (website, Help Center, or PDFs) our system processes and indexes everything automatically. You can start testing before the page even finishes loading.",
   },
   {
-    question: "Can I customize the look of the chat widget?",
+    question: "Can I customize the chat widget's appearance?",
     answer:
-      "Yes. You have full control over the widget's appearance, including brand colors, typography, launcher icons, and welcome messages to ensure it perfectly matches your website.",
+      "Completely. You control colors, typography, launcher icon, avatar, border radius, welcome message, and conversation starters. The widget editor has a live preview so you see changes instantly.",
   },
   {
-    question: "What happens if the AI doesn't know the answer?",
+    question: "What happens when the AI doesn't know the answer?",
     answer:
-      "When confidence drops below your set threshold, the AI seamlessly routes the conversation to a human agent, providing them with the full chat history and context.",
+      "When the AI's confidence drops below your configured threshold, it routes the conversation to your team seamlessly, handing over the full chat history and context so the agent doesn't have to start from scratch.",
   },
   {
     question: "Do you support multiple languages?",
     answer:
-      "Our AI automatically detects and responds in over 90 languages out of the box, even if your underlying knowledge base is entirely in English.",
+      "Yes. The AI auto-detects and responds in 90+ languages, even if your entire knowledge base is written in English.",
   },
   {
-    question: "How do you handle data privacy and security?",
+    question: "How is my data handled?",
     answer:
-      "We are SOC2 Type II compliant. Your data is encrypted at rest and in transit. We never use your proprietary data to train our foundational models.",
+      "We are SOC 2 Type II certified. All data is encrypted at rest and in transit. Your knowledge base and conversation data are never used to train foundational models.",
   },
   {
-    question: "Can I integrate this with my existing helpdesk?",
+    question: "Can I connect my existing helpdesk?",
     answer:
-      "Absolutely. We offer deep integrations with Zendesk, Intercom, HubSpot, and Salesforce, allowing you to use our AI alongside your existing workflows.",
+      "Yes. We integrate with Zendesk, Intercom, HubSpot, Salesforce, and more. Human handoffs land directly in your existing queue so your workflow doesn't change.",
   },
 ];
 
@@ -42,44 +43,48 @@ export function Faq() {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
-    <section className="bg-background py-24 md:py-32">
-      <div className="mx-auto max-w-3xl px-5">
-        <div className="mb-16 text-center">
-          <h2 className="text-3xl font-medium tracking-tight text-foreground sm:text-4xl">
-            Frequently asked questions
-          </h2>
-        </div>
+    <SectionLayout id="faq">
+      {/* Header + accordion in a centered narrow column */}
+      <div className="mx-auto max-w-3xl">
+        <SectionHeader label="FAQ" heading={<>Common questions.</>} center />
 
-        <div className="divide-y divide-border/50 border-y border-border/50">
-          {faqs.map((faq, index) => {
+        <div className="divide-y divide-gray-100">
+          {FAQS.map((faq, index) => {
             const isOpen = openIndex === index;
             return (
-              <div key={index} className="py-6">
+              <div key={index}>
                 <button
+                  type="button"
                   onClick={() => setOpenIndex(isOpen ? null : index)}
-                  className="flex w-full items-center justify-between text-left focus:outline-none group"
+                  className="group flex w-full items-start justify-between gap-4 py-5 text-left focus:outline-none"
+                  aria-expanded={isOpen}
                 >
-                  <span className="text-lg font-medium text-foreground transition-colors group-hover:text-primary">
+                  <span
+                    className={cn(
+                      "text-[15px] font-semibold leading-snug transition-colors duration-150",
+                      isOpen ? "text-primary" : "text-gray-900 group-hover:text-primary",
+                    )}
+                  >
                     {faq.question}
                   </span>
                   <HugeiconsIcon
                     icon={ArrowDown01Icon}
                     className={cn(
-                      "size-5 shrink-0 text-muted-foreground transition-transform duration-300",
-                      isOpen && "rotate-180",
+                      "mt-0.5 size-4 shrink-0 text-gray-400 transition-transform duration-200 ease-out",
+                      isOpen && "rotate-180 text-primary",
                     )}
                   />
                 </button>
+
+                {/* Grid-row trick for smooth height animation — Emil principle */}
                 <div
                   className={cn(
-                    "grid transition-all duration-300 ease-in-out",
+                    "grid transition-all duration-200 ease-out",
                     isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
                   )}
                 >
                   <div className="overflow-hidden">
-                    <p className="pt-4 text-base leading-relaxed text-muted-foreground">
-                      {faq.answer}
-                    </p>
+                    <p className="pb-5 text-[15px] leading-relaxed text-gray-500">{faq.answer}</p>
                   </div>
                 </div>
               </div>
@@ -87,6 +92,6 @@ export function Faq() {
           })}
         </div>
       </div>
-    </section>
+    </SectionLayout>
   );
 }
