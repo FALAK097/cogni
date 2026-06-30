@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { Check, ChevronDown, ChevronUp, FolderKanban, Loader2, Plus } from "@/components/icons";
+import { Check, ChevronDown, ChevronUp, FolderKanban, Loader2 } from "@/components/icons";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -30,7 +30,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "@/components/ui/use-toast";
 import { useCreateWorkspaceWorkspace, useWorkspaces } from "@/hooks/query";
 import { useAuthMe, useSwitchWorkspace } from "@/hooks/use-auth";
@@ -172,7 +171,7 @@ export function WorkspaceSwitcher({ isOpen }: WorkspaceSwitcherProps) {
     );
   };
 
-  const openCreateDialog = () => {
+  const _openCreateDialog = () => {
     if (hasReachedWorkspaceLimit) {
       toast({
         title: USAGE_LIMIT_REACHED_TITLE,
@@ -191,21 +190,22 @@ export function WorkspaceSwitcher({ isOpen }: WorkspaceSwitcherProps) {
 
   return (
     <>
-      {workspaces.length === 0 ? (
-        <Button
-          variant="ghost"
-          className={cn(
-            "w-full mx-0 h-10 font-normal hover:bg-muted/50",
-            isOpen ? "justify-start px-2.5" : "justify-center px-0",
-          )}
-          onClick={openCreateDialog}
-          data-testid="workspace-switcher-add"
-          title={!isOpen ? "Add Workspace" : undefined}
-        >
-          <Plus className="flex-shrink-0 w-4 h-4 text-muted-foreground" />
-          {isOpen && <span className="text-sm font-medium">Add Workspace</span>}
-        </Button>
-      ) : (
+      {workspaces.length ===
+      0 ? // TODO: Re-enable workspace creation when multi-workspace is ready.
+      // <Button
+      //   variant="ghost"
+      //   className={cn(
+      //     "w-full mx-0 h-10 font-normal hover:bg-muted/50",
+      //     isOpen ? "justify-start px-2.5" : "justify-center px-0",
+      //   )}
+      //   onClick={openCreateDialog}
+      //   data-testid="workspace-switcher-add"
+      //   title={!isOpen ? "Add Workspace" : undefined}
+      // >
+      //   <Plus className="flex-shrink-0 w-4 h-4 text-muted-foreground" />
+      //   {isOpen && <span className="text-sm font-medium">Add Workspace</span>}
+      // </Button>
+      null : (
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
@@ -245,6 +245,7 @@ export function WorkspaceSwitcher({ isOpen }: WorkspaceSwitcherProps) {
           >
             <div className="flex items-center justify-between px-2 py-1.5">
               <p className="text-xs font-normal text-muted-foreground">Workspaces</p>
+              {/* TODO: Re-enable workspace creation when multi-workspace is ready.
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger
@@ -265,6 +266,7 @@ export function WorkspaceSwitcher({ isOpen }: WorkspaceSwitcherProps) {
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
+              */}
             </div>
 
             {workspaces.map((workspace) => (

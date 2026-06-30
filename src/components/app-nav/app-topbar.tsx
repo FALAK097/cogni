@@ -229,7 +229,7 @@ export function AppTopbar({ userData }: AppTopbarProps) {
   }, [toggleOpen]);
 
   return (
-    <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-4 border-b border-border bg-card px-4 sm:px-8 print:hidden">
+    <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-4 border-b border-sidebar-border bg-sidebar px-4 sm:px-8 print:hidden">
       <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden sm:gap-4">
         {!sidebarDisabled && (
           <>

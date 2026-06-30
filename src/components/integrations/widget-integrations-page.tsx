@@ -50,10 +50,6 @@ export function WidgetIntegrationsPage() {
 
   return (
     <div className="space-y-10 pb-10">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Integrations</h1>
-      </div>
-
       {INTEGRATION_CATEGORIES.map((category) => {
         const integrations = getIntegrationsByCategory(category.id);
         if (integrations.length === 0) return null;
