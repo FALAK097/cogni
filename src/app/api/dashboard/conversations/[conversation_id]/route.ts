@@ -79,7 +79,9 @@ export async function GET(_request: Request, context: RouteContext) {
     id: entry.id,
     subject: entry.subject,
     status: entry.status,
-    lastMessageAt: new Date(entry.lastMessageAt).toISOString(),
+    lastMessageAt: entry.lastMessageAt
+      ? new Date(entry.lastMessageAt).toISOString()
+      : new Date().toISOString(),
   }));
 
   return NextResponse.json({
