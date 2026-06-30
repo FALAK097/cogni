@@ -1,5 +1,6 @@
 import "server-only";
 
+import { randomUUID } from "node:crypto";
 import { and, eq, isNull, like, ne, or, sql } from "drizzle-orm";
 
 import { getDb } from "@/lib/db/client";
@@ -225,6 +226,55 @@ export async function markConversationAsRead(workspaceId: string, conversationId
   return false;
 }
 
+export async function appendTeamConversationMessage(
+  workspaceId: string,
+  conversationId: string,
+  message: Pick<MessageJson, "body" | "authorType" | "visibility">,
+  options: { updateLastMessageAt: boolean },
+): Promise<boolean> {
+  const db = getDb();
+  const nowIso = new Date().toISOString();
+  const newMessage: MessageJson = {
+    id: randomUUID(),
+    body: message.body,
+    authorType: message.authorType,
+    visibility: message.visibility,
+    createdAt: nowIso,
+  };
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const conversation = await db.query.conversation.findFirst({
+      where: (fields, { eq, and }) =>
+        and(eq(fields.id, conversationId), eq(fields.workspaceId, workspaceId)),
+      columns: { messages: true, updatedAt: true },
+    });
+
+    if (!conversation) return false;
+
+    const messagesList = parseMessages(conversation.messages);
+    const updatedMessages = [...messagesList, newMessage];
+
+    const result = await db
+      .update(conversationTable)
+      .set({
+        messages: JSON.stringify(updatedMessages),
+        updatedAt: nowIso,
+        ...(options.updateLastMessageAt ? { lastMessageAt: nowIso } : {}),
+      })
+      .where(
+        and(
+          eq(conversationTable.id, conversationId),
+          eq(conversationTable.updatedAt, conversation.updatedAt),
+        ),
+      )
+      .returning({ id: conversationTable.id });
+
+    if (result.length > 0) return true;
+  }
+
+  return false;
+}
+
 function getLastPublicMessage(messages: MessageJson[]) {
   const publicMessages = messages.filter(
     (message) => message.visibility === "PUBLIC" || !message.visibility,
@@ -340,7 +390,9 @@ export function mapConversationToListItem(conversation: ParsedConversation) {
     assigneeId: conversation.assignedMemberId,
     unreadCount: countUnreadMessages(conversation.messages),
     preview: lastMessage?.body ?? conversation.subject,
-    lastMessageAt: new Date(conversation.lastMessageAt).toISOString(),
+    lastMessageAt: conversation.lastMessageAt
+      ? new Date(conversation.lastMessageAt).toISOString()
+      : new Date().toISOString(),
     country: conversation.visitorSession?.country ?? null,
     city: conversation.visitorSession?.city ?? null,
   };

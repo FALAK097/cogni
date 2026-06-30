@@ -66,14 +66,14 @@ export function ConversationsList({
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const listKey = `${filter}:${debouncedSearch}`;
   const [trackedListKey, setTrackedListKey] = useState(listKey);
-  const pagesCacheRef = useRef<Map<number, ConversationSummary[]>>(new Map());
+  const [pagesCache, setPagesCache] = useState<Record<number, ConversationSummary[]>>({});
   const { mutate: markConversationRead } = useMarkConversationRead();
   const markedReadRef = useRef<string | null>(null);
 
   if (listKey !== trackedListKey) {
     setTrackedListKey(listKey);
     setPage(1);
-    pagesCacheRef.current = new Map();
+    setPagesCache({});
   }
 
   useEffect(() => {
@@ -103,21 +103,22 @@ export function ConversationsList({
     filter,
   });
 
-  if (conversationsData && !isPlaceholderData) {
-    pagesCacheRef.current.set(page, conversationsData.conversations);
-  }
+  const effectivePagesCache = useMemo(() => {
+    if (!conversationsData || isPlaceholderData) return pagesCache;
+    return { ...pagesCache, [page]: conversationsData.conversations };
+  }, [pagesCache, conversationsData, page, isPlaceholderData]);
 
   const totalPages = conversationsData?.pagination.pages ?? 1;
   const hasMore = page < totalPages;
   const conversations = useMemo(() => {
     if (page === 1) {
-      return conversationsData?.conversations ?? [];
+      return effectivePagesCache[1] ?? conversationsData?.conversations ?? [];
     }
 
     const seen = new Set<string>();
     const result: ConversationSummary[] = [];
     for (let currentPage = 1; currentPage <= page; currentPage++) {
-      for (const conversation of pagesCacheRef.current.get(currentPage) ?? []) {
+      for (const conversation of effectivePagesCache[currentPage] ?? []) {
         if (!seen.has(conversation.id)) {
           seen.add(conversation.id);
           result.push(conversation);
@@ -125,7 +126,14 @@ export function ConversationsList({
       }
     }
     return result;
-  }, [conversationsData, page]);
+  }, [effectivePagesCache, page, conversationsData?.conversations]);
+
+  const handleLoadMore = () => {
+    if (conversationsData && !isPlaceholderData) {
+      setPagesCache((current) => ({ ...current, [page]: conversationsData.conversations }));
+    }
+    setPage((current) => current + 1);
+  };
   const firstConversationId = conversations[0]?.id ?? null;
 
   useEffect(() => {
@@ -240,7 +248,7 @@ export function ConversationsList({
           <Button
             variant="ghost"
             className="h-8 w-full text-sm text-muted-foreground hover:text-foreground"
-            onClick={() => setPage((current) => current + 1)}
+            onClick={handleLoadMore}
             disabled={isFetching}
           >
             {isFetching ? "Loading..." : "+ Load more conversations"}

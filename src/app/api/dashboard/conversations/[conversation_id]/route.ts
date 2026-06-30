@@ -1,9 +1,12 @@
-import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { eq, and } from "drizzle-orm";
 
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
-import { getConversation, markConversationAsRead } from "@/features/conversations/server/queries";
+import {
+  appendTeamConversationMessage,
+  getConversation,
+  markConversationAsRead,
+} from "@/features/conversations/server/queries";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import {
   conversation as conversationTable,
@@ -164,25 +167,23 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Message is required." }, { status: 400 });
     }
 
-    const messagesList = JSON.parse(conversation.messages || "[]") as MessageJson[];
-    const now = new Date();
-    const nowIso = now.toISOString();
-    const newMessage: MessageJson = {
-      id: randomUUID(),
-      body: message,
-      authorType: "TEAM",
-      visibility: body.action === "note" ? "INTERNAL" : "PUBLIC",
-      createdAt: nowIso,
-    };
+    const saved = await appendTeamConversationMessage(
+      workspace.id,
+      conversation.id,
+      {
+        body: message,
+        authorType: "TEAM",
+        visibility: body.action === "note" ? "INTERNAL" : "PUBLIC",
+      },
+      { updateLastMessageAt: body.action === "reply" },
+    );
 
-    await db
-      .update(conversationTable)
-      .set({
-        ...(body.action === "reply" ? { lastMessageAt: nowIso, updatedAt: nowIso } : {}),
-        messages: JSON.stringify([...messagesList, newMessage]),
-        updatedAt: nowIso,
-      })
-      .where(eq(conversationTable.id, conversation.id));
+    if (!saved) {
+      return NextResponse.json(
+        { error: "Failed to save message. Please try again." },
+        { status: 409 },
+      );
+    }
 
     return NextResponse.json({ ok: true });
   }
