@@ -18,6 +18,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import type { WidgetPosition, WidgetTheme } from "@/features/widget/domain";
+import { normalizeLogoUrl } from "@/features/widget/domain";
 import { WIDGET_BRAND_COLOR } from "@/lib/widget-accent";
 import { cn } from "@/lib/utils";
 
@@ -199,13 +200,18 @@ export function getAppearanceDefaults(): AppearanceConfig {
 export function WidgetAppearancePanel({
   config,
   onUpdate,
+  onBatchUpdate,
   onReset,
 }: {
   config: AppearanceConfig;
   onUpdate: <K extends keyof AppearanceConfig>(key: K, value: AppearanceConfig[K]) => void;
+  onBatchUpdate?: (updates: Partial<AppearanceConfig>) => void;
   onReset: () => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const resolvedLogoUrl = normalizeLogoUrl(config.logoUrl);
+  const fontFamily = config.fontFamily || APPEARANCE_DEFAULTS.fontFamily;
+  const fontSize = config.fontSize || APPEARANCE_DEFAULTS.fontSize;
 
   const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -247,11 +253,11 @@ export function WidgetAppearancePanel({
             <div className="flex items-center gap-3">
               <div
                 className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border"
-                style={{ backgroundColor: config.logoUrl ? "transparent" : config.primaryColor }}
+                style={{ backgroundColor: resolvedLogoUrl ? "transparent" : config.primaryColor }}
               >
-                {config.logoUrl ? (
+                {resolvedLogoUrl ? (
                   <Image
-                    src={config.logoUrl}
+                    src={resolvedLogoUrl}
                     alt="Widget icon"
                     width={48}
                     height={48}
@@ -261,10 +267,15 @@ export function WidgetAppearancePanel({
                 ) : (
                   <svg
                     viewBox="0 0 24 24"
-                    className="size-6 text-primary-foreground"
-                    fill="currentColor"
+                    className="size-6 text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden
                   >
-                    <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z" />
+                    <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
                   </svg>
                 )}
               </div>
@@ -289,7 +300,7 @@ export function WidgetAppearancePanel({
                 variant="ghost"
                 size="sm"
                 onClick={() => onUpdate("logoUrl", "")}
-                disabled={!config.logoUrl}
+                disabled={!resolvedLogoUrl}
                 className="h-9 rounded-lg px-4 text-sm font-medium text-destructive hover:bg-destructive/10 hover:text-destructive"
               >
                 Remove
@@ -302,6 +313,15 @@ export function WidgetAppearancePanel({
             label="Widget Color"
             value={config.primaryColor}
             onChange={(value) => {
+              if (onBatchUpdate) {
+                onBatchUpdate({
+                  primaryColor: value,
+                  linkColor: value,
+                  userBubbleColor: value,
+                  headerGradientFrom: value,
+                });
+                return;
+              }
               onUpdate("primaryColor", value);
               onUpdate("linkColor", value);
               onUpdate("userBubbleColor", value);
@@ -385,6 +405,10 @@ export function WidgetAppearancePanel({
               label="Link color"
               value={config.linkColor}
               onChange={(value) => {
+                if (onBatchUpdate) {
+                  onBatchUpdate({ linkColor: value, primaryColor: value });
+                  return;
+                }
                 onUpdate("linkColor", value);
                 onUpdate("primaryColor", value);
               }}
@@ -398,11 +422,11 @@ export function WidgetAppearancePanel({
             <div className="space-y-1.5">
               <Label className="text-sm font-medium text-foreground">Font family</Label>
               <Select
-                value={config.fontFamily}
+                value={fontFamily}
                 onValueChange={(value) => value && onUpdate("fontFamily", value)}
               >
                 <SelectTrigger className={FIELD_CLASS}>
-                  <SelectValue />
+                  <SelectValue placeholder={APPEARANCE_DEFAULTS.fontFamily} />
                 </SelectTrigger>
                 <SelectContent className="rounded-lg">
                   {FONT_FAMILIES.map((font) => (
@@ -416,11 +440,11 @@ export function WidgetAppearancePanel({
             <div className="space-y-1.5">
               <Label className="text-sm font-medium text-foreground">Font size</Label>
               <Select
-                value={config.fontSize}
+                value={fontSize}
                 onValueChange={(value) => value && onUpdate("fontSize", value)}
               >
                 <SelectTrigger className={FIELD_CLASS}>
-                  <SelectValue />
+                  <SelectValue placeholder={APPEARANCE_DEFAULTS.fontSize} />
                 </SelectTrigger>
                 <SelectContent className="rounded-lg">
                   {FONT_SIZES.map((size) => (

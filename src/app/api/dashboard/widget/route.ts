@@ -5,6 +5,9 @@ import {
   normalizeHostname,
   normalizeLauncherSize,
   normalizePosition,
+  normalizeFontFamily,
+  normalizeFontSize,
+  normalizeLogoUrl,
   stringifyJsonArray,
 } from "@/features/widget/domain";
 import { ensureWorkspaceWidget, toWidgetSettings } from "@/features/widget/server/widget-service";
@@ -42,12 +45,24 @@ async function saveWidgetConfig(body: Record<string, unknown>) {
       displayName: typeof body.agentName === "string" ? body.agentName : current.displayName,
       welcomeMessage:
         typeof body.welcomeMessage === "string" ? body.welcomeMessage : current.welcomeMessage,
-      logoUrl: typeof body.logoUrl === "string" ? body.logoUrl || null : current.logoUrl,
+      logoUrl:
+        typeof body.logoUrl === "string"
+          ? normalizeLogoUrl(body.logoUrl)
+          : body.logoUrl === null
+            ? null
+            : current.logoUrl,
       primaryColor:
         typeof body.primaryColor === "string" ? body.primaryColor : current.primaryColor,
       backgroundColor:
         typeof body.backgroundColor === "string" ? body.backgroundColor : current.backgroundColor,
       textColor: typeof body.textColor === "string" ? body.textColor : current.textColor,
+      borderColor: typeof body.borderColor === "string" ? body.borderColor : current.borderColor,
+      fontFamily: normalizeFontFamily(
+        typeof body.fontFamily === "string" ? body.fontFamily : current.fontFamily,
+      ),
+      fontSize: normalizeFontSize(
+        typeof body.fontSize === "string" ? body.fontSize : current.fontSize,
+      ),
       userBubbleColor:
         typeof body.userBubbleColor === "string" ? body.userBubbleColor : current.userBubbleColor,
       userBubbleTextColor:
@@ -127,6 +142,10 @@ async function saveWidgetConfig(body: Record<string, unknown>) {
       isEnabled: typeof body.isEnabled === "boolean" ? body.isEnabled : current.isEnabled,
       instructions:
         typeof body.instructions === "string" ? body.instructions : current.instructions,
+      escalationKeywords:
+        typeof body.escalationKeywords === "string"
+          ? body.escalationKeywords
+          : current.escalationKeywords,
       authorizedDomains: JSON.stringify(domains),
       updatedAt: new Date().toISOString(),
     })

@@ -4,7 +4,8 @@
  */
 
 import { searchDocuments, saveMessage } from "./api.js";
-import { ICONS, WIDGET_LOGO, BROCHURE_KEYWORDS } from "./constants.js";
+import { renderBotAvatarMarkup } from "./utils.js";
+import { ICONS, BROCHURE_KEYWORDS } from "./constants.js";
 import { state } from "./state.js";
 import { escapeHtml, scrollToBottom, getCurrentTime, formatBotMessage } from "./utils.js";
 
@@ -48,8 +49,6 @@ export function extractBrochureSearchQuery(message) {
  * Search and display documents/brochures
  */
 export async function searchAndDisplayDocuments(searchQuery = null) {
-  const logoSrc = state.config.logoUrl || WIDGET_LOGO;
-
   // Show loading message
   const loadingDiv = document.createElement("div");
   loadingDiv.className = "oc-message bot";
@@ -57,7 +56,7 @@ export async function searchAndDisplayDocuments(searchQuery = null) {
   loadingDiv.innerHTML = `
 		<div class="oc-bot-header">
 			<div class="oc-bot-avatar">
-				<img src="${logoSrc}" alt="Logo" />
+				${renderBotAvatarMarkup(state.config.logoUrl)}
 			</div>
 			<span class="oc-bot-name">${escapeHtml(state.config.agentName)}</span>
 		</div>
@@ -112,7 +111,7 @@ export async function searchAndDisplayDocuments(searchQuery = null) {
     docDiv.innerHTML = `
 			<div class="oc-bot-header">
 				<div class="oc-bot-avatar">
-					<img src="${logoSrc}" alt="Logo" />
+					${renderBotAvatarMarkup(state.config.logoUrl)}
 				</div>
 				<span class="oc-bot-name">${escapeHtml(state.config.agentName)}</span>
 			</div>
@@ -152,8 +151,6 @@ export async function searchAndDisplayDocuments(searchQuery = null) {
  * Restore document message from history
  */
 export function restoreDocumentMessage(text, documents, timestamp, messageId, existingFeedback) {
-  const logoSrc = state.config.logoUrl || WIDGET_LOGO;
-
   const msg = document.createElement("div");
   msg.className = "oc-message bot";
 
@@ -192,7 +189,7 @@ export function restoreDocumentMessage(text, documents, timestamp, messageId, ex
     msg.innerHTML = `
 			<div class="oc-bot-header">
 				<div class="oc-bot-avatar">
-					<img src="${logoSrc}" alt="Logo" />
+					${renderBotAvatarMarkup(state.config.logoUrl)}
 				</div>
 				<span class="oc-bot-name">${escapeHtml(state.config.agentName)}</span>
 			</div>

@@ -55,8 +55,8 @@
   --card-foreground: oklch(0.141 0.005 285.823);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.141 0.005 285.823);
-  --primary: oklch(0.508 0.118 165.612);
-  --primary-foreground: oklch(0.979 0.021 166.113);
+  --primary: oklch(0.541 0.245 293.009);
+  --primary-foreground: oklch(0.985 0.01 293);
   --secondary: oklch(0.967 0.001 286.375);
   --secondary-foreground: oklch(0.21 0.006 285.885);
   --muted: oklch(0.967 0.001 286.375);
@@ -75,8 +75,8 @@
   --radius: 0.625rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.141 0.005 285.823);
-  --sidebar-primary: oklch(0.596 0.145 163.225);
-  --sidebar-primary-foreground: oklch(0.979 0.021 166.113);
+  --sidebar-primary: oklch(0.541 0.245 293.009);
+  --sidebar-primary-foreground: oklch(0.985 0.01 293);
   --sidebar-accent: oklch(0.967 0.001 286.375);
   --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
   --sidebar-border: oklch(0.92 0.004 286.32);
@@ -90,8 +90,8 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.21 0.006 285.885);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.432 0.095 166.913);
-  --primary-foreground: oklch(0.979 0.021 166.113);
+  --primary: oklch(0.627 0.233 293.5);
+  --primary-foreground: oklch(0.985 0.01 293);
   --secondary: oklch(0.274 0.006 286.033);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.274 0.006 286.033);
@@ -109,8 +109,8 @@
   --chart-5: oklch(0.274 0.006 286.033);
   --sidebar: oklch(0.21 0.006 285.885);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.696 0.17 162.48);
-  --sidebar-primary-foreground: oklch(0.262 0.051 172.552);
+  --sidebar-primary: oklch(0.627 0.233 293.5);
+  --sidebar-primary-foreground: oklch(0.985 0.01 293);
   --sidebar-accent: oklch(0.274 0.006 286.033);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
@@ -177,6 +177,10 @@
 
 .widget-preview-host.widget-preview-mode-widget #widget-container .oc-preview-container {
   pointer-events: auto !important;
+}
+
+.widget-preview-host #widget-container:has(.oc-window.is-open) .oc-preview-container {
+  display: none !important;
 }
 
 .widget-preview-host #widget-container .oc-body {
@@ -265,44 +269,4 @@
 .widget-preview-host.widget-preview-mode-widget #widget-container .oc-window.is-open {
   display: flex !important;
   flex-direction: column !important;
-}
-
-.widget-preview-host[data-device="mobile"] #widget-container,
-.widget-preview-host[data-device="tablet"] #widget-container {
-  position: absolute !important;
-  inset: 0 !important;
-  display: flex !important;
-  flex-direction: column !important;
-  justify-content: stretch !important;
-  align-items: stretch !important;
-  padding: 0 !important;
-  gap: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-  pointer-events: auto !important;
-}
-
-.widget-preview-host[data-device="mobile"] #widget-container .oc-launcher,
-.widget-preview-host[data-device="tablet"] #widget-container .oc-launcher {
-  display: none !important;
-}
-
-.widget-preview-host[data-device="mobile"] #widget-container .oc-window,
-.widget-preview-host[data-device="tablet"] #widget-container .oc-window {
-  position: relative !important;
-  inset: auto !important;
-  flex: 1 1 auto !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  min-height: 0 !important;
-  height: 100% !important;
-  max-height: 100% !important;
-  display: flex !important;
-  flex-direction: column !important;
-  border-radius: inherit !important;
-  animation: none !important;
-}
-
-.widget-preview-host[data-device="mobile"] #widget-container .oc-window .oc-header {
-  border-radius: 0 !important;
 }

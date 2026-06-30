@@ -15,6 +15,20 @@
       "when": 1782541257729,
       "tag": "0001_better_auth_date_types",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1782801814531,
+      "tag": "0002_brand_color_purple",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1782802180788,
+      "tag": "0003_widget_typography",
+      "breakpoints": true
     }
   ]
 }
