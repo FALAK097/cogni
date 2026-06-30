@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { ConversationDetail } from "./conversation-detail";
 import { ConversationsList } from "./conversations-list";
@@ -10,13 +10,7 @@ interface WidgetConversationsProps {
 }
 
 export function WidgetConversations({ initialSessionId = null }: WidgetConversationsProps) {
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (initialSessionId) {
-      setSelectedSessionId(initialSessionId);
-    }
-  }, [initialSessionId]);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(initialSessionId);
 
   return (
     <div className="h-[calc(100vh-200px)] min-h-[600px] overflow-hidden">

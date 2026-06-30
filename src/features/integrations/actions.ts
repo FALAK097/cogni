@@ -5,11 +5,12 @@ import { z } from "zod";
 
 import { randomUUID } from "node:crypto";
 import { integration as integrationTable } from "@/lib/db/schema";
-import { requireDashboardContext } from "@/lib/auth/dashboard-context";
+import { requireAuth, requireDashboardContext } from "@/lib/auth/dashboard-context";
 
 const providerSchema = z.enum(["GMAIL", "GOOGLE_CALENDAR", "SLACK"]);
 
 async function updateIntegrationStatus(providerValue: FormDataEntryValue | null, status: string) {
+  await requireAuth();
   const parsed = providerSchema.safeParse(providerValue);
 
   if (!parsed.success) {
@@ -38,9 +39,11 @@ async function updateIntegrationStatus(providerValue: FormDataEntryValue | null,
 }
 
 export async function connectIntegrationAction(formData: FormData) {
+  await requireAuth();
   await updateIntegrationStatus(formData.get("provider"), "CONNECTED");
 }
 
 export async function disconnectIntegrationAction(formData: FormData) {
+  await requireAuth();
   await updateIntegrationStatus(formData.get("provider"), "DISCONNECTED");
 }

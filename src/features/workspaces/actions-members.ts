@@ -10,7 +10,7 @@ import {
   workspaceMember as workspaceMemberTable,
   workspaceInvite as workspaceInviteTable,
 } from "@/lib/db/schema";
-import { requireDashboardContext } from "@/lib/auth/dashboard-context";
+import { requireAuth, requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { getAuth } from "@/lib/auth/server";
 import { getDb } from "@/lib/db/client";
 import {
@@ -46,6 +46,10 @@ const switchWorkspaceSchema = z.object({
   returnTo: z.string().optional(),
 });
 
+const transferOwnershipSchema = z.object({
+  membershipId: z.string().min(1),
+});
+
 function activeWorkspaceCookieOptions() {
   return {
     httpOnly: true,
@@ -64,19 +68,17 @@ function safeReturnPath(returnTo: string | undefined) {
   return returnTo;
 }
 
-async function ownerGuard() {
-  const context = await requireDashboardContext();
-  if (context.membership.role !== "OWNER") {
-    return { context, error: "Only workspace owners can manage members." } as const;
-  }
-
-  return { context, error: null } as const;
-}
-
 export async function inviteMemberAction(
   _previousState: MemberActionState,
   formData: FormData,
 ): Promise<MemberActionState> {
+  await requireAuth();
+  const context = await requireDashboardContext();
+
+  if (context.membership.role !== "OWNER") {
+    return { error: "Only workspace owners can manage members." };
+  }
+
   const parsed = inviteMemberSchema.safeParse({
     email: formData.get("email"),
     role: formData.get("role") ?? "MEMBER",
@@ -84,11 +86,6 @@ export async function inviteMemberAction(
 
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Check the invite details." };
-  }
-
-  const { context, error } = await ownerGuard();
-  if (error) {
-    return { error };
   }
 
   const { db, workspace } = context;
@@ -122,17 +119,19 @@ export async function inviteMemberAction(
 }
 
 export async function updateMemberRoleAction(formData: FormData) {
+  await requireAuth();
+  const context = await requireDashboardContext();
+
+  if (context.membership.role !== "OWNER") {
+    return;
+  }
+
   const parsed = updateMemberRoleSchema.safeParse({
     membershipId: formData.get("membershipId"),
     role: formData.get("role"),
   });
 
   if (!parsed.success) {
-    return;
-  }
-
-  const { context, error } = await ownerGuard();
-  if (error) {
     return;
   }
 
@@ -179,16 +178,18 @@ export async function updateMemberRoleAction(formData: FormData) {
 }
 
 export async function removeMemberAction(formData: FormData) {
+  await requireAuth();
+  const context = await requireDashboardContext();
+
+  if (context.membership.role !== "OWNER") {
+    return;
+  }
+
   const parsed = removeMemberSchema.safeParse({
     membershipId: formData.get("membershipId"),
   });
 
   if (!parsed.success) {
-    return;
-  }
-
-  const { context, error } = await ownerGuard();
-  if (error) {
     return;
   }
 
@@ -233,20 +234,20 @@ export async function acceptInviteAction(
   _previousState: MemberActionState,
   formData: FormData,
 ): Promise<MemberActionState> {
-  const parsed = acceptInviteSchema.safeParse({
-    token: formData.get("token"),
-  });
-
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Invalid invite token." };
-  }
-
   const session = await getAuth().api.getSession({
     headers: await headers(),
   });
 
   if (!session) {
     return { error: "Sign in to accept this invite." };
+  }
+
+  const parsed = acceptInviteSchema.safeParse({
+    token: formData.get("token"),
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid invite token." };
   }
 
   const db = getDb();
@@ -301,21 +302,19 @@ export async function acceptInviteAction(
   redirect("/dashboard");
 }
 
-const transferOwnershipSchema = z.object({
-  membershipId: z.string().min(1),
-});
-
 export async function transferOwnershipAction(formData: FormData) {
+  await requireAuth();
+  const context = await requireDashboardContext();
+
+  if (context.membership.role !== "OWNER") {
+    return;
+  }
+
   const parsed = transferOwnershipSchema.safeParse({
     membershipId: formData.get("membershipId"),
   });
 
   if (!parsed.success) {
-    return;
-  }
-
-  const { context, error } = await ownerGuard();
-  if (error) {
     return;
   }
 
@@ -333,12 +332,13 @@ export async function transferOwnershipAction(formData: FormData) {
     return;
   }
 
+  const now = new Date().toISOString();
   await db.transaction(async (tx) => {
     await tx
       .update(workspaceMemberTable)
       .set({
         role: "MEMBER",
-        updatedAt: new Date().toISOString(),
+        updatedAt: now,
       })
       .where(eq(workspaceMemberTable.id, membership.id));
 
@@ -346,7 +346,7 @@ export async function transferOwnershipAction(formData: FormData) {
       .update(workspaceMemberTable)
       .set({
         role: "OWNER",
-        updatedAt: new Date().toISOString(),
+        updatedAt: now,
       })
       .where(eq(workspaceMemberTable.id, target.id));
   });
@@ -355,6 +355,9 @@ export async function transferOwnershipAction(formData: FormData) {
 }
 
 export async function switchWorkspaceAction(formData: FormData) {
+  await requireAuth();
+  const { db, session } = await requireDashboardContext();
+
   const parsed = switchWorkspaceSchema.safeParse({
     workspaceId: formData.get("workspaceId"),
     returnTo: formData.get("returnTo"),
@@ -364,7 +367,6 @@ export async function switchWorkspaceAction(formData: FormData) {
     return;
   }
 
-  const { db, session } = await requireDashboardContext();
   const membership = await db.query.workspaceMember.findFirst({
     where: (member, { eq, and }) =>
       and(eq(member.userId, session.user.id), eq(member.workspaceId, parsed.data.workspaceId)),

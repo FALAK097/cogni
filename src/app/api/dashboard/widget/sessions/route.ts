@@ -75,8 +75,8 @@ export async function GET(request: Request) {
       createdAt: session.createdAt
         ? new Date(session.createdAt).toISOString()
         : new Date().toISOString(),
-      contactName: session.contact?.name ?? "Visitor",
-      contactEmail: session.contact?.email,
+      contactName: session.name ?? session.contact?.name ?? "Visitor",
+      contactEmail: session.email ?? session.contact?.email,
       preview: (() => {
         const convo = session.conversations[0];
         if (!convo) return "No messages yet";

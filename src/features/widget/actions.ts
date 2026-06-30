@@ -14,7 +14,7 @@ import {
   type WidgetModelProvider,
 } from "@/features/widget/domain";
 import { ensureWorkspaceWidget } from "@/features/widget/server/widget-service";
-import { requireDashboardContext } from "@/lib/auth/dashboard-context";
+import { requireAuth, requireDashboardContext } from "@/lib/auth/dashboard-context";
 
 export type WidgetActionState = {
   error?: string;
@@ -83,6 +83,9 @@ export async function saveWidgetWidgetSettingsAction(
   _previousState: WidgetActionState,
   formData: FormData,
 ): Promise<WidgetActionState> {
+  await requireAuth();
+  const { db, workspace } = await requireDashboardContext();
+
   const parsed = widgetWidgetSettingsSchema.safeParse({
     displayName: formData.get("displayName"),
     welcomeMessage: formData.get("welcomeMessage"),
@@ -128,7 +131,6 @@ export async function saveWidgetWidgetSettingsAction(
     .map(normalizeHostname)
     .filter((domain): domain is string => Boolean(domain));
 
-  const { db, workspace } = await requireDashboardContext();
   const widget = await ensureWorkspaceWidget(db, workspace.id);
 
   await db
@@ -175,6 +177,7 @@ export async function saveWidgetSettingsAction(
   previousState: WidgetActionState,
   formData: FormData,
 ): Promise<WidgetActionState> {
+  await requireAuth();
   return saveWidgetWidgetSettingsAction(previousState, formData);
 }
 
@@ -187,6 +190,9 @@ export async function saveWidgetAgentSettingsAction(
   _previousState: WidgetAgentActionState,
   formData: FormData,
 ): Promise<WidgetAgentActionState> {
+  await requireAuth();
+  const { db, workspace } = await requireDashboardContext();
+
   const parsed = widgetAgentSettingsSchema.safeParse({
     instructions: formData.get("instructions"),
     escalationKeywords: formData.get("escalationKeywords"),
@@ -195,8 +201,6 @@ export async function saveWidgetAgentSettingsAction(
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Check the agent settings." };
   }
-
-  const { db, workspace } = await requireDashboardContext();
   const widget = await ensureWorkspaceWidget(db, workspace.id);
 
   await db

@@ -52,9 +52,6 @@ export function WidgetIntegrationsPage() {
     <div className="space-y-10 pb-10">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Integrations</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Connect Gmail, Google Calendar, and Slack for agent actions and notifications.
-        </p>
       </div>
 
       {INTEGRATION_CATEGORIES.map((category) => {
