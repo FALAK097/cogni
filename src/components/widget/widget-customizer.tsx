@@ -306,13 +306,18 @@ function WidgetSettingsMenu({
 function WidgetCustomizerSkeleton() {
   return (
     <div
-      className="flex h-full min-h-0 w-full gap-3 overflow-hidden bg-background p-3"
+      className="flex h-full min-h-0 w-full items-stretch gap-3 overflow-hidden p-3"
       style={getWidgetAccentVars(WIDGET_BRAND_COLOR)}
     >
       <Skeleton className="size-9 shrink-0 rounded-lg" />
 
-      <div className={cn(WIDGET_SETTINGS_CARD_CLASS, "flex min-h-0 min-w-0 flex-1 flex-col")}>
-        <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto p-6">
+      <div
+        className={cn(
+          WIDGET_SETTINGS_CARD_CLASS,
+          "flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden",
+        )}
+      >
+        <div className="min-h-0 flex-1 overflow-y-auto p-6">
           <Skeleton className="h-5 w-28 rounded" />
           <Skeleton className="mt-2 h-4 w-56 rounded" />
           <div className="mt-6 space-y-4">
@@ -326,7 +331,7 @@ function WidgetCustomizerSkeleton() {
       <div
         className={cn(
           WIDGET_CARD_CLASS,
-          "flex w-[380px] shrink-0 flex-col overflow-visible xl:w-[420px]",
+          "flex h-full min-h-0 w-[380px] shrink-0 flex-col overflow-hidden xl:w-[420px]",
         )}
       >
         <div className="flex shrink-0 gap-2 px-4 py-3">
@@ -336,8 +341,8 @@ function WidgetCustomizerSkeleton() {
           <Skeleton className="h-7 w-7 rounded-md" />
           <Skeleton className="h-7 w-7 rounded-md" />
         </div>
-        <div className="flex min-h-0 flex-1 items-center justify-center p-4">
-          <Skeleton className="h-[460px] w-[320px] rounded-2xl" />
+        <div className="flex min-h-0 flex-1 overflow-hidden p-4">
+          <Skeleton className="h-full min-h-0 w-full rounded-2xl" />
         </div>
       </div>
     </div>
@@ -673,7 +678,7 @@ export function WidgetCustomizer({
 
   return (
     <div
-      className="flex h-full min-h-0 w-full items-stretch gap-3 overflow-hidden bg-background p-3"
+      className="flex h-full min-h-0 w-full items-stretch gap-3 overflow-hidden p-3"
       style={getWidgetAccentVars(WIDGET_BRAND_COLOR)}
     >
       <div ref={menuContainerRef} className="relative shrink-0 self-start pt-1">
@@ -696,8 +701,13 @@ export function WidgetCustomizer({
         />
       </div>
 
-      <div className={cn(WIDGET_SETTINGS_CARD_CLASS, "flex min-h-0 min-w-0 flex-1 flex-col")}>
-        <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto px-6 py-6">
+      <div
+        className={cn(
+          WIDGET_SETTINGS_CARD_CLASS,
+          "flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden",
+        )}
+      >
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
           {activeTab === "appearance" ? (
             <WidgetAppearancePanel
               config={appearanceConfig}
