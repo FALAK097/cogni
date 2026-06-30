@@ -1,6 +1,8 @@
 import { sqliteTable, text, numeric, integer, uniqueIndex, index } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
+import { BRAND_COLOR } from "@/lib/widget-accent";
+
 export const user = sqliteTable(
   "user",
   {
@@ -85,7 +87,7 @@ export const workspace = sqliteTable(
     name: text().notNull(),
     slug: text().notNull(),
     logo: text(),
-    brandColor: text().default("#14805e").notNull(),
+    brandColor: text().default(BRAND_COLOR).notNull(),
     timezone: text().default("UTC").notNull(),
     createdAt: numeric()
       .default(sql`(CURRENT_TIMESTAMP)`)
@@ -216,9 +218,12 @@ export const widget = sqliteTable(
     displayName: text().default("Support").notNull(),
     welcomeMessage: text().default("Hi! How can we help?").notNull(),
     inputPlaceholder: text().default("Ask a question…").notNull(),
-    primaryColor: text().default("#14805e").notNull(),
+    primaryColor: text().default(BRAND_COLOR).notNull(),
     backgroundColor: text().default("#ffffff").notNull(),
     textColor: text().default("#171717").notNull(),
+    borderColor: text().default("#EAECF0").notNull(),
+    fontFamily: text().default("Inter").notNull(),
+    fontSize: text().default("14px").notNull(),
     position: text().default("bottom-right").notNull(),
     launcherSize: text().default("md").notNull(),
     panelWidth: integer().default(380).notNull(),
@@ -236,12 +241,12 @@ export const widget = sqliteTable(
     modelName: text().default("gpt-5-mini").notNull(),
     isEnabled: integer({ mode: "boolean" }).default(true).notNull(),
     theme: text().default("light").notNull(),
-    userBubbleColor: text().default("#14805e").notNull(),
+    userBubbleColor: text().default(BRAND_COLOR).notNull(),
     userBubbleTextColor: text().default("#ffffff").notNull(),
     botBubbleColor: text().default("#f2f2f8").notNull(),
     botBubbleTextColor: text().default("#171717").notNull(),
-    headerGradientFrom: text().default("#14805e").notNull(),
-    headerGradientTo: text().default("#0f6b4e").notNull(),
+    headerGradientFrom: text().default(BRAND_COLOR).notNull(),
+    headerGradientTo: text().default(BRAND_COLOR).notNull(),
     shadowSize: text().default("md").notNull(),
     suggestions: text()
       .default(

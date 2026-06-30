@@ -1,11 +1,14 @@
 import type { CSSProperties } from "react";
 
-export const WIDGET_BRAND_COLOR = "#14805e";
+/** Single brand color used across the app UI, widget defaults, and database seeds. */
+export const WIDGET_BRAND_COLOR = "#7c3aed" as const;
+
+export const BRAND_COLOR = WIDGET_BRAND_COLOR;
 
 function parseHex(hex: string): [number, number, number] {
   const normalized = hex.replace("#", "");
   if (normalized.length !== 6) {
-    return [20, 128, 94];
+    return [124, 58, 237];
   }
   return [
     parseInt(normalized.slice(0, 2), 16),

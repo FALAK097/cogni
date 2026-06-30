@@ -1,3 +1,5 @@
+import "server-only";
+
 import { and, eq, ne, gt, like, sql } from "drizzle-orm";
 import type { conversation, visitorSession } from "@/lib/db/schema";
 
@@ -14,6 +16,7 @@ export function getEngagedVisitorSessionCond(s: typeof visitorSession) {
   );
 }
 
+/** Dashboard inbox lists every engaged session, including dashboard preview chats. */
 export function getDashboardEngagedVisitorSessionCond(s: typeof visitorSession) {
   return and(
     gt(s.messageCount, 0),

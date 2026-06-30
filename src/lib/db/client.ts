@@ -1,5 +1,8 @@
 import "server-only";
 
+import { mkdirSync } from "node:fs";
+import path from "node:path";
+
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import type { D1Database } from "@cloudflare/workers-types";
 import { drizzle as drizzleD1 } from "drizzle-orm/d1";
@@ -46,7 +49,9 @@ export function getDb(): Db {
   } else {
     // Local SQLite development using better-sqlite3
     const databaseUrl = env.DATABASE_URL || "file:./dev.db";
-    const dbPath = databaseUrl.replace(/^file:/, "");
+    const rawPath = databaseUrl.replace(/^file:/, "");
+    const dbPath = path.isAbsolute(rawPath) ? rawPath : path.resolve(process.cwd(), rawPath);
+    mkdirSync(path.dirname(dbPath), { recursive: true });
     const sqlite = new Database(dbPath);
     db = drizzleBetterSqlite3(sqlite, { schema: fullSchema }) as DrizzleDb;
   }

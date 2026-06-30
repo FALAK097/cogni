@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   Bot,
@@ -20,6 +20,7 @@ import type { DashboardWidgetConfig } from "@/hooks/query";
 import { useWidgetConfig, useSaveWidgetConfig } from "@/hooks/query";
 import { isValidDomain, sanitizeDomain } from "@/lib/domain-validation";
 import { getWidgetAccentVars, WIDGET_BRAND_COLOR } from "@/lib/widget-accent";
+import { normalizeFontFamily, normalizeFontSize, normalizeLogoUrl } from "@/features/widget/domain";
 import { cn } from "@/lib/utils";
 
 import { WidgetPreviewPanel } from "./widget-preview-panel";
@@ -82,13 +83,13 @@ type WidgetCustomizerConfig = Pick<
   | "allowedDomains"
   | "instructions"
   | "escalationKeywords"
+  | "borderColor"
+  | "fontFamily"
+  | "fontSize"
 > & {
   workspaceId: string;
   secondaryTextColor: string;
-  borderColor: string;
   linkColor: string;
-  fontFamily: string;
-  fontSize: string;
 };
 
 const LEGACY_TAB_MAP: Record<string, WidgetSettingsTab> = {
@@ -129,33 +130,65 @@ function mergeWidgetConfig(
   overrides: Partial<WidgetCustomizerConfig>,
   workspaceId: string,
 ): WidgetCustomizerConfig {
-  const secondaryTextColor =
-    overrides.secondaryTextColor ??
-    (server.botBubbleTextColor === "#171717"
-      ? APPEARANCE_DEFAULTS.secondaryTextColor
-      : server.botBubbleTextColor);
-
-  return {
+  const merged = {
     ...server,
     workspaceId,
     ...overrides,
-    secondaryTextColor,
-    linkColor: overrides.linkColor ?? server.primaryColor,
-    borderColor: overrides.borderColor ?? APPEARANCE_DEFAULTS.borderColor,
-    fontFamily: overrides.fontFamily ?? APPEARANCE_DEFAULTS.fontFamily,
-    fontSize: overrides.fontSize ?? APPEARANCE_DEFAULTS.fontSize,
   };
+
+  return {
+    ...merged,
+    logoUrl: normalizeLogoUrl(merged.logoUrl) ?? null,
+    secondaryTextColor: overrides.secondaryTextColor ?? server.botBubbleTextColor,
+    linkColor: overrides.linkColor ?? merged.primaryColor,
+    borderColor: merged.borderColor || APPEARANCE_DEFAULTS.borderColor,
+    fontFamily: normalizeFontFamily(merged.fontFamily || APPEARANCE_DEFAULTS.fontFamily),
+    fontSize: normalizeFontSize(merged.fontSize || APPEARANCE_DEFAULTS.fontSize),
+  };
+}
+
+function valuesEqual(a: unknown, b: unknown) {
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 function toSavePayload(config: WidgetCustomizerConfig) {
   return {
-    ...config,
+    agentName: config.agentName,
+    welcomeMessage: config.welcomeMessage,
+    logoUrl: normalizeLogoUrl(config.logoUrl?.trim() ? config.logoUrl.trim() : null),
+    primaryColor: config.primaryColor,
+    backgroundColor: config.backgroundColor,
+    textColor: config.textColor,
+    userBubbleColor: config.userBubbleColor,
+    userBubbleTextColor: config.userBubbleTextColor,
+    botBubbleColor: config.botBubbleColor,
     botBubbleTextColor: config.secondaryTextColor,
+    headerGradientFrom: config.headerGradientFrom,
     headerGradientTo: config.headerGradientFrom,
+    theme: config.theme,
+    position: config.position,
+    launcherSize: config.launcherSize,
+    borderRadius: config.borderRadius,
+    shadowSize: config.shadowSize,
+    inputPlaceholder: config.inputPlaceholder,
     suggestions: config.suggestions.filter((item) => item.trim()),
     previewMessages: config.previewMessages.filter((item) => item.trim()),
+    hideSuggestionsOnInteract: config.hideSuggestionsOnInteract,
+    autoShowPreviewDelay: config.autoShowPreviewDelay,
+    showBranding: config.showBranding,
+    privacyPolicyUrl: config.privacyPolicyUrl,
+    enableLeadCapture: config.enableLeadCapture,
     leadCaptureKeywords: config.leadCaptureKeywords.filter((item) => item.trim()),
+    leadCaptureMinutesThreshold: config.leadCaptureMinutesThreshold,
+    leadCaptureMessageThreshold: config.leadCaptureMessageThreshold,
+    enableBrochure: config.enableBrochure,
+    brochureSuggestionText: config.brochureSuggestionText,
     allowedDomains: config.allowedDomains || [],
+    instructions: config.instructions,
+    escalationKeywords: config.escalationKeywords,
+    borderColor: config.borderColor,
+    fontFamily: config.fontFamily,
+    fontSize: config.fontSize,
   };
 }
 
@@ -304,19 +337,24 @@ export function WidgetCustomizer({
   const [configOverrides, setConfigOverrides] = useState<Partial<WidgetCustomizerConfig>>({});
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isSavingRef = useRef(false);
+  const pendingSaveRef = useRef(false);
+  const savedOverridesRef = useRef<Partial<WidgetCustomizerConfig>>({});
+  const configOverridesRef = useRef(configOverrides);
   const buildSavePayloadRef = useRef<() => Record<string, unknown>>(() => ({}));
   const menuContainerRef = useRef<HTMLDivElement>(null);
   const menuPanelRef = useRef<HTMLDivElement>(null);
+
+  configOverridesRef.current = configOverrides;
 
   const { data: widgetConfigData, isLoading } = useWidgetConfig(activeWorkspaceId);
   const saveWidgetConfigMutation = useSaveWidgetConfig();
 
   const isReady = Boolean(activeWorkspaceId) && Boolean(widgetConfigData) && !isLoading;
 
-  const config =
-    isReady && widgetConfigData
-      ? mergeWidgetConfig(widgetConfigData, configOverrides, activeWorkspaceId)
-      : null;
+  const config = useMemo(() => {
+    if (!isReady || !widgetConfigData) return null;
+    return mergeWidgetConfig(widgetConfigData, configOverrides, activeWorkspaceId);
+  }, [activeWorkspaceId, configOverrides, isReady, widgetConfigData]);
 
   const updateConfig = useCallback(
     <Key extends keyof WidgetCustomizerConfig>(key: Key, value: WidgetCustomizerConfig[Key]) => {
@@ -324,6 +362,10 @@ export function WidgetCustomizer({
     },
     [],
   );
+
+  const updateConfigBatch = useCallback((updates: Partial<WidgetCustomizerConfig>) => {
+    setConfigOverrides((current) => ({ ...current, ...updates }));
+  }, []);
 
   const handleSubTabChange = (value: WidgetSettingsTab) => {
     setActiveTab(value);
@@ -381,7 +423,7 @@ export function WidgetCustomizer({
 
   const persistConfig = useCallback(
     (options?: { silent?: boolean }) => {
-      if (!activeWorkspaceId || !widgetConfigData || isSavingRef.current) {
+      if (!activeWorkspaceId || !widgetConfigData) {
         if (!activeWorkspaceId && !options?.silent) {
           toast({
             title: "Error",
@@ -392,6 +434,12 @@ export function WidgetCustomizer({
         return;
       }
 
+      if (isSavingRef.current) {
+        pendingSaveRef.current = true;
+        return;
+      }
+
+      savedOverridesRef.current = { ...configOverridesRef.current };
       isSavingRef.current = true;
 
       saveWidgetConfigMutation.mutate(
@@ -401,8 +449,25 @@ export function WidgetCustomizer({
         },
         {
           onSuccess: () => {
-            setConfigOverrides({});
             isSavingRef.current = false;
+            setConfigOverrides((current) => {
+              const next: Partial<WidgetCustomizerConfig> = {};
+              for (const key of Object.keys(current) as (keyof WidgetCustomizerConfig)[]) {
+                const savedValue = savedOverridesRef.current[key];
+                if (savedValue === undefined) {
+                  next[key] = current[key];
+                  continue;
+                }
+                if (!valuesEqual(current[key], savedValue)) {
+                  next[key] = current[key];
+                }
+              }
+              return next;
+            });
+            if (pendingSaveRef.current) {
+              pendingSaveRef.current = false;
+              persistConfig({ silent: true });
+            }
             if (!options?.silent) {
               toast({
                 title: "Configuration saved",
@@ -412,6 +477,7 @@ export function WidgetCustomizer({
           },
           onError: (error) => {
             isSavingRef.current = false;
+            pendingSaveRef.current = false;
             if (!options?.silent) {
               toast({
                 title: "Error saving configuration",
@@ -429,7 +495,6 @@ export function WidgetCustomizer({
   useEffect(() => {
     if (!isReady) return;
     if (Object.keys(configOverrides).length === 0) return;
-    if (isSavingRef.current) return;
 
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current);
@@ -437,7 +502,7 @@ export function WidgetCustomizer({
 
     saveTimerRef.current = setTimeout(() => {
       persistConfig({ silent: true });
-    }, 1200);
+    }, 800);
 
     return () => {
       if (saveTimerRef.current) {
@@ -456,7 +521,50 @@ export function WidgetCustomizer({
     }));
   };
 
-  if (!isReady || !config) {
+  const liveConfig = useMemo(() => {
+    if (!config) return null;
+
+    return {
+      workspaceId: config.workspaceId,
+      publicKey: config.publicKey,
+      agentName: config.agentName,
+      welcomeMessage: config.welcomeMessage,
+      logoUrl: normalizeLogoUrl(config.logoUrl),
+      primaryColor: config.primaryColor,
+      backgroundColor: config.backgroundColor,
+      textColor: config.textColor,
+      userBubbleColor: config.userBubbleColor,
+      userBubbleTextColor: config.userBubbleTextColor,
+      botBubbleColor: config.botBubbleColor,
+      botBubbleTextColor: config.secondaryTextColor,
+      headerGradientFrom: config.headerGradientFrom,
+      headerGradientTo: config.headerGradientTo,
+      position: config.position,
+      theme: config.theme,
+      launcherSize: config.launcherSize,
+      borderRadius: config.borderRadius,
+      shadowSize: config.shadowSize,
+      borderColor: config.borderColor,
+      fontFamily: config.fontFamily,
+      fontSize: config.fontSize,
+      inputPlaceholder: config.inputPlaceholder,
+      suggestions: config.suggestions,
+      hideSuggestionsOnInteract: config.hideSuggestionsOnInteract,
+      previewMessages: config.previewMessages,
+      autoShowPreviewDelay: config.autoShowPreviewDelay,
+      showBranding: config.showBranding,
+      privacyPolicyUrl: config.privacyPolicyUrl,
+      enableLeadCapture: config.enableLeadCapture,
+      leadCaptureKeywords: config.leadCaptureKeywords,
+      leadCaptureMinutesThreshold: config.leadCaptureMinutesThreshold,
+      leadCaptureMessageThreshold: config.leadCaptureMessageThreshold,
+      enableBrochure: config.enableBrochure,
+      brochureSuggestionText: config.brochureSuggestionText,
+      allowedDomains: config.allowedDomains,
+    };
+  }, [config]);
+
+  if (!isReady || !config || !liveConfig) {
     return <WidgetCustomizerSkeleton />;
   }
 
@@ -531,8 +639,10 @@ export function WidgetCustomizer({
     value: AppearanceConfig[K],
   ) => {
     if (key === "secondaryTextColor") {
-      updateConfig("secondaryTextColor", value as string);
-      updateConfig("botBubbleTextColor", value as string);
+      updateConfigBatch({
+        secondaryTextColor: value as string,
+        botBubbleTextColor: value as string,
+      });
       return;
     }
     updateConfig(
@@ -541,12 +651,19 @@ export function WidgetCustomizer({
     );
   };
 
+  const handleAppearanceBatchUpdate = (updates: Partial<AppearanceConfig>) => {
+    const batch: Partial<WidgetCustomizerConfig> = { ...updates };
+    if (updates.headerGradientFrom) {
+      batch.headerGradientTo = updates.headerGradientFrom;
+    }
+    updateConfigBatch(batch);
+  };
+
   return (
     <div
-      className="flex h-full min-h-0 w-full gap-3 overflow-hidden bg-background p-3"
-      style={getWidgetAccentVars(config.primaryColor)}
+      className="flex h-full min-h-0 w-full items-stretch gap-3 overflow-hidden bg-background p-3"
+      style={getWidgetAccentVars(WIDGET_BRAND_COLOR)}
     >
-      {/* Left hamburger */}
       <div ref={menuContainerRef} className="relative shrink-0 self-start pt-1">
         <button
           type="button"
@@ -567,13 +684,13 @@ export function WidgetCustomizer({
         />
       </div>
 
-      {/* Center settings box — always open */}
       <div className={cn(WIDGET_SETTINGS_CARD_CLASS, "flex min-h-0 min-w-0 flex-1 flex-col")}>
         <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto px-6 py-6">
           {activeTab === "appearance" ? (
             <WidgetAppearancePanel
               config={appearanceConfig}
               onUpdate={handleAppearanceUpdate}
+              onBatchUpdate={handleAppearanceBatchUpdate}
               onReset={handleResetAppearance}
             />
           ) : null}
@@ -635,50 +752,13 @@ export function WidgetCustomizer({
         </div>
       </div>
 
-      {/* Right preview box — always visible */}
       <div
         className={cn(
           WIDGET_CARD_CLASS,
-          "flex min-h-0 w-[380px] shrink-0 flex-col overflow-visible xl:w-[420px]",
+          "flex h-full min-h-0 w-[380px] shrink-0 flex-col overflow-hidden xl:w-[420px]",
         )}
       >
-        <WidgetPreviewPanel
-          liveConfig={{
-            workspaceId: config.workspaceId,
-            publicKey: config.publicKey,
-            agentName: config.agentName,
-            welcomeMessage: config.welcomeMessage,
-            logoUrl: config.logoUrl,
-            primaryColor: config.primaryColor,
-            backgroundColor: config.backgroundColor,
-            textColor: config.textColor,
-            userBubbleColor: config.userBubbleColor,
-            userBubbleTextColor: config.userBubbleTextColor,
-            botBubbleColor: config.botBubbleColor,
-            botBubbleTextColor: config.secondaryTextColor,
-            headerGradientFrom: config.headerGradientFrom,
-            headerGradientTo: config.headerGradientTo,
-            position: config.position,
-            theme: config.theme,
-            launcherSize: config.launcherSize,
-            borderRadius: config.borderRadius,
-            shadowSize: config.shadowSize,
-            inputPlaceholder: config.inputPlaceholder,
-            suggestions: config.suggestions,
-            hideSuggestionsOnInteract: config.hideSuggestionsOnInteract,
-            previewMessages: config.previewMessages,
-            autoShowPreviewDelay: config.autoShowPreviewDelay,
-            showBranding: config.showBranding,
-            privacyPolicyUrl: config.privacyPolicyUrl,
-            enableLeadCapture: config.enableLeadCapture,
-            leadCaptureKeywords: config.leadCaptureKeywords,
-            leadCaptureMinutesThreshold: config.leadCaptureMinutesThreshold,
-            leadCaptureMessageThreshold: config.leadCaptureMessageThreshold,
-            enableBrochure: config.enableBrochure,
-            brochureSuggestionText: config.brochureSuggestionText,
-            allowedDomains: config.allowedDomains,
-          }}
-        />
+        <WidgetPreviewPanel liveConfig={liveConfig} />
       </div>
     </div>
   );

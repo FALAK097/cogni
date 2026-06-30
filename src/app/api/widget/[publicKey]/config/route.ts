@@ -1,6 +1,9 @@
-import { parseJsonArray } from "@/features/widget/domain";
 import { getRequestOrigin, withWidgetCors } from "@/features/widget/server/widget-utils";
-import { getPublicWidget, validateEmbedOrigin } from "@/features/widget/server/widget-service";
+import {
+  getPublicWidget,
+  toWidgetPublicConfig,
+  validateEmbedOrigin,
+} from "@/features/widget/server/widget-service";
 import { getDb } from "@/lib/db/client";
 
 export async function GET(
@@ -22,41 +25,7 @@ export async function GET(
     return Response.json({ error: "This domain is not authorized." }, { status: 403 });
   }
 
-  const config = {
-    workspaceId: widget.workspaceId,
-    publicKey: widget.publicKey,
-    position: widget.position,
-    theme: widget.theme,
-    agentName: widget.displayName,
-    welcomeMessage: widget.welcomeMessage,
-    logoUrl: widget.logoUrl,
-    primaryColor: widget.primaryColor,
-    userBubbleColor: widget.userBubbleColor,
-    userBubbleTextColor: widget.userBubbleTextColor,
-    botBubbleColor: widget.botBubbleColor,
-    botBubbleTextColor: widget.botBubbleTextColor,
-    headerGradientFrom: widget.headerGradientFrom,
-    headerGradientTo: widget.headerGradientTo,
-    backgroundColor: widget.backgroundColor,
-    textColor: widget.textColor,
-    launcherSize: widget.launcherSize,
-    borderRadius: widget.borderRadiusStyle,
-    shadowSize: widget.shadowSize,
-    inputPlaceholder: widget.inputPlaceholder,
-    suggestions: parseJsonArray(widget.suggestions),
-    hideSuggestionsOnInteract: widget.hideSuggestionsOnInteract,
-    previewMessages: parseJsonArray(widget.previewMessages),
-    autoShowPreviewDelay: widget.autoShowPreviewDelay,
-    showBranding: widget.showBranding,
-    privacyPolicyUrl: widget.privacyPolicyUrl,
-    enableLeadCapture: widget.enableLeadCapture,
-    leadCaptureKeywords: parseJsonArray(widget.leadCaptureKeywords),
-    leadCaptureMinutesThreshold: widget.leadCaptureMinutesThreshold,
-    leadCaptureMessageThreshold: widget.leadCaptureMessageThreshold,
-    enableBrochure: widget.enableBrochure,
-    brochureSuggestionText: widget.brochureSuggestionText,
-    allowedDomains,
-  };
+  const config = toWidgetPublicConfig(widget);
 
   return withWidgetCors(Response.json(config), origin, allowed);
 }

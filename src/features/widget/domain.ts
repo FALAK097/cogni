@@ -5,6 +5,12 @@ export type WidgetTheme = "light" | "dark";
 export type WidgetBorderRadiusStyle = "none" | "default" | "full";
 export type WidgetShadowSize = "none" | "md" | "lg";
 
+export const WIDGET_FONT_FAMILIES = ["Inter", "Geist", "System UI", "Roboto", "Open Sans"] as const;
+export type WidgetFontFamily = (typeof WIDGET_FONT_FAMILIES)[number];
+
+export const WIDGET_FONT_SIZES = ["12px", "13px", "14px", "15px", "16px"] as const;
+export type WidgetFontSize = (typeof WIDGET_FONT_SIZES)[number];
+
 export type WidgetWidgetConfig = {
   publicKey: string;
   workspaceId: string;
@@ -14,6 +20,9 @@ export type WidgetWidgetConfig = {
   primaryColor: string;
   backgroundColor: string;
   textColor: string;
+  borderColor: string;
+  fontFamily: string;
+  fontSize: string;
   position: WidgetPosition;
   launcherSize: WidgetLauncherSize;
   panelWidth: number;
@@ -66,6 +75,11 @@ export type WidgetPublicConfig = {
   botBubbleTextColor: string;
   headerGradientFrom: string;
   headerGradientTo: string;
+  backgroundColor: string;
+  textColor: string;
+  borderColor: string;
+  fontFamily: string;
+  fontSize: string;
   launcherSize: WidgetLauncherSize;
   borderRadius: WidgetBorderRadiusStyle;
   shadowSize: WidgetShadowSize;
@@ -120,6 +134,32 @@ export function normalizeLauncherSize(value: string): WidgetLauncherSize {
   if (normalized === "small" || normalized === "sm") return "sm";
   if (normalized === "large" || normalized === "lg") return "lg";
   return "md";
+}
+
+export function normalizeFontFamily(value: string): WidgetFontFamily {
+  return WIDGET_FONT_FAMILIES.includes(value as WidgetFontFamily)
+    ? (value as WidgetFontFamily)
+    : "Inter";
+}
+
+export function normalizeFontSize(value: string): WidgetFontSize {
+  return WIDGET_FONT_SIZES.includes(value as WidgetFontSize) ? (value as WidgetFontSize) : "14px";
+}
+
+export function normalizeLogoUrl(value: string | null | undefined): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith("data:image/")) return trimmed;
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+      return trimmed;
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 export function normalizeHostname(value: string) {

@@ -31,7 +31,7 @@ import {
   storeSessionToken,
   getStoredLeadInfo,
 } from "./storage.js";
-import { injectStyles } from "./styles.js";
+import { applyWidgetStyles } from "./styles.js";
 import {
   escapeHtml,
   formatTimestamp,
@@ -40,25 +40,14 @@ import {
   formatBotMessage,
   getCurrentTime,
   generateUUID,
+  renderAvatarMarkup,
+  renderBotAvatarMarkup,
+  attachAvatarImageFallbacks,
 } from "./utils.js";
 
 /**
  * Create the widget DOM structure
  */
-function renderAvatarMarkup(logoUrl) {
-  if (logoUrl) {
-    return `<img src="${escapeHtml(logoUrl)}" alt="Logo" />`;
-  }
-  return `<span class="oc-avatar-icon">${ICONS.chat}</span>`;
-}
-
-function renderBotAvatarMarkup(logoUrl) {
-  if (logoUrl) {
-    return `<img src="${escapeHtml(logoUrl)}" alt="Logo" />`;
-  }
-  return `<span class="oc-bot-avatar-icon">${ICONS.sparkle}</span>`;
-}
-
 export function createWidget() {
   const config = state.config;
 
@@ -140,6 +129,7 @@ export function createWidget() {
 
   state.messagesContainer = state.windowEl.querySelector(".oc-body");
   state.input = state.windowEl.querySelector(".oc-input");
+  attachAvatarImageFallbacks(state.container);
 }
 
 /**
@@ -708,6 +698,8 @@ export function addBotMessage(
 	`;
   state.messagesContainer.appendChild(msg);
 
+  attachAvatarImageFallbacks(msg);
+
   if ((!isRestored && !state.config.hideSuggestionsOnInteract) || !state.hasInteracted) {
     const existingSuggestions = state.messagesContainer.querySelector(".oc-suggestions");
     if (existingSuggestions) existingSuggestions.remove();
@@ -986,6 +978,24 @@ export function hidePreviewMessages() {
 }
 
 /**
+ * Update appearance-related config and refresh injected styles (dashboard preview).
+ */
+export async function updateAppearance(userConfig = {}) {
+  if (!state.isInitialized) return;
+  state.config = { ...state.config, ...userConfig };
+  await applyWidgetStyles();
+}
+
+function openPreviewWidget() {
+  if (!state.preview || !state.windowEl || !state.launcher) return;
+  if (state.isOpen) return;
+  state.isOpen = true;
+  state.windowEl.classList.add("is-open");
+  state.launcher.classList.add("is-open");
+  hidePreviewMessages();
+}
+
+/**
  * Tear down widget DOM and in-memory state (dashboard preview remounts).
  */
 export function destroyWidget() {
@@ -1079,7 +1089,7 @@ export async function init(userConfig = {}) {
   state.isInitialized = true;
 
   // Inject CSS
-  injectStyles();
+  await applyWidgetStyles();
 
   // Create DOM elements
   createWidget();
@@ -1089,6 +1099,8 @@ export async function init(userConfig = {}) {
 
   // Initialize session and restore messages (or show welcome)
   await initSession();
+
+  openPreviewWidget();
 
   // Show preview messages after delay
   if (state.config.previewMessages?.length > 0 && state.config.autoShowPreviewDelay > 0) {
