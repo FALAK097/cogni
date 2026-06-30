@@ -45,6 +45,7 @@ export function IntegrationIcon({
         alt={alt}
         width={img}
         height={img}
+        unoptimized
         className="h-full w-auto max-w-full object-contain shrink-0"
       />
     </div>

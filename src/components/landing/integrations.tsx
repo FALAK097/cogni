@@ -66,6 +66,7 @@ export function Integrations() {
                   alt={`${item.name} logo`}
                   width={32}
                   height={32}
+                  unoptimized
                   className={`size-8 object-contain ${item.invertInDark ? "dark:invert" : ""}`}
                 />
               </div>
