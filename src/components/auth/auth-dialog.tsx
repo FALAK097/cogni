@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { GoogleIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -16,15 +17,18 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { authClient } from "@/lib/auth/client";
+import { cn } from "@/lib/utils";
 
 type AuthDialogProps = {
   label?: string;
+  className?: string;
 } & VariantProps<typeof buttonVariants>;
 
 export function AuthDialog({
   label = "Continue with Google",
   variant = "default",
   size = "default",
+  className,
 }: AuthDialogProps) {
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string>();
@@ -46,7 +50,9 @@ export function AuthDialog({
 
   return (
     <Dialog>
-      <DialogTrigger render={<Button variant={variant} size={size} />}>{label}</DialogTrigger>
+      <DialogTrigger render={<Button variant={variant} size={size} className={cn(className)} />}>
+        {label}
+      </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Continue to widget</DialogTitle>
@@ -70,7 +76,18 @@ export function AuthDialog({
           </p>
         ) : null}
         <p className="text-center text-xs text-muted-foreground">
-          By continuing, you agree to widget terms and privacy policy.
+          By continuing, you agree to our{" "}
+          <Link href="/terms" className="underline underline-offset-4 hover:text-foreground">
+            Terms
+          </Link>{" "}
+          and{" "}
+          <Link
+            href="/privacy-policy"
+            className="underline underline-offset-4 hover:text-foreground"
+          >
+            Privacy Policy
+          </Link>
+          .
         </p>
       </DialogContent>
     </Dialog>
