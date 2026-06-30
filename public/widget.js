@@ -13,6 +13,7 @@ function emit(name, detail) {
 }
 
 function show() {
+  if (!state.windowEl || !state.launcher) return;
   if (!state.isOpen) {
     toggleChat();
     emit("open");
@@ -20,6 +21,7 @@ function show() {
 }
 
 function hide() {
+  if (!state.windowEl || !state.launcher) return;
   if (state.isOpen) {
     toggleChat();
     emit("close");
@@ -27,6 +29,7 @@ function hide() {
 }
 
 function toggle() {
+  if (!state.windowEl || !state.launcher) return;
   const wasOpen = state.isOpen;
   toggleChat();
   emit(wasOpen ? "close" : "open");

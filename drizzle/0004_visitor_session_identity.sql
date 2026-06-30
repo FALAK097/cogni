@@ -1,4 +1,12 @@
-ALTER TABLE `visitor_session` ADD `name` text;--> statement-breakpoint
-ALTER TABLE `visitor_session` ADD `email` text;--> statement-breakpoint
-ALTER TABLE `visitor_session` ADD `phone` text;--> statement-breakpoint
-ALTER TABLE `visitor_session` ADD `leadCapturedAt` numeric;
+-- No-op: these four columns (name, email, phone, leadCapturedAt) were already
+-- added to visitor_session on production under a legacy migration filename
+-- (0002_visitor_identity.sql, which no longer exists in this repo).
+-- Repeating the ALTER TABLE here causes "duplicate column name: name" on D1.
+-- Fresh databases receive these columns from 0000_dapper_mauler.sql instead.
+-- Intermediate staging DBs provisioned before this change should run:
+--   ALTER TABLE visitor_session ADD name text;
+--   ALTER TABLE visitor_session ADD email text;
+--   ALTER TABLE visitor_session ADD phone text;
+--   ALTER TABLE visitor_session ADD leadCapturedAt numeric;
+-- or reset the database and re-apply migrations.
+SELECT 1;
