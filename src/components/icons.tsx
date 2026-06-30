@@ -49,7 +49,6 @@ import {
   Forward01Icon,
   GitBranchIcon,
   Globe02Icon,
-  GridIcon,
   HelpCircleIcon,
   Home01Icon,
   Image01Icon,
@@ -72,7 +71,6 @@ import {
   Menu01Icon,
   Message01Icon,
   MessageCircleCodeIcon,
-  MicOffIcon,
   MoonIcon,
   MoreHorizontalIcon,
   MoreVerticalIcon,
@@ -242,8 +240,6 @@ export const Inbox = createIcon(InboxIcon, "Inbox");
 export const ListTree = createIcon(ListTreeIcon, "ListTree");
 export const MessageCircleIcon = createIcon(Message01Icon, "MessageCircleIcon");
 export const MessageSquare = createIcon(Message01Icon, "MessageSquare");
-export const Mic = createIcon(MicOffIcon, "MicOff");
-export const MicOff = createIcon(MicOffIcon, "MicOff");
 export const MinusCircle = createIcon(RemoveCircleIcon, "MinusCircle");
 export const Monitor = createIcon(ComputerIcon, "Monitor");
 export const Moon = createIcon(MoonIcon, "Moon");

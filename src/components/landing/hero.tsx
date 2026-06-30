@@ -450,6 +450,7 @@ export function Hero() {
         src="/assets/widget-bg.png"
         alt=""
         fill
+        unoptimized
         className="-z-10 object-cover object-top"
         priority
         aria-hidden

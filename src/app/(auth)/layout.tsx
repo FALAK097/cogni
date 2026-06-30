@@ -33,6 +33,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           src="/assets/widget-bg.png"
           alt=""
           fill
+          unoptimized
           className="object-cover object-center"
           priority
           aria-hidden

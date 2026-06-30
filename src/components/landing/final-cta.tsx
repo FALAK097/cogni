@@ -10,6 +10,7 @@ export function FinalCta() {
         src="/assets/widget-bg.png"
         alt=""
         fill
+        unoptimized
         className="-z-20 object-cover object-center"
         aria-hidden
       />
