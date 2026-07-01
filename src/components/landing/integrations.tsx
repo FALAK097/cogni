@@ -64,7 +64,7 @@ export function Integrations() {
 
         {/* ── Right: icon grid with tooltips ── */}
         <div className="flex-1">
-          <div className="grid grid-cols-5 gap-3 sm:grid-cols-6 lg:grid-cols-5 xl:grid-cols-6">
+          <div className="grid grid-cols-4 gap-2.5 sm:grid-cols-5 sm:gap-3 md:grid-cols-6 lg:grid-cols-5 xl:grid-cols-6">
             {INTEGRATIONS.map((item) => (
               <Tooltip key={item.name}>
                 <TooltipTrigger

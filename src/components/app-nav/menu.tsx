@@ -6,6 +6,7 @@ import { Ellipsis } from "@/components/icons";
 import { CollapseMenuButton } from "@/components/app-nav/collapse-menu-button";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { closeMobileSidebar } from "@/hooks/use-sidebar";
 import { buildMenuList } from "@/lib/menu-list";
 import { cn } from "@/lib/utils";
 
@@ -78,7 +79,10 @@ export function Menu({ isOpen }: MenuProps) {
                       isOpen === false ? "justify-center px-0" : "justify-start px-4",
                       isCurrentActive && "shadow-sm",
                     )}
-                    onClick={() => router.push(href)}
+                    onClick={() => {
+                      closeMobileSidebar();
+                      router.push(href);
+                    }}
                   >
                     {isCurrentActive && (
                       <div className="absolute inset-0 transition-opacity duration-300 opacity-100">

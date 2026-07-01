@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Bot,
   Code,
+  Eye,
   ExternalLink,
   Menu,
   MessageCircle,
@@ -306,7 +307,7 @@ function WidgetSettingsMenu({
 function WidgetCustomizerSkeleton() {
   return (
     <div
-      className="flex h-full min-h-0 w-full items-stretch gap-3 overflow-hidden p-3"
+      className="flex h-full min-h-0 w-full flex-col gap-3 overflow-hidden p-2 sm:p-3 lg:flex-row"
       style={getWidgetAccentVars(WIDGET_BRAND_COLOR)}
     >
       <Skeleton className="size-9 shrink-0 rounded-lg" />
@@ -317,7 +318,7 @@ function WidgetCustomizerSkeleton() {
           "flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden",
         )}
       >
-        <div className="min-h-0 flex-1 overflow-y-auto p-6">
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
           <Skeleton className="h-5 w-28 rounded" />
           <Skeleton className="mt-2 h-4 w-56 rounded" />
           <div className="mt-6 space-y-4">
@@ -331,7 +332,7 @@ function WidgetCustomizerSkeleton() {
       <div
         className={cn(
           WIDGET_CARD_CLASS,
-          "flex h-full min-h-0 w-[380px] shrink-0 flex-col overflow-hidden xl:w-[420px]",
+          "hidden h-[360px] min-h-0 w-full shrink-0 flex-col overflow-hidden sm:h-[420px] lg:flex lg:h-full lg:w-[380px] xl:w-[420px]",
         )}
       >
         <div className="flex shrink-0 gap-2 px-4 py-3">
@@ -363,6 +364,7 @@ export function WidgetCustomizer({
     resolveInitialTab(initialSubtab),
   );
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showMobilePreview, setShowMobilePreview] = useState(false);
   const [copied, setCopied] = useState(false);
   const [domainInput, setDomainInput] = useState("");
   const [configOverrides, setConfigOverrides] = useState<Partial<WidgetCustomizerConfig>>({});
@@ -678,36 +680,53 @@ export function WidgetCustomizer({
 
   return (
     <div
-      className="flex h-full min-h-0 w-full items-stretch gap-3 overflow-hidden p-3"
+      className="flex h-full min-h-0 w-full flex-col gap-2 overflow-hidden p-2 sm:gap-3 sm:p-3 lg:flex-row lg:items-stretch"
       style={getWidgetAccentVars(WIDGET_BRAND_COLOR)}
     >
-      <div ref={menuContainerRef} className="relative shrink-0 self-start pt-1">
+      <div className="flex shrink-0 items-center gap-2 lg:block lg:self-start lg:pt-1">
+        <div ref={menuContainerRef} className="relative">
+          <button
+            type="button"
+            onClick={() => setMenuOpen((open) => !open)}
+            className="inline-flex size-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground shadow-xs transition-colors hover:bg-muted hover:text-foreground"
+            aria-label="Open widget settings menu"
+            aria-expanded={menuOpen}
+          >
+            <Menu className="size-5" />
+          </button>
+
+          <WidgetSettingsMenu
+            activeTab={activeTab}
+            isOpen={menuOpen}
+            onClose={() => setMenuOpen(false)}
+            onTabChange={handleSubTabChange}
+            menuRef={menuPanelRef}
+          />
+        </div>
+
         <button
           type="button"
-          onClick={() => setMenuOpen((open) => !open)}
-          className="inline-flex size-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground shadow-xs transition-colors hover:bg-muted hover:text-foreground"
-          aria-label="Open widget settings menu"
-          aria-expanded={menuOpen}
+          onClick={() => setShowMobilePreview((open) => !open)}
+          className={cn(
+            "inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-sm font-medium text-muted-foreground shadow-xs transition-colors hover:bg-muted hover:text-foreground lg:hidden",
+            showMobilePreview && "border-[var(--widget-accent)] text-[var(--widget-accent)]",
+          )}
+          aria-label={showMobilePreview ? "Hide preview" : "Show preview"}
+          aria-pressed={showMobilePreview}
         >
-          <Menu className="size-5" />
+          <Eye className="size-4" />
+          Preview
         </button>
-
-        <WidgetSettingsMenu
-          activeTab={activeTab}
-          isOpen={menuOpen}
-          onClose={() => setMenuOpen(false)}
-          onTabChange={handleSubTabChange}
-          menuRef={menuPanelRef}
-        />
       </div>
 
       <div
         className={cn(
           WIDGET_SETTINGS_CARD_CLASS,
-          "flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden",
+          "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden",
+          showMobilePreview ? "hidden lg:flex" : "flex",
         )}
       >
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
           {activeTab === "appearance" ? (
             <WidgetAppearancePanel
               config={appearanceConfig}
@@ -777,7 +796,10 @@ export function WidgetCustomizer({
       <div
         className={cn(
           WIDGET_CARD_CLASS,
-          "flex h-full min-h-0 w-[380px] shrink-0 flex-col overflow-hidden xl:w-[420px]",
+          "flex min-h-0 w-full shrink-0 flex-col overflow-hidden",
+          showMobilePreview
+            ? "h-[min(70vh,520px)] flex-1 lg:h-full lg:flex-1 lg:w-[380px] xl:w-[420px]"
+            : "hidden lg:flex lg:h-full lg:w-[380px] xl:w-[420px]",
         )}
       >
         <WidgetPreviewPanel liveConfig={liveConfig} />

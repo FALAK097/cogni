@@ -96,10 +96,12 @@ export function WidgetConversations({ initialConversationId = null }: WidgetConv
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-sidebar">
-      <header className="shrink-0 bg-sidebar px-4 pt-4 sm:px-5">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">Conversations</h1>
+      <header className="shrink-0 bg-sidebar px-4 pt-3 sm:px-5 sm:pt-4 lg:pt-4">
+        <h1 className="hidden text-xl font-semibold tracking-tight text-foreground lg:block">
+          Conversations
+        </h1>
 
-        <div className="mt-3">
+        <div className="mt-0 lg:mt-3">
           <Tabs
             value={filter}
             onValueChange={(value) => setFilter(value as ConversationFilter)}

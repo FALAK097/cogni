@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { closeMobileSidebar } from "@/hooks/use-sidebar";
 import { cn } from "@/lib/utils";
 
 type CollapseMenuButtonProps = {
@@ -72,6 +73,7 @@ export function CollapseMenuButton({
           )}
           onClick={() => {
             if (href) {
+              closeMobileSidebar();
               router.push(href);
             }
           }}
@@ -126,7 +128,7 @@ export function CollapseMenuButton({
                 key={href}
                 variant="ghost"
                 nativeButton={false}
-                render={<Link href={href} />}
+                render={<Link href={href} onClick={() => closeMobileSidebar()} />}
                 className={cn(
                   "mb-1 h-9 w-full justify-start rounded-md bg-transparent px-3 text-left transition-colors",
                   isSubmenuItemActive && "hover:bg-transparent",
@@ -216,6 +218,7 @@ export function CollapseMenuButton({
           onClick={() => {
             setDropdownOpen(false);
             if (href) {
+              closeMobileSidebar();
               router.push(href);
             }
           }}
@@ -237,6 +240,7 @@ export function CollapseMenuButton({
                     isSubmenuItemActive && "bg-secondary font-medium text-primary",
                   )}
                   href={href}
+                  onClick={() => closeMobileSidebar()}
                 />
               }
             >

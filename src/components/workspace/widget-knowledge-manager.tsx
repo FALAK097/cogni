@@ -339,7 +339,7 @@ function KnowledgeToolbar({
   onSelectAddDialog: (dialog: Exclude<AddDialog, null>) => void;
 }) {
   return (
-    <div className="flex items-center justify-end gap-2">
+    <div className="flex flex-wrap items-center justify-end gap-2">
       {showRetry ? (
         <Button size="sm" variant="outline" className="h-9 rounded-full" onClick={onRetry}>
           <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
@@ -350,7 +350,7 @@ function KnowledgeToolbar({
         <DropdownMenuTrigger
           render={
             <Button
-              className="h-9 rounded-full px-4 shadow-none"
+              className="h-9 rounded-full px-3 shadow-none sm:px-4"
               size="default"
               aria-label="Add knowledge source"
             >
@@ -360,7 +360,7 @@ function KnowledgeToolbar({
                 <Plus className="h-4 w-4" />
               )}
               Add Source
-              <ChevronDown className="h-4 w-4 opacity-70" />
+              <ChevronDown className="hidden h-4 w-4 opacity-70 sm:inline" />
             </Button>
           }
         />
@@ -402,14 +402,20 @@ function KnowledgeSourcesPanel({
       ) : sources.length === 0 ? (
         <KnowledgeEmptyState onAddFirstSource={onAddFirstSource} />
       ) : (
-        <KnowledgeSourcesTable
-          sources={sources}
-          sourceCount={sources.length}
-          sorting={sorting}
-          isRefetching={isRefetching}
-          onSortChange={onSortChange}
-          onDeleteSource={onDeleteSource}
-        />
+        <>
+          <KnowledgeSourcesMobileList sources={sources} onDeleteSource={onDeleteSource} />
+          <KnowledgeSourcesTable
+            sources={sources}
+            sorting={sorting}
+            onSortChange={onSortChange}
+            onDeleteSource={onDeleteSource}
+          />
+          <KnowledgeSourcesFooter
+            visibleCount={sources.length}
+            totalCount={sources.length}
+            isRefetching={isRefetching}
+          />
+        </>
       )}
     </div>
   );
@@ -432,18 +438,86 @@ function KnowledgeEmptyState({ onAddFirstSource }: { onAddFirstSource: () => voi
   );
 }
 
+function KnowledgeSourcesMobileList({
+  sources,
+  onDeleteSource,
+}: {
+  sources: KnowledgeBaseSource[];
+  onDeleteSource: (source: KnowledgeBaseSource) => void;
+}) {
+  return (
+    <div className="space-y-3 p-4 md:hidden">
+      {sources.map((source) => {
+        const typeMeta = getSourceTypeMeta(source.sourceType);
+        const Icon = typeMeta.icon;
+        const fileName = getDocumentFileName(getStorageKey(source));
+        const sourceType = source.sourceType.toLowerCase();
+        const hasFileLabel = (sourceType === "file" || sourceType === "txt") && fileName;
+        const primaryLabel = hasFileLabel ? fileName : source.displayName;
+
+        return (
+          <div
+            key={source.id}
+            className="rounded-2xl border border-border/60 bg-card p-4 shadow-sm"
+          >
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 text-muted-foreground">
+                <Icon className="h-4 w-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-foreground">{primaryLabel}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <SourceTypeBadge sourceType={source.sourceType} />
+                  <StatusBadge status={source.status} />
+                </div>
+                <div className="mt-3 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                  <span>
+                    {source.chunkCount > 0 ? `${source.chunkCount} pages` : "No pages indexed"}
+                  </span>
+                  <span>{formatUpdatedAt(source.updatedAt)}</span>
+                </div>
+              </div>
+              <SourceActions source={source} onDeleteSource={onDeleteSource} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function KnowledgeSourcesFooter({
+  visibleCount,
+  totalCount,
+  isRefetching,
+}: {
+  visibleCount: number;
+  totalCount: number;
+  isRefetching: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between border-t border-border/60 px-4 py-4 text-sm text-muted-foreground sm:px-5">
+      <span>
+        Showing {visibleCount} of {totalCount} source{totalCount === 1 ? "" : "s"}
+      </span>
+      {isRefetching ? (
+        <span className="inline-flex items-center gap-1.5 text-xs">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Refreshing...
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 function KnowledgeSourcesTable({
   sources,
-  sourceCount,
   sorting,
-  isRefetching,
   onSortChange,
   onDeleteSource,
 }: {
   sources: KnowledgeBaseSource[];
-  sourceCount: number;
   sorting: SortingState;
-  isRefetching: boolean;
   onSortChange: (updater: SortingState | ((old: SortingState) => SortingState)) => void;
   onDeleteSource: (source: KnowledgeBaseSource) => void;
 }) {
@@ -509,7 +583,7 @@ function KnowledgeSourcesTable({
 
   return (
     <>
-      <Table className="table-fixed">
+      <Table className="hidden table-fixed md:table">
         <colgroup>
           <col className="w-[30%]" />
           <col className="w-[14%]" />
@@ -571,17 +645,6 @@ function KnowledgeSourcesTable({
           )}
         </TableBody>
       </Table>
-      <div className="flex items-center justify-between border-t border-border/60 px-5 py-4 text-sm text-muted-foreground">
-        <span>
-          Showing {rows.length} of {sourceCount} source{sourceCount === 1 ? "" : "s"}
-        </span>
-        {isRefetching ? (
-          <span className="inline-flex items-center gap-1.5 text-xs">
-            <Loader2 className="h-3 w-3 animate-spin" />
-            Refreshing...
-          </span>
-        ) : null}
-      </div>
     </>
   );
 }

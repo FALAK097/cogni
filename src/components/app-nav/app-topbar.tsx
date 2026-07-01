@@ -34,6 +34,7 @@ type AppTopbarProps = {
     name?: string;
     email?: string;
   };
+  className?: string;
 };
 
 const LABELS: Record<string, string> = {
@@ -203,7 +204,7 @@ function Breadcrumbs() {
   );
 }
 
-export function AppTopbar({ userData }: AppTopbarProps) {
+export function AppTopbar({ userData, className }: AppTopbarProps) {
   const toggleOpen = useSidebar((state) => state.toggleOpen);
   const sidebarDisabled = useSidebar((state) => state.settings.disabled);
   const normalizedUserData = {
@@ -229,7 +230,12 @@ export function AppTopbar({ userData }: AppTopbarProps) {
   }, [toggleOpen]);
 
   return (
-    <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-4 border-b border-sidebar-border bg-sidebar px-4 sm:px-8 print:hidden">
+    <header
+      className={cn(
+        "sticky top-0 z-10 flex h-14 items-center justify-between gap-4 border-b border-sidebar-border bg-sidebar px-4 sm:px-8 print:hidden",
+        className,
+      )}
+    >
       <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden sm:gap-4">
         {!sidebarDisabled && (
           <>

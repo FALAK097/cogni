@@ -9,14 +9,16 @@ import { Sidebar } from "@/components/app-nav/sidebar";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { cn } from "@/lib/utils";
 
+type UserData = {
+  avatar?: string;
+  name?: string;
+  email?: string;
+};
+
 type AdminPanelLayoutProps = {
   children: ReactNode;
   initialSidebarOpen?: boolean;
-  userData?: {
-    avatar?: string;
-    name?: string;
-    email?: string;
-  };
+  userData?: UserData;
 };
 
 export default function AdminPanelLayout({
@@ -31,11 +33,11 @@ export default function AdminPanelLayout({
   const setHasHydrated = useSidebar((state) => state.setHasHydrated);
 
   useLayoutEffect(() => {
-    useSidebar.setState({ isOpen: initialSidebarOpen });
+    useSidebar.setState({ isOpen: initialSidebarOpen, mobileDrawerOpen: false });
     setHasHydrated(true);
   }, [initialSidebarOpen, setHasHydrated]);
 
-  const openState =
+  const desktopOpenState =
     (hasHydrated ? isOpen : initialSidebarOpen) || (settings.isHoverOpen && isHover);
   const pathname = usePathname();
   const isFullBleedPage = pathname === "/widget" || pathname === "/conversations";
@@ -45,13 +47,13 @@ export default function AdminPanelLayout({
       <Sidebar initialOpen={initialSidebarOpen} />
       <main
         className={cn(
-          "bg-sidebar transition-[margin-left] ease-in-out duration-300",
-          !settings.disabled && (!openState ? "lg:ml-[90px]" : "lg:ml-56"),
+          "bg-sidebar text-foreground transition-[margin-left] ease-in-out duration-300",
+          !settings.disabled && (!desktopOpenState ? "lg:ml-[90px]" : "lg:ml-56"),
           "print:ml-0 print:w-full print:overflow-visible",
           isFullBleedPage ? "flex h-svh flex-col overflow-hidden" : "min-h-screen",
         )}
       >
-        {!isFullBleedPage ? <AppTopbar userData={userData} /> : null}
+        <AppTopbar userData={userData} className={cn(isFullBleedPage && "lg:hidden")} />
         <div className={cn(isFullBleedPage && "flex min-h-0 flex-1 flex-col overflow-hidden")}>
           {children}
         </div>

@@ -289,7 +289,7 @@ export function Features() {
 
         {/* Card 1: AI Agent — large left */}
         <div
-          className="col-span-12 flex flex-col justify-between rounded-3xl p-7 md:col-span-5"
+          className="col-span-12 flex flex-col justify-between rounded-3xl p-5 sm:p-7 md:col-span-5"
           style={{ backgroundColor: "#EEF0FE" }}
         >
           <div>
@@ -311,7 +311,7 @@ export function Features() {
 
         {/* Card 2: Human Handoff — large right */}
         <div
-          className="col-span-12 flex flex-col justify-between rounded-3xl p-7 md:col-span-7"
+          className="col-span-12 flex flex-col justify-between rounded-3xl p-5 sm:p-7 md:col-span-7"
           style={{ backgroundColor: "#EFF8FF" }}
         >
           <div>
@@ -335,7 +335,7 @@ export function Features() {
 
         {/* Card 3: Knowledge Base */}
         <div
-          className="col-span-12 flex flex-col justify-between rounded-3xl p-7 sm:col-span-6 md:col-span-4"
+          className="col-span-12 flex flex-col justify-between rounded-3xl p-5 sm:p-7 sm:col-span-6 md:col-span-4"
           style={{ backgroundColor: "#ECFDF5" }}
         >
           <div>
@@ -356,7 +356,7 @@ export function Features() {
 
         {/* Card 4: Analytics */}
         <div
-          className="col-span-12 flex flex-col justify-between rounded-3xl p-7 sm:col-span-6 md:col-span-4"
+          className="col-span-12 flex flex-col justify-between rounded-3xl p-5 sm:p-7 sm:col-span-6 md:col-span-4"
           style={{ backgroundColor: "#F5F3FF" }}
         >
           <div>
@@ -377,7 +377,7 @@ export function Features() {
 
         {/* Card 5: Custom Widget */}
         <div
-          className="col-span-12 flex flex-col justify-between rounded-3xl p-7 sm:col-span-6 md:col-span-4"
+          className="col-span-12 flex flex-col justify-between rounded-3xl p-5 sm:p-7 sm:col-span-6 md:col-span-4"
           style={{ backgroundColor: "#EDF4FF" }}
         >
           <div>
