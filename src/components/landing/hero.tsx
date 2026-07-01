@@ -470,7 +470,7 @@ export function Hero() {
 
         {/* ── Headline ── */}
         <div className="mx-auto max-w-3xl text-center">
-          <h1 className="text-balance text-4xl font-bold tracking-[-0.03em] text-white [text-shadow:0_2px_20px_rgba(0,0,0,0.3)] sm:text-5xl sm:text-6xl md:text-[68px] md:leading-[1.08]">
+          <h1 className="text-balance text-4xl font-bold tracking-[-0.03em] text-white [text-shadow:0_2px_20px_rgba(0,0,0,0.3)] sm:text-5xl md:text-6xl md:text-[68px] md:leading-[1.08]">
             AI Support that
             <br />
             actually <span className="text-blue-200">understands</span>
