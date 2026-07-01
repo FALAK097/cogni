@@ -47,7 +47,7 @@ export default function AdminPanelLayout({
       <Sidebar initialOpen={initialSidebarOpen} />
       <main
         className={cn(
-          "bg-background text-foreground transition-[margin-left] ease-in-out duration-300",
+          "bg-sidebar text-foreground transition-[margin-left] ease-in-out duration-300",
           !settings.disabled && (!desktopOpenState ? "lg:ml-[90px]" : "lg:ml-56"),
           "print:ml-0 print:w-full print:overflow-visible",
           isFullBleedPage ? "flex h-svh flex-col overflow-hidden" : "min-h-screen",

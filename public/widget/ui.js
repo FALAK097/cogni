@@ -477,6 +477,8 @@ async function switchToSession(session) {
  * Toggle chat open/closed
  */
 export function toggleChat() {
+  if (!state.windowEl || !state.launcher) return;
+
   state.isOpen = !state.isOpen;
   if (state.isOpen) {
     state.windowEl.classList.add("is-open");

@@ -232,7 +232,7 @@ export function AppTopbar({ userData, className }: AppTopbarProps) {
   return (
     <header
       className={cn(
-        "sticky top-0 z-10 flex h-14 items-center justify-between gap-4 border-b border-border bg-card px-4 sm:px-8 print:hidden",
+        "sticky top-0 z-10 flex h-14 items-center justify-between gap-4 border-b border-sidebar-border bg-sidebar px-4 sm:px-8 print:hidden",
         className,
       )}
     >

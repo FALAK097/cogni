@@ -56,7 +56,7 @@ export function Sidebar({ initialOpen = true }: { initialOpen?: boolean }) {
       />
       <aside
         className={cn(
-          "fixed top-0 left-0 z-40 h-screen bg-card print:hidden",
+          "fixed top-0 left-0 z-40 h-screen bg-sidebar print:hidden",
           "max-lg:w-56 max-lg:-translate-x-full",
           mobileDrawerOpen && "max-lg:translate-x-0",
           "lg:translate-x-0",
@@ -68,7 +68,7 @@ export function Sidebar({ initialOpen = true }: { initialOpen?: boolean }) {
         <div
           onMouseEnter={() => setIsHover(true)}
           onMouseLeave={() => setIsHover(false)}
-          className="flex h-full flex-col items-stretch border-r border-border"
+          className="flex h-full flex-col items-stretch border-r border-sidebar-border"
         >
           {/* Header section */}
           <div className="flex-none px-4 pt-4 pb-2">

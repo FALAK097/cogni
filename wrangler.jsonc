@@ -18,7 +18,7 @@
   "vars": {
     "ENV": "production",
     "DATABASE_URL": "file:./dev.db",
-    "BETTER_AUTH_URL": "https://widget-prod.falak-widget.workers.dev",
+    "BETTER_AUTH_URL": "https://widget-prod.widget-chat.workers.dev",
     "CLOUDFLARE_ACCOUNT_ID": "598a393819cd44e21ef2145dabea9a2f",
     "D1_DATABASE_ID": "c0e9cc6e-438a-4b4f-9bf1-73c24d4417a4",
     "R2_BUCKET_NAME": "widget-prod-uploads",

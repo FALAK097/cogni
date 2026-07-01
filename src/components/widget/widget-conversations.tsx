@@ -95,8 +95,8 @@ export function WidgetConversations({ initialConversationId = null }: WidgetConv
   }, [conversationsData, selectedConversationId]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#f9fafb] dark:bg-zinc-900">
-      <header className="shrink-0 bg-[#f9fafb] px-4 pt-3 dark:bg-zinc-900 sm:px-5 sm:pt-4 lg:pt-4">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-sidebar">
+      <header className="shrink-0 bg-sidebar px-4 pt-3 sm:px-5 sm:pt-4 lg:pt-4">
         <h1 className="hidden text-xl font-semibold tracking-tight text-foreground lg:block">
           Conversations
         </h1>

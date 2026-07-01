@@ -193,13 +193,17 @@ export function WidgetLiveWidgetPreview({
   const configKey = useMemo(() => JSON.stringify(builtConfig), [builtConfig]);
 
   const openPreview = (force = false) => {
+    if (!mountedRef.current || !document.getElementById("widget-container") || !window.Widget) {
+      return;
+    }
+
     if (previewModeRef.current === "full-chat") {
-      window.Widget?.show();
+      window.Widget.show();
       return;
     }
 
     if (!force && userClosedRef.current) return;
-    window.Widget?.show();
+    window.Widget.show();
   };
 
   useEffect(() => {
@@ -283,6 +287,8 @@ export function WidgetLiveWidgetPreview({
   }, [builtConfig, config.publicKey, config.workspaceId, configKey, mountRef]);
 
   useEffect(() => {
+    if (!mountedRef.current) return;
+
     if (previewMode === "full-chat") {
       openPreview(true);
       return;
