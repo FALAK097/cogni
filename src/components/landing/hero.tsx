@@ -124,7 +124,7 @@ function DonutChart({ segments }: { segments: { pct: number; color: string }[] }
 function DashboardMockup() {
   return (
     <div className="overflow-hidden rounded-t-2xl border border-white/20 bg-white shadow-[0_-8px_60px_rgba(0,0,0,0.10),0_40px_80px_rgba(0,0,0,0.14)] ring-1 ring-inset ring-white/60">
-      <div className="flex h-[460px] md:h-[500px]">
+      <div className="flex h-[380px] sm:h-[460px] md:h-[500px]">
         {/* ── Sidebar ── */}
         <div className="hidden w-[200px] shrink-0 flex-col border-r border-gray-100 bg-gray-50/70 p-3 sm:flex">
           {/* Brand */}
@@ -199,14 +199,14 @@ function DashboardMockup() {
         {/* ── Main ── */}
         <div className="flex flex-1 flex-col overflow-hidden">
           {/* Topbar */}
-          <div className="flex shrink-0 items-start justify-between border-b border-gray-100 px-5 py-3.5">
-            <div>
+          <div className="flex shrink-0 flex-col gap-2 border-b border-gray-100 px-3 py-3 sm:flex-row sm:items-start sm:justify-between sm:px-5 sm:py-3.5">
+            <div className="min-w-0">
               <h2 className="text-[14px] font-semibold text-gray-900">Dashboard</h2>
               <p className="text-[11px] text-gray-400">
                 Overview of your AI support agent performance
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <div className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[11px] text-gray-500 shadow-xs">
                 <svg
                   viewBox="0 0 14 14"
@@ -250,9 +250,9 @@ function DashboardMockup() {
           </div>
 
           {/* Metric cards */}
-          <div className="grid shrink-0 grid-cols-5 divide-x divide-gray-100 border-b border-gray-100">
+          <div className="grid shrink-0 grid-cols-2 divide-x divide-y divide-gray-100 border-b border-gray-100 sm:grid-cols-3 lg:grid-cols-5 lg:divide-y-0">
             {METRICS.map(({ label, value, change, note, up, icon: Icon, iconColor }) => (
-              <div key={label} className="flex flex-col gap-0.5 px-4 py-3">
+              <div key={label} className="flex flex-col gap-0.5 px-3 py-3 sm:px-4">
                 <div className="flex items-center gap-1.5">
                   <div
                     className={cn(
@@ -470,7 +470,7 @@ export function Hero() {
 
         {/* ── Headline ── */}
         <div className="mx-auto max-w-3xl text-center">
-          <h1 className="text-balance text-5xl font-bold tracking-[-0.03em] text-white [text-shadow:0_2px_20px_rgba(0,0,0,0.3)] sm:text-6xl md:text-[68px] md:leading-[1.08]">
+          <h1 className="text-balance text-4xl font-bold tracking-[-0.03em] text-white [text-shadow:0_2px_20px_rgba(0,0,0,0.3)] sm:text-5xl sm:text-6xl md:text-[68px] md:leading-[1.08]">
             AI Support that
             <br />
             actually <span className="text-blue-200">understands</span>

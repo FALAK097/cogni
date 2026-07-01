@@ -15,7 +15,7 @@ export const metadata = {
 
 export default function HomePage() {
   return (
-    <main className="overflow-x-hidden bg-white">
+    <main className="light overflow-x-hidden bg-white text-gray-900">
       <Navbar />
       <Hero />
       <Features />
