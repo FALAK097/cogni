@@ -65,7 +65,7 @@ Major gaps:
 - No feedback/roadmap/changelog module.
 - No billing, usage counters, plan gates, or upgrade flows.
 - No developer API keys, webhooks, or public API docs.
-- No app tests in scripts beyond lint/type/format.
+- No dedicated automated test suite is planned for this roadmap pass. Verification will rely on format, lint, typecheck, build, and manual smoke checks unless a future issue explicitly adds tests.
 
 ## Correct AI SDK 7 Direction
 
@@ -220,19 +220,18 @@ Goal: create rails so teammates/agents can build safely without breaking archite
 
 Order:
 
-1. Test coverage foundation.
-2. AI SDK 7 migration and agent telemetry.
-3. Streamdown migration for AI markdown.
-4. TanStack Form migration pattern.
-5. Cloudflare platform bindings: Queues, Workflows, Durable Objects, Email Sending.
-6. Queue-backed async ingestion and retries.
-7. Cloudflare Workflows for durable source sync.
+1. AI SDK 7 migration and agent telemetry.
+2. Streamdown migration for AI markdown.
+3. TanStack Form migration pattern.
+4. Cloudflare platform bindings: Queues, Workflows, Durable Objects, Email Sending.
+5. Queue-backed async ingestion and retries.
+6. Cloudflare Workflows for durable source sync.
 
 Why first:
 
-- Tests prevent regressions while schema/API surface expands.
 - AI SDK 7 changes affect agent/tool design, so do before Composio/copilot.
 - Cloudflare bindings define how realtime, ingestion, email, actions, evals work.
+- Verification stays lightweight for now: format, lint, typecheck, build, and manual smoke checks.
 
 ### Phase M1 - Core Support Suite
 
@@ -322,33 +321,43 @@ Not immediate:
 
 | Order | Issue                                                | Phase | Priority | Size | Estimate | Status  | Depends on |
 | ----- | ---------------------------------------------------- | ----- | -------- | ---- | -------- | ------- | ---------- |
-| 1     | #43 Test coverage foundation                         | M0    | P0       | L    | 8        | Ready   | none       |
-| 2     | #44 AI SDK 7 migration and agent telemetry           | M0    | P0       | L    | 8        | Ready   | #43        |
-| 3     | #42 Streamdown migration for AI markdown             | M0    | P0       | M    | 5        | Ready   | #43        |
-| 4     | #41 TanStack Form migration pattern                  | M0    | P1       | M    | 5        | Ready   | #43        |
-| 5     | #24 Queue-backed async ingestion and retries         | M0    | P0       | L    | 8        | Ready   | #43        |
-| 6     | #25 Cloudflare Workflows for durable source sync     | M0    | P0       | L    | 8        | Ready   | #24        |
-| 7     | #20 Realtime conversation rooms with Durable Objects | M1    | P0       | XL   | 13       | Backlog | #43        |
-| 8     | #40 Chat UI component polish pass                    | M1    | P1       | M    | 5        | Backlog | #42        |
-| 9     | #21 Ticket lifecycle MVP                             | M1    | P0       | L    | 8        | Backlog | #43        |
-| 10    | #29 Customer intelligence profiles                   | M1    | P0       | L    | 8        | Backlog | #21        |
-| 11    | #26 Cloudflare Email Sending channel                 | M1    | P1       | L    | 8        | Backlog | #21        |
-| 12    | #36 Reporting builder and saved analytics views      | M1    | P2       | M    | 5        | Backlog | #21        |
-| 13    | #22 Agent inbox copilot                              | M2    | P0       | L    | 8        | Backlog | #44        |
-| 14    | #23 Composio tool connections and action approvals   | M2    | P0       | XL   | 13       | Backlog | #44        |
-| 15    | #37 Integration marketplace with connection health   | M2    | P1       | M    | 5        | Backlog | #23        |
-| 16    | #31 AI evaluation and QA scoring                     | M2    | P0       | L    | 8        | Backlog | #44        |
-| 17    | #32 Unanswered questions optimization center         | M2    | P1       | M    | 5        | Backlog | #31        |
-| 18    | #28 Knowledge source health and scheduled sync       | M3    | P1       | L    | 8        | Backlog | #25        |
-| 19    | #27 Chat SDK adapter foundation                      | M3    | P1       | XL   | 13       | Backlog | #21, #23   |
-| 20    | #39 Developer API keys and webhooks                  | M3    | P1       | L    | 8        | Backlog | #24        |
-| 21    | #30 Lead qualification dashboard                     | M3    | P1       | M    | 5        | Backlog | #29        |
-| 22    | #34 Feedback portal and roadmap MVP                  | M4    | P1       | XL   | 13       | Backlog | #29        |
-| 23    | #35 Changelog publishing                             | M4    | P2       | M    | 5        | Backlog | #34        |
-| 24    | #33 Proactive outbound campaigns MVP                 | M4    | P2       | XL   | 13       | Backlog | #29, #39   |
-| 25    | #38 Billing, usage limits, and plan gates            | M4    | P1       | L    | 8        | Backlog | #44        |
+| 1     | #44 AI SDK 7 migration and agent telemetry           | M0    | P0       | L    | 8        | Ready   | none       |
+| 2     | #42 Streamdown migration for AI markdown             | M0    | P0       | M    | 5        | Ready   | none       |
+| 3     | #41 TanStack Form migration pattern                  | M0    | P1       | M    | 5        | Ready   | none       |
+| 4     | #24 Queue-backed async ingestion and retries         | M0    | P0       | L    | 8        | Ready   | none       |
+| 5     | #25 Cloudflare Workflows for durable source sync     | M0    | P0       | L    | 8        | Ready   | #24        |
+| 6     | #20 Realtime conversation rooms with Durable Objects | M1    | P0       | XL   | 13       | Backlog | none       |
+| 7     | #40 Chat UI component polish pass                    | M1    | P1       | M    | 5        | Backlog | #42        |
+| 8     | #21 Ticket lifecycle MVP                             | M1    | P0       | L    | 8        | Backlog | none       |
+| 9     | #29 Customer intelligence profiles                   | M1    | P0       | L    | 8        | Backlog | #21        |
+| 10    | #26 Cloudflare Email Sending channel                 | M1    | P1       | L    | 8        | Backlog | #21        |
+| 11    | #36 Reporting builder and saved analytics views      | M1    | P2       | M    | 5        | Backlog | #21        |
+| 12    | #22 Agent inbox copilot                              | M2    | P0       | L    | 8        | Backlog | #44        |
+| 13    | #23 Composio tool connections and action approvals   | M2    | P0       | XL   | 13       | Backlog | #44        |
+| 14    | #37 Integration marketplace with connection health   | M2    | P1       | M    | 5        | Backlog | #23        |
+| 15    | #31 AI evaluation and QA scoring                     | M2    | P0       | L    | 8        | Backlog | #44        |
+| 16    | #32 Unanswered questions optimization center         | M2    | P1       | M    | 5        | Backlog | #31        |
+| 17    | #28 Knowledge source health and scheduled sync       | M3    | P1       | L    | 8        | Backlog | #25        |
+| 18    | #27 Chat SDK adapter foundation                      | M3    | P1       | XL   | 13       | Backlog | #21, #23   |
+| 19    | #39 Developer API keys and webhooks                  | M3    | P1       | L    | 8        | Backlog | #24        |
+| 20    | #30 Lead qualification dashboard                     | M3    | P1       | M    | 5        | Backlog | #29        |
+| 21    | #34 Feedback portal and roadmap MVP                  | M4    | P1       | XL   | 13       | Backlog | #29        |
+| 22    | #35 Changelog publishing                             | M4    | P2       | M    | 5        | Backlog | #34        |
+| 23    | #33 Proactive outbound campaigns MVP                 | M4    | P2       | XL   | 13       | Backlog | #29, #39   |
+| 24    | #38 Billing, usage limits, and plan gates            | M4    | P1       | L    | 8        | Backlog | #44        |
 
-Note: issue #44 should be created for AI SDK 7 migration because it is now a distinct blocker.
+Closed/superseded:
+
+- #1 -> #30 and #29.
+- #2 -> #44 and #22.
+- #3 -> #40 and #42.
+- #4 -> #23, #22, and #27.
+- #5 -> #20, #40, and #33.
+- #6 -> #30 and #26.
+- #7 -> #27 and a future WhatsApp adapter slice.
+- #8 -> #21.
+- #9 -> #24, #25, and #28.
+- #43 closed because automated test-writing is out of scope for this roadmap pass.
 
 ## Feature Detail
 
@@ -357,7 +366,7 @@ Note: issue #44 should be created for AI SDK 7 migration because it is now a dis
 MVP:
 
 - Current widget settings continue.
-- Add agent playground with test conversation, selected sources, model, reasoning mode, and output preview.
+- Add agent playground with sample conversation, selected sources, model, reasoning mode, and output preview.
 - Add AI SDK 7 runtime context:
   - `workspaceId`
   - `widgetId`
@@ -551,7 +560,7 @@ Every issue should be implemented as a vertical slice:
 - Route handler/API.
 - Dashboard/widget UI.
 - Query hooks/cache invalidation.
-- Tests.
+- Verification: format, lint, typecheck, build, and manual smoke checks.
 - Docs or comments only where useful.
 
 Rules:
