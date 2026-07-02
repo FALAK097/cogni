@@ -84,6 +84,7 @@ import {
   RadioIcon,
   Refresh01Icon,
   RemoveCircleIcon,
+  Rocket01Icon,
   Rotate01Icon,
   SaveIcon,
   ScrollIcon,
@@ -267,6 +268,7 @@ export const RefreshCw = createIcon(Refresh01Icon, "RefreshCw");
 export const RefreshCwIcon = createIcon(Refresh01Icon, "RefreshCwIcon");
 export const RewindIcon = createIcon(Backward01Icon, "RewindIcon");
 export const RotateCcw = createIcon(Rotate01Icon, "RotateCcw");
+export const Rocket = createIcon(Rocket01Icon, "Rocket");
 export const Save = createIcon(SaveIcon, "Save");
 export const ScrollText = createIcon(ScrollIcon, "ScrollText");
 export const Search = createIcon(Search01Icon, "Search");

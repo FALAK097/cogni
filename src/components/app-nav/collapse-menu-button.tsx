@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronDownIcon, ChevronRightIcon } from "@/components/icons";
 
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useSidebar } from "@/hooks/use-sidebar";
 import { cn } from "@/lib/utils";
 
 type CollapseMenuButtonProps = {
@@ -40,13 +41,23 @@ export function CollapseMenuButton({
 }: CollapseMenuButtonProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const closeOnMobile = useSidebar((state) => state.closeOnMobile);
   const isSubmenuActive = submenus.some((submenu) =>
     submenu.active === undefined ? submenu.href === pathname : submenu.active,
   );
   const isMenuActive = active || isSubmenuActive;
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const isExpanded = isMenuActive || isCollapsed;
+  const wasMenuActiveRef = useRef(isMenuActive);
+  const isExpanded = isCollapsed;
+
+  useEffect(() => {
+    const wasActive = wasMenuActiveRef.current;
+    wasMenuActiveRef.current = isMenuActive;
+    if (!wasActive && isMenuActive) {
+      setIsCollapsed(true);
+    }
+  }, [isMenuActive]);
 
   return isOpen ? (
     <Collapsible open={isExpanded} onOpenChange={setIsCollapsed} className="mb-1 w-full">
@@ -71,7 +82,9 @@ export function CollapseMenuButton({
             isMenuActive && "hover:text-secondary-foreground",
           )}
           onClick={() => {
-            if (href) {
+            setIsCollapsed((prev) => !prev);
+            if (href && !isExpanded) {
+              closeOnMobile();
               router.push(href);
             }
           }}
@@ -126,7 +139,14 @@ export function CollapseMenuButton({
                 key={href}
                 variant="ghost"
                 nativeButton={false}
-                render={<Link href={href} />}
+                render={
+                  <Link
+                    href={href}
+                    onClick={() => {
+                      closeOnMobile();
+                    }}
+                  />
+                }
                 className={cn(
                   "mb-1 h-9 w-full justify-start rounded-md bg-transparent px-3 text-left transition-colors",
                   isSubmenuItemActive && "hover:bg-transparent",
@@ -229,7 +249,10 @@ export function CollapseMenuButton({
           return (
             <DropdownMenuItem
               key={href}
-              onClick={() => setDropdownOpen(false)}
+              onClick={() => {
+                setDropdownOpen(false);
+                closeOnMobile();
+              }}
               render={
                 <Link
                   className={cn(

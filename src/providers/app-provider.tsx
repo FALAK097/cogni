@@ -15,7 +15,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <NuqsAdapter>
-      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="light"
+        enableSystem
+        storageKey="widget-dashboard-theme"
+        disableTransitionOnChange
+      >
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>{children}</TooltipProvider>
           <Toaster />

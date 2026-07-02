@@ -1,10 +1,12 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Sparkles } from "@/components/icons";
+import { ForceLightTheme } from "@/components/force-light-theme";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="grid h-svh overflow-hidden bg-white lg:grid-cols-2">
+      <ForceLightTheme />
       {/* ── Left: form panel ── */}
       <div className="flex h-full flex-col bg-white px-6 py-8 sm:px-10 lg:px-16">
         {/* Logo */}

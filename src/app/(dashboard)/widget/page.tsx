@@ -18,7 +18,12 @@ export default async function WidgetPage({
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <Suspense>
-        <WidgetCustomizer workspaceId={workspace.id} initialSubtab={subtab} key={workspace.id} />
+        <WidgetCustomizer
+          workspaceId={workspace.id}
+          initialSubtab={subtab}
+          showPreviewModeToggle={false}
+          key={workspace.id}
+        />
       </Suspense>
     </div>
   );

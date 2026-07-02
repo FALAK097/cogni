@@ -1,4 +1,5 @@
 import { Navbar } from "@/components/landing/navbar";
+import { ForceLightTheme } from "@/components/force-light-theme";
 import { Hero } from "@/components/landing/hero";
 import { Features } from "@/components/landing/features";
 import { HowItWorks } from "@/components/landing/how-it-works";
@@ -16,6 +17,7 @@ export const metadata = {
 export default function HomePage() {
   return (
     <main className="overflow-x-hidden bg-white">
+      <ForceLightTheme />
       <Navbar />
       <Hero />
       <Features />

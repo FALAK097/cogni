@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { isOnboardingComplete } from "@/features/onboarding/queries";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 
 const switchSchema = z.object({
@@ -33,6 +34,9 @@ export async function POST(request: Request) {
     secure: process.env.NODE_ENV === "production",
     maxAge: 60 * 60 * 24 * 365,
   });
+  cookieStore.delete("active_widget_id");
 
-  return NextResponse.json({ ok: true });
+  const onboardingComplete = await isOnboardingComplete(db, body.data.workspaceId);
+
+  return NextResponse.json({ ok: true, onboardingComplete });
 }
