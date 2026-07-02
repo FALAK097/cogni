@@ -53,7 +53,7 @@ export async function streamWidgetAgent({
 
   return streamText({
     model: getWidgetModel(config.modelProvider, config.modelName),
-    system: [
+    instructions: [
       `You are ${config.displayName}, the AI support assistant for ${config.workspaceName}.`,
       config.instructions,
       "Use retrieved knowledge when it is relevant. Cite sources inline like [Source: Title].",
@@ -65,7 +65,7 @@ export async function streamWidgetAgent({
       .filter(Boolean)
       .join("\n"),
     messages: await convertToModelMessages(messages),
-    onFinish: async ({ text, totalUsage }) => {
+    onEnd: async ({ text, usage }) => {
       const citationSuffix =
         sources.length > 0
           ? `\n\nSources:\n${sources.map((source: { title: string }) => `- ${source.title}`).join("\n")}`
@@ -74,8 +74,8 @@ export async function streamWidgetAgent({
 
       await onFinish({
         text: finalText,
-        inputTokens: totalUsage.inputTokens ?? null,
-        outputTokens: totalUsage.outputTokens ?? null,
+        inputTokens: usage.inputTokens ?? null,
+        outputTokens: usage.outputTokens ?? null,
         sources: sources.map((source: { documentId: string; title: string }) => ({
           documentId: source.documentId,
           title: source.title,
@@ -99,9 +99,9 @@ export async function streamHandoffMessage({
 }) {
   const result = streamText({
     model: getWidgetModel(config.modelProvider, config.modelName),
-    system: "Repeat the user-provided message exactly. Do not add anything else.",
+    instructions: "Repeat the user-provided message exactly. Do not add anything else.",
     prompt: text,
-    onFinish: async ({ text: output }) => {
+    onEnd: async ({ text: output }) => {
       await onFinish({ text: output });
     },
   });
