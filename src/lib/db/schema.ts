@@ -581,6 +581,52 @@ export const workflowRun = sqliteTable(
   ],
 );
 
+export const agentRun = sqliteTable(
+  "agent_run",
+  {
+    id: text().primaryKey().notNull(),
+    status: text().default("RUNNING").notNull(),
+    trigger: text().notNull(),
+    modelProvider: text().notNull(),
+    modelName: text().notNull(),
+    channel: text().notNull(),
+    runtimeContext: text().default("{}").notNull(),
+    sourceRefs: text().default("[]").notNull(),
+    usage: text().default("{}").notNull(),
+    inputTokens: integer(),
+    outputTokens: integer(),
+    totalTokens: integer(),
+    latencyMs: integer(),
+    finishReason: text(),
+    errorMessage: text(),
+    startedAt: numeric()
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+    finishedAt: numeric(),
+    workspaceId: text()
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    widgetId: text().references(() => widget.id, { onDelete: "set null", onUpdate: "cascade" }),
+    conversationId: text().references(() => conversation.id, {
+      onDelete: "set null",
+      onUpdate: "cascade",
+    }),
+    contactId: text().references(() => contact.id, { onDelete: "set null", onUpdate: "cascade" }),
+    visitorSessionId: text().references(() => visitorSession.id, {
+      onDelete: "set null",
+      onUpdate: "cascade",
+    }),
+  },
+  (table) => [
+    index("agent_run_workspaceId_status_startedAt_idx").on(
+      table.workspaceId,
+      table.status,
+      table.startedAt,
+    ),
+    index("agent_run_conversationId_startedAt_idx").on(table.conversationId, table.startedAt),
+  ],
+);
+
 export const integrationAction = sqliteTable(
   "integration_action",
   {

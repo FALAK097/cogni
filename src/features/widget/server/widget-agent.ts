@@ -15,6 +15,7 @@ type WidgetAgentConfig = {
   latestUserMessage: string;
   memoryContext?: string;
   documentIds?: string[] | null;
+  runTimeoutMs?: number;
 };
 
 export async function streamWidgetAgent({
@@ -30,6 +31,8 @@ export async function streamWidgetAgent({
     text: string;
     inputTokens: number | null;
     outputTokens: number | null;
+    totalTokens: number | null;
+    finishReason: string | null;
     sources: { documentId: string; title: string }[];
   }) => Promise<void>;
 }) {
@@ -50,9 +53,12 @@ export async function streamWidgetAgent({
       : "No knowledge sources matched this question.";
 
   const { convertToModelMessages } = await import("ai");
+  const abortController = new AbortController();
+  const timeout = setTimeout(() => abortController.abort(), config.runTimeoutMs ?? 55_000);
 
   return streamText({
     model: getWidgetModel(config.modelProvider, config.modelName),
+    abortSignal: abortController.signal,
     instructions: [
       `You are ${config.displayName}, the AI support assistant for ${config.workspaceName}.`,
       config.instructions,
@@ -65,7 +71,8 @@ export async function streamWidgetAgent({
       .filter(Boolean)
       .join("\n"),
     messages: await convertToModelMessages(messages),
-    onEnd: async ({ text, usage }) => {
+    onEnd: async ({ text, usage, finishReason }) => {
+      clearTimeout(timeout);
       const citationSuffix =
         sources.length > 0
           ? `\n\nSources:\n${sources.map((source: { title: string }) => `- ${source.title}`).join("\n")}`
@@ -76,6 +83,8 @@ export async function streamWidgetAgent({
         text: finalText,
         inputTokens: usage.inputTokens ?? null,
         outputTokens: usage.outputTokens ?? null,
+        totalTokens: usage.totalTokens ?? null,
+        finishReason: finishReason ?? null,
         sources: sources.map((source: { documentId: string; title: string }) => ({
           documentId: source.documentId,
           title: source.title,
@@ -83,6 +92,7 @@ export async function streamWidgetAgent({
       });
     },
     onError: ({ error }) => {
+      clearTimeout(timeout);
       onError(error);
     },
   });

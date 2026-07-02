@@ -25,6 +25,12 @@ import {
   withWidgetCors,
 } from "@/features/widget/server/widget-utils";
 import { buildAgentMemoryContext } from "@/lib/ai/memory";
+import {
+  buildWidgetAgentRuntimeContext,
+  completeAgentRun,
+  createWidgetAgentRun,
+  failAgentRun,
+} from "@/lib/ai/telemetry";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { getDb } from "@/lib/db/client";
 import { conversation as conversationTable } from "@/lib/db/schema";
@@ -348,6 +354,22 @@ export async function POST(
       conversationId: conversation.id,
       contactId: conversation.contactId,
     });
+    const runtimeContext = buildWidgetAgentRuntimeContext({
+      workspaceId: widget.workspace.id,
+      widgetId: widget.id,
+      conversationId: conversation.id,
+      contactId: conversation.contactId,
+      visitorSessionId: isPreview ? null : visitorSession.id,
+      locale: body.metadata.language,
+    });
+    const run = isPreview
+      ? null
+      : await createWidgetAgentRun({
+          db,
+          runtimeContext,
+          modelProvider: widget.modelProvider as WidgetModelProvider,
+          modelName: widget.modelName,
+        });
     const result = await streamWidgetAgent({
       config: {
         displayName: widget.displayName,
@@ -360,29 +382,64 @@ export async function POST(
         latestUserMessage: body.message,
         memoryContext,
         documentIds: null,
+        runTimeoutMs: runtimeContext.runTimeoutMs,
       },
       messages: historyMessages,
-      onFinish: async ({ text, inputTokens, outputTokens }) => {
-        if (!text.trim()) return;
+      onFinish: async ({ text, inputTokens, outputTokens, totalTokens, finishReason, sources }) => {
+        if (!text.trim()) {
+          if (run) {
+            await completeAgentRun({
+              db,
+              agentRunId: run.id,
+              startedAtMs: run.startedAtMs,
+              usage: { inputTokens, outputTokens, totalTokens },
+              finishReason,
+              sources,
+            });
+          }
+          return;
+        }
         await recordAiMessage({
           db,
           conversationId: conversation.id,
           text,
           replyToMessageId: visitorMessageId,
         });
+        if (run) {
+          await completeAgentRun({
+            db,
+            agentRunId: run.id,
+            startedAtMs: run.startedAtMs,
+            usage: { inputTokens, outputTokens, totalTokens },
+            finishReason,
+            sources,
+          });
+        }
         logInfo("widget.ai.response.completed", {
           workspaceId: widget.workspace.id,
           widgetId: widget.id,
           conversationId: conversation.id,
+          agentRunId: run?.id ?? null,
           inputTokens,
           outputTokens,
+          totalTokens,
+          finishReason,
         });
       },
       onError: (error) => {
+        if (run) {
+          void failAgentRun({
+            db,
+            agentRunId: run.id,
+            startedAtMs: run.startedAtMs,
+            error,
+          });
+        }
         logError("widget.ai.response.failed", {
           workspaceId: widget.workspace.id,
           widgetId: widget.id,
           conversationId: conversation.id,
+          agentRunId: run?.id ?? null,
           error: error instanceof Error ? error.message : "Unknown model error",
         });
       },

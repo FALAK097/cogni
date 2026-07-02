@@ -20,6 +20,7 @@ import {
   notification,
   domainEvent,
   workflowRun,
+  agentRun,
   integrationAction,
 } from "./schema";
 
@@ -70,6 +71,7 @@ export const workspaceRelations = relations(workspace, ({ many }) => ({
   notifications: many(notification),
   domainEvents: many(domainEvent),
   workflowRuns: many(workflowRun),
+  agentRuns: many(agentRun),
   integrationActions: many(integrationAction),
 }));
 
@@ -117,6 +119,7 @@ export const conversationRelations = relations(conversation, ({ one, many }) => 
     references: [workspace.id],
   }),
   attachments: many(attachment),
+  agentRuns: many(agentRun),
 }));
 
 export const visitorSessionRelations = relations(visitorSession, ({ one, many }) => ({
@@ -139,6 +142,7 @@ export const widgetRelations = relations(widget, ({ one, many }) => ({
     references: [workspace.id],
   }),
   visitorSessions: many(visitorSession),
+  agentRuns: many(agentRun),
 }));
 
 export const leadRelations = relations(lead, ({ one, many }) => ({
@@ -226,6 +230,29 @@ export const workflowRunRelations = relations(workflowRun, ({ one }) => ({
   workspace: one(workspace, {
     fields: [workflowRun.workspaceId],
     references: [workspace.id],
+  }),
+}));
+
+export const agentRunRelations = relations(agentRun, ({ one }) => ({
+  workspace: one(workspace, {
+    fields: [agentRun.workspaceId],
+    references: [workspace.id],
+  }),
+  widget: one(widget, {
+    fields: [agentRun.widgetId],
+    references: [widget.id],
+  }),
+  conversation: one(conversation, {
+    fields: [agentRun.conversationId],
+    references: [conversation.id],
+  }),
+  contact: one(contact, {
+    fields: [agentRun.contactId],
+    references: [contact.id],
+  }),
+  visitorSession: one(visitorSession, {
+    fields: [agentRun.visitorSessionId],
+    references: [visitorSession.id],
   }),
 }));
 
