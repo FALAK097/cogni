@@ -18,7 +18,7 @@ export function FinalCta() {
       <div className="pointer-events-none absolute inset-0 -z-10 bg-gray-900/55" />
       <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_center,transparent_40%,rgba(0,0,0,0.35)_100%)]" />
 
-      <div className="mx-auto max-w-7xl px-5 py-32 sm:px-8 md:py-44 lg:px-12">
+      <div className="mx-auto max-w-7xl px-5 py-24 sm:px-8 sm:py-32 md:py-44 lg:px-12">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-4xl font-bold tracking-[-0.03em] text-white text-balance sm:text-5xl md:text-6xl">
             Start supporting customers

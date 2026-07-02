@@ -57,7 +57,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         type="button"
         variant="outline"
         size="lg"
-        className="h-12 w-full gap-3 rounded-xl border-border/80 bg-background text-[15px] font-medium shadow-sm transition-all hover:bg-muted/40"
+        className="h-12 w-full gap-3 rounded-xl border-gray-200 bg-white text-[15px] font-medium text-gray-900 shadow-sm transition-colors hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900 disabled:cursor-not-allowed disabled:text-gray-900 disabled:opacity-100 dark:border-gray-200 dark:bg-white dark:text-gray-900 dark:hover:border-gray-300 dark:hover:bg-gray-50 dark:hover:text-gray-900 dark:disabled:text-gray-900"
         disabled={isPending}
         onClick={continueWithGoogle}
       >

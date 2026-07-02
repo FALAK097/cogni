@@ -1,8 +1,8 @@
 "use client";
 
-import { useTheme } from "next-themes";
 import * as React from "react";
 import { Sun, Moon } from "@/components/icons";
+import { useTheme } from "next-themes";
 
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";

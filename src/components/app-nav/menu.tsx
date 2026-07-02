@@ -7,8 +7,8 @@ import { Ellipsis } from "@/components/icons";
 import { CollapseMenuButton } from "@/components/app-nav/collapse-menu-button";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { closeMobileSidebar, useSidebar } from "@/hooks/use-sidebar";
 import { buildMenuList, buildWorkspaceMenuList, type MenuItem } from "@/lib/menu-list";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { cn } from "@/lib/utils";
 
 type MenuProps = {
@@ -131,6 +131,7 @@ export function Menu({ isOpen, variant = "agent" }: MenuProps) {
                     )}
                     onClick={() => {
                       closeOnMobile();
+                      closeMobileSidebar();
                       router.push(href);
                     }}
                   >

@@ -1,49 +1,72 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { usePathname } from "next/navigation";
+import { useEffect, useLayoutEffect, useState } from "react";
 
 import { Menu } from "@/components/app-nav/menu";
 import { WorkspaceSwitcher } from "@/components/app-nav/workspace-switcher";
 import { ThemeLogo } from "@/components/theme-logo";
+import { closeMobileSidebar, useSidebar } from "@/hooks/use-sidebar";
 import { SITE_NAME } from "@/lib/constants";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { cn } from "@/lib/utils";
 
 export function Sidebar({ initialOpen = true }: { initialOpen?: boolean }) {
+  const pathname = usePathname();
   const isOpen = useSidebar((state) => state.isOpen);
+  const mobileDrawerOpen = useSidebar((state) => state.mobileDrawerOpen);
   const isHover = useSidebar((state) => state.isHover);
   const hasHydrated = useSidebar((state) => state.hasHydrated);
   const toggleOpen = useSidebar((state) => state.toggleOpen);
   const closeOnMobile = useSidebar((state) => state.closeOnMobile);
   const setIsHover = useSidebar((state) => state.setIsHover);
   const settings = useSidebar((state) => state.settings);
+  const [transitionsEnabled, setTransitionsEnabled] = useState(false);
 
-  const openState = (hasHydrated ? isOpen : initialOpen) || (settings.isHoverOpen && isHover);
-  const canAnimate = hasHydrated;
+  const desktopOpen = (hasHydrated ? isOpen : initialOpen) || (settings.isHoverOpen && isHover);
+  const openState = mobileDrawerOpen || desktopOpen;
+  const canAnimate = hasHydrated && transitionsEnabled;
+
+  useLayoutEffect(() => {
+    closeMobileSidebar();
+  }, []);
+
+  useEffect(() => {
+    closeMobileSidebar();
+    closeOnMobile();
+  }, [pathname, closeOnMobile]);
 
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth < 1024 && openState) {
+      if (window.innerWidth < 1024 && mobileDrawerOpen) {
         toggleOpen(false);
       }
     };
 
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [openState, toggleOpen]);
+  }, [mobileDrawerOpen, toggleOpen]);
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      setTransitionsEnabled(true);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   return (
     <>
       <button
         type="button"
         aria-label="Close navigation"
-        className="fixed inset-0 z-30 bg-foreground/80 lg:hidden"
-        onClick={() => toggleOpen(false)}
-        style={{
-          opacity: openState ? 1 : 0,
-          pointerEvents: openState ? "auto" : "none",
-        }}
+        aria-hidden={!mobileDrawerOpen}
+        tabIndex={mobileDrawerOpen ? 0 : -1}
+        className={cn(
+          "fixed inset-0 z-30 bg-black/50 supports-backdrop-filter:backdrop-blur-sm lg:hidden",
+          canAnimate && "transition-opacity duration-300",
+          mobileDrawerOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0",
+        )}
+        onClick={() => closeMobileSidebar()}
       />
       <aside
         className={cn(
@@ -62,7 +85,10 @@ export function Sidebar({ initialOpen = true }: { initialOpen?: boolean }) {
         >
           <Link
             href="/backstage"
-            onClick={closeOnMobile}
+            onClick={() => {
+              closeOnMobile();
+              closeMobileSidebar();
+            }}
             className={cn("flex items-center gap-2.5", !openState && "justify-center")}
           >
             <ThemeLogo className="size-7 shrink-0 rounded-full" />

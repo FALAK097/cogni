@@ -8,17 +8,19 @@ import { AppShellNavbar } from "@/components/app-nav/app-shell-navbar";
 import { CreateWorkspaceDialog } from "@/components/app-nav/create-workspace-dialog";
 import { Sidebar } from "@/components/app-nav/sidebar";
 import { WorkspaceSidebar } from "@/components/app-nav/workspace-sidebar";
-import { useSidebar } from "@/hooks/use-sidebar";
+import { closeMobileSidebar, useSidebar } from "@/hooks/use-sidebar";
 import { isWorkspaceRoute } from "@/lib/workspace-routing";
+
+type UserData = {
+  avatar?: string;
+  name?: string;
+  email?: string;
+};
 
 type AdminPanelLayoutProps = {
   children: ReactNode;
   initialSidebarOpen?: boolean;
-  userData?: {
-    avatar?: string;
-    name?: string;
-    email?: string;
-  };
+  userData?: UserData;
 };
 
 export default function AdminPanelLayout({
@@ -32,12 +34,13 @@ export default function AdminPanelLayout({
   const workspaceView = isWorkspaceRoute(pathname);
 
   useLayoutEffect(() => {
-    useSidebar.setState({ isOpen: initialSidebarOpen });
+    useSidebar.setState({ isOpen: initialSidebarOpen, mobileDrawerOpen: false });
     setHasHydrated(true);
   }, [initialSidebarOpen, setHasHydrated]);
 
   useEffect(() => {
     closeOnMobile();
+    closeMobileSidebar();
   }, [pathname, closeOnMobile]);
 
   return (

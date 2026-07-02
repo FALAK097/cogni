@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useSidebar } from "@/hooks/use-sidebar";
+import { closeMobileSidebar, useSidebar } from "@/hooks/use-sidebar";
 import { cn } from "@/lib/utils";
 
 type CollapseMenuButtonProps = {
@@ -85,6 +85,7 @@ export function CollapseMenuButton({
             setIsCollapsed((prev) => !prev);
             if (href && !isExpanded) {
               closeOnMobile();
+              closeMobileSidebar();
               router.push(href);
             }
           }}
@@ -144,6 +145,7 @@ export function CollapseMenuButton({
                     href={href}
                     onClick={() => {
                       closeOnMobile();
+                      closeMobileSidebar();
                     }}
                   />
                 }
@@ -236,6 +238,8 @@ export function CollapseMenuButton({
           onClick={() => {
             setDropdownOpen(false);
             if (href) {
+              closeOnMobile();
+              closeMobileSidebar();
               router.push(href);
             }
           }}
@@ -252,6 +256,7 @@ export function CollapseMenuButton({
               onClick={() => {
                 setDropdownOpen(false);
                 closeOnMobile();
+                closeMobileSidebar();
               }}
               render={
                 <Link
@@ -260,6 +265,10 @@ export function CollapseMenuButton({
                     isSubmenuItemActive && "bg-secondary font-medium text-primary",
                   )}
                   href={href}
+                  onClick={() => {
+                    closeOnMobile();
+                    closeMobileSidebar();
+                  }}
                 />
               }
             >

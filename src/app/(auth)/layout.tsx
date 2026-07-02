@@ -5,7 +5,7 @@ import { ForceLightTheme } from "@/components/force-light-theme";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="grid h-svh overflow-hidden bg-white lg:grid-cols-2">
+    <div className="grid h-svh overflow-hidden bg-white text-gray-900 lg:grid-cols-2">
       <ForceLightTheme />
       {/* ── Left: form panel ── */}
       <div className="flex h-full flex-col bg-white px-6 py-8 sm:px-10 lg:px-16">
@@ -65,7 +65,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           </p>
 
           {/* Metric cards */}
-          <div className="mt-10 grid grid-cols-3 gap-3">
+          <div className="mt-10 grid grid-cols-1 gap-3 sm:grid-cols-3">
             {[
               { label: "Ticket deflection", value: "94%" },
               { label: "Avg. response", value: "8s" },
