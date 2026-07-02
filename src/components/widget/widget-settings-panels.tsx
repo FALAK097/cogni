@@ -471,30 +471,6 @@ export function WidgetAppearancePanel({
             className="data-checked:bg-[var(--widget-accent)]"
           />
         </section>
-
-        <section className="space-y-1.5 border-t border-border pt-8">
-          <Label htmlFor="welcome-message" className="text-sm font-medium text-foreground">
-            Welcome Message
-          </Label>
-          <p className="text-sm text-muted-foreground">The first message users will see.</p>
-          <div className="relative">
-            <Textarea
-              id="welcome-message"
-              value={config.welcomeMessage}
-              onChange={(event) =>
-                onUpdate("welcomeMessage", event.target.value.slice(0, WELCOME_MESSAGE_MAX))
-              }
-              rows={3}
-              className={cn(
-                TEXTAREA_FIELD_CLASS,
-                "min-h-[88px] resize-none focus-visible:border-[var(--widget-accent)] focus-visible:ring-2 focus-visible:ring-[var(--widget-accent)]/20",
-              )}
-            />
-            <span className="absolute right-3 bottom-2.5 text-xs text-muted-foreground">
-              {config.welcomeMessage.length}/{WELCOME_MESSAGE_MAX}
-            </span>
-          </div>
-        </section>
       </div>
     </>
   );

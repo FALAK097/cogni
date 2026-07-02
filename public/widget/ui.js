@@ -78,10 +78,6 @@ export function createWidget() {
 					<span>Start a new chat</span>
 				</button>
 				<button class="oc-menu-item" data-action="recent_chats">
-					${ICONS.historyCircle}
-					<span>Recent chats</span>
-				</button>
-				<button class="oc-menu-item" data-action="recent_chats">
 					${ICONS.history}
 					<span>Recent chats</span>
 				</button>
