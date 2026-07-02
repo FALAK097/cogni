@@ -2,457 +2,571 @@
 
 Last updated: 2026-07-02
 
-## Goal
-
-Build widget into an AI-first customer support platform comparable to Intercom, Chatbase, Chatwoot, Cossistant, and Productlane: embedded support widget, human inbox, AI agent, knowledge base, app actions, tickets, customer intelligence, analytics, proactive messaging, feedback, roadmap, changelog, and Cloudflare-native durable execution.
-
-## Current Product State
-
-### Already Implemented
-
-- Marketing site with hero, features, integrations, pricing, FAQ, testimonials, legal pages, and contact form.
-- Google OAuth via Better Auth, workspace provisioning, workspace switching, workspace invites, member roles.
-- Dashboard shell with sidebar/topbar, theme support, session guard, workspace switcher.
-- Embedded widget loader under `public/widget.js` and widget modules for UI, state, API, storage, lead capture, feedback, documents.
-- Widget customization for branding, colors, sizing, typography, position, launcher, preview messages, suggestions, privacy link, lead capture, brochure prompt, model provider/name, AI instructions, escalation keywords, authorized domains.
-- Public widget APIs for config, session, sessions, identify, history, message, chat streaming, feedback, upload, documents, lead capture detection/submission.
-- Conversation schema with JSON message history, visitor sessions, contacts, attachments, assignment, `aiPaused`, status, visitor metadata.
-- Dashboard conversations page with filters for all/unassigned/mine/open/closed, conversation detail panel, contact/conversation details panel, unread count adjustment.
-- AI widget agent using Vercel AI SDK `streamText`, OpenAI/Gemini providers, retrieved knowledge, memory context hook, citations, token reporting, handoff message streaming.
-- Knowledge base manager with manual text, URL, sitemap, file upload, source table, sorting, deletion, status badges, chunk counts.
-- Knowledge processing for extraction, chunking, retrieval, Cloudflare AI Search integration, local fallback paths.
-- R2-backed upload storage with local fallback.
-- Dashboard analytics for conversations, unique users, resolved conversations, response time, satisfaction, engagement, source/status breakdowns, top questions, time series.
-- Integrations catalog for Gmail, Google Calendar, Slack with manifests, placeholder OAuth status/actions, integration action records.
-- Domain events, notifications, and local workflow run records.
-- Cloudflare deployment config with Workers, D1, R2, AI Search, OpenNext, observability.
-
-### Current Gaps
-
-- No ticket object. Conversations have status, but no ticket lifecycle, priority, SLA, due date, comments, linked issues, or customer-visible ticket tracking.
-- No realtime presence or live inbox transport. Conversation UI depends on polling/query refresh, not Durable Objects/WebSocket/SSE presence.
-- AI actions are registry placeholders. No Composio connection model, OAuth token vault, tool execution approval UX, action audit detail, or retry queue.
-- No Cloudflare Queues, Workflows, or Durable Objects bindings in `wrangler.jsonc`.
-- No email channel. Cloudflare Email Sending is not wired to inbound/outbound support threads.
-- No omnichannel adapters for Slack, Teams, WhatsApp, Discord, Google Chat, or email via Chat SDK.
-- No agent copilot in inbox. AI only replies to visitor widget, not human agent drafting, summarization, suggested replies, or macro application.
-- No AI quality layer. Missing evaluation sets, hallucination checks, source coverage, deflection rate, QA scoring, sentiment/topic classification, or monitoring alerts.
-- Knowledge base lacks recurring sync, connector sources, Q&A pairs, versioning, access control, crawl scheduling, and source health.
-- Customer intelligence exists as `contact` plus notes but lacks companies/accounts, segments, custom attributes, events, timeline, tags UI, lead scoring, or enrichment.
-- Lead management is schema/API-level only. Missing dashboard lead list, qualification pipeline, assignment rules, lifecycle states, and CRM sync.
-- No proactive outbound messaging, product tours, banners, checklists, campaigns, or audience targeting.
-- No Productlane-style feedback, public roadmap, changelog, feature requests, votes, linking feedback to conversations/customers.
-- No admin reporting builder, custom dashboards, cohorts, funnel metrics, saved filters, exports, or alerting.
-- No billing/plans/usage enforcement UI despite `plan-limits`.
-- No API keys, webhooks, public REST API, or developer docs for customer apps.
-- UI polish gaps: chat message primitives are custom/public JS, not aligned with newer shadcn message, bubble, attachment, scrollbar, marker components; dashboard tables/forms are mixed with React Hook Form instead of TanStack Form.
-- Test coverage is unclear from package scripts; no visible unit/e2e suite in scripts.
-
-## Competitor Parity Targets
-
-### Intercom-Level Helpdesk
-
-- Omnichannel inbox covering widget, email, Slack/Teams, WhatsApp, social, and API-created conversations.
-- AI agent plus human agent workspace sharing same customer record and full handoff context.
-- Ticketing, routing, assignment, SLAs, priority, automations, macros, internal notes.
-- Customer intelligence with people, companies, attributes, events, segments, and conversation history.
-- Reporting, always-on QA, insights, topic trends, and support operations recommendations.
-
-### Chatbase/Cossistant-Level AI Agent
-
-- Agent builder with instructions, model routing, tools/actions, guardrails, test playground, deploy channels, and analytics.
-- Train from docs, websites, files, FAQs, sitemap, Google Drive, Notion, GitHub, help center, and APIs.
-- Human handoff and escalation rules.
-- Agent optimization loop: unanswered questions, weak sources, failed actions, low confidence answers, feedback-driven improvements.
-
-### Chatwoot-Level Open Support Suite
-
-- Shared inbox, teams, assignment, labels, contact profile, canned responses, macros.
-- Multi-channel support and app integrations.
-- Agent availability, business hours, automations, webhooks, API.
-
-### Productlane-Level Feedback + Roadmap
-
-- Feedback capture from conversations, forms, and public portal.
-- Feature requests, votes, linked customers, revenue/account impact, triage states.
-- Roadmap boards and changelog publishing.
-- Support conversation to feedback item conversion.
-
-## Target Technical Direction
-
-### App Stack
-
-- Next.js 16 App Router, TypeScript, Zod, Tailwind v4, shadcn/ui.
-- TanStack Query for all async dashboard state.
-- TanStack Table for all data grids.
-- TanStack Form for dashboard forms and validation, using Zod schemas.
-- Zustand only for local UI state that must span sibling components.
-- Vercel AI SDK current stable major. As of 2026-07-02, official docs show AI SDK v6 as latest, not v7.
-- Chat SDK for platform-agnostic bots/adapters across Slack, Teams, Google Chat, Discord, WhatsApp, and similar channels.
-- Streamdown for streaming markdown rendering in AI/chat surfaces.
-
-### Cloudflare Platform
-
-- Workers + OpenNext for app deployment.
-- D1 for relational product data.
-- R2 for attachments, uploads, transcripts, exports, generated artifacts.
-- AI Search for retrieval indexes.
-- Queues for async ingestion, webhooks, outbound notifications, AI eval jobs, retries.
-- Workflows for durable long-running tasks like website crawls, connector sync, complex agent actions, and post-conversation processing.
-- Durable Objects for realtime conversation room state, typing, presence, stream coordination, and per-conversation ordering.
-- Email Sending for outbound email replies, notifications, invites, digests, and customer updates.
-
-### Integration Platform
-
-- Composio for external app connectors and tool execution where possible.
-- Store integration connection state per workspace.
-- Keep action audit logs in product DB.
-- Execute side-effecting actions through queue/workflow with idempotency keys.
-- Require human approval for dangerous actions until policy confidence exists.
-
-## Milestones
-
-### M0 - Foundation Hardening
-
-- Add missing test scripts and coverage plan.
-- Add Cloudflare Queues, Workflows, Durable Objects, Email Sending bindings.
-- Add API error/result conventions, audit logging, and typed JSON helpers.
-- Migrate chat markdown to Streamdown.
-- Create TanStack Form pattern and gradually replace React Hook Form dashboard forms.
-
-### M1 - Core Support Suite
-
-- Ticket model and ticket-conversation bridge.
-- Agent inbox upgrades: assignment, priority, notes, macros, status, search, saved views.
-- Realtime conversation rooms with Durable Objects.
-- Email channel with Cloudflare Email Sending.
-- Customer/contact profiles with tags, notes, custom fields, events, timeline.
-
-### M2 - AI Agent Platform
-
-- Agent builder/playground with test conversations and deploy settings.
-- Tool/action execution through Composio and internal tools.
-- Agent copilot for summaries, drafts, suggested replies, next actions.
-- AI eval/QA pipeline for answer quality, source use, sentiment, topics, deflection.
-- Optimization dashboard for unanswered questions, bad feedback, missing docs.
-
-### M3 - Knowledge + Integrations
-
-- Scheduled source sync via Queues/Workflows.
-- Google Drive, Notion, GitHub, help center, API connector sources.
-- Source versioning, health, incremental indexing, and reindex controls.
-- Integration marketplace with OAuth setup, connection health, permissions, and logs.
-
-### M4 - Growth + Product Ops
-
-- Lead dashboard, lead scoring, routing, CRM sync, lifecycle pipeline.
-- Proactive campaigns: banners, messages, tours, checklists, audience targeting.
-- Feedback portal, roadmap boards, votes, changelog.
-- Billing/usage limits and team settings.
-
-### M5 - Enterprise Readiness
-
-- Roles/permissions beyond owner/member.
-- SSO/SAML if Google-only auth rule changes.
-- Audit logs, data export/delete, retention controls.
-- Reliability dashboards, alerting, webhooks, public API keys.
-- Security hardening, abuse/rate limiting, compliance docs.
-
-## Roadmap Issues
-
-| Issue                                            | Area         | Type | Related         |
-| ------------------------------------------------ | ------------ | ---- | --------------- |
-| Realtime conversation rooms with Durable Objects | Inbox        | AFK  | #5              |
-| Ticket lifecycle MVP                             | Tickets      | AFK  | #8              |
-| Agent inbox copilot                              | AI/Inboxes   | AFK  | #4              |
-| Composio tool connections and action approvals   | Integrations | AFK  | #4              |
-| Queue-backed async ingestion and retries         | Platform     | AFK  | #9              |
-| Cloudflare Workflows for durable source sync     | Platform     | AFK  | #9              |
-| Cloudflare Email Sending channel                 | Omnichannel  | AFK  | #7              |
-| Chat SDK adapter foundation                      | Omnichannel  | HITL | #4              |
-| Knowledge source health and scheduled sync       | Knowledge    | AFK  | #9              |
-| Customer intelligence profiles                   | CRM          | AFK  | #1              |
-| Lead qualification dashboard                     | Leads        | AFK  | #1              |
-| AI evaluation and QA scoring                     | AI Ops       | AFK  | #4              |
-| Unanswered questions optimization center         | AI Ops       | AFK  | #9              |
-| Proactive outbound campaigns MVP                 | Growth       | HITL | #5              |
-| Feedback portal and roadmap MVP                  | Product Ops  | HITL | none            |
-| Changelog publishing                             | Product Ops  | AFK  | Feedback portal |
-| Reporting builder and saved analytics views      | Analytics    | AFK  | none            |
-| Integration marketplace with connection health   | Integrations | AFK  | #4              |
-| Billing, usage limits, and plan gates            | Billing      | HITL | none            |
-| Developer API keys and webhooks                  | Platform     | AFK  | none            |
-| Chat UI component polish pass                    | UI           | AFK  | #5              |
-| TanStack Form migration pattern                  | UI/Infra     | AFK  | none            |
-| Streamdown migration for AI markdown             | UI/AI        | AFK  | #5              |
-| Test coverage foundation                         | Quality      | AFK  | none            |
-
-## Detailed Issue Backlog
-
-### 1. Realtime Conversation Rooms With Durable Objects
-
-Build per-conversation room coordination so visitor widget and dashboard agents see new messages, typing, read state, and AI stream progress without manual refresh.
-
-Acceptance:
-
-- Durable Object namespace exists in config with local/dev fallback.
-- Widget and dashboard subscribe to same conversation room.
-- Message ordering and duplicate client message IDs stay idempotent.
-- Typing/read events do not persist as messages.
-- Basic fallback works when realtime connection unavailable.
-
-### 2. Ticket Lifecycle MVP
-
-Add first-class tickets linked to conversations and contacts so support teams can track work beyond chat status.
-
-Acceptance:
-
-- Ticket schema supports title, status, priority, assignee, due date, source conversation, contact, workspace.
-- Agents can create ticket from conversation, update status/priority/assignee, and view linked ticket context.
-- Customer-visible ticket reference can be sent in widget/email.
-- Existing conversation status remains compatible.
-
-### 3. Agent Inbox Copilot
-
-Add AI assistance for human agents inside dashboard conversations.
-
-Acceptance:
-
-- Agent can generate summary, draft reply, and suggested next action from conversation detail.
-- Drafts never send automatically.
-- Suggestions cite used KB sources/actions where relevant.
-- Copilot usage is logged with workspace/conversation IDs.
-
-### 4. Composio Tool Connections And Action Approvals
-
-Turn integration action placeholders into real workspace app actions using Composio.
-
-Acceptance:
-
-- Workspace can connect at least one Composio-backed app.
-- Connected tools appear in agent/action registry with typed Zod inputs.
-- AI-proposed side effects require agent approval.
-- Approved action runs with idempotency key and stores result/error.
-
-### 5. Queue-Backed Async Ingestion And Retries
-
-Move document ingestion and long-running jobs off request lifecycle.
-
-Acceptance:
-
-- Cloudflare Queue binding exists for ingestion jobs.
-- Upload/URL/sitemap requests enqueue work and return processing status.
-- Worker consumer updates source status, chunks, search index, and failure reason.
-- Retry/dead-letter behavior is visible in dashboard.
-
-### 6. Cloudflare Workflows For Durable Source Sync
-
-Use Workflows for multi-step crawls, connector sync, and action workflows.
-
-Acceptance:
-
-- Workflow binding exists in config.
-- Source sync workflow records run state in `workflow_run`.
-- Workflow supports resume/retry and idempotent source updates.
-- Dashboard shows latest sync status and error.
-
-### 7. Cloudflare Email Sending Channel
-
-Add email as a support channel for outbound replies and notifications.
-
-Acceptance:
-
-- Email Sending binding and sender config exist.
-- Agent can send email reply from conversation/ticket.
-- Email replies create or update conversations.
-- Email events are logged and scoped to workspace.
-
-### 8. Chat SDK Adapter Foundation
-
-Create platform-agnostic adapter layer for Slack/Teams/WhatsApp-like channels.
-
-Acceptance:
-
-- Chat SDK is integrated behind a `channel_adapter` boundary.
-- One non-widget channel can receive inbound event and create conversation.
-- Outbound reply path reuses conversation service.
-- Adapter auth/config is per workspace.
-
-### 9. Knowledge Source Health And Scheduled Sync
-
-Upgrade KB from static sources to monitored, refreshable sources.
-
-Acceptance:
-
-- Sources track last sync, next sync, sync interval, health, content hash, and error.
-- User can re-sync source manually.
-- Scheduled sync enqueues work.
-- Changed content creates new chunks and updates retrieval index.
-
-### 10. Customer Intelligence Profiles
-
-Build full customer record for support context.
-
-Acceptance:
-
-- Contact profile shows identity, tags, notes, sessions, conversations, tickets, leads, attributes, timeline.
-- Agents can edit tags/custom fields.
-- Widget identify API updates profile safely.
-- All reads/writes enforce workspace membership.
-
-### 11. Lead Qualification Dashboard
-
-Turn captured leads into manageable pipeline.
-
-Acceptance:
-
-- Lead list/table supports filters, status, score, owner, source, created date.
-- Lead detail links contact, conversation, captured chat summary.
-- Qualification rules compute initial score/category.
-- Assignment and notification path exists.
-
-### 12. AI Evaluation And QA Scoring
-
-Score AI and human support interactions for quality.
-
-Acceptance:
-
-- Post-conversation job scores answer helpfulness, source grounding, sentiment, escalation appropriateness.
-- Dashboard shows QA score and failure reasons.
-- Low-score conversations create notification/recommendation.
-- Scores are reproducible enough for tests with mocked model output.
-
-### 13. Unanswered Questions Optimization Center
-
-Expose knowledge gaps and AI improvement tasks.
-
-Acceptance:
-
-- Dashboard lists unanswered/low-confidence questions and negative feedback.
-- Each gap links to source conversation and suggested KB fix.
-- User can create manual KB snippet or mark as ignored.
-- Metrics show gap trend over time.
-
-### 14. Proactive Outbound Campaigns MVP
-
-Add targeted in-product messages for activation/support.
-
-Acceptance:
-
-- Campaign schema supports audience, trigger, message, status, schedule.
-- Widget can receive and render targeted banner/message.
-- Dashboard can create draft campaign and preview it.
-- Events track delivered/opened/clicked/dismissed.
-
-### 15. Feedback Portal And Roadmap MVP
-
-Add Productlane-style feedback collection and roadmap.
-
-Acceptance:
-
-- Feedback item schema supports title, body, status, customer, workspace, votes.
-- Agents can convert conversation message into feedback item.
-- Public portal lists planned/in-progress/shipped items.
-- Customers can vote or submit feedback with identity guardrails.
-
-### 16. Changelog Publishing
-
-Publish shipped updates from roadmap/feedback workflow.
-
-Acceptance:
-
-- Changelog entry schema supports title, content, tags, publish status/date.
-- Dashboard can draft/publish entry.
-- Public changelog route renders entries.
-- Linked feedback voters can be notified.
-
-### 17. Reporting Builder And Saved Analytics Views
-
-Move from fixed analytics to customizable operations reporting.
-
-Acceptance:
-
-- User can save analytics view with filters/date range/chart type.
-- Report builder supports conversation, ticket, AI, satisfaction, source dimensions.
-- Saved views are workspace-scoped.
-- CSV export exists.
-
-### 18. Integration Marketplace With Connection Health
-
-Make integrations production-manageable.
-
-Acceptance:
-
-- Integration detail shows status, auth scope, last sync/action, errors, disconnect.
-- Connection health check runs per provider.
-- Action logs are searchable by provider/status.
-- UI distinguishes configured, connected, errored, disabled.
-
-### 19. Billing, Usage Limits, And Plan Gates
-
-Add plan enforcement for $5 Workers-plan-friendly launch.
-
-Acceptance:
-
-- Usage counters cover messages, AI tokens, seats, storage, source syncs, actions.
-- Plan limits are checked server-side.
-- Dashboard shows current usage and upgrade/limit state.
-- Limit errors are user-readable and logged.
-
-### 20. Developer API Keys And Webhooks
-
-Add programmable surface for customer apps.
-
-Acceptance:
-
-- Workspace admins can create/revoke API keys.
-- Webhook endpoints can subscribe to conversation/ticket/lead/feedback events.
-- Delivery uses queue with retries and signing secret.
-- API key access is scoped and audited.
-
-### 21. Chat UI Component Polish Pass
-
-Modernize dashboard/widget chat UI with shadcn message primitives.
-
-Acceptance:
-
-- Message, bubble, attachment, scrollbar, marker/read-state primitives exist or are adopted.
-- Widget and dashboard share consistent message rendering where feasible.
-- Attachments, feedback, source citations, typing, and streaming states render cleanly on mobile/desktop.
-- Accessibility labels and keyboard focus are verified.
-
-### 22. TanStack Form Migration Pattern
-
-Standardize complex dashboard forms on TanStack Form.
-
-Acceptance:
-
-- Shared form adapter pattern exists with Zod validation.
-- One high-value form is migrated.
-- Error display, pending state, reset, and optimistic update patterns are documented.
-- React Hook Form remains only where intentionally deferred.
-
-### 23. Streamdown Migration For AI Markdown
-
-Use Streamdown for streamed AI markdown in widget/dashboard surfaces.
-
-Acceptance:
-
-- Streamdown renders AI responses with safe links and GFM.
-- Streaming partial markdown does not break layout.
-- Code blocks, lists, citations, and attachments are styled.
-- XSS/link safety behavior is covered by tests.
-
-### 24. Test Coverage Foundation
-
-Add reliable checks before larger product expansion.
-
-Acceptance:
-
-- Unit/integration test runner exists in scripts.
-- Conversation service, domain validation, KB chunk/retrieval helpers, and API auth guards have tests.
-- Minimal Playwright smoke covers sign-in guard, widget config, conversations empty state, KB page.
-- CI runs lint, typecheck, format check, tests, and build.
+## North Star
+
+Build widget into an AI-first customer support and product feedback suite for SaaS teams:
+
+- Intercom-style helpdesk: shared inbox, AI agent, tickets, SLAs, customer profiles, automations, reporting.
+- Chatbase/Cossistant-style AI agent builder: knowledge ingestion, actions, guardrails, playground, deployment channels, analytics.
+- Chatwoot-style open support suite: multi-channel inbox, teams, labels, macros, APIs, webhooks.
+- Productlane-style product ops: feedback capture, feature requests, votes, roadmap, changelog.
+
+The first sellable product should not try to equal every competitor at once. It should ship a tight wedge:
+
+1. Embedded AI widget answers from knowledge.
+2. Human team takes over in shared inbox.
+3. Leads/customers/tickets stay tracked.
+4. Knowledge gaps and bad answers become improvement tasks.
+5. Integrations/actions turn conversations into outcomes.
+
+## Source Findings
+
+### Current Codebase Snapshot
+
+Implemented today:
+
+- Next.js 16 App Router, React 19, TypeScript, Tailwind v4, shadcn/base-ui components.
+- Better Auth with Google OAuth, workspace provisioning, members, invites, workspace switching.
+- Dashboard shell: sidebar, topbar, workspace switcher, theme support, session guard.
+- Marketing site: landing, pricing, integrations, testimonials, FAQ, footer, legal, contact.
+- Embedded widget runtime in `public/widget.js` and modular files under `public/widget/`.
+- Widget settings: branding, colors, typography, dimensions, position, suggestions, preview messages, lead capture, brochure prompt, model provider/name, instructions, escalation keywords, domains.
+- Public widget APIs: config, session/bootstrap, identify, history, message/chat, feedback, upload, documents, lead capture.
+- Conversation persistence using JSON message arrays per project invariant.
+- Visitor sessions with browser/session identity, metadata, location fields, contact links.
+- Attachments linked to conversation.
+- Dashboard conversation list/detail with polling, filters, assignment, reply, internal notes, read state.
+- Contact notes and previous conversation context in conversation detail.
+- AI widget agent using Vercel AI SDK `streamText`, retrieved knowledge, memory context hook, citations, token capture.
+- Knowledge manager with manual text, URL, sitemap, upload, table sorting, deletion, chunk counts, statuses.
+- Knowledge extraction/chunking/retrieval, Cloudflare AI Search integration, local fallbacks.
+- R2 upload storage with local fallback.
+- Dashboard analytics: conversations, users, resolved, response time, satisfaction, engagement, sources, status, top questions, time series.
+- Integrations catalog for Gmail, Google Calendar, Slack with placeholder connection/actions.
+- Domain events, notifications, local workflow run records, integration action records.
+- Cloudflare Workers deployment config with D1, R2, AI Search, OpenNext, observability.
+- CI checks lint, typecheck, format on PR. React Doctor runs on PR and main.
+
+Major gaps:
+
+- No first-class tickets, priorities, SLAs, due dates, queue views, macros, saved views, labels, or business hours.
+- No realtime inbox transport. Dashboard relies on TanStack Query polling.
+- No Durable Objects, Queues, Workflows, or Email Sending bindings yet.
+- No true email/Slack/WhatsApp/Teams channels, only widget channel plus placeholder integrations.
+- No Composio connection model, tool auth, tool approvals, action run UI, or retry/approval workflow.
+- No agent copilot for human support reps.
+- No AI SDK 7 migration, `ToolLoopAgent`, tool context, runtime context, approvals, `WorkflowAgent`, timeouts, telemetry callbacks, or performance stats.
+- No Streamdown markdown rendering.
+- No AI QA/eval layer: answer scoring, grounding checks, hallucination detection, sentiment/topics, deflection metrics, low-quality alerts.
+- Knowledge has static ingestion but lacks scheduled sync, connector sources, versioning, Q&A pairs, source health, incremental reindex.
+- Customer model is contact-only. Missing companies/accounts, custom attributes, events, segments, timeline, lead score, enrichment.
+- Lead schema exists but no lead dashboard/pipeline/routing/scoring UI.
+- No proactive campaigns: banners, targeted messages, tours, checklists, sequences.
+- No feedback/roadmap/changelog module.
+- No billing, usage counters, plan gates, or upgrade flows.
+- No developer API keys, webhooks, or public API docs.
+- No app tests in scripts beyond lint/type/format.
+
+## Correct AI SDK 7 Direction
+
+Previous version of this document incorrectly said official docs showed v6 as latest. That was based on `ai-sdk.dev/docs` navigation still showing v6 on 2026-07-02. Vercel's AI SDK 7 announcement was published on 2026-06-25 and explicitly says AI SDK 7 is available.
+
+Product implications:
+
+- Upgrade package target from `ai@6.x` to `ai@7.x`.
+- Run codemod during implementation: `npx @ai-sdk/codemod v7`.
+- Use AI SDK 7 reasoning controls for model policy by task type:
+  - low reasoning: greeting, simple FAQ, rewrite, summarization.
+  - medium reasoning: support troubleshooting, KB synthesis, lead qualification.
+  - high reasoning: multi-step account actions, complex ticket triage, workflow planning.
+- Use typed tool context for Composio and internal tools so tool secrets/config are scoped per tool, not exposed globally.
+- Use runtime context for workspace, conversation, contact, plan, approval policy, locale, channel, and current agent mode.
+- Use tool approvals for side effects: email send, CRM update, calendar booking, ticket mutation, Slack/WhatsApp send, refund/coupon/admin actions.
+- Use HMAC-signed approval continuation for high-risk actions.
+- Use `WorkflowAgent` or equivalent AI SDK 7 workflow support for long-running runs that wait for approvals or survive deploys.
+- Use timeout controls for total run, step, chunk, and tool budgets.
+- Capture lifecycle events and performance statistics for billing, debugging, QA, and customer-facing reliability metrics.
+- Consider provider file uploads for large attachments and uploaded docs where provider-native file reference improves repeated inference.
+- Consider MCP Apps later for rich tool configuration/approval UIs, not M0.
+- Voice/video generation are future optional channels, not part of MVP.
+
+## Product Shape
+
+### Primary Users
+
+- Founder/operator: wants AI support installed fast, fewer repetitive questions, lead capture, simple analytics.
+- Support teammate: wants a clean inbox, context, assignment, macros, AI drafts, tickets, customer history.
+- Product teammate: wants feedback linked to customers, votes, roadmap, changelog.
+- Developer/admin: wants integration setup, domains, API keys, webhooks, deployment reliability.
+
+### Core Objects
+
+Already present:
+
+- `workspace`, `workspace_member`, `workspace_invite`
+- `user`, `session`, `account`, `verification`
+- `widget`
+- `visitor_session`
+- `contact`, `contact_note`
+- `conversation` with JSON `messages`
+- `attachment`
+- `document`, `document_chunk`
+- `lead`, `widget_lead_capture`
+- `integration`, `integration_action`
+- `notification`, `domain_event`, `workflow_run`
+
+Needed soon:
+
+- `ticket`: title, number, status, priority, type, source, assignee, due date, SLA timestamps, workspace, contact, conversation.
+- `conversation_label` or JSON labels if kept simple.
+- `macro`: saved replies/actions scoped by workspace/team.
+- `customer_event`: tracked app/page/action events.
+- `company`: account/org profile for contacts.
+- `segment`: saved audience filters.
+- `knowledge_source_sync`: runs, hashes, health, scheduling, stats.
+- `agent_run`: AI SDK 7 run metadata, lifecycle, usage, performance, status.
+- `agent_tool_call`: tool input/result/approval/audit.
+- `approval_request`: human approval state for side-effecting actions.
+- `channel_connection`: Chat SDK/Composio/email channel credentials/config state.
+- `email_message`: provider IDs, headers, threading metadata.
+- `feedback_item`, `feedback_vote`, `roadmap_item`, `changelog_entry`.
+- `campaign`, `campaign_audience`, `campaign_event`.
+- `api_key`, `webhook_endpoint`, `webhook_delivery`.
+- `usage_meter`, `billing_plan`, `plan_limit`.
+
+Keep project invariants:
+
+- `Conversation.messages` remains JSON array. Do not create `Message` table unless invariant changes.
+- `Widget.authorizedDomains` remains JSON string array.
+- `Attachment` links directly to `Conversation`.
+- Every query stays workspace-scoped and membership-checked.
+
+## Technical Operating Model
+
+### Next.js App
+
+- Route handlers for public widget, dashboard API, webhooks, and channel callbacks.
+- Server actions only where existing UI patterns expect them; dashboard data should mostly use typed route handlers with TanStack Query.
+- Shared domain logic in `src/features/*/server` modules.
+- Zod schemas at API boundaries and form boundaries.
+- No in-memory state for production-critical behavior.
+
+### Client State
+
+- TanStack Query: dashboard reads/writes, cache invalidation, polling fallback.
+- TanStack Table: all heavy tables: conversations, tickets, leads, KB sources, integrations, feedback, analytics exports, logs.
+- TanStack Form: all non-trivial dashboard forms going forward.
+- Zustand: local panel/UI state only, not server truth.
+
+### Cloudflare
+
+- D1: product DB and audit records.
+- R2: uploads, attachments, transcripts, exports, large crawl artifacts.
+- AI Search: retrieval index.
+- Queues:
+  - `ingestion-jobs`: URL/file/sitemap/source sync.
+  - `ai-eval-jobs`: QA scoring, topic/sentiment extraction.
+  - `notification-jobs`: Slack/email/in-app notification fanout.
+  - `webhook-deliveries`: webhook retries.
+  - `action-jobs`: side-effecting integration actions.
+- Workflows:
+  - source crawl and sync workflow.
+  - approved AI action workflow.
+  - post-conversation processing workflow.
+  - campaign delivery workflow.
+- Durable Objects:
+  - per-conversation realtime room.
+  - typing/read/presence state.
+  - AI stream coordination.
+  - ordering/dedupe guard for concurrent widget/dashboard sends.
+- Email Sending:
+  - outbound support replies.
+  - invite/notification/digest emails.
+  - roadmap/changelog notifications.
+
+### AI Runtime
+
+- AI SDK 7 is target runtime.
+- `streamWidgetAgent` evolves into agent layer:
+  - shared agent config.
+  - typed runtime context.
+  - tool registry.
+  - approval policy.
+  - per-channel response adapters.
+  - lifecycle telemetry.
+  - timeouts and cost guards.
+- Streamdown renders AI markdown in widget/dashboard.
+- Agent eval jobs score all important conversations.
+- Agent run data powers cost, latency, deflection, quality, and audit views.
+
+### Integrations
+
+- Composio handles external connectors/actions where supported.
+- Chat SDK handles chat platform adapters where relevant.
+- Internal action registry remains for first-party operations: assign conversation, create ticket, add note, create lead, update contact, create feedback, send email.
+- Every side-effecting action must have:
+  - Zod input schema.
+  - workspace-scoped context.
+  - idempotency key.
+  - approval policy.
+  - audit row.
+  - retry/dead-letter strategy if async.
+
+## Build Order
+
+### Phase M0 - Foundation Hardening
+
+Goal: create rails so teammates/agents can build safely without breaking architecture.
+
+Order:
+
+1. Test coverage foundation.
+2. AI SDK 7 migration and agent telemetry.
+3. Streamdown migration for AI markdown.
+4. TanStack Form migration pattern.
+5. Cloudflare platform bindings: Queues, Workflows, Durable Objects, Email Sending.
+6. Queue-backed async ingestion and retries.
+7. Cloudflare Workflows for durable source sync.
+
+Why first:
+
+- Tests prevent regressions while schema/API surface expands.
+- AI SDK 7 changes affect agent/tool design, so do before Composio/copilot.
+- Cloudflare bindings define how realtime, ingestion, email, actions, evals work.
+
+### Phase M1 - Core Support Suite
+
+Goal: make product usable by support team daily.
+
+Order:
+
+1. Realtime conversation rooms with Durable Objects.
+2. Chat UI component polish pass.
+3. Ticket lifecycle MVP.
+4. Customer intelligence profiles.
+5. Cloudflare Email Sending channel.
+6. Reporting builder and saved analytics views.
+
+Why:
+
+- Realtime + polished chat improves current core UX.
+- Tickets/customer profiles turn conversations into tracked support work.
+- Email expands beyond widget.
+
+### Phase M2 - AI Agent Platform
+
+Goal: AI becomes controllable, auditable, actionable.
+
+Order:
+
+1. Agent inbox copilot.
+2. Composio tool connections and action approvals.
+3. Integration marketplace with connection health.
+4. AI evaluation and QA scoring.
+5. Unanswered questions optimization center.
+
+Why:
+
+- Copilot gives immediate value without autonomous risk.
+- Tool approvals enable safe actions.
+- Eval/optimization turns support data into product quality loop.
+
+### Phase M3 - Knowledge + Omnichannel
+
+Goal: more sources and channels without losing reliability.
+
+Order:
+
+1. Knowledge source health and scheduled sync.
+2. Chat SDK adapter foundation.
+3. Developer API keys and webhooks.
+4. Lead qualification dashboard.
+
+Why:
+
+- Better knowledge improves AI answer quality.
+- Channel adapters should reuse mature conversation/ticket/customer systems.
+- API/webhooks support customer integrations.
+
+### Phase M4 - Growth + Product Ops
+
+Goal: convert support into activation, feedback, roadmap.
+
+Order:
+
+1. Feedback portal and roadmap MVP.
+2. Changelog publishing.
+3. Proactive outbound campaigns MVP.
+4. Billing, usage limits, and plan gates.
+
+Why:
+
+- Feedback/roadmap differentiates from plain chatbots.
+- Campaigns need segments/events from customer intelligence.
+- Billing should gate usage once product value paths exist.
+
+### Phase M5 - Enterprise Later
+
+Not immediate:
+
+- Advanced roles/permissions.
+- SSO/SAML unless Google-only rule changes.
+- Data residency.
+- Retention policies.
+- Audit export.
+- SOC2 evidence automation.
+- Voice/video support.
+- MCP App UIs.
+
+## Prioritized Issue Plan
+
+| Order | Issue                                                | Phase | Priority | Size | Estimate | Status  | Depends on |
+| ----- | ---------------------------------------------------- | ----- | -------- | ---- | -------- | ------- | ---------- |
+| 1     | #43 Test coverage foundation                         | M0    | P0       | L    | 8        | Ready   | none       |
+| 2     | #44 AI SDK 7 migration and agent telemetry           | M0    | P0       | L    | 8        | Ready   | #43        |
+| 3     | #42 Streamdown migration for AI markdown             | M0    | P0       | M    | 5        | Ready   | #43        |
+| 4     | #41 TanStack Form migration pattern                  | M0    | P1       | M    | 5        | Ready   | #43        |
+| 5     | #24 Queue-backed async ingestion and retries         | M0    | P0       | L    | 8        | Ready   | #43        |
+| 6     | #25 Cloudflare Workflows for durable source sync     | M0    | P0       | L    | 8        | Ready   | #24        |
+| 7     | #20 Realtime conversation rooms with Durable Objects | M1    | P0       | XL   | 13       | Backlog | #43        |
+| 8     | #40 Chat UI component polish pass                    | M1    | P1       | M    | 5        | Backlog | #42        |
+| 9     | #21 Ticket lifecycle MVP                             | M1    | P0       | L    | 8        | Backlog | #43        |
+| 10    | #29 Customer intelligence profiles                   | M1    | P0       | L    | 8        | Backlog | #21        |
+| 11    | #26 Cloudflare Email Sending channel                 | M1    | P1       | L    | 8        | Backlog | #21        |
+| 12    | #36 Reporting builder and saved analytics views      | M1    | P2       | M    | 5        | Backlog | #21        |
+| 13    | #22 Agent inbox copilot                              | M2    | P0       | L    | 8        | Backlog | #44        |
+| 14    | #23 Composio tool connections and action approvals   | M2    | P0       | XL   | 13       | Backlog | #44        |
+| 15    | #37 Integration marketplace with connection health   | M2    | P1       | M    | 5        | Backlog | #23        |
+| 16    | #31 AI evaluation and QA scoring                     | M2    | P0       | L    | 8        | Backlog | #44        |
+| 17    | #32 Unanswered questions optimization center         | M2    | P1       | M    | 5        | Backlog | #31        |
+| 18    | #28 Knowledge source health and scheduled sync       | M3    | P1       | L    | 8        | Backlog | #25        |
+| 19    | #27 Chat SDK adapter foundation                      | M3    | P1       | XL   | 13       | Backlog | #21, #23   |
+| 20    | #39 Developer API keys and webhooks                  | M3    | P1       | L    | 8        | Backlog | #24        |
+| 21    | #30 Lead qualification dashboard                     | M3    | P1       | M    | 5        | Backlog | #29        |
+| 22    | #34 Feedback portal and roadmap MVP                  | M4    | P1       | XL   | 13       | Backlog | #29        |
+| 23    | #35 Changelog publishing                             | M4    | P2       | M    | 5        | Backlog | #34        |
+| 24    | #33 Proactive outbound campaigns MVP                 | M4    | P2       | XL   | 13       | Backlog | #29, #39   |
+| 25    | #38 Billing, usage limits, and plan gates            | M4    | P1       | L    | 8        | Backlog | #44        |
+
+Note: issue #44 should be created for AI SDK 7 migration because it is now a distinct blocker.
+
+## Feature Detail
+
+### 1. AI Widget + Agent Builder
+
+MVP:
+
+- Current widget settings continue.
+- Add agent playground with test conversation, selected sources, model, reasoning mode, and output preview.
+- Add AI SDK 7 runtime context:
+  - `workspaceId`
+  - `widgetId`
+  - `conversationId`
+  - `contactId`
+  - `channel`
+  - `plan`
+  - `locale`
+  - `approvalPolicy`
+- Store `agent_run` rows with model, provider, reasoning, tokens, latency, timeouts, finish reason, error, tool count.
+- Support per-agent instructions, tone, escalation rules, tool enablement, source filters.
+
+Later:
+
+- Multiple agents per workspace.
+- A/B model evaluation.
+- Voice agent.
+- MCP App UI.
+
+### 2. Shared Inbox
+
+MVP:
+
+- Realtime room per conversation.
+- Assignment, status, labels, internal notes, public replies.
+- Saved views: Mine, Unassigned, Open, Snoozed, Waiting, Closed.
+- Macros with text and optional actions.
+- Read state and typing indicators.
+- Customer side receives human replies in widget/email.
+
+Later:
+
+- Collision detection, agent presence, workload balancing.
+- Team routing and business hours.
+
+### 3. Ticketing
+
+MVP:
+
+- Ticket created from conversation or manually from contact.
+- Status: open, pending, waiting_on_customer, resolved, closed.
+- Priority: low, normal, high, urgent.
+- Type: question, bug, task, feature_request, billing, incident.
+- SLA target timestamps: first response, next response, resolution.
+- Linked conversation, contact, assignee.
+
+Later:
+
+- Custom fields.
+- Forms.
+- Customer portal ticket tracking.
+- Incident grouping.
+
+### 4. Knowledge
+
+MVP:
+
+- Existing manual URL/file/sitemap stays.
+- Move ingestion to queue.
+- Add source health:
+  - last sync
+  - next sync
+  - interval
+  - content hash
+  - chunk count
+  - error
+  - retrieval coverage
+- Add re-sync button and scheduled sync.
+- Add Q&A source type.
+- Add unanswered questions -> source gap flow.
+
+Later:
+
+- Notion, Google Drive, GitHub, Help Center, API docs connectors.
+- ACL-aware retrieval.
+- Version diff.
+
+### 5. Integrations + Actions
+
+MVP:
+
+- Composio connection for first external app.
+- Internal tools:
+  - create ticket
+  - assign conversation
+  - add internal note
+  - create/update lead
+  - update contact
+  - send email
+- External tools:
+  - Gmail/send email or Cloudflare Email send path.
+  - Google Calendar/create meeting.
+  - Slack notify.
+- AI SDK 7 tool approvals for side effects.
+- Action run details: input, approval, status, result, error, retry.
+
+Later:
+
+- CRM sync, Stripe lookup, Linear/Jira issue creation, WhatsApp follow-up.
+
+### 6. Omnichannel
+
+MVP:
+
+- Email channel using Cloudflare Email Sending.
+- Chat SDK adapter boundary for future Slack/Teams/WhatsApp.
+- Single conversation service normalizes inbound events.
+
+Later:
+
+- WhatsApp lead follow-up.
+- Slack/Teams agent.
+- Social DMs.
+
+### 7. Customer Intelligence + Leads
+
+MVP:
+
+- Contact profile with tags, custom fields, notes, sessions, conversations, tickets, leads.
+- Lead list/table with status, score, owner, source, last activity.
+- Qualification rules from conversation and form data.
+- Notifications on high-score lead.
+
+Later:
+
+- Companies/accounts.
+- Segments.
+- Revenue/account impact.
+- Enrichment.
+
+### 8. AI QA + Optimization
+
+MVP:
+
+- Post-conversation queue job scores:
+  - helpfulness
+  - source grounding
+  - escalation appropriateness
+  - sentiment
+  - topic
+  - deflection
+- Bad feedback and low confidence become improvement tasks.
+- Dashboard shows unanswered questions and suggested KB fixes.
+
+Later:
+
+- Custom QA rubrics.
+- Agent coaching.
+- Automated experiments.
+
+### 9. Feedback + Roadmap + Changelog
+
+MVP:
+
+- Convert conversation message into feedback item.
+- Public portal with planned/in-progress/shipped.
+- Voting with identity guardrails.
+- Changelog entries linked to roadmap items.
+
+Later:
+
+- Revenue-weighted prioritization.
+- Customer notifications.
+- Private roadmap boards.
+
+### 10. Billing + Usage
+
+MVP:
+
+- Counters:
+  - messages
+  - AI tokens
+  - seats
+  - sources
+  - storage
+  - sync runs
+  - tool actions
+- Server-side plan gates before expensive work.
+- Dashboard usage page.
+
+Later:
+
+- Stripe subscription, invoices, trial, metered billing.
+
+## Agent Instructions For Future Work
+
+Every issue should be implemented as a vertical slice:
+
+- Schema/migration if needed.
+- Server/domain logic.
+- Route handler/API.
+- Dashboard/widget UI.
+- Query hooks/cache invalidation.
+- Tests.
+- Docs or comments only where useful.
+
+Rules:
+
+- Keep DB queries workspace-scoped.
+- Use Zod at input boundaries.
+- No `any`.
+- No production-critical in-memory state.
+- Keep `Conversation.messages` JSON invariant.
+- Use existing `src/features/*` ownership boundaries.
+- Use TanStack Query/Table/Form patterns.
+- For Cloudflare jobs/actions, use idempotency keys.
+- For side-effecting AI tools, require approval until policy explicitly says safe.
+- Log domain events for support-relevant mutations.
+- Add project issue references in PR description.
 
 ## References
 
@@ -461,6 +575,7 @@ Acceptance:
 - Chatwoot: https://www.chatwoot.com/
 - Cossistant: https://cossistant.com/
 - Productlane: https://productlane.com/
+- AI SDK 7 announcement: https://vercel.com/blog/ai-sdk-7
 - Vercel AI SDK docs: https://ai-sdk.dev/docs
 - Chat SDK: https://chat-sdk.dev/
 - Streamdown: https://streamdown.ai/
