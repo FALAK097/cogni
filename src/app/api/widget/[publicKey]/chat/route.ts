@@ -462,7 +462,7 @@ export async function POST(
     );
   } catch (error) {
     if (run) {
-      await failAgentRun({
+      void failAgentRun({
         db,
         agentRunId: run.id,
         startedAtMs: run.startedAtMs,
