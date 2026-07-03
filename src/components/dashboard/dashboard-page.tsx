@@ -429,13 +429,15 @@ function CardSkeleton({ className }: { className?: string }) {
   );
 }
 
+const defaultLabelFormatter = (label: string) => label;
+
 function LineChart({
   data,
   className,
   height = 240,
   showArea = false,
   valueFormatter = formatAxisValue,
-  labelFormatter = (label: string) => label,
+  labelFormatter = defaultLabelFormatter,
   ariaLabel,
 }: {
   data: LineChartPoint[];

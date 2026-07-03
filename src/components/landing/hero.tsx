@@ -93,14 +93,14 @@ const STATUS_DATA = [
 function DonutChart({ segments }: { segments: { pct: number; color: string }[] }) {
   const r = 28;
   const circ = 2 * Math.PI * r; // ≈ 175.9
-  let offset = 0;
   return (
     <svg viewBox="0 0 80 80" className="size-[72px]">
       <circle cx="40" cy="40" r={r} fill="none" stroke="#f3f4f6" strokeWidth="11" />
       {segments.map((seg, i) => {
+        const prevOffset = segments.slice(0, i).reduce((sum, s) => sum + (s.pct / 100) * circ, 0);
         const dash = (seg.pct / 100) * circ;
         const gap = circ - dash;
-        const el = (
+        return (
           <circle
             key={i}
             cx="40"
@@ -110,12 +110,10 @@ function DonutChart({ segments }: { segments: { pct: number; color: string }[] }
             stroke={seg.color}
             strokeWidth="11"
             strokeDasharray={`${dash} ${gap}`}
-            strokeDashoffset={-offset}
+            strokeDashoffset={-prevOffset}
             transform="rotate(-90 40 40)"
           />
         );
-        offset += dash;
-        return el;
       })}
     </svg>
   );

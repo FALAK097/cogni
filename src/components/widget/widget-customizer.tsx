@@ -87,6 +87,8 @@ type WidgetCustomizerConfig = Pick<
   | "borderColor"
   | "fontFamily"
   | "fontSize"
+  | "modelProvider"
+  | "modelName"
 > & {
   workspaceId: string;
   secondaryTextColor: string;
@@ -376,7 +378,9 @@ export function WidgetCustomizer({
   const menuContainerRef = useRef<HTMLDivElement>(null);
   const menuPanelRef = useRef<HTMLDivElement>(null);
 
-  configOverridesRef.current = configOverrides;
+  useEffect(() => {
+    configOverridesRef.current = configOverrides;
+  }, [configOverrides]);
 
   const { data: widgetConfigData, isLoading } = useWidgetConfig(activeWorkspaceId);
   const saveWidgetConfigMutation = useSaveWidgetConfig();
@@ -451,6 +455,8 @@ export function WidgetCustomizer({
     return toSavePayload(merged);
   }, [activeWorkspaceId, configOverrides, widgetConfigData]);
 
+  const persistConfigRef = useRef<(options?: { silent?: boolean }) => void>(() => {});
+
   const persistConfig = useCallback(
     (options?: { silent?: boolean }) => {
       if (!activeWorkspaceId || !widgetConfigData) {
@@ -485,7 +491,7 @@ export function WidgetCustomizer({
             );
             if (pendingSaveRef.current) {
               pendingSaveRef.current = false;
-              persistConfig({ silent: true });
+              persistConfigRef.current({ silent: true });
             }
             if (!options?.silent) {
               toast({
@@ -510,6 +516,10 @@ export function WidgetCustomizer({
     },
     [activeWorkspaceId, buildSavePayload, saveWidgetConfigMutation, toast, widgetConfigData],
   );
+
+  useEffect(() => {
+    persistConfigRef.current = persistConfig;
+  }, [persistConfig]);
 
   useEffect(() => {
     if (!isReady) return;
@@ -741,6 +751,8 @@ export function WidgetCustomizer({
               agentName={config.agentName}
               instructions={config.instructions}
               escalationKeywords={config.escalationKeywords}
+              modelProvider={config.modelProvider}
+              modelName={config.modelName}
               onUpdate={(key, value) => updateConfig(key, value)}
             />
           ) : null}

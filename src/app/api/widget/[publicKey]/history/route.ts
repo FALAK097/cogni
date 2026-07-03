@@ -39,7 +39,7 @@ export async function GET(
         gt(fields.expiresAt, nowIso),
         sql`exists (
           select 1 from conversation 
-          where conversation.visitor_session_id = ${fields.id} 
+          where conversation.visitorSessionId = ${fields.id} 
           and conversation.channel = 'WIDGET'
         )`,
       ];

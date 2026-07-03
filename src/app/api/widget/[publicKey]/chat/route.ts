@@ -25,6 +25,12 @@ import {
   withWidgetCors,
 } from "@/features/widget/server/widget-utils";
 import { buildAgentMemoryContext } from "@/lib/ai/memory";
+import {
+  buildWidgetAgentRuntimeContext,
+  completeAgentRun,
+  createWidgetAgentRun,
+  failAgentRun,
+} from "@/lib/ai/telemetry";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { getDb } from "@/lib/db/client";
 import { conversation as conversationTable } from "@/lib/db/schema";
@@ -32,6 +38,7 @@ import { emitDomainEvent } from "@/lib/events/domain-events";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { notifyWorkspaceMembers } from "@/lib/notifications/create-notification";
 import { checkRateLimit } from "@/lib/rate-limit/memory";
+import { env } from "@/lib/env/server";
 
 export const maxDuration = 60;
 
@@ -341,6 +348,8 @@ export async function POST(
     return respondWithText(handoffReply);
   }
 
+  let run: { id: string; startedAtMs: number } | null = null;
+
   try {
     const memoryContext = await buildAgentMemoryContext({
       db,
@@ -348,41 +357,97 @@ export async function POST(
       conversationId: conversation.id,
       contactId: conversation.contactId,
     });
+    const runtimeContext = buildWidgetAgentRuntimeContext({
+      workspaceId: widget.workspace.id,
+      widgetId: widget.id,
+      conversationId: conversation.id,
+      contactId: conversation.contactId,
+      visitorSessionId: isPreview ? null : visitorSession.id,
+      locale: body.metadata.language,
+    });
+
+    const resolvedModelProvider =
+      env.WIDGET_MODEL_PROVIDER ?? (widget.modelProvider as WidgetModelProvider);
+    const resolvedModelName = env.WIDGET_MODEL_NAME ?? widget.modelName;
+
+    run = isPreview
+      ? null
+      : await createWidgetAgentRun({
+          db,
+          runtimeContext,
+          modelProvider: resolvedModelProvider,
+          modelName: resolvedModelName,
+        });
     const result = await streamWidgetAgent({
       config: {
         displayName: widget.displayName,
         instructions: widget.instructions,
         escalationKeywords: widget.escalationKeywords,
-        modelProvider: widget.modelProvider as WidgetModelProvider,
-        modelName: widget.modelName,
+        modelProvider: resolvedModelProvider,
+        modelName: resolvedModelName,
         workspaceName: widget.workspace.name,
         workspaceId: widget.workspace.id,
         latestUserMessage: body.message,
         memoryContext,
         documentIds: null,
+        runTimeoutMs: runtimeContext.runTimeoutMs,
       },
       messages: historyMessages,
-      onFinish: async ({ text, inputTokens, outputTokens }) => {
-        if (!text.trim()) return;
+      onFinish: async ({ text, inputTokens, outputTokens, totalTokens, finishReason, sources }) => {
+        if (!text.trim()) {
+          if (run) {
+            await completeAgentRun({
+              db,
+              agentRunId: run.id,
+              startedAtMs: run.startedAtMs,
+              usage: { inputTokens, outputTokens, totalTokens },
+              finishReason,
+              sources,
+            });
+          }
+          return;
+        }
         await recordAiMessage({
           db,
           conversationId: conversation.id,
           text,
           replyToMessageId: visitorMessageId,
         });
+        if (run) {
+          await completeAgentRun({
+            db,
+            agentRunId: run.id,
+            startedAtMs: run.startedAtMs,
+            usage: { inputTokens, outputTokens, totalTokens },
+            finishReason,
+            sources,
+          });
+        }
         logInfo("widget.ai.response.completed", {
           workspaceId: widget.workspace.id,
           widgetId: widget.id,
           conversationId: conversation.id,
+          agentRunId: run?.id ?? null,
           inputTokens,
           outputTokens,
+          totalTokens,
+          finishReason,
         });
       },
       onError: (error) => {
+        if (run) {
+          void failAgentRun({
+            db,
+            agentRunId: run.id,
+            startedAtMs: run.startedAtMs,
+            error,
+          });
+        }
         logError("widget.ai.response.failed", {
           workspaceId: widget.workspace.id,
           widgetId: widget.id,
           conversationId: conversation.id,
+          agentRunId: run?.id ?? null,
           error: error instanceof Error ? error.message : "Unknown model error",
         });
       },
@@ -396,6 +461,14 @@ export async function POST(
       corsAllowed,
     );
   } catch (error) {
+    if (run) {
+      void failAgentRun({
+        db,
+        agentRunId: run.id,
+        startedAtMs: run.startedAtMs,
+        error: error instanceof Error ? error : new Error(String(error)),
+      });
+    }
     logError("widget.chat.failed", {
       workspaceId: widget.workspace.id,
       widgetId: widget.id,

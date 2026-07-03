@@ -101,10 +101,13 @@ export type WidgetPublicConfig = {
 
 export const widgetModelOptions: Record<WidgetModelProvider, { label: string; value: string }[]> = {
   OPENAI: [
+    { label: "GPT-4o mini", value: "gpt-4o-mini" },
+    { label: "GPT-4o", value: "gpt-4o" },
     { label: "GPT-5 mini", value: "gpt-5-mini" },
     { label: "GPT-5.1", value: "gpt-5.1" },
   ],
   GOOGLE: [
+    { label: "Gemini 1.5 Flash", value: "gemini-1.5-flash" },
     { label: "Gemini 2.5 Flash", value: "gemini-2.5-flash" },
     { label: "Gemini 2.5 Pro", value: "gemini-2.5-pro" },
   ],

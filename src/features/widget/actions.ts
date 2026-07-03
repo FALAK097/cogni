@@ -121,7 +121,7 @@ export async function saveWidgetWidgetSettingsAction(
   }
 
   const provider = (parsed.data.modelProvider ?? "OPENAI") as WidgetModelProvider;
-  const modelName = parsed.data.modelName ?? "gpt-5-mini";
+  const modelName = parsed.data.modelName ?? "gpt-4o-mini";
   const allowedModels = widgetModelOptions[provider].map((option) => option.value);
   if (!allowedModels.includes(modelName)) {
     return { error: "Choose a supported model for the selected provider." };

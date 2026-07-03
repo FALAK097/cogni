@@ -46,6 +46,8 @@ export const env = createEnv({
     SEARCH_INDEX: z.string().min(1).optional(),
     OPENAI_API_KEY: z.string().min(1).optional(),
     GEMINI_API_KEY: z.string().min(1).optional(),
+    WIDGET_MODEL_PROVIDER: z.enum(["OPENAI", "GOOGLE"]).optional(),
+    WIDGET_MODEL_NAME: z.string().optional(),
   },
   experimental__runtimeEnv: runtimeEnv,
   emptyStringAsUndefined: true,

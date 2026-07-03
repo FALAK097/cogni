@@ -61,11 +61,8 @@ export type MessageJson = {
   feedbackAt?: string | null;
 };
 
-type TransactionDb = Parameters<Parameters<Db["transaction"]>[0]>[0];
-type ConversationDb = Db | TransactionDb;
-
 async function appendVisitorMessage(
-  tx: ConversationDb,
+  db: Db,
   visitorSession: VisitorSessionContext,
   text: string,
   clientMessageId: string,
@@ -73,7 +70,7 @@ async function appendVisitorMessage(
   const now = new Date();
   const nowIso = now.toISOString();
 
-  const existingConversation = await tx.query.conversation.findFirst({
+  const existingConversation = await db.query.conversation.findFirst({
     where: (convo, { eq, and, ne }) =>
       and(
         eq(convo.visitorSessionId, visitorSession.id),
@@ -104,7 +101,7 @@ async function appendVisitorMessage(
     };
 
     const updatedMessages = [...messagesList, newMessage];
-    const results = await tx
+    const results = await db
       .update(conversation)
       .set({
         lastMessageAt: nowIso,
@@ -116,7 +113,7 @@ async function appendVisitorMessage(
 
     const updatedConvo = results[0];
 
-    await tx
+    await db
       .update(visitorSessionTable)
       .set({
         lastSeenAt: nowIso,
@@ -134,7 +131,7 @@ async function appendVisitorMessage(
 
   let contactId = visitorSession.contactId;
   if (!contactId) {
-    const contactResults = await tx
+    const contactResults = await db
       .insert(contact)
       .values({
         id: randomUUID(),
@@ -145,7 +142,7 @@ async function appendVisitorMessage(
       })
       .returning();
     contactId = contactResults[0].id;
-    await tx
+    await db
       .update(visitorSessionTable)
       .set({ contactId })
       .where(eq(visitorSessionTable.id, visitorSession.id));
@@ -160,7 +157,7 @@ async function appendVisitorMessage(
     createdAt: nowIso,
   };
 
-  const conversationResults = await tx
+  const conversationResults = await db
     .insert(conversation)
     .values({
       id: randomUUID(),
@@ -176,7 +173,7 @@ async function appendVisitorMessage(
     .returning();
   const createdConvo = conversationResults[0];
 
-  await tx
+  await db
     .update(visitorSessionTable)
     .set({
       lastSeenAt: nowIso,
@@ -210,7 +207,9 @@ export async function recordVisitorMessage({
   text: string;
   clientMessageId: string;
 }) {
-  return db.transaction((tx) => appendVisitorMessage(tx, visitorSession, text, clientMessageId));
+  return db.transaction(async (tx) => {
+    return appendVisitorMessage(tx as any, visitorSession, text, clientMessageId);
+  });
 }
 
 export async function startVisitorConversation({
@@ -330,7 +329,12 @@ export async function startVisitorConversation({
         workspace: { id: widgetContext.workspace.id },
       },
     };
-    const messageResult = await appendVisitorMessage(tx, sessionContext, text, clientMessageId);
+    const messageResult = await appendVisitorMessage(
+      tx as any,
+      sessionContext,
+      text,
+      clientMessageId,
+    );
 
     return {
       ...messageResult,
@@ -372,9 +376,9 @@ export async function recordAiMessage({
   text: string;
   replyToMessageId: string;
 }) {
-  return (db as any).transaction(async (tx: any) => {
+  return db.transaction(async (tx) => {
     const conversationData = await tx.query.conversation.findFirst({
-      where: (convo: any, { eq }: any) => eq(convo.id, conversationId),
+      where: (convo, { eq }) => eq(convo.id, conversationId),
     });
 
     if (!conversationData) {

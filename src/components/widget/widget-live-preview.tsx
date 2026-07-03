@@ -187,7 +187,9 @@ export function WidgetLiveWidgetPreview({
   const userClosedRef = useRef(false);
   const previewModeRef = useRef(previewMode);
 
-  previewModeRef.current = previewMode;
+  useEffect(() => {
+    previewModeRef.current = previewMode;
+  }, [previewMode]);
 
   const builtConfig = useMemo(() => buildWidgetConfig(config), [config]);
   const configKey = useMemo(() => JSON.stringify(builtConfig), [builtConfig]);
