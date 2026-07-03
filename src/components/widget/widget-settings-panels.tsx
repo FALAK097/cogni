@@ -17,8 +17,8 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import type { WidgetPosition, WidgetTheme } from "@/features/widget/domain";
-import { normalizeLogoUrl } from "@/features/widget/domain";
+import type { WidgetPosition, WidgetTheme, WidgetModelProvider } from "@/features/widget/domain";
+import { normalizeLogoUrl, widgetModelOptions } from "@/features/widget/domain";
 import { WIDGET_BRAND_COLOR } from "@/lib/widget-accent";
 import { cn } from "@/lib/utils";
 
@@ -480,13 +480,23 @@ export function WidgetAgentPanel({
   agentName,
   instructions,
   escalationKeywords,
+  modelProvider,
+  modelName,
   onUpdate,
 }: {
   agentName: string;
   instructions: string;
   escalationKeywords: string;
-  onUpdate: (key: "agentName" | "instructions" | "escalationKeywords", value: string) => void;
+  modelProvider: string | null;
+  modelName: string | null;
+  onUpdate: (
+    key: "agentName" | "instructions" | "escalationKeywords" | "modelProvider" | "modelName",
+    value: any,
+  ) => void;
 }) {
+  const provider = (modelProvider === "GOOGLE" ? "GOOGLE" : "OPENAI") as WidgetModelProvider;
+  const models = widgetModelOptions[provider];
+
   return (
     <>
       <SettingsPanelHeader
@@ -494,6 +504,48 @@ export function WidgetAgentPanel({
         description="Configure your AI assistant's identity and behavior instructions."
       />
       <div className="space-y-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="model-provider" className="text-sm font-medium text-foreground">
+              Model Provider
+            </Label>
+            <Select
+              value={provider}
+              onValueChange={(value) => {
+                onUpdate("modelProvider", value);
+                const defaultModel =
+                  widgetModelOptions[value as WidgetModelProvider][0]?.value ?? "";
+                onUpdate("modelName", defaultModel);
+              }}
+            >
+              <SelectTrigger id="model-provider" className={FIELD_CLASS}>
+                <SelectValue placeholder="Select provider" />
+              </SelectTrigger>
+              <SelectContent className="rounded-lg">
+                <SelectItem value="OPENAI">OpenAI</SelectItem>
+                <SelectItem value="GOOGLE">Google Gemini</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="model-name" className="text-sm font-medium text-foreground">
+              Model Name
+            </Label>
+            <Select value={modelName} onValueChange={(value) => onUpdate("modelName", value)}>
+              <SelectTrigger id="model-name" className={FIELD_CLASS}>
+                <SelectValue placeholder="Select model" />
+              </SelectTrigger>
+              <SelectContent className="rounded-lg">
+                {models.map((model) => (
+                  <SelectItem key={model.value} value={model.value}>
+                    {model.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
         <div className="space-y-1.5">
           <Label htmlFor="agent-name" className="text-sm font-medium text-foreground">
             Agent name

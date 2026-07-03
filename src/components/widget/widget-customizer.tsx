@@ -87,6 +87,8 @@ type WidgetCustomizerConfig = Pick<
   | "borderColor"
   | "fontFamily"
   | "fontSize"
+  | "modelProvider"
+  | "modelName"
 > & {
   workspaceId: string;
   secondaryTextColor: string;
@@ -741,6 +743,8 @@ export function WidgetCustomizer({
               agentName={config.agentName}
               instructions={config.instructions}
               escalationKeywords={config.escalationKeywords}
+              modelProvider={config.modelProvider}
+              modelName={config.modelName}
               onUpdate={(key, value) => updateConfig(key, value)}
             />
           ) : null}

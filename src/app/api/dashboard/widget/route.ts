@@ -146,6 +146,11 @@ async function saveWidgetConfig(body: Record<string, unknown>) {
         typeof body.escalationKeywords === "string"
           ? body.escalationKeywords
           : current.escalationKeywords,
+      modelProvider:
+        body.modelProvider === "OPENAI" || body.modelProvider === "GOOGLE"
+          ? body.modelProvider
+          : current.modelProvider,
+      modelName: typeof body.modelName === "string" ? body.modelName : current.modelName,
       authorizedDomains: JSON.stringify(domains),
       updatedAt: new Date().toISOString(),
     })

@@ -238,7 +238,7 @@ export const widget = sqliteTable(
       .notNull(),
     escalationKeywords: text().default("human,agent,person,representative,support team").notNull(),
     modelProvider: text().default("OPENAI").notNull(),
-    modelName: text().default("gpt-5-mini").notNull(),
+    modelName: text().default("gpt-4o-mini").notNull(),
     isEnabled: integer({ mode: "boolean" }).default(true).notNull(),
     theme: text().default("light").notNull(),
     userBubbleColor: text().default(BRAND_COLOR).notNull(),
