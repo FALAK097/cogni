@@ -28,5 +28,10 @@ function getGoogleProvider() {
 }
 
 export function getWidgetModel(provider: WidgetModelProvider, modelName: string) {
-  return provider === "GOOGLE" ? getGoogleProvider()(modelName) : getOpenAIProvider()(modelName);
+  const resolvedProvider = env.WIDGET_MODEL_PROVIDER ?? provider;
+  const resolvedModelName = env.WIDGET_MODEL_NAME ?? modelName;
+
+  return resolvedProvider === "GOOGLE"
+    ? getGoogleProvider()(resolvedModelName)
+    : getOpenAIProvider()(resolvedModelName);
 }
