@@ -2,6 +2,7 @@
 
 import { format, formatDistanceToNow, isToday, isYesterday } from "date-fns";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Streamdown } from "streamdown";
 import {
   ArrowLeft,
   Bot,
@@ -541,7 +542,9 @@ function MessageBubble({
                 : "border border-primary/10 bg-primary/5 text-foreground",
           )}
         >
-          <p className="whitespace-pre-wrap break-words">{message.content}</p>
+          <Streamdown className="break-words font-sans text-sm leading-relaxed">
+            {message.content}
+          </Streamdown>
 
           {hasDocuments ? (
             <div className="mt-3 space-y-2">

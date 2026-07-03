@@ -5,6 +5,7 @@
 
 import { ICONS } from "./constants.js";
 import { state } from "./state.js";
+import remend from "remend";
 
 /**
  * Generate a UUID v4
@@ -158,8 +159,11 @@ export function scrollToBottom() {
 export function formatBotMessage(text) {
   const config = state.config;
 
+  // Heal incomplete Markdown streaming tokens using remend
+  const healed = remend(text || "");
+
   // First, normalize the text to add newlines before list items
-  let normalized = text
+  let normalized = healed
     .replace(/([^\n])- /g, "$1\n- ")
     .replace(/([^\n])(\s{2,}- )/g, "$1\n$2")
     .replace(/\n{2,}/g, "\n")
