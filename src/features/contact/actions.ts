@@ -18,6 +18,7 @@ const contactSchema = z.object({
   message: z.string().trim().min(10, "Message must be at least 10 characters.").max(4000),
 });
 
+// react-doctor-disable-next-line react-doctor/server-auth-actions
 export async function submitContactAction(
   _previousState: ContactActionState,
   formData: FormData,

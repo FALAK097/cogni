@@ -84,6 +84,7 @@ export const contactRelations = relations(contact, ({ one, many }) => ({
   conversations: many(conversation),
   visitorSessions: many(visitorSession),
   leads: many(lead),
+  agentRuns: many(agentRun),
 }));
 
 export const contactNoteRelations = relations(contactNote, ({ one }) => ({
@@ -133,6 +134,7 @@ export const visitorSessionRelations = relations(visitorSession, ({ one, many })
     references: [widget.id],
   }),
   widgetLeadCaptures: many(widgetLeadCapture),
+  agentRuns: many(agentRun),
 }));
 
 export const widgetRelations = relations(widget, ({ one, many }) => ({

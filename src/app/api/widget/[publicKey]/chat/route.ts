@@ -38,6 +38,7 @@ import { emitDomainEvent } from "@/lib/events/domain-events";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { notifyWorkspaceMembers } from "@/lib/notifications/create-notification";
 import { checkRateLimit } from "@/lib/rate-limit/memory";
+import { env } from "@/lib/env/server";
 
 export const maxDuration = 60;
 
@@ -347,6 +348,8 @@ export async function POST(
     return respondWithText(handoffReply);
   }
 
+  let run: { id: string; startedAtMs: number } | null = null;
+
   try {
     const memoryContext = await buildAgentMemoryContext({
       db,
@@ -362,21 +365,26 @@ export async function POST(
       visitorSessionId: isPreview ? null : visitorSession.id,
       locale: body.metadata.language,
     });
-    const run = isPreview
+
+    const resolvedModelProvider =
+      env.WIDGET_MODEL_PROVIDER ?? (widget.modelProvider as WidgetModelProvider);
+    const resolvedModelName = env.WIDGET_MODEL_NAME ?? widget.modelName;
+
+    run = isPreview
       ? null
       : await createWidgetAgentRun({
           db,
           runtimeContext,
-          modelProvider: widget.modelProvider as WidgetModelProvider,
-          modelName: widget.modelName,
+          modelProvider: resolvedModelProvider,
+          modelName: resolvedModelName,
         });
     const result = await streamWidgetAgent({
       config: {
         displayName: widget.displayName,
         instructions: widget.instructions,
         escalationKeywords: widget.escalationKeywords,
-        modelProvider: widget.modelProvider as WidgetModelProvider,
-        modelName: widget.modelName,
+        modelProvider: resolvedModelProvider,
+        modelName: resolvedModelName,
         workspaceName: widget.workspace.name,
         workspaceId: widget.workspace.id,
         latestUserMessage: body.message,
@@ -453,6 +461,14 @@ export async function POST(
       corsAllowed,
     );
   } catch (error) {
+    if (run) {
+      await failAgentRun({
+        db,
+        agentRunId: run.id,
+        startedAtMs: run.startedAtMs,
+        error: error instanceof Error ? error : new Error(String(error)),
+      });
+    }
     logError("widget.chat.failed", {
       workspaceId: widget.workspace.id,
       widgetId: widget.id,
