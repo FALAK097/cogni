@@ -6,11 +6,19 @@ import { parseJsonArray } from "@/features/widget/domain";
 import { assertPublicWidgetAccess, bearerToken } from "@/features/widget/server/widget-public";
 import { createWidgetBootstrapToken } from "@/features/widget/server/widget-bootstrap";
 import { getPublicWidget, validateEmbedOrigin } from "@/features/widget/server/widget-service";
-import { toWidgetHistoryMessages, withWidgetCors } from "@/features/widget/server/widget-utils";
+import {
+  toWidgetHistoryMessages,
+  widgetPreflightResponse,
+  withWidgetCors,
+} from "@/features/widget/server/widget-utils";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { getDb } from "@/lib/db/client";
 
 const PREVIEW_HOSTNAME = "dashboard-preview";
+
+export function OPTIONS(request: Request) {
+  return widgetPreflightResponse(request);
+}
 
 const sessionRequestSchema = z.object({
   sessionId: z.string().uuid().nullable().default(null),

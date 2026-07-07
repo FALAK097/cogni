@@ -99,6 +99,25 @@ export function withWidgetCors(response: Response, origin: string | null, allowe
   });
 }
 
+export function widgetPreflightResponse(request: Request) {
+  const origin = request.headers.get("origin");
+  const response = new Response(null, { status: 204 });
+
+  if (!origin) return response;
+
+  response.headers.set("Access-Control-Allow-Origin", origin);
+  response.headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  response.headers.set(
+    "Access-Control-Expose-Headers",
+    "X-Widget-Session-Id, X-Widget-Session-Token",
+  );
+  response.headers.set("Access-Control-Max-Age", "86400");
+  response.headers.set("Vary", "Origin");
+
+  return response;
+}
+
 export function getRequestOrigin(request: Request) {
   const origin = request.headers.get("origin");
   if (origin) return origin;

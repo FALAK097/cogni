@@ -6,10 +6,15 @@ import {
 import {
   getRequestOrigin,
   toWidgetHistoryMessages,
+  widgetPreflightResponse,
   withWidgetCors,
 } from "@/features/widget/server/widget-utils";
 import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
 import { getDb } from "@/lib/db/client";
+
+export function OPTIONS(request: Request) {
+  return widgetPreflightResponse(request);
+}
 
 export async function GET(
   request: Request,

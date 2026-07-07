@@ -1,4 +1,8 @@
-import { getRequestOrigin, withWidgetCors } from "@/features/widget/server/widget-utils";
+import {
+  getRequestOrigin,
+  widgetPreflightResponse,
+  withWidgetCors,
+} from "@/features/widget/server/widget-utils";
 import {
   getPublicWidget,
   toWidgetPublicConfig,
@@ -30,16 +34,6 @@ export async function GET(
   return withWidgetCors(Response.json(config), origin, allowed);
 }
 
-export async function OPTIONS(
-  request: Request,
-  { params }: { params: Promise<{ publicKey: string }> },
-) {
-  const { publicKey } = await params;
-  const db = getDb();
-  const widget = await getPublicWidget(db, publicKey);
-  const origin = getRequestOrigin(request);
-  const allowedDomains = widget ? (JSON.parse(widget.authorizedDomains || "[]") as string[]) : [];
-  const allowed = widget ? validateEmbedOrigin(origin, allowedDomains) : false;
-
-  return withWidgetCors(new Response(null, { status: 204 }), origin, allowed);
+export async function OPTIONS(request: Request) {
+  return widgetPreflightResponse(request);
 }

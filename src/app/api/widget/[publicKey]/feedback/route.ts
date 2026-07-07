@@ -5,7 +5,11 @@ import {
   assertPublicWidgetAccess,
   requireAuthorizedVisitorSession,
 } from "@/features/widget/server/widget-public";
-import { getRequestOrigin, withWidgetCors } from "@/features/widget/server/widget-utils";
+import {
+  getRequestOrigin,
+  widgetPreflightResponse,
+  withWidgetCors,
+} from "@/features/widget/server/widget-utils";
 import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
 import { getDb } from "@/lib/db/client";
 import { conversation as conversationTable } from "@/lib/db/schema";
@@ -16,6 +20,10 @@ const feedbackSchema = z.object({
   feedback: z.enum(["positive", "negative"]),
   reason: z.string().trim().max(500).nullable().default(null),
 });
+
+export function OPTIONS(request: Request) {
+  return widgetPreflightResponse(request);
+}
 
 export async function POST(
   request: Request,

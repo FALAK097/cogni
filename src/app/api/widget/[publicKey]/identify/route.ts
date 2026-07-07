@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { eq } from "drizzle-orm";
+import { widgetPreflightResponse } from "@/features/widget/server/widget-utils";
 import { getDb } from "@/lib/db/client";
 import { checkRateLimit } from "@/lib/rate-limit/memory";
 import { visitorSession as visitorSessionTable } from "@/lib/db/schema";
@@ -13,6 +14,10 @@ const identifySchema = z.object({
 function bearerToken(request: Request) {
   const authorization = request.headers.get("authorization");
   return authorization?.startsWith("Bearer ") ? authorization.slice(7) : null;
+}
+
+export function OPTIONS(request: Request) {
+  return widgetPreflightResponse(request);
 }
 
 export async function POST(

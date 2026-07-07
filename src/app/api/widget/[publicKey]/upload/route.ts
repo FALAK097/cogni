@@ -12,7 +12,11 @@ import {
   getAuthorizedVisitorSession,
 } from "@/features/widget/server/widget-public";
 import { verifyWidgetBootstrapToken } from "@/features/widget/server/widget-bootstrap";
-import { getRequestOrigin, withWidgetCors } from "@/features/widget/server/widget-utils";
+import {
+  getRequestOrigin,
+  widgetPreflightResponse,
+  withWidgetCors,
+} from "@/features/widget/server/widget-utils";
 import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
 import { getDb } from "@/lib/db/client";
 import { attachment as attachmentTable } from "@/lib/db/schema";
@@ -32,6 +36,10 @@ const metadataSchema = z.object({
   language: z.string().max(50).nullable().default(null),
   screenSize: z.string().max(50).nullable().default(null),
 });
+
+export function OPTIONS(request: Request) {
+  return widgetPreflightResponse(request);
+}
 
 export async function POST(
   request: Request,

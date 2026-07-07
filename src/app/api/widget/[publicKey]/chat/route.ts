@@ -22,6 +22,7 @@ import {
   createWidgetSseStream,
   getRequestOrigin,
   widgetHistoryToUiMessages,
+  widgetPreflightResponse,
   withWidgetCors,
 } from "@/features/widget/server/widget-utils";
 import { buildAgentMemoryContext } from "@/lib/ai/memory";
@@ -41,6 +42,10 @@ import { checkRateLimit } from "@/lib/rate-limit/memory";
 import { env } from "@/lib/env/server";
 
 export const maxDuration = 60;
+
+export function OPTIONS(request: Request) {
+  return widgetPreflightResponse(request);
+}
 
 const PREVIEW_HOSTNAME = "dashboard-preview";
 
