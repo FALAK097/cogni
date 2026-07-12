@@ -1,7 +1,6 @@
 import "server-only";
 
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import type { AiSearchInstance } from "@cloudflare/workers-types";
 
 import { env } from "@/lib/env/server";
 

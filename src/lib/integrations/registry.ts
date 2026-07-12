@@ -103,6 +103,23 @@ export const INTEGRATION_MANIFESTS: IntegrationManifest[] = [
       useCases: ["Sales and customer support."],
     },
   },
+  {
+    id: "microsoft_teams",
+    slug: "microsoft-teams",
+    name: "Microsoft Teams",
+    subtitle: "Omnichannel",
+    description: "Route Teams messages into Conversations with Adaptive Card support.",
+    category: "COMMUNICATION",
+    icon: "/assets/icons/microsoft-teams.svg",
+    auth: { type: "oauth" },
+    metadata: {},
+    features: ["NOTIFICATIONS"],
+    permissions: ["send_messages"],
+    content: {
+      whatItDoes: ["Receive and answer Teams conversations."],
+      useCases: ["Workplace support and escalation."],
+    },
+  },
 ];
 
 export function getAllIntegrations() {

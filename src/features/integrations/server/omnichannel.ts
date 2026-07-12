@@ -8,12 +8,15 @@ import { retrieveKnowledgeContext } from "@/features/knowledge/server/retrieval"
 import { getWidgetModel } from "@/lib/ai/providers";
 import type { Db } from "@/lib/db/client";
 import { contact, conversation } from "@/lib/db/schema";
+import { broadcastConversationEvent } from "@/lib/realtime/broadcast";
 
 export const supportedChatChannels = ["SLACK", "DISCORD", "TEAMS", "GCHAT", "WHATSAPP"] as const;
 export type SupportedChatChannel = (typeof supportedChatChannels)[number];
 
 export async function ingestOmnichannelMessage({
   db,
+  workspaceId,
+  integrationId,
   channel,
   externalThreadId,
   externalMessageId,
@@ -22,6 +25,8 @@ export async function ingestOmnichannelMessage({
   text,
 }: {
   db: Db;
+  workspaceId: string;
+  integrationId: string;
   channel: SupportedChatChannel;
   externalThreadId: string;
   externalMessageId: string;
@@ -29,16 +34,16 @@ export async function ingestOmnichannelMessage({
   userName: string;
   text: string;
 }) {
-  const connections = await db.query.integration.findMany({
+  const connection = await db.query.integration.findFirst({
     where: (fields, { eq, and }) =>
-      and(eq(fields.provider, channel), eq(fields.status, "CONNECTED")),
-    limit: 2,
+      and(
+        eq(fields.id, integrationId),
+        eq(fields.workspaceId, workspaceId),
+        eq(fields.provider, channel),
+        eq(fields.status, "CONNECTED"),
+      ),
   });
-  if (connections.length !== 1) {
-    throw new Error(`Expected one active ${channel} connection; found ${connections.length}.`);
-  }
-  const connection = connections[0];
-  const workspaceId = connection.workspaceId;
+  if (!connection) throw new Error("Channel integration is not connected.");
   const externalId = `${channel.toLowerCase()}:${externalUserId}`;
   await db
     .insert(contact)
@@ -112,6 +117,11 @@ export async function ingestOmnichannelMessage({
       current = updated;
     }
   }
+  await broadcastConversationEvent({
+    type: "message",
+    conversationId: current.id,
+    messageId: incoming.id,
+  });
   return { connection, contact: channelContact, conversation: current };
 }
 
@@ -166,5 +176,10 @@ export async function answerOmnichannelMessage({
       lastMessageAt: response.createdAt,
     })
     .where(and(eq(conversation.id, conversationId), eq(conversation.workspaceId, workspaceId)));
+  await broadcastConversationEvent({
+    type: "message",
+    conversationId,
+    messageId: response.id,
+  });
   return result.text;
 }

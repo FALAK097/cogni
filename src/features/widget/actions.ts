@@ -21,11 +21,6 @@ export type WidgetActionState = {
   savedAt?: number;
 };
 
-export type WidgetAgentActionState = {
-  error?: string;
-  savedAt?: number;
-};
-
 const hexColor = z.string().regex(/^#[0-9a-f]{6}$/i, "Use a six-digit hex color.");
 
 const widgetWidgetSettingsSchema = z.object({
@@ -169,7 +164,7 @@ export async function saveWidgetWidgetSettingsAction(
     })
     .where(eq(widgetTable.id, widget.id));
 
-  revalidatePath("/dashboard/widget");
+  revalidatePath("/playground");
   return { savedAt: Date.now() };
 }
 
@@ -179,40 +174,4 @@ export async function saveWidgetSettingsAction(
 ): Promise<WidgetActionState> {
   await requireAuth();
   return saveWidgetWidgetSettingsAction(previousState, formData);
-}
-
-const widgetAgentSettingsSchema = z.object({
-  instructions: z.string().trim().min(1).max(4_000),
-  escalationKeywords: z.string().trim().min(1).max(500),
-});
-
-export async function saveWidgetAgentSettingsAction(
-  _previousState: WidgetAgentActionState,
-  formData: FormData,
-): Promise<WidgetAgentActionState> {
-  await requireAuth();
-  const { db, workspace } = await requireDashboardContext();
-
-  const parsed = widgetAgentSettingsSchema.safeParse({
-    instructions: formData.get("instructions"),
-    escalationKeywords: formData.get("escalationKeywords"),
-  });
-
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Check the agent settings." };
-  }
-  const widget = await ensureWorkspaceWidget(db, workspace.id);
-
-  await db
-    .update(widgetTable)
-    .set({
-      instructions: parsed.data.instructions,
-      escalationKeywords: parsed.data.escalationKeywords,
-      updatedAt: new Date().toISOString(),
-    })
-    .where(eq(widgetTable.id, widget.id));
-
-  revalidatePath("/dashboard/agent");
-  revalidatePath("/dashboard/widget");
-  return { savedAt: Date.now() };
 }

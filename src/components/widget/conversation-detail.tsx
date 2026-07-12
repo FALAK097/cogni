@@ -692,6 +692,9 @@ function SessionDetailsContent({
               {session.contactEmail ? (
                 <p className="text-xs text-muted-foreground">{session.contactEmail}</p>
               ) : null}
+              {session.contactPhone ? (
+                <p className="text-xs text-muted-foreground">{session.contactPhone}</p>
+              ) : null}
             </div>
           </div>
 
@@ -745,6 +748,7 @@ function SessionDetailsContent({
               {formatStatusLabel(session.conversationStatus ?? "OPEN")}
             </Badge>
           </DetailRow>
+          <DetailRow label="Ticket">{session.conversationSubject ?? "Customer request"}</DetailRow>
           <DetailRow label="Assignee">
             <span className="inline-flex items-center gap-1">
               {session.assigneeName ?? "Unassigned"}
@@ -753,6 +757,17 @@ function SessionDetailsContent({
           </DetailRow>
           <DetailRow label="Channel">
             {session.conversationChannel === "WIDGET" ? "Widget" : session.conversationChannel}
+          </DetailRow>
+          <DetailRow label="Qualification">
+            <Badge
+              variant={session.contactCapturedAt ? "default" : "outline"}
+              className="text-[10px]"
+            >
+              {session.contactCapturedAt ? "Contact captured" : "Anonymous"}
+            </Badge>
+          </DetailRow>
+          <DetailRow label="Source">
+            {session.contactSource ?? session.conversationChannel ?? "Widget"}
           </DetailRow>
           <DetailRow label="Started">
             {format(

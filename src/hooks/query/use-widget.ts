@@ -108,10 +108,15 @@ export interface WidgetSessionDetail {
   contactExternalId?: string | null;
   contactCreatedAt?: string | null;
   contactLastSeenAt?: string | null;
+  contactPhone?: string | null;
+  contactSource?: string | null;
+  contactCapturedAt?: string | null;
+  contactCaptureContext?: Record<string, unknown> | null;
   conversationId?: string | null;
   conversationStatus?: string;
   conversationChannel?: string;
   conversationStartedAt?: string;
+  conversationSubject?: string;
   assigneeName?: string | null;
   assigneeId?: string | null;
   agentName?: string;
@@ -320,6 +325,8 @@ export interface ConversationSummary {
   lastMessageAt: string;
   country: string | null;
   city: string | null;
+  channel: string;
+  subject: string;
 }
 
 export type ConversationDetail = WidgetSessionDetail;

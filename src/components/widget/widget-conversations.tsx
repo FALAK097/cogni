@@ -6,6 +6,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useConversations } from "@/hooks/query";
 import type { ConversationFilter, ConversationSummary } from "@/hooks/query";
 import { cn } from "@/lib/utils";
+import { useConversationRealtime } from "@/hooks/use-conversation-realtime";
 
 import { ConversationDetail } from "./conversation-detail";
 import { ConversationsList } from "./conversations-list";
@@ -64,6 +65,7 @@ export function WidgetConversations({ initialConversationId = null }: WidgetConv
   const [filter, setFilter] = useState<ConversationFilter>("all");
   const [prevInitialConversationId, setPrevInitialConversationId] = useState(initialConversationId);
   const [prevFilter, setPrevFilter] = useState(filter);
+  useConversationRealtime(selectedConversationId);
 
   if (initialConversationId !== prevInitialConversationId) {
     setPrevInitialConversationId(initialConversationId);

@@ -221,6 +221,9 @@ export function ConversationsList({
                       <span className="truncate text-sm font-semibold text-foreground">
                         {displayName}
                       </span>
+                      <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[9px] font-medium uppercase text-muted-foreground">
+                        {conversation.channel}
+                      </span>
                       <span className="shrink-0 text-[11px] text-muted-foreground">
                         {formatListTime(conversation.lastMessageAt)}
                       </span>

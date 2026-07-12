@@ -18,6 +18,7 @@ const nextConfig: NextConfig = {
     "@chat-adapter/discord",
     "@chat-adapter/gchat",
     "@chat-adapter/slack",
+    "@chat-adapter/teams",
     "@chat-adapter/whatsapp",
     "discord.js",
     "@discordjs/ws",

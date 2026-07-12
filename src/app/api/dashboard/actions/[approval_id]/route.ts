@@ -4,7 +4,7 @@ import { z } from "zod";
 import { decideApprovalRequest } from "@/features/integrations/server/approval-service";
 import { executeApprovedTool } from "@/features/integrations/server/tool-executor";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
-import { updateWorkflowStep } from "@/lib/workflows/runner";
+import { completeWorkflowRun, updateWorkflowStep } from "@/lib/workflows/runner";
 import { workflowRun } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 
@@ -71,15 +71,32 @@ export async function PATCH(request: Request, context: RouteContext) {
         status: "COMPLETED",
         output: { actionId: action.id, result: action.result },
       });
-      await db
-        .update(workflowRun)
-        .set({ status: "RUNNING" })
-        .where(
+      const pendingStep = await db.query.workflowStep.findFirst({
+        where: (fields, { and, eq }) =>
           and(
-            eq(workflowRun.id, approval.workflowRunId),
-            eq(workflowRun.workspaceId, workspace.id),
+            eq(fields.workflowRunId, approval.workflowRunId!),
+            eq(fields.workspaceId, workspace.id),
+            eq(fields.status, "PENDING"),
           ),
-        );
+      });
+      if (pendingStep) {
+        await db
+          .update(workflowRun)
+          .set({ status: "RUNNING" })
+          .where(
+            and(
+              eq(workflowRun.id, approval.workflowRunId),
+              eq(workflowRun.workspaceId, workspace.id),
+            ),
+          );
+      } else {
+        await completeWorkflowRun({
+          db,
+          workspaceId: workspace.id,
+          runId: approval.workflowRunId,
+          output: { actionId: action.id },
+        });
+      }
     }
     return NextResponse.json({ approval, action });
   } catch (error) {

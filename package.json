@@ -32,6 +32,7 @@
     "@chat-adapter/discord": "^4.33.0",
     "@chat-adapter/gchat": "^4.33.0",
     "@chat-adapter/slack": "^4.33.0",
+    "@chat-adapter/teams": "4.33.0",
     "@chat-adapter/whatsapp": "^4.33.0",
     "@composio/core": "^0.13.1",
     "@composio/vercel": "^0.11.0",
@@ -71,7 +72,6 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260625.1",
     "@commitlint/cli": "^21.1.0",
     "@commitlint/config-conventional": "^21.1.0",
     "@opennextjs/cloudflare": "^1.19.11",

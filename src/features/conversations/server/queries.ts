@@ -16,9 +16,10 @@ import {
   type workspaceMember,
 } from "@/lib/db/schema";
 import type { MessageJson } from "./conversation-service";
+import { broadcastConversationEvent } from "@/lib/realtime/broadcast";
 
-function getWidgetConversationBaseCond(c: typeof conversationTable) {
-  return and(eq(c.channel, "WIDGET"), like(c.messages, '%"authorType":"VISITOR"%'));
+function getInboxConversationBaseCond(c: typeof conversationTable) {
+  return like(c.messages, '%"authorType":"VISITOR"%');
 }
 
 function conversationFilterCond(
@@ -26,7 +27,7 @@ function conversationFilterCond(
   filter: string | undefined,
   membershipId: string | undefined,
 ) {
-  const base = getWidgetConversationBaseCond(c);
+  const base = getInboxConversationBaseCond(c);
 
   switch (filter) {
     case "unassigned":
@@ -220,7 +221,14 @@ export async function markConversationAsRead(workspaceId: string, conversationId
       )
       .returning({ id: conversationTable.id });
 
-    if (result.length > 0) return true;
+    if (result.length > 0) {
+      await broadcastConversationEvent({
+        type: "read",
+        conversationId,
+        actor: "TEAM",
+      });
+      return true;
+    }
   }
 
   return false;
@@ -269,7 +277,14 @@ export async function appendTeamConversationMessage(
       )
       .returning({ id: conversationTable.id });
 
-    if (result.length > 0) return true;
+    if (result.length > 0) {
+      await broadcastConversationEvent({
+        type: "message",
+        conversationId,
+        messageId: newMessage.id,
+      });
+      return true;
+    }
   }
 
   return false;
@@ -301,7 +316,7 @@ export async function getInboxSummary(
       .where(
         and(
           eq(conversationTable.workspaceId, workspaceId),
-          getWidgetConversationBaseCond(conversationTable),
+          getInboxConversationBaseCond(conversationTable),
         ),
       ),
     db.query.conversation.findMany({
@@ -347,7 +362,7 @@ export async function getConversation(
       and(
         eq(fields.id, conversationId),
         eq(fields.workspaceId, workspaceId),
-        getWidgetConversationBaseCond(fields as typeof conversationTable),
+        getInboxConversationBaseCond(fields as typeof conversationTable),
       ),
     with: {
       contact: {
@@ -395,5 +410,7 @@ export function mapConversationToListItem(conversation: ParsedConversation) {
       : new Date().toISOString(),
     country: conversation.visitorSession?.country ?? null,
     city: conversation.visitorSession?.city ?? null,
+    channel: conversation.channel,
+    subject: conversation.subject,
   };
 }

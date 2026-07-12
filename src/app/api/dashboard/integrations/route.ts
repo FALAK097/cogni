@@ -11,6 +11,7 @@ const PROVIDER_SLUGS: Record<string, string> = {
   DISCORD: "discord",
   GCHAT: "google-chat",
   WHATSAPP: "whatsapp",
+  TEAMS: "microsoft-teams",
 };
 
 const SLUG_PROVIDERS = Object.fromEntries(
@@ -55,12 +56,14 @@ export async function POST(request: Request) {
       workspaceId: workspace.id,
       provider,
       status: "CONNECTED",
+      config: JSON.stringify({ webhookToken: crypto.randomUUID() }),
       updatedAt: new Date().toISOString(),
     })
     .onConflictDoUpdate({
       target: [integrationTable.workspaceId, integrationTable.provider],
       set: {
         status: "CONNECTED",
+        config: JSON.stringify({ webhookToken: crypto.randomUUID() }),
         updatedAt: new Date().toISOString(),
       },
     });

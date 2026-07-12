@@ -8,6 +8,9 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "preview_urls": true,
+  "alias": {
+    "server-only": "./src/lib/cloudflare/server-only.ts",
+  },
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS",

@@ -4,7 +4,6 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import type { D1Database } from "@cloudflare/workers-types";
 import { drizzle as drizzleD1 } from "drizzle-orm/d1";
 import { drizzle as drizzleBetterSqlite3 } from "drizzle-orm/better-sqlite3";
 import type { BaseSQLiteDatabase } from "drizzle-orm/sqlite-core/db";

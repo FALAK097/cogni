@@ -1,6 +1,7 @@
 import { createDiscordAdapter } from "@chat-adapter/discord";
 import { createGoogleChatAdapter } from "@chat-adapter/gchat";
 import { createSlackAdapter } from "@chat-adapter/slack";
+import { createTeamsAdapter } from "@chat-adapter/teams";
 import { createWhatsAppAdapter } from "@chat-adapter/whatsapp";
 import { Chat, type Adapter, type Message, type Thread } from "chat";
 import { createCloudflareState, type ChatStateDO } from "chat-state-cloudflare-do";
@@ -12,7 +13,7 @@ import {
 } from "@/features/integrations/server/omnichannel";
 import type { Db } from "@/lib/db/client";
 
-export const chatSdkChannelSchema = ["slack", "discord", "gchat", "whatsapp"] as const;
+export const chatSdkChannelSchema = ["slack", "discord", "gchat", "teams", "whatsapp"] as const;
 export type ChatSdkChannel = (typeof chatSdkChannelSchema)[number];
 
 function channelName(channel: ChatSdkChannel): SupportedChatChannel {
@@ -23,6 +24,7 @@ function createAdapter(channel: ChatSdkChannel): Adapter {
   if (channel === "slack") return createSlackAdapter();
   if (channel === "discord") return createDiscordAdapter();
   if (channel === "gchat") return createGoogleChatAdapter();
+  if (channel === "teams") return createTeamsAdapter({ appType: "SingleTenant" });
   return createWhatsAppAdapter();
 }
 
@@ -30,10 +32,14 @@ export function createChannelBot({
   channel,
   namespace,
   db,
+  workspaceId,
+  integrationId,
 }: {
   channel: ChatSdkChannel;
   namespace: DurableObjectNamespace<ChatStateDO>;
   db: Db;
+  workspaceId: string;
+  integrationId: string;
 }) {
   const adapter = createAdapter(channel);
   const bot = new Chat({
@@ -52,6 +58,8 @@ export function createChannelBot({
     await thread.startTyping("Thinking…");
     const ingested = await ingestOmnichannelMessage({
       db,
+      workspaceId,
+      integrationId,
       channel: channelName(channel),
       externalThreadId: thread.id,
       externalMessageId: message.id,

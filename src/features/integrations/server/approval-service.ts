@@ -22,6 +22,10 @@ function signApprovalToken(approvalId: string, expiresAt: string) {
   return `${payload}.${signature}`;
 }
 
+export function getApprovalToken(approval: { id: string; expiresAt: string }) {
+  return signApprovalToken(approval.id, approval.expiresAt);
+}
+
 function tokensMatch(left: string, rightHash: string) {
   const leftBuffer = Buffer.from(hashToken(left), "hex");
   const rightBuffer = Buffer.from(rightHash, "hex");

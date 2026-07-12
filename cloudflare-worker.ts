@@ -115,9 +115,10 @@ export class ConversationRoom extends DurableObject<CloudflareEnv> {
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    const webhookMatch = url.pathname.match(/^\/api\/channels\/([^/]+)\/webhook$/);
+    const webhookMatch = url.pathname.match(/^\/api\/channels\/([^/]+)\/([^/]+)\/webhook$/);
     if (request.method === "POST" && webhookMatch) {
       const channel = webhookMatch[1] ?? "";
+      const integrationId = webhookMatch[2] ?? "";
       const { createChannelBot, isChatSdkChannel } =
         await import("./src/features/integrations/server/chat-sdk");
       if (!isChatSdkChannel(channel)) {
@@ -125,7 +126,26 @@ export default {
       }
       return runWithCloudflareRequestContext(request, env, ctx, async () => {
         const { getDb } = await import("./src/lib/db/client");
-        const bot = createChannelBot({ channel, namespace: env.CHAT_STATE, db: getDb() });
+        const db = getDb();
+        const integration = await db.query.integration.findFirst({
+          where: (fields, { and, eq }) =>
+            and(eq(fields.id, integrationId), eq(fields.provider, channel.toUpperCase())),
+          columns: { id: true, workspaceId: true, status: true, config: true },
+        });
+        const token = url.searchParams.get("token");
+        const config = integration
+          ? (JSON.parse(integration.config) as { webhookToken?: string })
+          : {};
+        if (!integration || integration.status !== "CONNECTED" || token !== config.webhookToken) {
+          return Response.json({ error: "Webhook not found." }, { status: 404 });
+        }
+        const bot = createChannelBot({
+          channel,
+          namespace: env.CHAT_STATE,
+          db,
+          workspaceId: integration.workspaceId,
+          integrationId: integration.id,
+        });
         return bot.webhooks[channel](request, { waitUntil: (task) => ctx.waitUntil(task) });
       });
     }

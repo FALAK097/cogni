@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { createApprovalRequest } from "@/features/integrations/server/approval-service";
+import {
+  createApprovalRequest,
+  getApprovalToken,
+} from "@/features/integrations/server/approval-service";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 
 const proposeActionSchema = z.object({
@@ -11,6 +14,27 @@ const proposeActionSchema = z.object({
   conversationId: z.string().min(1),
   agentRunId: z.string().min(1).optional(),
 });
+
+export async function GET() {
+  const { db, workspace } = await requireDashboardContext();
+  const approvals = await db.query.approvalRequest.findMany({
+    where: (fields, { and, eq, gt }) =>
+      and(
+        eq(fields.workspaceId, workspace.id),
+        eq(fields.status, "PENDING"),
+        gt(fields.expiresAt, new Date().toISOString()),
+      ),
+    orderBy: (fields, { desc }) => [desc(fields.createdAt)],
+    limit: 100,
+  });
+  return NextResponse.json({
+    approvals: approvals.map((approval) => ({
+      ...approval,
+      token: getApprovalToken(approval),
+      tokenHash: undefined,
+    })),
+  });
+}
 
 export async function POST(request: Request) {
   const { db, workspace } = await requireDashboardContext();

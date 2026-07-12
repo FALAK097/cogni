@@ -15,7 +15,10 @@ import {
 } from "@/features/widget/server/widget-utils";
 import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
 import { getDb } from "@/lib/db/client";
-import { createWorkflowWithSteps } from "@/lib/workflows/runner";
+import { createApprovalRequest } from "@/features/integrations/server/approval-service";
+import { createWorkflowWithSteps, updateWorkflowStep } from "@/lib/workflows/runner";
+import { workflowRun } from "@/lib/db/schema";
+import { and, eq } from "drizzle-orm";
 
 type RouteContext = { params: Promise<{ publicKey: string }> };
 
@@ -108,12 +111,33 @@ export async function POST(request: Request, context: RouteContext) {
     );
   }
 
+  const workspaceId = result.access.widget.workspaceId;
+  const idempotencyKey = `booking:${workspaceId}:${parsed.data.startAt}`;
+  const existing = await result.db.query.workflowRun.findFirst({
+    where: (fields, { and, eq }) =>
+      and(eq(fields.workspaceId, workspaceId), eq(fields.idempotencyKey, idempotencyKey)),
+  });
+  if (existing) {
+    const sameRequest = JSON.stringify(JSON.parse(existing.input)) === JSON.stringify(parsed.data);
+    return corsResponse(
+      request,
+      result.access.allowedDomains,
+      {
+        error: sameRequest
+          ? "This booking request is already pending."
+          : "Slot is already reserved.",
+        workflowId: existing.id,
+      },
+      409,
+    );
+  }
+
   const workflow = await createWorkflowWithSteps({
     db: result.db,
-    workspaceId: result.access.widget.workspaceId,
+    workspaceId,
     conversationId: conversation.id,
     name: "appointment.booking",
-    idempotencyKey: `booking:${conversation.id}:${parsed.data.startAt}`,
+    idempotencyKey,
     input: parsed.data,
     steps: [
       {
@@ -131,13 +155,36 @@ export async function POST(request: Request, context: RouteContext) {
           },
         },
       },
-      {
-        name: "Send booking confirmation",
-        kind: "MESSAGE",
-        input: { startAt: parsed.data.startAt, attendeeEmail: parsed.data.attendeeEmail },
-      },
     ],
   });
+  const actionStep = workflow.steps[0];
+  if (!actionStep) throw new Error("Booking workflow step was not created.");
+  const actionInput = JSON.parse(actionStep.input) as {
+    actionType: string;
+    payload: unknown;
+  };
+  const approval = await createApprovalRequest({
+    db: result.db,
+    workspaceId,
+    conversationId: conversation.id,
+    workflowRunId: workflow.run.id,
+    workflowStepId: actionStep.id,
+    actionType: actionInput.actionType,
+    input: actionInput.payload,
+    summary: actionStep.name,
+  });
+  await updateWorkflowStep({
+    db: result.db,
+    workspaceId,
+    runId: workflow.run.id,
+    stepId: actionStep.id,
+    status: "WAITING_APPROVAL",
+    output: { approvalId: approval.approval.id },
+  });
+  await result.db
+    .update(workflowRun)
+    .set({ status: "WAITING_APPROVAL" })
+    .where(and(eq(workflowRun.id, workflow.run.id), eq(workflowRun.workspaceId, workspaceId)));
   return corsResponse(request, result.access.allowedDomains, {
     workflowId: workflow.run.id,
     status: "PENDING_TEAM_APPROVAL",

@@ -110,10 +110,17 @@ export async function GET(_request: Request, context: RouteContext) {
     contactLastSeenAt: conversation.contact.lastSeenAt
       ? new Date(conversation.contact.lastSeenAt).toISOString()
       : null,
+    contactPhone: conversation.contact.phone,
+    contactSource: conversation.contact.source,
+    contactCapturedAt: conversation.contact.capturedAt
+      ? new Date(conversation.contact.capturedAt).toISOString()
+      : null,
+    contactCaptureContext: JSON.parse(conversation.contact.captureContext) as unknown,
     conversationId: conversation.id,
     conversationStatus: conversation.status,
     conversationChannel: conversation.channel,
     conversationStartedAt: new Date(conversation.createdAt).toISOString(),
+    conversationSubject: conversation.subject,
     assigneeName: conversation.assignedMember?.user.name ?? null,
     assigneeId: conversation.assignedMemberId,
     agentName,
