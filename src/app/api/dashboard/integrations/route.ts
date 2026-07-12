@@ -8,7 +8,14 @@ const PROVIDER_SLUGS: Record<string, string> = {
   GMAIL: "gmail",
   GOOGLE_CALENDAR: "google-calendar",
   SLACK: "slack",
+  DISCORD: "discord",
+  GCHAT: "google-chat",
+  WHATSAPP: "whatsapp",
 };
+
+const SLUG_PROVIDERS = Object.fromEntries(
+  Object.entries(PROVIDER_SLUGS).map(([provider, slug]) => [slug, provider]),
+) as Record<string, string>;
 
 export async function GET() {
   const { db, workspace } = await requireDashboardContext();
@@ -18,7 +25,7 @@ export async function GET() {
   });
 
   return NextResponse.json(
-    integrations.map((integration: any) => ({
+    integrations.map((integration) => ({
       id: integration.id,
       integrationSlug: PROVIDER_SLUGS[integration.provider] ?? integration.provider.toLowerCase(),
       slug: PROVIDER_SLUGS[integration.provider] ?? integration.provider.toLowerCase(),
@@ -35,14 +42,7 @@ export async function POST(request: Request) {
   const body = (await request.json()) as { slug?: string };
   const slug = body.slug?.toLowerCase();
 
-  const provider =
-    slug === "gmail"
-      ? "GMAIL"
-      : slug === "google-calendar"
-        ? "GOOGLE_CALENDAR"
-        : slug === "slack"
-          ? "SLACK"
-          : null;
+  const provider = slug ? SLUG_PROVIDERS[slug] : null;
 
   if (!provider) {
     return NextResponse.json({ error: "Unsupported integration." }, { status: 400 });
@@ -77,14 +77,7 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "Integration slug is required." }, { status: 400 });
   }
 
-  const provider =
-    slug === "gmail"
-      ? "GMAIL"
-      : slug === "google-calendar"
-        ? "GOOGLE_CALENDAR"
-        : slug === "slack"
-          ? "SLACK"
-          : null;
+  const provider = SLUG_PROVIDERS[slug];
 
   if (!provider) {
     return NextResponse.json({ error: "Unsupported integration." }, { status: 400 });

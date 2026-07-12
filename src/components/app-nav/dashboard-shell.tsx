@@ -15,17 +15,17 @@ type UserData = {
   email?: string;
 };
 
-type AdminPanelLayoutProps = {
+type DashboardShellProps = {
   children: ReactNode;
   initialSidebarOpen?: boolean;
   userData?: UserData;
 };
 
-export default function AdminPanelLayout({
+export function DashboardShell({
   children,
   userData,
   initialSidebarOpen = true,
-}: AdminPanelLayoutProps) {
+}: DashboardShellProps) {
   const isOpen = useSidebar((state) => state.isOpen);
   const isHover = useSidebar((state) => state.isHover);
   const hasHydrated = useSidebar((state) => state.hasHydrated);
@@ -40,7 +40,7 @@ export default function AdminPanelLayout({
   const desktopOpenState =
     (hasHydrated ? isOpen : initialSidebarOpen) || (settings.isHoverOpen && isHover);
   const pathname = usePathname();
-  const isFullBleedPage = pathname === "/widget" || pathname === "/conversations";
+  const isFullBleedPage = pathname === "/playground" || pathname === "/conversations";
 
   return (
     <>

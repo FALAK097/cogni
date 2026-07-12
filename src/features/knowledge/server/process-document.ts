@@ -4,6 +4,7 @@ import { document as documentTable } from "@/lib/db/schema";
 
 import { extractDocumentText, indexDocumentContent } from "@/features/knowledge/server/extract";
 import { logError } from "@/lib/logging/logger";
+import { emitDomainEvent } from "@/lib/events/domain-events";
 import { completeWorkflowRun, failWorkflowRun, startWorkflowRun } from "@/lib/workflows/runner";
 
 export async function processDocument({
@@ -58,6 +59,12 @@ export async function processDocument({
       workspaceId,
       runId: run.id,
       output: { documentId, chunkCount: text.length },
+    });
+    await emitDomainEvent({
+      db,
+      workspaceId,
+      type: "document.ready",
+      entityId: documentId,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Processing failed.";

@@ -6,7 +6,7 @@ import { z } from "zod";
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
 import { executeIntegrationAction } from "@/features/integrations/server/execute-action";
 import { getIntegrationTool } from "@/features/integrations/server/tool-registry";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { conversation as conversationTable } from "@/lib/db/schema";
 import { requireAuth, requireDashboardContext } from "@/lib/auth/dashboard-context";
 
@@ -66,6 +66,15 @@ export async function runIntegrationToolAction(
       return { error: "Select a teammate to assign." };
     }
 
+    const membership = await db.query.workspaceMember.findFirst({
+      where: (fields, { eq, and }) =>
+        and(eq(fields.id, membershipId), eq(fields.workspaceId, workspace.id)),
+      columns: { id: true },
+    });
+    if (!membership) {
+      return { error: "Teammate is not in this workspace." };
+    }
+
     await db
       .update(conversationTable)
       .set({
@@ -73,7 +82,12 @@ export async function runIntegrationToolAction(
         status: "ASSIGNED",
         updatedAt: new Date().toISOString(),
       })
-      .where(eq(conversationTable.id, conversation.id));
+      .where(
+        and(
+          eq(conversationTable.id, conversation.id),
+          eq(conversationTable.workspaceId, workspace.id),
+        ),
+      );
 
     revalidatePath("/conversations");
     return { savedAt: Date.now() };
@@ -86,7 +100,8 @@ export async function runIntegrationToolAction(
     }
 
     const conv = await db.query.conversation.findFirst({
-      where: (fields, { eq }) => eq(fields.id, conversation.id),
+      where: (fields, { eq, and }) =>
+        and(eq(fields.id, conversation.id), eq(fields.workspaceId, workspace.id)),
       columns: { messages: true },
     });
 
@@ -105,7 +120,12 @@ export async function runIntegrationToolAction(
           messages: JSON.stringify([...messagesList, newMessage]),
           updatedAt: new Date().toISOString(),
         })
-        .where(eq(conversationTable.id, conversation.id));
+        .where(
+          and(
+            eq(conversationTable.id, conversation.id),
+            eq(conversationTable.workspaceId, workspace.id),
+          ),
+        );
     }
 
     revalidatePath("/conversations");

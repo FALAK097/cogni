@@ -4,11 +4,11 @@ import { Suspense } from "react";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 
 export const metadata = {
-  title: `Widget | ${SITE_NAME}`,
-  description: "Customize your AI chat widget",
+  title: `Playground | ${SITE_NAME}`,
+  description: "Configure and test your AI customer agent",
 };
 
-export default async function WidgetPage({
+export default async function PlaygroundPage({
   searchParams,
 }: {
   searchParams: Promise<{ subtab?: string }>;

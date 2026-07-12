@@ -125,6 +125,10 @@ export const contact = sqliteTable(
     id: text().primaryKey().notNull(),
     name: text().notNull(),
     email: text(),
+    phone: text(),
+    source: text().default("WIDGET").notNull(),
+    capturedAt: numeric(),
+    captureContext: text().default("{}").notNull(),
     externalId: text(),
     avatarUrl: text(),
     tags: text().default("[]").notNull(),
@@ -172,6 +176,7 @@ export const conversation = sqliteTable(
     subject: text().notNull(),
     status: text().default("OPEN").notNull(),
     channel: text().default("WIDGET").notNull(),
+    externalThreadId: text(),
     aiPaused: integer({ mode: "boolean" }).default(false).notNull(),
     createdAt: numeric()
       .default(sql`(CURRENT_TIMESTAMP)`)
@@ -202,6 +207,11 @@ export const conversation = sqliteTable(
     index("conversation_widgetId_idx").on(table.widgetId),
     index("conversation_assignedMemberId_idx").on(table.assignedMemberId),
     index("conversation_workspaceId_contactId_idx").on(table.workspaceId, table.contactId),
+    uniqueIndex("conversation_workspaceId_channel_externalThreadId_key").on(
+      table.workspaceId,
+      table.channel,
+      table.externalThreadId,
+    ),
     index("conversation_workspaceId_status_lastMessageAt_idx").on(
       table.workspaceId,
       table.status,
@@ -239,6 +249,13 @@ export const widget = sqliteTable(
     escalationKeywords: text().default("human,agent,person,representative,support team").notNull(),
     modelProvider: text().default("OPENAI").notNull(),
     modelName: text().default("gpt-4o-mini").notNull(),
+    bookingEnabled: integer({ mode: "boolean" }).default(false).notNull(),
+    bookingTimezone: text().default("UTC").notNull(),
+    bookingDurationMinutes: integer().default(30).notNull(),
+    bookingMinimumNoticeMinutes: integer().default(60).notNull(),
+    bookingWorkingHours: text()
+      .default('{"start":"09:00","end":"17:00","weekdays":[1,2,3,4,5]}')
+      .notNull(),
     isEnabled: integer({ mode: "boolean" }).default(true).notNull(),
     theme: text().default("light").notNull(),
     userBubbleColor: text().default(BRAND_COLOR).notNull(),
@@ -329,62 +346,6 @@ export const visitorSession = sqliteTable(
     index("visitor_session_widgetId_visitorId_idx").on(table.widgetId, table.visitorId),
     index("visitor_session_widgetId_lastSeenAt_idx").on(table.widgetId, table.lastSeenAt),
     uniqueIndex("visitor_session_token_key").on(table.token),
-  ],
-);
-
-export const lead = sqliteTable(
-  "lead",
-  {
-    id: text().primaryKey().notNull(),
-    workspaceId: text()
-      .notNull()
-      .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
-    contactId: text().references(() => contact.id, { onDelete: "set null", onUpdate: "cascade" }),
-    name: text().notNull(),
-    email: text(),
-    phone: text(),
-    source: text().default("WIDGET").notNull(),
-    status: text().default("new").notNull(),
-    capturedFromChat: integer({ mode: "boolean" }).default(false).notNull(),
-    chatSessionId: text(),
-    chatSummary: text(),
-    createdAt: numeric()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
-    updatedAt: numeric().notNull(),
-  },
-  (table) => [
-    index("lead_workspaceId_phone_idx").on(table.workspaceId, table.phone),
-    index("lead_workspaceId_email_idx").on(table.workspaceId, table.email),
-  ],
-);
-
-export const widgetLeadCapture = sqliteTable(
-  "widget_lead_capture",
-  {
-    id: text().primaryKey().notNull(),
-    visitorSessionId: text()
-      .notNull()
-      .references(() => visitorSession.id, { onDelete: "cascade", onUpdate: "cascade" }),
-    leadId: text().references(() => lead.id, { onDelete: "set null", onUpdate: "cascade" }),
-    triggerType: text().notNull(),
-    triggerValue: text(),
-    formShownAt: numeric()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
-    formSubmittedAt: numeric(),
-    abandoned: integer({ mode: "boolean" }).default(false).notNull(),
-    messageCountAtCapture: integer().default(0).notNull(),
-    conversationSummary: text(),
-    createdAt: numeric()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
-    updatedAt: numeric().notNull(),
-  },
-  (table) => [
-    index("widget_lead_capture_leadId_idx").on(table.leadId),
-    uniqueIndex("widget_lead_capture_leadId_key").on(table.leadId),
-    uniqueIndex("widget_lead_capture_visitorSessionId_key").on(table.visitorSessionId),
   ],
 );
 
@@ -487,6 +448,13 @@ export const integration = sqliteTable(
     provider: text().notNull(),
     status: text().default("DISCONNECTED").notNull(),
     displayName: text(),
+    connectedAccountId: text(),
+    externalAccountId: text(),
+    toolkitVersion: text(),
+    config: text().default("{}").notNull(),
+    credentials: text(),
+    lastHealthCheckAt: numeric(),
+    lastError: text(),
     createdAt: numeric()
       .default(sql`(CURRENT_TIMESTAMP)`)
       .notNull(),
@@ -567,6 +535,10 @@ export const workflowRun = sqliteTable(
       .default(sql`(CURRENT_TIMESTAMP)`)
       .notNull(),
     finishedAt: numeric(),
+    conversationId: text().references(() => conversation.id, {
+      onDelete: "set null",
+      onUpdate: "cascade",
+    }),
     workspaceId: text()
       .notNull()
       .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
@@ -577,7 +549,10 @@ export const workflowRun = sqliteTable(
       table.status,
       table.startedAt,
     ),
-    uniqueIndex("workflow_run_idempotencyKey_key").on(table.idempotencyKey),
+    uniqueIndex("workflow_run_workspaceId_idempotencyKey_key").on(
+      table.workspaceId,
+      table.idempotencyKey,
+    ),
   ],
 );
 
@@ -653,6 +628,84 @@ export const integrationAction = sqliteTable(
       table.status,
       table.createdAt,
     ),
-    uniqueIndex("integration_action_idempotencyKey_key").on(table.idempotencyKey),
+    uniqueIndex("integration_action_workspaceId_idempotencyKey_key").on(
+      table.workspaceId,
+      table.idempotencyKey,
+    ),
+  ],
+);
+
+export const workflowStep = sqliteTable(
+  "workflow_step",
+  {
+    id: text().primaryKey().notNull(),
+    position: integer().notNull(),
+    name: text().notNull(),
+    kind: text().notNull(),
+    status: text().default("PENDING").notNull(),
+    input: text().default("{}").notNull(),
+    output: text(),
+    errorMessage: text(),
+    startedAt: numeric(),
+    finishedAt: numeric(),
+    workflowRunId: text()
+      .notNull()
+      .references(() => workflowRun.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    workspaceId: text()
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
+  },
+  (table) => [
+    uniqueIndex("workflow_step_run_position_key").on(table.workflowRunId, table.position),
+    index("workflow_step_workspaceId_status_idx").on(table.workspaceId, table.status),
+  ],
+);
+
+export const approvalRequest = sqliteTable(
+  "approval_request",
+  {
+    id: text().primaryKey().notNull(),
+    status: text().default("PENDING").notNull(),
+    actionType: text().notNull(),
+    riskLevel: text().default("MEDIUM").notNull(),
+    summary: text().notNull(),
+    payload: text().default("{}").notNull(),
+    tokenHash: text().notNull(),
+    expiresAt: numeric().notNull(),
+    decidedAt: numeric(),
+    createdAt: numeric()
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+    workspaceId: text()
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    conversationId: text().references(() => conversation.id, {
+      onDelete: "set null",
+      onUpdate: "cascade",
+    }),
+    workflowRunId: text().references(() => workflowRun.id, {
+      onDelete: "cascade",
+      onUpdate: "cascade",
+    }),
+    workflowStepId: text().references(() => workflowStep.id, {
+      onDelete: "cascade",
+      onUpdate: "cascade",
+    }),
+    requestedByAgentRunId: text().references(() => agentRun.id, {
+      onDelete: "set null",
+      onUpdate: "cascade",
+    }),
+    decidedByUserId: text().references(() => user.id, {
+      onDelete: "set null",
+      onUpdate: "cascade",
+    }),
+  },
+  (table) => [
+    uniqueIndex("approval_request_tokenHash_key").on(table.tokenHash),
+    index("approval_request_workspaceId_status_createdAt_idx").on(
+      table.workspaceId,
+      table.status,
+      table.createdAt,
+    ),
   ],
 );

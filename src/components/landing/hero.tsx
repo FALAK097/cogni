@@ -458,14 +458,6 @@ export function Hero() {
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[65%] bg-gradient-to-b from-black/40 via-black/20 to-transparent" />
 
       <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-12">
-        {/* ── Eyebrow badge ── */}
-        <div className="mb-7 flex justify-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/15 px-4 py-1.5 text-[13px] font-medium text-white backdrop-blur-sm">
-            <Sparkles className="size-3.5" />
-            AI Support Agent for Modern Teams
-          </div>
-        </div>
-
         {/* ── Headline ── */}
         <div className="mx-auto max-w-3xl text-center">
           <h1 className="text-balance text-4xl font-bold tracking-[-0.03em] text-white [text-shadow:0_2px_20px_rgba(0,0,0,0.3)] sm:text-5xl md:text-6xl md:text-[68px] md:leading-[1.08]">
@@ -503,7 +495,7 @@ export function Hero() {
 
         {/* ── Trust badges ── */}
         <div className="mt-5 flex flex-wrap items-center justify-center gap-x-7 gap-y-2 text-[13px] text-white/80">
-          {["No credit card required", "Setup in 2 minutes", "Cancel anytime"].map((text) => (
+          {["No credit card required", "Setup in 5 minutes", "Cancel anytime"].map((text) => (
             <div key={text} className="flex items-center gap-1.5">
               <svg
                 className="size-[14px] shrink-0 text-white"

@@ -2,7 +2,7 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "widget-prod",
   "account_id": "598a393819cd44e21ef2145dabea9a2f",
-  "main": ".open-next/worker.js",
+  "main": "cloudflare-worker.ts",
   "minify": true,
   "compatibility_date": "2026-06-26",
   "compatibility_flags": ["nodejs_compat"],
@@ -46,6 +46,53 @@
     {
       "binding": "AI_SEARCH",
       "instance_name": "widget-prod-search",
+    },
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "INGESTION_QUEUE",
+        "queue": "widget-ingestion-jobs",
+      },
+    ],
+    "consumers": [
+      {
+        "queue": "widget-ingestion-jobs",
+        "max_batch_size": 5,
+        "max_batch_timeout": 5,
+        "max_retries": 5,
+        "dead_letter_queue": "widget-ingestion-dead-letter",
+        "retry_delay": 30,
+      },
+    ],
+  },
+  "workflows": [
+    {
+      "binding": "SOURCE_SYNC_WORKFLOW",
+      "name": "widget-source-sync",
+      "class_name": "SourceSyncWorkflow",
+    },
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CHAT_STATE",
+        "class_name": "ChatStateDO",
+      },
+      {
+        "name": "CONVERSATION_ROOMS",
+        "class_name": "ConversationRoom",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["ChatStateDO"],
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["ConversationRoom"],
     },
   ],
 }

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
-import { processDocument } from "@/features/knowledge/server/process-document";
-import { emitDomainEvent } from "@/lib/events/domain-events";
+import { enqueueDocumentProcessing } from "@/lib/jobs/ingestion";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { isAllowedKnowledgeUpload, saveObject } from "@/lib/storage/index";
 import { document as documentTable } from "@/lib/db/schema";
@@ -53,17 +52,11 @@ export async function POST(request: Request) {
     .returning();
 
   try {
-    await processDocument({
+    await enqueueDocumentProcessing({
       db,
       workspaceId: workspace.id,
       documentId: document.id,
       idempotencyKey: `document:upload:${document.id}`,
-    });
-    await emitDomainEvent({
-      db,
-      workspaceId: workspace.id,
-      type: "document.ready",
-      entityId: document.id,
     });
   } catch {
     // processDocument updates status on failure

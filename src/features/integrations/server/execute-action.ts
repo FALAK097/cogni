@@ -22,7 +22,8 @@ export async function executeIntegrationAction({
   idempotencyKey?: string;
 }) {
   const existing = await db.query.integrationAction.findFirst({
-    where: (fields, { eq }) => eq(fields.idempotencyKey, idempotencyKey),
+    where: (fields, { eq, and }) =>
+      and(eq(fields.workspaceId, workspaceId), eq(fields.idempotencyKey, idempotencyKey)),
   });
   if (existing) return existing;
 

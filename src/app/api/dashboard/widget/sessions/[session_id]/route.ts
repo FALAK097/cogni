@@ -8,7 +8,6 @@ import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import {
   conversation as conversationTable,
   contact as contactTable,
-  lead as leadTable,
   visitorSession as visitorSessionTable,
 } from "@/lib/db/schema";
 
@@ -73,9 +72,6 @@ export async function GET(_request: Request, context: RouteContext) {
             },
           },
         },
-      },
-      widgetLeadCaptures: {
-        columns: { leadId: true },
       },
       conversations: {
         where: (fields, { eq, and, like }) =>
@@ -324,23 +320,12 @@ export async function DELETE(_request: Request, context: RouteContext) {
         eq(fields.widgetId, widget.id),
         getDashboardEngagedVisitorSessionCond(fields),
       ),
-    with: {
-      widgetLeadCaptures: {
-        columns: { leadId: true },
-      },
-    },
   });
 
   if (!session) {
     return NextResponse.json({ error: "Session not found." }, { status: 404 });
   }
 
-  const leadId = session.widgetLeadCaptures[0]?.leadId;
-  if (leadId) {
-    await db
-      .delete(leadTable)
-      .where(and(eq(leadTable.id, leadId), eq(leadTable.workspaceId, workspace.id)));
-  }
   await db
     .delete(conversationTable)
     .where(
@@ -356,16 +341,12 @@ export async function DELETE(_request: Request, context: RouteContext) {
       where: (fields, { eq }) => eq(fields.contactId, session.contactId!),
       columns: { id: true },
     });
-    const hasLeads = await db.query.lead.findFirst({
-      where: (fields, { eq }) => eq(fields.contactId, session.contactId!),
-      columns: { id: true },
-    });
     const hasSessions = await db.query.visitorSession.findFirst({
       where: (fields, { eq }) => eq(fields.contactId, session.contactId!),
       columns: { id: true },
     });
 
-    if (!hasConvos && !hasLeads && !hasSessions) {
+    if (!hasConvos && !hasSessions) {
       await db.delete(contactTable).where(eq(contactTable.id, session.contactId));
     }
   }

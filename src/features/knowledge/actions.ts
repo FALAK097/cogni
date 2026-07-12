@@ -6,8 +6,7 @@ import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { eq, and } from "drizzle-orm";
 import { document as documentTable } from "@/lib/db/schema";
-import { processDocument } from "@/features/knowledge/server/process-document";
-import { emitDomainEvent } from "@/lib/events/domain-events";
+import { enqueueDocumentProcessing } from "@/lib/jobs/ingestion";
 import { requireAuth, requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { deleteObject, isAllowedKnowledgeUpload, saveObject } from "@/lib/storage/index";
 
@@ -61,17 +60,11 @@ export async function addUrlSourceAction(
     .returning();
 
   try {
-    await processDocument({
+    await enqueueDocumentProcessing({
       db,
       workspaceId: workspace.id,
       documentId: document.id,
       idempotencyKey: `document:url:${document.id}`,
-    });
-    await emitDomainEvent({
-      db,
-      workspaceId: workspace.id,
-      type: "document.ready",
-      entityId: document.id,
     });
   } catch {
     return { error: "Could not process that URL." };
@@ -126,17 +119,11 @@ export async function uploadDocumentAction(formData: FormData) {
     .returning();
 
   try {
-    await processDocument({
+    await enqueueDocumentProcessing({
       db,
       workspaceId: workspace.id,
       documentId: document.id,
       idempotencyKey: `document:upload:${document.id}`,
-    });
-    await emitDomainEvent({
-      db,
-      workspaceId: workspace.id,
-      type: "document.ready",
-      entityId: document.id,
     });
   } catch {
     // Status updated inside processDocument.
@@ -184,17 +171,11 @@ export async function addManualTextSourceAction(
     .returning();
 
   try {
-    await processDocument({
+    await enqueueDocumentProcessing({
       db,
       workspaceId: workspace.id,
       documentId: document.id,
       idempotencyKey: `document:manual:${document.id}`,
-    });
-    await emitDomainEvent({
-      db,
-      workspaceId: workspace.id,
-      type: "document.ready",
-      entityId: document.id,
     });
   } catch {
     return { error: "Could not process that text." };
@@ -234,17 +215,11 @@ export async function importSitemapSourceAction(
     .returning();
 
   try {
-    await processDocument({
+    await enqueueDocumentProcessing({
       db,
       workspaceId: workspace.id,
       documentId: document.id,
       idempotencyKey: `document:sitemap:${document.id}`,
-    });
-    await emitDomainEvent({
-      db,
-      workspaceId: workspace.id,
-      type: "document.ready",
-      entityId: document.id,
     });
   } catch {
     return { error: "Could not process that sitemap." };

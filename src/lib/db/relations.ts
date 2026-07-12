@@ -10,8 +10,6 @@ import {
   visitorSession,
   conversation,
   widget,
-  lead,
-  widgetLeadCapture,
   attachment,
   document,
   documentChunk,
@@ -63,7 +61,6 @@ export const workspaceRelations = relations(workspace, ({ many }) => ({
   contacts: many(contact),
   conversations: many(conversation),
   widgets: many(widget),
-  leads: many(lead),
   attachments: many(attachment),
   documents: many(document),
   workspaceInvites: many(workspaceInvite),
@@ -83,7 +80,6 @@ export const contactRelations = relations(contact, ({ one, many }) => ({
   contactNotes: many(contactNote),
   conversations: many(conversation),
   visitorSessions: many(visitorSession),
-  leads: many(lead),
   agentRuns: many(agentRun),
 }));
 
@@ -133,7 +129,6 @@ export const visitorSessionRelations = relations(visitorSession, ({ one, many })
     fields: [visitorSession.widgetId],
     references: [widget.id],
   }),
-  widgetLeadCaptures: many(widgetLeadCapture),
   agentRuns: many(agentRun),
 }));
 
@@ -145,29 +140,6 @@ export const widgetRelations = relations(widget, ({ one, many }) => ({
   }),
   visitorSessions: many(visitorSession),
   agentRuns: many(agentRun),
-}));
-
-export const leadRelations = relations(lead, ({ one, many }) => ({
-  contact: one(contact, {
-    fields: [lead.contactId],
-    references: [contact.id],
-  }),
-  workspace: one(workspace, {
-    fields: [lead.workspaceId],
-    references: [workspace.id],
-  }),
-  widgetLeadCaptures: many(widgetLeadCapture),
-}));
-
-export const widgetLeadCaptureRelations = relations(widgetLeadCapture, ({ one }) => ({
-  lead: one(lead, {
-    fields: [widgetLeadCapture.leadId],
-    references: [lead.id],
-  }),
-  visitorSession: one(visitorSession, {
-    fields: [widgetLeadCapture.visitorSessionId],
-    references: [visitorSession.id],
-  }),
 }));
 
 export const attachmentRelations = relations(attachment, ({ one }) => ({

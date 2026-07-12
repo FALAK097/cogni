@@ -41,6 +41,7 @@ const LABELS: Record<string, string> = {
   analytics: "Analytics",
   "knowledge-base": "Knowledge Base",
   conversations: "Conversations",
+  tickets: "Tickets",
 
   dashboard: "Dashboard",
   widget: "Widget",

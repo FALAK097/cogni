@@ -11,7 +11,17 @@ const nextConfig: NextConfig = {
     loaderFile: "./src/lib/cloudflare/image-loader.ts",
   },
   reactCompiler: true,
-  serverExternalPackages: ["better-sqlite3"],
+  serverExternalPackages: [
+    "better-sqlite3",
+    "chat",
+    "chat-state-cloudflare-do",
+    "@chat-adapter/discord",
+    "@chat-adapter/gchat",
+    "@chat-adapter/slack",
+    "@chat-adapter/whatsapp",
+    "discord.js",
+    "@discordjs/ws",
+  ],
 };
 
 export default nextConfig;

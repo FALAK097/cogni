@@ -68,6 +68,7 @@ import {
   useDeleteKnowledgeBaseSource,
   useImportSitemapSource,
   useKnowledgeBaseSources,
+  useRetryKnowledgeBaseSource,
   useUploadRagDocument,
 } from "@/hooks/query/use-knowledge-base";
 import { cn } from "@/lib/utils";
@@ -238,6 +239,7 @@ function formatSortValue(state: SortingState): SortValue {
 export function WidgetKnowledgeManager() {
   const sourcesQuery = useKnowledgeBaseSources("default");
   const deleteMutation = useDeleteKnowledgeBaseSource();
+  const retryMutation = useRetryKnowledgeBaseSource();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const addDialog = useKnowledgeManagerStore((store) => store.addDialog);
   const addMenuOpen = useKnowledgeManagerStore((store) => store.addMenuOpen);
@@ -301,6 +303,7 @@ export function WidgetKnowledgeManager() {
         onAddFirstSource={() => setAddDialog("url")}
         onSortChange={handleSortChange}
         onDeleteSource={setDeleteTarget}
+        onRetrySource={(source) => retryMutation.mutate(source.id)}
       />
 
       <KnowledgeDialogs
@@ -382,6 +385,7 @@ function KnowledgeSourcesPanel({
   onAddFirstSource,
   onSortChange,
   onDeleteSource,
+  onRetrySource,
 }: {
   isInitialLoading: boolean;
   isError: boolean;
@@ -392,6 +396,7 @@ function KnowledgeSourcesPanel({
   onAddFirstSource: () => void;
   onSortChange: (updater: SortingState | ((old: SortingState) => SortingState)) => void;
   onDeleteSource: (source: KnowledgeBaseSource) => void;
+  onRetrySource: (source: KnowledgeBaseSource) => void;
 }) {
   return (
     <div className="overflow-hidden rounded-[20px] border border-border/60 bg-transparent shadow-none [--card-spacing:0rem]">
@@ -403,12 +408,17 @@ function KnowledgeSourcesPanel({
         <KnowledgeEmptyState onAddFirstSource={onAddFirstSource} />
       ) : (
         <>
-          <KnowledgeSourcesMobileList sources={sources} onDeleteSource={onDeleteSource} />
+          <KnowledgeSourcesMobileList
+            sources={sources}
+            onDeleteSource={onDeleteSource}
+            onRetrySource={onRetrySource}
+          />
           <KnowledgeSourcesTable
             sources={sources}
             sorting={sorting}
             onSortChange={onSortChange}
             onDeleteSource={onDeleteSource}
+            onRetrySource={onRetrySource}
           />
           <KnowledgeSourcesFooter
             visibleCount={sources.length}
@@ -441,9 +451,11 @@ function KnowledgeEmptyState({ onAddFirstSource }: { onAddFirstSource: () => voi
 function KnowledgeSourcesMobileList({
   sources,
   onDeleteSource,
+  onRetrySource,
 }: {
   sources: KnowledgeBaseSource[];
   onDeleteSource: (source: KnowledgeBaseSource) => void;
+  onRetrySource: (source: KnowledgeBaseSource) => void;
 }) {
   return (
     <div className="space-y-3 p-4 md:hidden">
@@ -477,7 +489,11 @@ function KnowledgeSourcesMobileList({
                   <span>{formatUpdatedAt(source.updatedAt)}</span>
                 </div>
               </div>
-              <SourceActions source={source} onDeleteSource={onDeleteSource} />
+              <SourceActions
+                source={source}
+                onDeleteSource={onDeleteSource}
+                onRetrySource={onRetrySource}
+              />
             </div>
           </div>
         );
@@ -515,11 +531,13 @@ function KnowledgeSourcesTable({
   sorting,
   onSortChange,
   onDeleteSource,
+  onRetrySource,
 }: {
   sources: KnowledgeBaseSource[];
   sorting: SortingState;
   onSortChange: (updater: SortingState | ((old: SortingState) => SortingState)) => void;
   onDeleteSource: (source: KnowledgeBaseSource) => void;
+  onRetrySource: (source: KnowledgeBaseSource) => void;
 }) {
   "use no memo";
 
@@ -566,7 +584,13 @@ function KnowledgeSourcesTable({
       id: "actions",
       header: "Actions",
       enableSorting: false,
-      cell: ({ row }) => <SourceActions source={row.original} onDeleteSource={onDeleteSource} />,
+      cell: ({ row }) => (
+        <SourceActions
+          source={row.original}
+          onDeleteSource={onDeleteSource}
+          onRetrySource={onRetrySource}
+        />
+      ),
     },
   ];
 
@@ -702,9 +726,11 @@ function SourceIdentity({ source }: { source: KnowledgeBaseSource }) {
 function SourceActions({
   source,
   onDeleteSource,
+  onRetrySource,
 }: {
   source: KnowledgeBaseSource;
   onDeleteSource: (source: KnowledgeBaseSource) => void;
+  onRetrySource: (source: KnowledgeBaseSource) => void;
 }) {
   return (
     <DropdownMenu>
@@ -721,6 +747,12 @@ function SourceActions({
         }
       />
       <DropdownMenuContent align="end" sideOffset={8} className="w-44">
+        {source.status === "failed" ? (
+          <DropdownMenuItem className="cursor-pointer gap-2" onClick={() => onRetrySource(source)}>
+            <RefreshCw className="h-4 w-4" />
+            Retry indexing
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuItem
           className="cursor-pointer gap-2 text-destructive"
           variant="destructive"

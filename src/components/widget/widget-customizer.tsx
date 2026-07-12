@@ -22,6 +22,7 @@ import { useWidgetConfig, useSaveWidgetConfig } from "@/hooks/query";
 import { isValidDomain, sanitizeDomain } from "@/lib/domain-validation";
 import { getWidgetAccentVars, WIDGET_BRAND_COLOR } from "@/lib/widget-accent";
 import { normalizeFontFamily, normalizeFontSize, normalizeLogoUrl } from "@/features/widget/domain";
+import { BookingSettingsCard } from "@/features/integrations/components/booking-settings-card";
 import { cn } from "@/lib/utils";
 
 import { WidgetPreviewPanel } from "./widget-preview-panel";
@@ -747,14 +748,17 @@ export function WidgetCustomizer({
           ) : null}
 
           {activeTab === "agent" ? (
-            <WidgetAgentPanel
-              agentName={config.agentName}
-              instructions={config.instructions}
-              escalationKeywords={config.escalationKeywords}
-              modelProvider={config.modelProvider}
-              modelName={config.modelName}
-              onUpdate={(key, value) => updateConfig(key, value)}
-            />
+            <div className="space-y-8">
+              <WidgetAgentPanel
+                agentName={config.agentName}
+                instructions={config.instructions}
+                escalationKeywords={config.escalationKeywords}
+                modelProvider={config.modelProvider}
+                modelName={config.modelName}
+                onUpdate={(key, value) => updateConfig(key, value)}
+              />
+              <BookingSettingsCard />
+            </div>
           ) : null}
 
           {activeTab === "behaviour" ? (

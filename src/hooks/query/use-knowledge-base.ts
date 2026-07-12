@@ -91,6 +91,8 @@ export function useKnowledgeBaseSources(
       return requireData(data, error, "Failed to fetch knowledge sources");
     },
     enabled: Boolean(workspaceId) && (options?.enabled ?? true),
+    refetchInterval: (query) =>
+      query.state.data?.sources.some((source) => source.status === "processing") ? 2_000 : false,
   });
 }
 
@@ -170,6 +172,26 @@ export function useDeleteKnowledgeBaseSource() {
         },
       );
       return requireData(data, error, "Failed to delete source");
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeBase.all });
+    },
+  });
+}
+
+export function useRetryKnowledgeBaseSource() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (sourceId: string) => {
+      const response = await fetch(`/api/dashboard/knowledge-base/sources/${sourceId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "retry" }),
+      });
+      const body = (await response.json().catch(() => ({}))) as { error?: string };
+      if (!response.ok) throw new Error(body.error ?? "Failed to retry source");
+      return body;
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeBase.all });
