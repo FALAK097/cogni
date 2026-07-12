@@ -8,6 +8,7 @@ import {
   markConversationAsRead,
 } from "@/features/conversations/server/queries";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import {
   conversation as conversationTable,
   visitorSession as visitorSessionTable,
@@ -174,6 +175,46 @@ export async function PATCH(request: Request, context: RouteContext) {
     const message = body.message?.trim();
     if (!message) {
       return NextResponse.json({ error: "Message is required." }, { status: 400 });
+    }
+
+    if (body.action === "reply" && conversation.channel !== "WIDGET") {
+      if (!conversation.externalThreadId) {
+        return NextResponse.json({ error: "Channel reply is unavailable." }, { status: 409 });
+      }
+      const integration = await db.query.integration.findFirst({
+        where: (fields, { and, eq }) =>
+          and(
+            eq(fields.workspaceId, workspace.id),
+            eq(fields.provider, conversation.channel),
+            eq(fields.status, "CONNECTED"),
+          ),
+        columns: { id: true },
+      });
+      if (!integration) {
+        return NextResponse.json(
+          { error: "Channel integration is disconnected." },
+          { status: 409 },
+        );
+      }
+      const environment = getCloudflareContext().env as CloudflareEnv & {
+        CONVERSATION_ROOMS: DurableObjectNamespace;
+      };
+      const room = environment.CONVERSATION_ROOMS.getByName(conversation.id) as unknown as {
+        postExternalReply(input: {
+          workspaceId: string;
+          integrationId: string;
+          channel: string;
+          externalThreadId: string;
+          text: string;
+        }): Promise<void>;
+      };
+      await room.postExternalReply({
+        workspaceId: workspace.id,
+        integrationId: integration.id,
+        channel: conversation.channel,
+        externalThreadId: conversation.externalThreadId,
+        text: message,
+      });
     }
 
     const saved = await appendTeamConversationMessage(

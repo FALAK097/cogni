@@ -78,6 +78,36 @@ export class SourceSyncWorkflow extends WorkflowEntrypoint<CloudflareEnv, Ingest
 }
 
 export class ConversationRoom extends DurableObject<CloudflareEnv> {
+  async postExternalReply(input: {
+    workspaceId: string;
+    integrationId: string;
+    channel: string;
+    externalThreadId: string;
+    text: string;
+  }) {
+    const channel = input.channel.toLowerCase();
+    const { isChatSdkChannel, postChannelReply } =
+      await import("./src/features/integrations/server/chat-sdk");
+    if (!isChatSdkChannel(channel)) throw new Error("Unsupported channel.");
+    return runWithCloudflareRequestContext(
+      new Request("https://widget.internal/channels/reply"),
+      this.env,
+      this.ctx,
+      async () => {
+        const { getDb } = await import("./src/lib/db/client");
+        await postChannelReply({
+          channel,
+          externalThreadId: input.externalThreadId,
+          namespace: this.env.CHAT_STATE,
+          db: getDb(),
+          workspaceId: input.workspaceId,
+          integrationId: input.integrationId,
+          text: input.text,
+        });
+      },
+    );
+  }
+
   async fetch(request: Request) {
     if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
       return new Response("WebSocket upgrade required", { status: 426 });

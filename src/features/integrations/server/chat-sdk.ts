@@ -85,3 +85,29 @@ export function createChannelBot({
 export function isChatSdkChannel(value: string): value is ChatSdkChannel {
   return chatSdkChannelSchema.some((channel) => channel === value);
 }
+
+export async function postChannelReply({
+  channel,
+  externalThreadId,
+  namespace,
+  db,
+  workspaceId,
+  integrationId,
+  text,
+}: {
+  channel: ChatSdkChannel;
+  externalThreadId: string;
+  namespace: DurableObjectNamespace<ChatStateDO>;
+  db: Db;
+  workspaceId: string;
+  integrationId: string;
+  text: string;
+}) {
+  const bot = createChannelBot({ channel, namespace, db, workspaceId, integrationId });
+  await bot.initialize();
+  try {
+    await bot.thread(externalThreadId).post(text);
+  } finally {
+    await bot.shutdown();
+  }
+}
