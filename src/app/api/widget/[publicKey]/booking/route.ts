@@ -17,7 +17,7 @@ import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
 import { getDb } from "@/lib/db/client";
 import { createApprovalRequest } from "@/features/integrations/server/approval-service";
 import { createWorkflowWithSteps, updateWorkflowStep } from "@/lib/workflows/runner";
-import { workflowRun } from "@/lib/db/schema";
+import { approvalRequest, workflowRun, workflowStep } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 
 type RouteContext = { params: Promise<{ publicKey: string }> };
@@ -113,12 +113,85 @@ export async function POST(request: Request, context: RouteContext) {
 
   const workspaceId = result.access.widget.workspaceId;
   const idempotencyKey = `booking:${workspaceId}:${parsed.data.startAt}`;
+  const calendarPayload = {
+    conversationId: conversation.id,
+    title: parsed.data.title,
+    startAt: parsed.data.startAt,
+    endAt: parsed.data.endAt,
+    attendeeEmail: parsed.data.attendeeEmail,
+    timezone: result.settings.timezone,
+  };
+  const confirmationPayload = {
+    conversationId: conversation.id,
+    to: parsed.data.attendeeEmail,
+    subject: `Confirmed: ${parsed.data.title}`,
+    text: `Your appointment is confirmed from ${parsed.data.startAt} to ${parsed.data.endAt}. Reply to this email if you need to make a change.`,
+  };
   const existing = await result.db.query.workflowRun.findFirst({
     where: (fields, { and, eq }) =>
       and(eq(fields.workspaceId, workspaceId), eq(fields.idempotencyKey, idempotencyKey)),
   });
   if (existing) {
     const sameRequest = JSON.stringify(JSON.parse(existing.input)) === JSON.stringify(parsed.data);
+    if (
+      !sameRequest &&
+      existing.conversationId === conversation.id &&
+      existing.status === "WAITING_APPROVAL"
+    ) {
+      const corrected = await result.db.transaction(async (tx) => {
+        const [pendingApproval] = await tx
+          .update(approvalRequest)
+          .set({
+            payload: JSON.stringify(calendarPayload),
+            summary: "Approve and create calendar event",
+          })
+          .where(
+            and(
+              eq(approvalRequest.workflowRunId, existing.id),
+              eq(approvalRequest.workspaceId, workspaceId),
+              eq(approvalRequest.status, "PENDING"),
+            ),
+          )
+          .returning({ id: approvalRequest.id });
+        if (!pendingApproval) return false;
+        await tx
+          .update(workflowRun)
+          .set({ input: JSON.stringify(parsed.data) })
+          .where(and(eq(workflowRun.id, existing.id), eq(workflowRun.workspaceId, workspaceId)));
+        await tx
+          .update(workflowStep)
+          .set({
+            input: JSON.stringify({ actionType: "calendar.create", payload: calendarPayload }),
+          })
+          .where(
+            and(
+              eq(workflowStep.workflowRunId, existing.id),
+              eq(workflowStep.workspaceId, workspaceId),
+              eq(workflowStep.position, 0),
+            ),
+          );
+        await tx
+          .update(workflowStep)
+          .set({
+            input: JSON.stringify({ actionType: "email.send", payload: confirmationPayload }),
+          })
+          .where(
+            and(
+              eq(workflowStep.workflowRunId, existing.id),
+              eq(workflowStep.workspaceId, workspaceId),
+              eq(workflowStep.position, 1),
+            ),
+          );
+        return true;
+      });
+      if (corrected) {
+        return corsResponse(request, result.access.allowedDomains, {
+          workflowId: existing.id,
+          status: "PENDING_TEAM_APPROVAL",
+          message: "Your pending booking details were updated.",
+        });
+      }
+    }
     return corsResponse(
       request,
       result.access.allowedDomains,
@@ -145,14 +218,7 @@ export async function POST(request: Request, context: RouteContext) {
         kind: "ACTION",
         input: {
           actionType: "calendar.create",
-          payload: {
-            conversationId: conversation.id,
-            title: parsed.data.title,
-            startAt: parsed.data.startAt,
-            endAt: parsed.data.endAt,
-            attendeeEmail: parsed.data.attendeeEmail,
-            timezone: result.settings.timezone,
-          },
+          payload: calendarPayload,
         },
       },
       {
@@ -160,12 +226,7 @@ export async function POST(request: Request, context: RouteContext) {
         kind: "MESSAGE",
         input: {
           actionType: "email.send",
-          payload: {
-            conversationId: conversation.id,
-            to: parsed.data.attendeeEmail,
-            subject: `Confirmed: ${parsed.data.title}`,
-            text: `Your appointment is confirmed from ${parsed.data.startAt} to ${parsed.data.endAt}. Reply to this email if you need to make a change.`,
-          },
+          payload: confirmationPayload,
         },
       },
     ],
