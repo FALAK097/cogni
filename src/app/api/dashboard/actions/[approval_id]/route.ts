@@ -71,34 +71,41 @@ export async function PATCH(request: Request, context: RouteContext) {
         status: "COMPLETED",
         output: { actionId: action.id, result: action.result },
       });
-      if (approval.actionType === "calendar.create") {
-        const run = await db.query.workflowRun.findFirst({
-          where: (fields, { and, eq }) =>
-            and(eq(fields.id, approval.workflowRunId!), eq(fields.workspaceId, workspace.id)),
-          columns: { input: true, conversationId: true },
-        });
-        if (!run?.conversationId) throw new Error("Booking workflow context was not found.");
-        const booking = z
+      const pendingStep = await db.query.workflowStep.findFirst({
+        where: (fields, { and, eq }) =>
+          and(
+            eq(fields.workflowRunId, approval.workflowRunId!),
+            eq(fields.workspaceId, workspace.id),
+            eq(fields.status, "PENDING"),
+          ),
+        orderBy: (fields, { asc }) => [asc(fields.position)],
+      });
+      if (pendingStep?.kind === "MESSAGE") {
+        const confirmation = z
           .object({
-            attendeeEmail: z.email(),
-            title: z.string().min(1),
-            startAt: z.iso.datetime(),
-            endAt: z.iso.datetime(),
+            actionType: z.literal("email.send"),
+            payload: z.unknown(),
           })
-          .parse(JSON.parse(run.input) as unknown);
+          .parse(JSON.parse(pendingStep.input) as unknown);
         try {
-          await executeApprovedTool({
+          const confirmationAction = await executeApprovedTool({
             db,
             workspaceId: workspace.id,
-            actionType: "email.send",
-            input: {
-              conversationId: run.conversationId,
-              to: booking.attendeeEmail,
-              subject: `Confirmed: ${booking.title}`,
-              text: `Your appointment is confirmed from ${booking.startAt} to ${booking.endAt}. Reply to this email if you need to make a change.`,
-            },
-            idempotencyKey: `booking-confirmation:${approval.workflowRunId}`,
+            actionType: confirmation.actionType,
+            input: confirmation.payload,
+            idempotencyKey: `workflow-step:${pendingStep.id}`,
             requestedById: session.user.id,
+          });
+          await updateWorkflowStep({
+            db,
+            workspaceId: workspace.id,
+            runId: approval.workflowRunId,
+            stepId: pendingStep.id,
+            status: "COMPLETED",
+            output: {
+              actionId: confirmationAction.id,
+              result: confirmationAction.result,
+            },
           });
         } catch (error) {
           const message =
@@ -112,7 +119,7 @@ export async function PATCH(request: Request, context: RouteContext) {
           throw error;
         }
       }
-      const pendingStep = await db.query.workflowStep.findFirst({
+      const remainingStep = await db.query.workflowStep.findFirst({
         where: (fields, { and, eq }) =>
           and(
             eq(fields.workflowRunId, approval.workflowRunId!),
@@ -120,7 +127,7 @@ export async function PATCH(request: Request, context: RouteContext) {
             eq(fields.status, "PENDING"),
           ),
       });
-      if (pendingStep) {
+      if (remainingStep) {
         await db
           .update(workflowRun)
           .set({ status: "RUNNING" })

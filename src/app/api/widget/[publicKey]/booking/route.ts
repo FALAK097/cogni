@@ -155,6 +155,19 @@ export async function POST(request: Request, context: RouteContext) {
           },
         },
       },
+      {
+        name: "Send attendee confirmation",
+        kind: "MESSAGE",
+        input: {
+          actionType: "email.send",
+          payload: {
+            conversationId: conversation.id,
+            to: parsed.data.attendeeEmail,
+            subject: `Confirmed: ${parsed.data.title}`,
+            text: `Your appointment is confirmed from ${parsed.data.startAt} to ${parsed.data.endAt}. Reply to this email if you need to make a change.`,
+          },
+        },
+      },
     ],
   });
   if (!workflow.created) {
