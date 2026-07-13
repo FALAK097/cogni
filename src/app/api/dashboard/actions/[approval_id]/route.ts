@@ -63,6 +63,35 @@ export async function PATCH(request: Request, context: RouteContext) {
       requestedById: session.user.id,
     });
     if (approval.workflowRunId && approval.workflowStepId) {
+      if (approval.actionType === "calendar.create") {
+        const run = await db.query.workflowRun.findFirst({
+          where: (fields, { and, eq }) =>
+            and(eq(fields.id, approval.workflowRunId!), eq(fields.workspaceId, workspace.id)),
+          columns: { input: true, conversationId: true },
+        });
+        if (!run?.conversationId) throw new Error("Booking workflow context was not found.");
+        const booking = z
+          .object({
+            attendeeEmail: z.email(),
+            title: z.string().min(1),
+            startAt: z.iso.datetime(),
+            endAt: z.iso.datetime(),
+          })
+          .parse(JSON.parse(run.input) as unknown);
+        await executeApprovedTool({
+          db,
+          workspaceId: workspace.id,
+          actionType: "email.send",
+          input: {
+            conversationId: run.conversationId,
+            to: booking.attendeeEmail,
+            subject: `Confirmed: ${booking.title}`,
+            text: `Your appointment is confirmed from ${booking.startAt} to ${booking.endAt}. Reply to this email if you need to make a change.`,
+          },
+          idempotencyKey: `booking-confirmation:${approval.workflowRunId}`,
+          requestedById: session.user.id,
+        });
+      }
       await updateWorkflowStep({
         db,
         workspaceId: workspace.id,

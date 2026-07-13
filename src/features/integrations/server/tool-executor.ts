@@ -177,22 +177,38 @@ export async function executeApprovedTool({
     where: (fields, { eq, and }) =>
       and(eq(fields.workspaceId, workspaceId), eq(fields.idempotencyKey, idempotencyKey)),
   });
-  if (existing) return existing;
+  if (existing?.status === "COMPLETED") return existing;
+  if (existing?.status === "RUNNING") throw new Error("This action is already running.");
 
-  const [action] = await db
-    .insert(integrationAction)
-    .values({
-      id: crypto.randomUUID(),
-      workspaceId,
-      provider: parsed.tool.provider,
-      actionType: parsed.tool.actionType,
-      idempotencyKey,
-      requestedById,
-      payload: JSON.stringify(parsed.input),
-      status: "RUNNING",
-      updatedAt: new Date().toISOString(),
-    })
-    .returning();
+  const now = new Date().toISOString();
+  const [action] = existing
+    ? await db
+        .update(integrationAction)
+        .set({ status: "RUNNING", errorMessage: null, updatedAt: now })
+        .where(
+          and(
+            eq(integrationAction.id, existing.id),
+            eq(integrationAction.workspaceId, workspaceId),
+            eq(integrationAction.status, "FAILED"),
+          ),
+        )
+        .returning()
+    : await db
+        .insert(integrationAction)
+        .values({
+          id: crypto.randomUUID(),
+          workspaceId,
+          provider: parsed.tool.provider,
+          actionType: parsed.tool.actionType,
+          idempotencyKey,
+          requestedById,
+          payload: JSON.stringify(parsed.input),
+          status: "RUNNING",
+          updatedAt: now,
+        })
+        .onConflictDoNothing()
+        .returning();
+  if (!action) throw new Error("This action is already running.");
 
   try {
     const result =

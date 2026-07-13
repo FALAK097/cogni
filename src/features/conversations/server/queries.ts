@@ -290,6 +290,19 @@ export async function appendTeamConversationMessage(
   return false;
 }
 
+export async function broadcastConversationChanged(
+  conversationId: string,
+  status: string,
+  assignedMemberId: string | null,
+) {
+  await broadcastConversationEvent({
+    type: "state",
+    conversationId,
+    status,
+    assignedMemberId,
+  });
+}
+
 function getLastPublicMessage(messages: MessageJson[]) {
   const publicMessages = messages.filter(
     (message) => message.visibility === "PUBLIC" || !message.visibility,

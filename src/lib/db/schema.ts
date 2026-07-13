@@ -702,6 +702,7 @@ export const approvalRequest = sqliteTable(
   },
   (table) => [
     uniqueIndex("approval_request_tokenHash_key").on(table.tokenHash),
+    uniqueIndex("approval_request_workflowStepId_key").on(table.workflowStepId),
     index("approval_request_workspaceId_status_createdAt_idx").on(
       table.workspaceId,
       table.status,

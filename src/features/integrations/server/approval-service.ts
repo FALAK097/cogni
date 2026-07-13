@@ -73,9 +73,19 @@ export async function createApprovalRequest({
       workflowStepId,
       requestedByAgentRunId: agentRunId,
     })
+    .onConflictDoNothing()
     .returning();
 
-  return { approval, token };
+  if (!approval && workflowStepId) {
+    const existing = await db.query.approvalRequest.findFirst({
+      where: (fields, { and, eq }) =>
+        and(eq(fields.workspaceId, workspaceId), eq(fields.workflowStepId, workflowStepId)),
+    });
+    if (existing) return { approval: existing, token: getApprovalToken(existing), created: false };
+  }
+  if (!approval) throw new Error("Approval request could not be created.");
+
+  return { approval, token, created: true };
 }
 
 export async function decideApprovalRequest({

@@ -8,7 +8,7 @@ import { emitDomainEvent } from "@/lib/events/domain-events";
 import { notifyWorkspaceMembers } from "@/lib/notifications/create-notification";
 import { logError, logInfo } from "@/lib/logging/logger";
 
-export async function startWorkflowRun({
+async function startWorkflowRunWithResult({
   db,
   workspaceId,
   name,
@@ -28,7 +28,7 @@ export async function startWorkflowRun({
       where: (run, { eq, and }) =>
         and(eq(run.workspaceId, workspaceId), eq(run.idempotencyKey, idempotencyKey)),
     });
-    if (existing) return existing;
+    if (existing) return { run: existing, created: false };
   }
 
   const results = await db
@@ -41,19 +41,34 @@ export async function startWorkflowRun({
       input: JSON.stringify(input ?? {}),
       conversationId,
     })
+    .onConflictDoNothing()
     .returning();
 
-  const run = results[0];
+  const run =
+    results[0] ??
+    (idempotencyKey
+      ? await db.query.workflowRun.findFirst({
+          where: (fields, { and, eq }) =>
+            and(eq(fields.workspaceId, workspaceId), eq(fields.idempotencyKey, idempotencyKey)),
+        })
+      : undefined);
+  if (!run) throw new Error("Workflow could not be created.");
 
-  await emitDomainEvent({
-    db,
-    workspaceId,
-    type: "workflow.started",
-    entityId: run.id,
-    payload: { name },
-  });
+  if (results[0]) {
+    await emitDomainEvent({
+      db,
+      workspaceId,
+      type: "workflow.started",
+      entityId: run.id,
+      payload: { name },
+    });
+  }
 
-  return run;
+  return { run, created: Boolean(results[0]) };
+}
+
+export async function startWorkflowRun(input: Parameters<typeof startWorkflowRunWithResult>[0]) {
+  return (await startWorkflowRunWithResult(input)).run;
 }
 
 const workflowStepInputSchema = z.object({
@@ -82,7 +97,7 @@ export async function createWorkflowWithSteps({
   steps: WorkflowStepInput[];
 }) {
   const parsedSteps = z.array(workflowStepInputSchema).min(1).max(20).parse(steps);
-  const run = await startWorkflowRun({
+  const started = await startWorkflowRunWithResult({
     db,
     workspaceId,
     conversationId,
@@ -90,11 +105,14 @@ export async function createWorkflowWithSteps({
     idempotencyKey,
     input,
   });
+  const run = started.run;
   const existingSteps = await db.query.workflowStep.findMany({
     where: (fields, { eq, and }) =>
       and(eq(fields.workflowRunId, run.id), eq(fields.workspaceId, workspaceId)),
   });
-  if (existingSteps.length > 0) return { run, steps: existingSteps };
+  if (!started.created || existingSteps.length > 0) {
+    return { run, steps: existingSteps, created: false };
+  }
 
   const createdSteps = await db
     .insert(workflowStep)
@@ -109,8 +127,16 @@ export async function createWorkflowWithSteps({
         input: JSON.stringify(step.input),
       })),
     )
+    .onConflictDoNothing()
     .returning();
-  return { run, steps: createdSteps };
+  const finalSteps =
+    createdSteps.length > 0
+      ? createdSteps
+      : await db.query.workflowStep.findMany({
+          where: (fields, { eq, and }) =>
+            and(eq(fields.workflowRunId, run.id), eq(fields.workspaceId, workspaceId)),
+        });
+  return { run, steps: finalSteps, created: createdSteps.length > 0 };
 }
 
 export async function updateWorkflowStep({

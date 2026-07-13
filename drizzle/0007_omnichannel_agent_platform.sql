@@ -24,6 +24,7 @@ CREATE TABLE `approval_request` (
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `approval_request_tokenHash_key` ON `approval_request` (`tokenHash`);--> statement-breakpoint
+CREATE UNIQUE INDEX `approval_request_workflowStepId_key` ON `approval_request` (`workflowStepId`);--> statement-breakpoint
 CREATE INDEX `approval_request_workspaceId_status_createdAt_idx` ON `approval_request` (`workspaceId`,`status`,`createdAt`);--> statement-breakpoint
 CREATE TABLE `workflow_step` (
 	`id` text PRIMARY KEY NOT NULL,

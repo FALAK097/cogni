@@ -157,6 +157,14 @@ export async function POST(request: Request, context: RouteContext) {
       },
     ],
   });
+  if (!workflow.created) {
+    return corsResponse(
+      request,
+      result.access.allowedDomains,
+      { error: "Slot is already reserved.", workflowId: workflow.run.id },
+      409,
+    );
+  }
   const actionStep = workflow.steps[0];
   if (!actionStep) throw new Error("Booking workflow step was not created.");
   const actionInput = JSON.parse(actionStep.input) as {
@@ -173,6 +181,14 @@ export async function POST(request: Request, context: RouteContext) {
     input: actionInput.payload,
     summary: actionStep.name,
   });
+  if (!approval.created) {
+    return corsResponse(
+      request,
+      result.access.allowedDomains,
+      { error: "This booking request is already pending.", workflowId: workflow.run.id },
+      409,
+    );
+  }
   await updateWorkflowStep({
     db: result.db,
     workspaceId,

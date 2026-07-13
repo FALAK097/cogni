@@ -4,6 +4,7 @@ import { eq, and } from "drizzle-orm";
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
 import {
   appendTeamConversationMessage,
+  broadcastConversationChanged,
   getConversation,
   markConversationAsRead,
 } from "@/features/conversations/server/queries";
@@ -65,7 +66,6 @@ export async function GET(_request: Request, context: RouteContext) {
         eq(fields.contactId, conversation.contactId),
         eq(fields.workspaceId, workspace.id),
         ne(fields.id, conversation.id),
-        eq(fields.channel, "WIDGET"),
       ),
     orderBy: (fields, { desc }) => [desc(fields.lastMessageAt)],
     limit: 5,
@@ -162,7 +162,13 @@ export async function PATCH(request: Request, context: RouteContext) {
     await db
       .update(conversationTable)
       .set({ assignedMemberId: membership.id, status: "ASSIGNED" })
-      .where(eq(conversationTable.id, conversation.id));
+      .where(
+        and(
+          eq(conversationTable.id, conversation.id),
+          eq(conversationTable.workspaceId, workspace.id),
+        ),
+      );
+    await broadcastConversationChanged(conversation.id, "ASSIGNED", membership.id);
     return NextResponse.json({ ok: true });
   }
 
