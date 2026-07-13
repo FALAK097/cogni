@@ -4,7 +4,7 @@ import { z } from "zod";
 import { decideApprovalRequest } from "@/features/integrations/server/approval-service";
 import { executeApprovedTool } from "@/features/integrations/server/tool-executor";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
-import { completeWorkflowRun, updateWorkflowStep } from "@/lib/workflows/runner";
+import { completeWorkflowRun, failWorkflowRun, updateWorkflowStep } from "@/lib/workflows/runner";
 import { workflowRun } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 
@@ -63,6 +63,14 @@ export async function PATCH(request: Request, context: RouteContext) {
       requestedById: session.user.id,
     });
     if (approval.workflowRunId && approval.workflowStepId) {
+      await updateWorkflowStep({
+        db,
+        workspaceId: workspace.id,
+        runId: approval.workflowRunId,
+        stepId: approval.workflowStepId,
+        status: "COMPLETED",
+        output: { actionId: action.id, result: action.result },
+      });
       if (approval.actionType === "calendar.create") {
         const run = await db.query.workflowRun.findFirst({
           where: (fields, { and, eq }) =>
@@ -78,28 +86,32 @@ export async function PATCH(request: Request, context: RouteContext) {
             endAt: z.iso.datetime(),
           })
           .parse(JSON.parse(run.input) as unknown);
-        await executeApprovedTool({
-          db,
-          workspaceId: workspace.id,
-          actionType: "email.send",
-          input: {
-            conversationId: run.conversationId,
-            to: booking.attendeeEmail,
-            subject: `Confirmed: ${booking.title}`,
-            text: `Your appointment is confirmed from ${booking.startAt} to ${booking.endAt}. Reply to this email if you need to make a change.`,
-          },
-          idempotencyKey: `booking-confirmation:${approval.workflowRunId}`,
-          requestedById: session.user.id,
-        });
+        try {
+          await executeApprovedTool({
+            db,
+            workspaceId: workspace.id,
+            actionType: "email.send",
+            input: {
+              conversationId: run.conversationId,
+              to: booking.attendeeEmail,
+              subject: `Confirmed: ${booking.title}`,
+              text: `Your appointment is confirmed from ${booking.startAt} to ${booking.endAt}. Reply to this email if you need to make a change.`,
+            },
+            idempotencyKey: `booking-confirmation:${approval.workflowRunId}`,
+            requestedById: session.user.id,
+          });
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : "Booking confirmation email failed.";
+          await failWorkflowRun({
+            db,
+            workspaceId: workspace.id,
+            runId: approval.workflowRunId,
+            errorMessage: message,
+          });
+          throw error;
+        }
       }
-      await updateWorkflowStep({
-        db,
-        workspaceId: workspace.id,
-        runId: approval.workflowRunId,
-        stepId: approval.workflowStepId,
-        status: "COMPLETED",
-        output: { actionId: action.id, result: action.result },
-      });
       const pendingStep = await db.query.workflowStep.findFirst({
         where: (fields, { and, eq }) =>
           and(
