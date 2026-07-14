@@ -99,6 +99,7 @@ export async function saveMessage(role, content, metadata = {}) {
         sessionId: state.sessionDbId,
         role,
         content,
+        preview: state.preview,
         metadata: msgMetadata,
       }),
     });
@@ -121,6 +122,7 @@ export async function submitFeedback(messageId, feedback, reason = null) {
         sessionId: state.sessionDbId,
         feedback,
         reason,
+        preview: state.preview,
       }),
     });
 

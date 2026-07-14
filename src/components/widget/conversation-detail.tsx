@@ -89,6 +89,32 @@ function getInitials(name: string) {
   return name.slice(0, 2).toUpperCase();
 }
 
+function splitMessageSources(content: string) {
+  const lines = content.trimEnd().split("\n");
+
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    if (lines[index]?.trim().toLowerCase() !== "sources:") continue;
+
+    const sourceLines = lines.slice(index + 1).filter((line) => line.trim());
+    if (sourceLines.length === 0) continue;
+
+    const sources = sourceLines.map((line) =>
+      line
+        .trim()
+        .match(/^[-*]\s+(.+)$/)?.[1]
+        ?.trim(),
+    );
+    if (sources.some((source) => !source)) continue;
+
+    return {
+      content: lines.slice(0, index).join("\n").trimEnd(),
+      sources: [...new Set(sources.filter((source): source is string => Boolean(source)))],
+    };
+  }
+
+  return { content, sources: [] };
+}
+
 function isOnline(lastActivityAt: string) {
   return Date.now() - new Date(lastActivityAt).getTime() < 5 * 60 * 1000;
 }
@@ -515,6 +541,7 @@ function MessageBubble({
   const isTeam = message.authorType === "TEAM";
   const hasDocuments =
     message.metadata?.type === "documents" && !!message.metadata?.documents?.length;
+  const parsedMessage = splitMessageSources(message.content);
 
   return (
     <div className="flex gap-3">
@@ -543,8 +570,28 @@ function MessageBubble({
           )}
         >
           <Streamdown className="break-words font-sans text-sm leading-relaxed">
-            {message.content}
+            {parsedMessage.content}
           </Streamdown>
+
+          {parsedMessage.sources.length > 0 ? (
+            <div
+              className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border/50 pt-2.5"
+              aria-label="Sources"
+            >
+              <span className="mr-0.5 inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
+                <FileText className="h-3 w-3" aria-hidden="true" />
+                Sources
+              </span>
+              {parsedMessage.sources.map((source) => (
+                <span
+                  key={source}
+                  className="inline-flex max-w-full items-center rounded-md bg-background/80 px-2 py-1 text-[11px] leading-none text-foreground ring-1 ring-border/60"
+                >
+                  <span className="truncate">{source}</span>
+                </span>
+              ))}
+            </div>
+          ) : null}
 
           {hasDocuments ? (
             <div className="mt-3 space-y-2">

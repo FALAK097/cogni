@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
 import {
   assertPublicWidgetAccess,
+  assertPreviewWidgetAccess,
   requireAuthorizedVisitorSession,
 } from "@/features/widget/server/widget-public";
 import {
@@ -19,6 +20,7 @@ const feedbackSchema = z.object({
   sessionId: z.string().min(1),
   feedback: z.enum(["positive", "negative"]),
   reason: z.string().trim().max(500).nullable().default(null),
+  preview: z.boolean().default(false),
 });
 
 export function OPTIONS(request: Request) {
@@ -31,16 +33,18 @@ export async function POST(
 ) {
   const { publicKey } = await params;
   const db = getDb();
-  const access = await assertPublicWidgetAccess(db, publicKey, request);
-  if ("error" in access) return access.error;
-  const authorized = await requireAuthorizedVisitorSession(db, publicKey, request);
-  if ("error" in authorized) return authorized.error;
-
   const parsed = feedbackSchema.safeParse(await request.json());
   if (!parsed.success) {
     return Response.json({ error: "Invalid feedback payload." }, { status: 400 });
   }
   const body = parsed.data;
+
+  const access = body.preview
+    ? await assertPreviewWidgetAccess(db, publicKey, request)
+    : await assertPublicWidgetAccess(db, publicKey, request);
+  if ("error" in access) return access.error;
+  const authorized = await requireAuthorizedVisitorSession(db, publicKey, request);
+  if ("error" in authorized) return authorized.error;
 
   if (body.sessionId !== authorized.session.id) {
     return Response.json({ error: "Session not found." }, { status: 404 });
@@ -81,6 +85,6 @@ export async function POST(
   return withWidgetCors(
     new Response(null, { status: 204 }),
     origin,
-    validateEmbedOrigin(origin, access.allowedDomains),
+    body.preview || validateEmbedOrigin(origin, access.allowedDomains),
   );
 }
