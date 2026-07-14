@@ -15,6 +15,8 @@ import {
   Sparkles,
   X,
 } from "@/components/icons";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/use-toast";
 import type { DashboardWidgetConfig } from "@/hooks/query";
@@ -355,9 +357,11 @@ function WidgetCustomizerSkeleton() {
 export function WidgetCustomizer({
   workspaceId,
   initialSubtab,
+  showPreviewModeToggle = true,
 }: {
   workspaceId?: string | null;
   initialSubtab?: string | null;
+  showPreviewModeToggle?: boolean;
 }) {
   const activeWorkspaceId = workspaceId || "";
   const { toast } = useToast();
@@ -366,6 +370,7 @@ export function WidgetCustomizer({
     resolveInitialTab(initialSubtab),
   );
   const [menuOpen, setMenuOpen] = useState(false);
+  const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
   const [showMobilePreview, setShowMobilePreview] = useState(false);
   const [copied, setCopied] = useState(false);
   const [domainInput, setDomainInput] = useState("");
@@ -690,7 +695,7 @@ export function WidgetCustomizer({
 
   return (
     <div
-      className="flex h-full min-h-0 w-full flex-col gap-2 overflow-hidden p-2 sm:gap-3 sm:p-3 lg:flex-row lg:items-stretch"
+      className="relative flex h-full min-h-0 w-full flex-col gap-2 overflow-hidden p-2 sm:gap-3 sm:p-3 lg:flex-row lg:items-stretch"
       style={getWidgetAccentVars(WIDGET_BRAND_COLOR)}
     >
       <div className="flex shrink-0 items-center gap-2 lg:block lg:self-start lg:pt-1">
@@ -736,7 +741,51 @@ export function WidgetCustomizer({
           showMobilePreview ? "hidden lg:flex" : "flex",
         )}
       >
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
+        <div className="flex items-center justify-between border-b border-border/60 px-4 py-3 lg:hidden">
+          <div>
+            <p className="text-sm font-semibold text-foreground">
+              {NAV_ITEMS.find((item) => item.id === activeTab)?.label ?? "Widget"}
+            </p>
+            <p className="text-xs text-muted-foreground">Customize your assistant</p>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            className="rounded-xl"
+            onClick={() => setMobilePreviewOpen(true)}
+          >
+            <MessageCircle className="size-4" />
+            Preview
+          </Button>
+        </div>
+
+        <div className="border-b border-border/60 px-3 py-2 lg:hidden">
+          <div className="flex gap-1.5 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {NAV_ITEMS.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => handleSubTabChange(item.id)}
+                  className={cn(
+                    "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                    isActive
+                      ? "border-[var(--widget-accent-border)] bg-[var(--widget-accent-muted)] text-[var(--widget-accent)]"
+                      : "border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground",
+                  )}
+                >
+                  <Icon className="size-3.5 shrink-0" />
+                  {item.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6">
           {activeTab === "appearance" ? (
             <WidgetAppearancePanel
               config={appearanceConfig}
@@ -814,8 +863,19 @@ export function WidgetCustomizer({
             : "hidden lg:flex lg:h-full lg:w-[380px] xl:w-[420px]",
         )}
       >
-        <WidgetPreviewPanel liveConfig={liveConfig} />
+        <WidgetPreviewPanel liveConfig={liveConfig} showModeToggle={showPreviewModeToggle} />
       </div>
+
+      <Sheet open={mobilePreviewOpen} onOpenChange={setMobilePreviewOpen}>
+        <SheetContent side="bottom" className="h-[min(88dvh,760px)] rounded-t-2xl p-0 lg:hidden">
+          <SheetHeader className="border-b border-border/70 px-5 py-4 text-left">
+            <SheetTitle>Widget preview</SheetTitle>
+          </SheetHeader>
+          <div className="h-[calc(100%-4rem)]">
+            <WidgetPreviewPanel liveConfig={liveConfig} showModeToggle={showPreviewModeToggle} />
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

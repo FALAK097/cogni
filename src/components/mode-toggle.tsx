@@ -11,13 +11,13 @@ export function ModeToggle() {
   const { setTheme, theme } = useTheme();
   const button = (
     <Button
-      className="size-9 shrink-0"
+      className="size-8 shrink-0"
       variant="ghost"
       size="icon"
       onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
     >
-      <Sun className="size-5 rotate-90 scale-0 transition-transform ease-in-out duration-500 dark:rotate-0 dark:scale-100" />
-      <Moon className="absolute size-5 rotate-0 scale-100 transition-transform ease-in-out duration-500 dark:-rotate-90 dark:scale-0" />
+      <Sun className="size-4 rotate-90 scale-0 transition-transform ease-in-out duration-500 dark:rotate-0 dark:scale-100" />
+      <Moon className="absolute size-4 rotate-0 scale-100 transition-transform ease-in-out duration-500 dark:-rotate-90 dark:scale-0" />
       <span className="sr-only">Switch Theme</span>
     </Button>
   );

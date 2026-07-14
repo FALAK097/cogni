@@ -52,7 +52,7 @@ export function useSwitchWorkspace() {
 
   return useMutation({
     mutationFn: async (workspaceId: string) => {
-      const { data, error } = await api.POST<{ ok: boolean }>(
+      const { data, error } = await api.POST<{ ok: boolean; onboardingComplete: boolean }>(
         "/api/workspaces/{workspace_id}/switch",
         {
           params: { path: { workspace_id: workspaceId } },

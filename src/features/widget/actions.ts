@@ -26,6 +26,11 @@ export type WidgetAgentActionState = {
   savedAt?: number;
 };
 
+export type ManageWidgetAgentActionState = {
+  error?: string;
+  savedAt?: number;
+};
+
 const hexColor = z.string().regex(/^#[0-9a-f]{6}$/i, "Use a six-digit hex color.");
 
 const widgetWidgetSettingsSchema = z.object({
@@ -214,5 +219,85 @@ export async function saveWidgetAgentSettingsAction(
 
   revalidatePath("/dashboard/agent");
   revalidatePath("/dashboard/widget");
+  return { savedAt: Date.now() };
+}
+
+const renameWidgetAgentSchema = z.object({
+  widgetId: z.string().trim().min(1),
+  displayName: z.string().trim().min(1, "Enter an agent name.").max(60),
+});
+
+export async function renameWidgetAgentAction(
+  _previousState: ManageWidgetAgentActionState,
+  formData: FormData,
+): Promise<ManageWidgetAgentActionState> {
+  await requireAuth();
+  const { db, workspace } = await requireDashboardContext();
+
+  const parsed = renameWidgetAgentSchema.safeParse({
+    widgetId: formData.get("widgetId"),
+    displayName: formData.get("displayName"),
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Check the agent name." };
+  }
+
+  const widget = await db.query.widget.findFirst({
+    where: (fields, { and, eq: eqFn }) =>
+      and(eqFn(fields.id, parsed.data.widgetId), eqFn(fields.workspaceId, workspace.id)),
+  });
+
+  if (!widget) {
+    return { error: "Agent not found." };
+  }
+
+  await db
+    .update(widgetTable)
+    .set({
+      displayName: parsed.data.displayName,
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(widgetTable.id, widget.id));
+
+  revalidatePath("/agents");
+  revalidatePath("/backstage");
+  revalidatePath("/widget");
+  return { savedAt: Date.now() };
+}
+
+const deleteWidgetAgentSchema = z.object({
+  widgetId: z.string().trim().min(1),
+});
+
+export async function deleteWidgetAgentAction(
+  _previousState: ManageWidgetAgentActionState,
+  formData: FormData,
+): Promise<ManageWidgetAgentActionState> {
+  await requireAuth();
+  const { db, workspace } = await requireDashboardContext();
+
+  const parsed = deleteWidgetAgentSchema.safeParse({
+    widgetId: formData.get("widgetId"),
+  });
+
+  if (!parsed.success) {
+    return { error: "Invalid agent." };
+  }
+
+  const widget = await db.query.widget.findFirst({
+    where: (fields, { and, eq: eqFn }) =>
+      and(eqFn(fields.id, parsed.data.widgetId), eqFn(fields.workspaceId, workspace.id)),
+  });
+
+  if (!widget) {
+    return { error: "Agent not found." };
+  }
+
+  await db.delete(widgetTable).where(eq(widgetTable.id, widget.id));
+
+  revalidatePath("/agents");
+  revalidatePath("/backstage");
+  revalidatePath("/widget");
   return { savedAt: Date.now() };
 }

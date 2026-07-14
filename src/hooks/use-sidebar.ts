@@ -32,6 +32,7 @@ interface SidebarState {
   hasHydrated: boolean;
   settings: { disabled: boolean; isHoverOpen: boolean };
   toggleOpen: (force?: boolean) => void;
+  closeOnMobile: () => void;
   setIsOpen: (isOpen: boolean) => void;
   setMobileDrawerOpen: (open: boolean) => void;
   setIsHover: (isHover: boolean) => void;
@@ -70,6 +71,11 @@ export const useSidebar = create<SidebarState>()(
         }
 
         set({ isOpen: force !== undefined ? force : !get().isOpen });
+      },
+      closeOnMobile: () => {
+        if (typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches) {
+          set({ isOpen: false });
+        }
       },
       setIsOpen: (isOpen: boolean) => {
         set({ isOpen });

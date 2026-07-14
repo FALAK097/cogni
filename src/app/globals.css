@@ -343,3 +343,39 @@
   display: flex !important;
   flex-direction: column !important;
 }
+
+.playground-live-preview.widget-preview-host.widget-preview-mode-widget #widget-container {
+  justify-content: center !important;
+  align-items: center !important;
+  padding: 24px !important;
+}
+
+.playground-live-preview.widget-preview-host.widget-preview-mode-widget
+  #widget-container
+  .oc-window {
+  flex: 0 1 auto !important;
+  width: 420px !important;
+  max-width: min(420px, 100%) !important;
+  min-height: 520px !important;
+  height: 520px !important;
+  max-height: 520px !important;
+  border-radius: 28px !important;
+}
+
+.playground-live-preview.widget-preview-host.widget-preview-mode-widget
+  #widget-container
+  .oc-preview-container {
+  width: 420px !important;
+  max-width: min(420px, 100%) !important;
+  align-items: center !important;
+}
+
+.playground-live-preview.widget-preview-host.widget-preview-mode-widget
+  #widget-container
+  .oc-launcher {
+  position: absolute !important;
+  right: 24px !important;
+  bottom: 24px !important;
+  align-self: auto !important;
+  order: 3 !important;
+}

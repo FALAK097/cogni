@@ -1,45 +1,97 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
+import { useMemo } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Ellipsis } from "@/components/icons";
 
 import { CollapseMenuButton } from "@/components/app-nav/collapse-menu-button";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { closeMobileSidebar } from "@/hooks/use-sidebar";
-import { buildMenuList } from "@/lib/menu-list";
+import { closeMobileSidebar, useSidebar } from "@/hooks/use-sidebar";
+import { buildMenuList, buildWorkspaceMenuList, type MenuItem } from "@/lib/menu-list";
 import { cn } from "@/lib/utils";
 
 type MenuProps = {
   isOpen?: boolean;
+  variant?: "workspace" | "agent";
 };
 
 const getHrefPathname = (href: string) => {
   try {
-    return new URL(href).pathname;
+    return new URL(href, "http://localhost").pathname;
   } catch {
-    return href;
+    return href.split("?")[0] ?? href;
   }
 };
 
-const isMenuActive = (pathname: string, href: string) => {
+function pathsMatch(pathname: string, href: string, searchParams: URLSearchParams): boolean {
   const hrefPathname = getHrefPathname(href);
-  if (hrefPathname === "/") return pathname === "/" || pathname === "/dashboard";
-  return pathname === hrefPathname || pathname.startsWith(`${hrefPathname}/`);
-};
+  if (pathname !== hrefPathname && !pathname.startsWith(`${hrefPathname}/`)) {
+    return false;
+  }
 
-export function Menu({ isOpen }: MenuProps) {
+  const queryIndex = href.indexOf("?");
+  if (queryIndex === -1) {
+    return true;
+  }
+
+  const hrefQuery = new URLSearchParams(href.slice(queryIndex + 1));
+  for (const [key, value] of hrefQuery.entries()) {
+    if (searchParams.get(key) !== value) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function resolveActiveMenuId(
+  pathname: string,
+  searchParams: URLSearchParams,
+  menus: MenuItem[],
+): string | null {
+  for (const menu of menus) {
+    if (menu.active === false) continue;
+
+    if (menu.submenus.length > 0) {
+      const submenuMatch = menu.submenus.some((submenu) =>
+        pathsMatch(pathname, submenu.href, searchParams),
+      );
+      if (submenuMatch || pathsMatch(pathname, menu.href, searchParams)) {
+        return menu.id;
+      }
+      continue;
+    }
+
+    if (pathsMatch(pathname, menu.href, searchParams)) {
+      return menu.id;
+    }
+  }
+
+  return null;
+}
+
+export function Menu({ isOpen, variant = "agent" }: MenuProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
-  const menuItems = buildMenuList();
+  const closeOnMobile = useSidebar((state) => state.closeOnMobile);
+  const menuItems = variant === "workspace" ? buildWorkspaceMenuList() : buildMenuList();
+
+  const flatMenus = useMemo(() => menuItems.flatMap((group) => group.menus), [menuItems]);
+
+  const activeMenuId = useMemo(
+    () => resolveActiveMenuId(pathname, searchParams, flatMenus),
+    [pathname, searchParams, flatMenus],
+  );
 
   return (
-    <nav className="w-full h-full">
-      <ul className="flex flex-col w-full min-h-[calc(100vh-48px-36px-16px-56px)] lg:min-h-[calc(100vh-32px-40px-56px)] items-stretch px-3">
+    <nav className="h-full w-full">
+      <ul className="flex w-full flex-col items-stretch px-2 py-3">
         {menuItems.map(({ groupLabel, menus }) => (
           <li
             className={cn("w-full", groupLabel ? "py-2" : "")}
-            key={groupLabel || menus.map((menu) => menu.href).join(":")}
+            key={groupLabel || menus.map((menu) => menu.id).join(":")}
           >
             {(isOpen && groupLabel) || isOpen === undefined ? (
               <p className="text-sm font-medium text-muted-foreground px-2.5 pb-2 w-full truncate">
@@ -63,63 +115,59 @@ export function Menu({ isOpen }: MenuProps) {
             ) : (
               <p className="pb-2"></p>
             )}
-            {menus.map(({ href, label, icon: Icon, active, submenus }) => {
-              const isActive = active === undefined ? isMenuActive(pathname, href) : active;
-
-              const hasActiveSubmenu = submenus?.some((submenu) => pathname.includes(submenu.href));
-
-              const isCurrentActive = isActive || hasActiveSubmenu;
+            {menus.map(({ id, href, label, icon: Icon, submenus, badge, badgeVariant }) => {
+              const isCurrentActive = activeMenuId === id;
 
               if (!submenus || submenus.length === 0) {
                 const button = (
                   <Button
-                    variant={isCurrentActive ? "secondary" : "ghost"}
+                    variant="ghost"
                     className={cn(
-                      "w-full h-10 mb-2 relative overflow-hidden group cursor-pointer flex items-center transition-[justify-content,padding]",
-                      isOpen === false ? "justify-center px-0" : "justify-start px-4",
-                      isCurrentActive && "shadow-sm",
+                      "group mb-1 flex h-10 w-full cursor-pointer items-center rounded-xl transition-colors",
+                      isOpen === false ? "justify-center px-0" : "justify-start px-3",
+                      isCurrentActive
+                        ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                        : "text-foreground hover:bg-sidebar-accent/60",
                     )}
                     onClick={() => {
+                      closeOnMobile();
                       closeMobileSidebar();
                       router.push(href);
                     }}
                   >
-                    {isCurrentActive && (
-                      <div className="absolute inset-0 transition-opacity duration-300 opacity-100">
-                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,0,0,0.02)_1px,transparent_1px)] dark:bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[length:4px_4px]" />
-                      </div>
-                    )}
-                    {isCurrentActive && (
-                      <div className="absolute inset-0 p-px transition-opacity duration-300 rounded-md opacity-100 -z-10 bg-gradient-to-br from-transparent via-border to-transparent" />
-                    )}
                     <span
                       className={cn(
-                        isOpen === false ? "" : "mr-4",
-                        "flex-shrink-0 flex items-center justify-center",
+                        "flex shrink-0 items-center justify-center",
+                        isOpen === false ? "" : "mr-3",
+                        isCurrentActive
+                          ? "text-sidebar-accent-foreground"
+                          : "text-muted-foreground",
                       )}
                     >
-                      <Icon size={18} className={isCurrentActive ? "text-primary" : ""} />
+                      <Icon size={18} />
                     </span>
                     {isOpen !== false && (
-                      <p
-                        className={cn(
-                          "flex-1 min-w-0 truncate text-left",
-                          isCurrentActive && "font-medium text-primary",
-                        )}
-                      >
+                      <p className="min-w-0 flex-1 truncate text-left text-sm font-medium">
                         {label}
                       </p>
                     )}
-                    {isOpen && submenus && submenus.length > 0 && (
-                      <span className="ml-auto px-1.5 py-0.5 text-xs rounded-full bg-primary/10 text-primary">
-                        {submenus.length}
+                    {isOpen && badge ? (
+                      <span
+                        className={cn(
+                          "ml-auto rounded px-1.5 py-0.5 text-[10px] font-medium",
+                          badgeVariant === "coming-soon"
+                            ? "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400"
+                            : "bg-foreground text-background",
+                        )}
+                      >
+                        {badge}
                       </span>
-                    )}
+                    ) : null}
                   </Button>
                 );
 
                 return (
-                  <div className="w-full" key={href}>
+                  <div className="w-full" key={id}>
                     {isOpen === false ? (
                       <TooltipProvider delay={100}>
                         <Tooltip>
@@ -132,21 +180,21 @@ export function Menu({ isOpen }: MenuProps) {
                     )}
                   </div>
                 );
-              } else {
-                return (
-                  <div className="w-full" key={href}>
-                    <CollapseMenuButton
-                      icon={Icon}
-                      label={label}
-                      active={isCurrentActive}
-                      submenus={submenus}
-                      isOpen={isOpen}
-                      badgeCount={submenus.length}
-                      href={href}
-                    />
-                  </div>
-                );
               }
+
+              return (
+                <div className="w-full" key={id}>
+                  <CollapseMenuButton
+                    icon={Icon}
+                    label={label}
+                    active={isCurrentActive}
+                    submenus={submenus}
+                    isOpen={isOpen}
+                    badgeCount={submenus.length}
+                    href={href}
+                  />
+                </div>
+              );
             })}
           </li>
         ))}

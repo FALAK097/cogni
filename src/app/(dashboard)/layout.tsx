@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { redirect } from "next/navigation";
 
 import AdminPanelLayout from "@/components/app-nav/admin-panel-layout";
 import { generateUserAvatarUrl, getStableBackgroundColor } from "@/lib/avatar-generator";
@@ -13,7 +14,11 @@ export const metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function DashboardShellLayout({ children }: { children: ReactNode }) {
-  const { session } = await requireDashboardContext();
+  const { session, onboardingComplete } = await requireDashboardContext();
+
+  if (!onboardingComplete) {
+    redirect("/onboarding");
+  }
 
   const avatarUrl =
     session.user.image ||

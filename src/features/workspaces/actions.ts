@@ -52,8 +52,8 @@ export async function updateWorkspaceSettingsAction(
     })
     .where(eq(workspaceTable.id, workspace.id));
 
-  revalidatePath("/dashboard");
-  revalidatePath("/dashboard/settings");
+  revalidatePath("/agents");
+  revalidatePath("/agents/settings");
 
   return { savedAt: Date.now() };
 }

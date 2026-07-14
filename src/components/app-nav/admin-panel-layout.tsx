@@ -1,13 +1,15 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useLayoutEffect } from "react";
+import { useEffect, useLayoutEffect } from "react";
 import { usePathname } from "next/navigation";
 
-import { AppTopbar } from "@/components/app-nav/app-topbar";
+import { AppShellNavbar } from "@/components/app-nav/app-shell-navbar";
+import { CreateWorkspaceDialog } from "@/components/app-nav/create-workspace-dialog";
 import { Sidebar } from "@/components/app-nav/sidebar";
-import { useSidebar } from "@/hooks/use-sidebar";
-import { cn } from "@/lib/utils";
+import { WorkspaceSidebar } from "@/components/app-nav/workspace-sidebar";
+import { closeMobileSidebar, useSidebar } from "@/hooks/use-sidebar";
+import { isWorkspaceRoute } from "@/lib/workspace-routing";
 
 type UserData = {
   avatar?: string;
@@ -26,38 +28,38 @@ export default function AdminPanelLayout({
   userData,
   initialSidebarOpen = true,
 }: AdminPanelLayoutProps) {
-  const isOpen = useSidebar((state) => state.isOpen);
-  const isHover = useSidebar((state) => state.isHover);
-  const hasHydrated = useSidebar((state) => state.hasHydrated);
-  const settings = useSidebar((state) => state.settings);
   const setHasHydrated = useSidebar((state) => state.setHasHydrated);
+  const closeOnMobile = useSidebar((state) => state.closeOnMobile);
+  const pathname = usePathname();
+  const workspaceView = isWorkspaceRoute(pathname);
 
   useLayoutEffect(() => {
     useSidebar.setState({ isOpen: initialSidebarOpen, mobileDrawerOpen: false });
     setHasHydrated(true);
   }, [initialSidebarOpen, setHasHydrated]);
 
-  const desktopOpenState =
-    (hasHydrated ? isOpen : initialSidebarOpen) || (settings.isHoverOpen && isHover);
-  const pathname = usePathname();
-  const isFullBleedPage = pathname === "/widget" || pathname === "/conversations";
+  useEffect(() => {
+    closeOnMobile();
+    closeMobileSidebar();
+  }, [pathname, closeOnMobile]);
 
   return (
-    <>
-      <Sidebar initialOpen={initialSidebarOpen} />
-      <main
-        className={cn(
-          "bg-sidebar text-foreground transition-[margin-left] ease-in-out duration-300",
-          !settings.disabled && (!desktopOpenState ? "lg:ml-[90px]" : "lg:ml-56"),
-          "print:ml-0 print:w-full print:overflow-visible",
-          isFullBleedPage ? "flex h-svh flex-col overflow-hidden" : "min-h-screen",
-        )}
-      >
-        <AppTopbar userData={userData} className={cn(isFullBleedPage && "lg:hidden")} />
-        <div className={cn(isFullBleedPage && "flex min-h-0 flex-1 flex-col overflow-hidden")}>
-          {children}
-        </div>
-      </main>
-    </>
+    <div className="flex h-svh overflow-hidden bg-background print:h-auto print:overflow-visible">
+      {workspaceView ? (
+        <WorkspaceSidebar initialOpen={initialSidebarOpen} />
+      ) : (
+        <Sidebar initialOpen={initialSidebarOpen} />
+      )}
+
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <AppShellNavbar userData={userData} />
+
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
+        </main>
+      </div>
+
+      <CreateWorkspaceDialog />
+    </div>
   );
 }

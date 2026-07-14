@@ -4,6 +4,7 @@ import { cookies, headers } from "next/headers";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 
+import { isOnboardingComplete } from "@/features/onboarding/queries";
 import { ensureDefaultWorkspace } from "@/lib/auth/provision-workspace";
 import { getAuth } from "@/lib/auth/server";
 import { getDb } from "@/lib/db/client";
@@ -38,13 +39,6 @@ export const requireDashboardContext = cache(async function requireDashboardCont
   const cookieStore = await cookies();
   const activeWorkspaceId = cookieStore.get("active_workspace_id")?.value;
   const memberships = await listUserWorkspaces(session.user.id);
-  const pathname = (await headers()).get("x-pathname") ?? "";
-  const onOnboardingRoute =
-    pathname.startsWith("/dashboard/onboarding") || pathname.startsWith("/onboarding");
-
-  if (onOnboardingRoute) {
-    redirect("/dashboard");
-  }
 
   const membership =
     memberships.find((entry) => entry.workspaceId === activeWorkspaceId) ?? memberships[0];
@@ -53,10 +47,13 @@ export const requireDashboardContext = cache(async function requireDashboardCont
     redirect("/");
   }
 
+  const onboardingComplete = await isOnboardingComplete(db, membership.workspaceId);
+
   return {
     db,
     membership,
     session,
     workspace: membership.workspace,
+    onboardingComplete,
   };
 });
