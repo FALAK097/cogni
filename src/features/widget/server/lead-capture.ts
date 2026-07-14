@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Db } from "@/lib/db/client";
+import { runDbWriteOperation, type Db } from "@/lib/db/client";
 import { eq, type SQL } from "drizzle-orm";
 import {
   contact as contactTable,
@@ -31,9 +31,9 @@ export async function submitWidgetLeadCapture({
   triggerValue?: string | null;
   messageCount: number;
 }) {
-  return (db as any).transaction(async (tx: any) => {
+  return runDbWriteOperation(db, async (tx) => {
     const session = await tx.query.visitorSession.findFirst({
-      where: (fields: any, { eq }: any) => eq(fields.id, visitorSessionId),
+      where: (fields, { eq }) => eq(fields.id, visitorSessionId),
     });
     if (!session) {
       throw new Error("Session not found");
@@ -41,7 +41,7 @@ export async function submitWidgetLeadCapture({
 
     let contact = email
       ? await tx.query.contact.findFirst({
-          where: (fields: any, { eq, and }: any) =>
+          where: (fields, { eq, and }) =>
             and(eq(fields.workspaceId, workspaceId), eq(fields.email, email)),
         })
       : null;
@@ -67,17 +67,18 @@ export async function submitWidgetLeadCapture({
       contact = updatedContact;
     }
 
-    let lead: typeof leadTable.$inferSelect | null | undefined = null;
-    const orConds: SQL[] = [
-      email ? eq(leadTable.email, email) : undefined,
-      phone ? eq(leadTable.phone, phone) : undefined,
-    ].filter((cond): cond is SQL => cond !== undefined);
+    let lead: typeof leadTable.$inferSelect | null = null;
+    const orConds: SQL[] = [];
+    if (email) orConds.push(eq(leadTable.email, email));
+    if (phone) orConds.push(eq(leadTable.phone, phone));
 
     if (orConds.length > 0) {
-      lead = await tx.query.lead.findFirst({
-        where: (fields: any, { eq, and, or }: any) =>
-          and(eq(fields.workspaceId, workspaceId), or(...orConds)),
-      });
+      lead = await tx.query.lead
+        .findFirst({
+          where: (fields, { eq, and, or }) =>
+            and(eq(fields.workspaceId, workspaceId), or(...orConds)),
+        })
+        .then((result) => result ?? null);
     }
 
     if (!lead) {
@@ -135,7 +136,7 @@ export async function submitWidgetLeadCapture({
       .values({
         id: randomUUID(),
         visitorSessionId,
-        leadId: lead!.id,
+        leadId: lead.id,
         triggerType,
         triggerValue: triggerValue ?? null,
         formSubmittedAt: new Date().toISOString(),
@@ -147,7 +148,7 @@ export async function submitWidgetLeadCapture({
       .onConflictDoUpdate({
         target: widgetLeadCaptureTable.visitorSessionId,
         set: {
-          leadId: lead!.id,
+          leadId: lead.id,
           triggerType,
           triggerValue: triggerValue ?? null,
           formSubmittedAt: new Date().toISOString(),
