@@ -1,34 +1,45 @@
-import { sqliteTable, text, numeric, integer, uniqueIndex, index } from "drizzle-orm/sqlite-core";
+import {
+  boolean,
+  index,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 import { BRAND_COLOR } from "@/lib/widget-accent";
 
-export const user = sqliteTable(
+const timestampString = () => timestamp({ mode: "string", withTimezone: true });
+const numeric = timestampString;
+
+export const user = pgTable(
   "user",
   {
     id: text().primaryKey().notNull(),
     name: text().notNull(),
     email: text().notNull(),
-    emailVerified: integer({ mode: "boolean" }).default(false).notNull(),
+    emailVerified: boolean().default(false).notNull(),
     image: text(),
-    createdAt: integer({ mode: "timestamp" })
+    createdAt: timestamp({ mode: "date", withTimezone: true })
       .default(sql`(CURRENT_TIMESTAMP)`)
       .notNull(),
-    updatedAt: integer({ mode: "timestamp" }).notNull(),
+    updatedAt: timestamp({ mode: "date", withTimezone: true }).notNull(),
   },
   (table) => [uniqueIndex("user_email_key").on(table.email)],
 );
 
-export const session = sqliteTable(
+export const session = pgTable(
   "session",
   {
     id: text().primaryKey().notNull(),
-    expiresAt: integer({ mode: "timestamp" }).notNull(),
+    expiresAt: timestamp({ mode: "date", withTimezone: true }).notNull(),
     token: text().notNull(),
-    createdAt: integer({ mode: "timestamp" })
+    createdAt: timestamp({ mode: "date", withTimezone: true })
       .default(sql`(CURRENT_TIMESTAMP)`)
       .notNull(),
-    updatedAt: integer({ mode: "timestamp" }).notNull(),
+    updatedAt: timestamp({ mode: "date", withTimezone: true }).notNull(),
     ipAddress: text(),
     userAgent: text(),
     userId: text()
@@ -41,7 +52,7 @@ export const session = sqliteTable(
   ],
 );
 
-export const account = sqliteTable(
+export const account = pgTable(
   "account",
   {
     id: text().primaryKey().notNull(),
@@ -53,34 +64,34 @@ export const account = sqliteTable(
     accessToken: text(),
     refreshToken: text(),
     idToken: text(),
-    accessTokenExpiresAt: integer({ mode: "timestamp" }),
-    refreshTokenExpiresAt: integer({ mode: "timestamp" }),
+    accessTokenExpiresAt: timestamp({ mode: "date", withTimezone: true }),
+    refreshTokenExpiresAt: timestamp({ mode: "date", withTimezone: true }),
     scope: text(),
     password: text(),
-    createdAt: integer({ mode: "timestamp" })
+    createdAt: timestamp({ mode: "date", withTimezone: true })
       .default(sql`(CURRENT_TIMESTAMP)`)
       .notNull(),
-    updatedAt: integer({ mode: "timestamp" }).notNull(),
+    updatedAt: timestamp({ mode: "date", withTimezone: true }).notNull(),
   },
   (table) => [index("account_userId_idx").on(table.userId)],
 );
 
-export const verification = sqliteTable(
+export const verification = pgTable(
   "verification",
   {
     id: text().primaryKey().notNull(),
     identifier: text().notNull(),
     value: text().notNull(),
-    expiresAt: integer({ mode: "timestamp" }).notNull(),
-    createdAt: integer({ mode: "timestamp" })
+    expiresAt: timestamp({ mode: "date", withTimezone: true }).notNull(),
+    createdAt: timestamp({ mode: "date", withTimezone: true })
       .default(sql`(CURRENT_TIMESTAMP)`)
       .notNull(),
-    updatedAt: integer({ mode: "timestamp" }).notNull(),
+    updatedAt: timestamp({ mode: "date", withTimezone: true }).notNull(),
   },
   (table) => [index("verification_identifier_idx").on(table.identifier)],
 );
 
-export const workspace = sqliteTable(
+export const workspace = pgTable(
   "workspace",
   {
     id: text().primaryKey().notNull(),
@@ -89,23 +100,23 @@ export const workspace = sqliteTable(
     logo: text(),
     brandColor: text().default(BRAND_COLOR).notNull(),
     timezone: text().default("UTC").notNull(),
-    createdAt: numeric()
+    createdAt: timestampString()
       .default(sql`(CURRENT_TIMESTAMP)`)
       .notNull(),
-    updatedAt: numeric().notNull(),
+    updatedAt: timestampString().notNull(),
   },
   (table) => [uniqueIndex("workspace_slug_key").on(table.slug)],
 );
 
-export const workspaceMember = sqliteTable(
+export const workspaceMember = pgTable(
   "workspace_member",
   {
     id: text().primaryKey().notNull(),
     role: text().default("MEMBER").notNull(),
-    createdAt: numeric()
+    createdAt: timestampString()
       .default(sql`(CURRENT_TIMESTAMP)`)
       .notNull(),
-    updatedAt: numeric().notNull(),
+    updatedAt: timestampString().notNull(),
     userId: text()
       .notNull()
       .references(() => user.id, { onDelete: "cascade", onUpdate: "cascade" }),
@@ -119,7 +130,7 @@ export const workspaceMember = sqliteTable(
   ],
 );
 
-export const contact = sqliteTable(
+export const contact = pgTable(
   "contact",
   {
     id: text().primaryKey().notNull(),
@@ -144,7 +155,7 @@ export const contact = sqliteTable(
   ],
 );
 
-export const contactNote = sqliteTable(
+export const contactNote = pgTable(
   "contact_note",
   {
     id: text().primaryKey().notNull(),
@@ -165,14 +176,14 @@ export const contactNote = sqliteTable(
   ],
 );
 
-export const conversation = sqliteTable(
+export const conversation = pgTable(
   "conversation",
   {
     id: text().primaryKey().notNull(),
     subject: text().notNull(),
     status: text().default("OPEN").notNull(),
     channel: text().default("WIDGET").notNull(),
-    aiPaused: integer({ mode: "boolean" }).default(false).notNull(),
+    aiPaused: boolean().default(false).notNull(),
     createdAt: numeric()
       .default(sql`(CURRENT_TIMESTAMP)`)
       .notNull(),
@@ -210,7 +221,7 @@ export const conversation = sqliteTable(
   ],
 );
 
-export const widget = sqliteTable(
+export const widget = pgTable(
   "widget",
   {
     id: text().primaryKey().notNull(),
@@ -239,7 +250,7 @@ export const widget = sqliteTable(
     escalationKeywords: text().default("human,agent,person,representative,support team").notNull(),
     modelProvider: text().default("OPENAI").notNull(),
     modelName: text().default("gpt-4o-mini").notNull(),
-    isEnabled: integer({ mode: "boolean" }).default(true).notNull(),
+    isEnabled: boolean().default(true).notNull(),
     theme: text().default("light").notNull(),
     userBubbleColor: text().default(BRAND_COLOR).notNull(),
     userBubbleTextColor: text().default("#ffffff").notNull(),
@@ -253,18 +264,18 @@ export const widget = sqliteTable(
         '["What services do you offer?","How can I get started?","Tell me more about pricing"]',
       )
       .notNull(),
-    hideSuggestionsOnInteract: integer({ mode: "boolean" }).default(true).notNull(),
+    hideSuggestionsOnInteract: boolean().default(true).notNull(),
     previewMessages: text().default('["Hi there! 👋","Need help with anything?"]').notNull(),
     autoShowPreviewDelay: integer().default(3000).notNull(),
-    showBranding: integer({ mode: "boolean" }).default(true).notNull(),
+    showBranding: boolean().default(true).notNull(),
     privacyPolicyUrl: text().default("/privacy-policy").notNull(),
-    enableLeadCapture: integer({ mode: "boolean" }).default(false).notNull(),
+    enableLeadCapture: boolean().default(false).notNull(),
     leadCaptureKeywords: text()
       .default('["contact","contact me","call me","reach me","get in touch"]')
       .notNull(),
     leadCaptureMinutesThreshold: integer().default(5).notNull(),
     leadCaptureMessageThreshold: integer().default(4).notNull(),
-    enableBrochure: integer({ mode: "boolean" }).default(false).notNull(),
+    enableBrochure: boolean().default(false).notNull(),
     brochureSuggestionText: text().default("Receive Brochure").notNull(),
     authorizedDomains: text().default("[]").notNull(),
     createdAt: numeric()
@@ -281,7 +292,7 @@ export const widget = sqliteTable(
   ],
 );
 
-export const visitorSession = sqliteTable(
+export const visitorSession = pgTable(
   "visitor_session",
   {
     id: text().primaryKey().notNull(),
@@ -332,7 +343,7 @@ export const visitorSession = sqliteTable(
   ],
 );
 
-export const lead = sqliteTable(
+export const lead = pgTable(
   "lead",
   {
     id: text().primaryKey().notNull(),
@@ -345,7 +356,7 @@ export const lead = sqliteTable(
     phone: text(),
     source: text().default("WIDGET").notNull(),
     status: text().default("new").notNull(),
-    capturedFromChat: integer({ mode: "boolean" }).default(false).notNull(),
+    capturedFromChat: boolean().default(false).notNull(),
     chatSessionId: text(),
     chatSummary: text(),
     createdAt: numeric()
@@ -359,7 +370,7 @@ export const lead = sqliteTable(
   ],
 );
 
-export const widgetLeadCapture = sqliteTable(
+export const widgetLeadCapture = pgTable(
   "widget_lead_capture",
   {
     id: text().primaryKey().notNull(),
@@ -373,7 +384,7 @@ export const widgetLeadCapture = sqliteTable(
       .default(sql`(CURRENT_TIMESTAMP)`)
       .notNull(),
     formSubmittedAt: numeric(),
-    abandoned: integer({ mode: "boolean" }).default(false).notNull(),
+    abandoned: boolean().default(false).notNull(),
     messageCountAtCapture: integer().default(0).notNull(),
     conversationSummary: text(),
     createdAt: numeric()
@@ -388,7 +399,7 @@ export const widgetLeadCapture = sqliteTable(
   ],
 );
 
-export const attachment = sqliteTable(
+export const attachment = pgTable(
   "attachment",
   {
     id: text().primaryKey().notNull(),
@@ -413,7 +424,7 @@ export const attachment = sqliteTable(
   ],
 );
 
-export const document = sqliteTable(
+export const document = pgTable(
   "document",
   {
     id: text().primaryKey().notNull(),
@@ -441,7 +452,7 @@ export const document = sqliteTable(
   ],
 );
 
-export const documentChunk = sqliteTable(
+export const documentChunk = pgTable(
   "document_chunk",
   {
     id: text().primaryKey().notNull(),
@@ -457,7 +468,7 @@ export const documentChunk = sqliteTable(
   (table) => [index("document_chunk_documentId_position_idx").on(table.documentId, table.position)],
 );
 
-export const workspaceInvite = sqliteTable(
+export const workspaceInvite = pgTable(
   "workspace_invite",
   {
     id: text().primaryKey().notNull(),
@@ -480,7 +491,7 @@ export const workspaceInvite = sqliteTable(
   ],
 );
 
-export const integration = sqliteTable(
+export const integration = pgTable(
   "integration",
   {
     id: text().primaryKey().notNull(),
@@ -500,7 +511,7 @@ export const integration = sqliteTable(
   ],
 );
 
-export const notification = sqliteTable(
+export const notification = pgTable(
   "notification",
   {
     id: text().primaryKey().notNull(),
@@ -528,7 +539,7 @@ export const notification = sqliteTable(
   ],
 );
 
-export const domainEvent = sqliteTable(
+export const domainEvent = pgTable(
   "domain_event",
   {
     id: text().primaryKey().notNull(),
@@ -551,7 +562,7 @@ export const domainEvent = sqliteTable(
   ],
 );
 
-export const workflowRun = sqliteTable(
+export const workflowRun = pgTable(
   "workflow_run",
   {
     id: text().primaryKey().notNull(),
@@ -581,7 +592,7 @@ export const workflowRun = sqliteTable(
   ],
 );
 
-export const agentRun = sqliteTable(
+export const agentRun = pgTable(
   "agent_run",
   {
     id: text().primaryKey().notNull(),
@@ -627,7 +638,7 @@ export const agentRun = sqliteTable(
   ],
 );
 
-export const integrationAction = sqliteTable(
+export const integrationAction = pgTable(
   "integration_action",
   {
     id: text().primaryKey().notNull(),

@@ -16,7 +16,7 @@ function createAuth() {
     baseURL: env.BETTER_AUTH_URL ?? "http://localhost:3000",
     secret: env.BETTER_AUTH_SECRET ?? "build-only-secret-not-valid-at-runtime",
     database: drizzleAdapter(db, {
-      provider: "sqlite",
+      provider: "pg",
       schema: schema,
     }),
     socialProviders: {

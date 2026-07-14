@@ -9,11 +9,9 @@ trustPolicyExclude:
   - "undici-types@6.21.0"
 
 allowBuilds:
-  better-sqlite3: true
   esbuild: true
   sharp: true
   unrs-resolver: true
-  workerd: true
 
 minimumReleaseAgeExclude:
   - "@ai-sdk/gateway@4.0.8"
