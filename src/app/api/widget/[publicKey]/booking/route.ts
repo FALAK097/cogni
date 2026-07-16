@@ -14,7 +14,7 @@ import {
   withWidgetCors,
 } from "@/features/widget/server/widget-utils";
 import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
-import { getDb } from "@/lib/db/client";
+import { getDb, runDbWriteOperation } from "@/lib/db/client";
 import { createApprovalRequest } from "@/features/integrations/server/approval-service";
 import { createWorkflowWithSteps, updateWorkflowStep } from "@/lib/workflows/runner";
 import { approvalRequest, workflowRun, workflowStep } from "@/lib/db/schema";
@@ -138,7 +138,7 @@ export async function POST(request: Request, context: RouteContext) {
       existing.conversationId === conversation.id &&
       existing.status === "WAITING_APPROVAL"
     ) {
-      const corrected = await result.db.transaction(async (tx) => {
+      const corrected = await runDbWriteOperation(result.db, async (tx) => {
         const [pendingApproval] = await tx
           .update(approvalRequest)
           .set({

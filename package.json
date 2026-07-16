@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --webpack",
     "build:widget": "node scripts/build-widget.js",
     "build": "pnpm build:widget && NEXT_TELEMETRY_DISABLED=1 next build --webpack",
     "cf:build": "pnpm build:widget && NEXT_TELEMETRY_DISABLED=1 SKIP_ENV_VALIDATION=1 opennextjs-cloudflare build",

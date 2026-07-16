@@ -22,6 +22,10 @@ const nextConfig: NextConfig = {
     "@chat-adapter/whatsapp",
     "discord.js",
     "@discordjs/ws",
+    "pdf-parse",
+    "pdfjs-dist",
+    "@napi-rs/canvas",
+    "mammoth",
   ],
 };
 

@@ -2,33 +2,39 @@ import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { enqueueDocumentProcessing } from "@/lib/jobs/ingestion";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
+import {
+  inferKnowledgeMimeType,
+  knowledgeSourceTypeFromMime,
+} from "@/features/knowledge/server/mime";
 import { isAllowedKnowledgeUpload, saveObject } from "@/lib/storage/index";
 import { document as documentTable } from "@/lib/db/schema";
 
 export async function POST(request: Request) {
   const { db, workspace } = await requireDashboardContext();
   const formData = await request.formData();
-  const title = formData.get("title");
+  const rawTitle = formData.get("title");
   const file = formData.get("file");
 
-  if (typeof title !== "string" || !title.trim() || !(file instanceof File)) {
-    return NextResponse.json({ error: "Title and file are required." }, { status: 400 });
+  if (!(file instanceof File) || file.size === 0) {
+    return NextResponse.json({ error: "A file is required." }, { status: 400 });
+  }
+
+  const title =
+    typeof rawTitle === "string" && rawTitle.trim() ? rawTitle.trim() : file.name.trim() || null;
+
+  if (!title) {
+    return NextResponse.json({ error: "A file name is required." }, { status: 400 });
   }
 
   const bytes = Buffer.from(await file.arrayBuffer());
-  const mimeType = file.type || "application/octet-stream";
+  const mimeType = inferKnowledgeMimeType(file.name, file.type || "application/octet-stream");
   if (!isAllowedKnowledgeUpload(mimeType, bytes.length)) {
     return NextResponse.json(
       { error: "Upload a PDF, DOCX, or text file up to 10 MB." },
       { status: 400 },
     );
   }
-  const sourceType =
-    mimeType === "application/pdf"
-      ? "PDF"
-      : mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        ? "DOCX"
-        : "TXT";
+  const sourceType = knowledgeSourceTypeFromMime(mimeType);
 
   const saved = await saveObject({
     workspaceId: workspace.id,
@@ -42,7 +48,7 @@ export async function POST(request: Request) {
     .values({
       id: randomUUID(),
       workspaceId: workspace.id,
-      title: title.trim(),
+      title,
       sourceType,
       storageKey: saved.storageKey,
       mimeType,

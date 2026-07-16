@@ -18,7 +18,6 @@ const fullSchema = { ...schema, ...relations };
 type DrizzleDb = BaseSQLiteDatabase<"sync" | "async", unknown, typeof fullSchema>;
 
 let db: DrizzleDb | undefined;
-const d1Databases = new WeakSet<object>();
 
 export type Db = DrizzleDb;
 
@@ -46,7 +45,6 @@ export function getDb(): Db {
   const d1Binding = getD1Binding();
   if (d1Binding) {
     db = drizzleD1(d1Binding, { schema: fullSchema });
-    d1Databases.add(db);
   } else {
     // Local SQLite development using better-sqlite3
     const databaseUrl = env.DATABASE_URL || "file:./dev.db";
@@ -61,17 +59,17 @@ export function getDb(): Db {
 }
 
 /**
- * Runs a multi-statement write operation without issuing transaction control
- * statements on D1, which does not support Drizzle's SQLite `BEGIN` flow.
- * Local SQLite keeps its transaction semantics.
+ * Runs a multi-statement write operation.
+ *
+ * D1 does not support Drizzle's SQLite `BEGIN` flow.
+ * better-sqlite3 only accepts synchronous transaction callbacks, so async
+ * work cannot be wrapped in `database.transaction()` either.
+ *
+ * Callers should keep writes idempotent / ordered; we run them directly.
  */
 export async function runDbWriteOperation<T>(
   database: Db,
   operation: (executor: Db) => Promise<T>,
 ): Promise<T> {
-  if (d1Databases.has(database)) {
-    return operation(database);
-  }
-
-  return database.transaction(async (transaction) => operation(transaction as Db));
+  return operation(database);
 }

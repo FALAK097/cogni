@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { documentChunk as documentChunkTable } from "@/lib/db/schema";
 import { readObject } from "@/lib/storage/index";
 import { chunkText, stripHtml } from "@/features/knowledge/server/chunk";
+import { extractPdfText } from "@/features/knowledge/server/extract-pdf";
 import { uploadCloudflareSearchDocument } from "@/lib/search/cloudflare-search";
 
 export async function extractDocumentText({
@@ -38,11 +39,7 @@ export async function extractDocumentText({
   }
 
   if (sourceType === "PDF") {
-    const { PDFParse } = await import("pdf-parse");
-    const parser = new PDFParse({ data: bytes });
-    const parsed = await parser.getText();
-    await parser.destroy();
-    return parsed.text.trim();
+    return extractPdfText(bytes);
   }
 
   if (sourceType === "DOCX") {

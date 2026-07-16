@@ -9,6 +9,10 @@ import { document as documentTable } from "@/lib/db/schema";
 import { enqueueDocumentProcessing } from "@/lib/jobs/ingestion";
 import { requireAuth, requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { deleteObject, isAllowedKnowledgeUpload, saveObject } from "@/lib/storage/index";
+import {
+  inferKnowledgeMimeType,
+  knowledgeSourceTypeFromMime,
+} from "@/features/knowledge/server/mime";
 
 export type KnowledgeActionState = {
   error?: string;
@@ -78,24 +82,26 @@ export async function uploadDocumentAction(formData: FormData) {
   await requireAuth();
   const { db, workspace } = await requireDashboardContext();
 
-  const title = formData.get("title");
+  const rawTitle = formData.get("title");
   const file = formData.get("file");
 
-  if (typeof title !== "string" || !title.trim() || !(file instanceof File)) {
+  if (!(file instanceof File) || file.size === 0) {
+    return;
+  }
+
+  const title =
+    typeof rawTitle === "string" && rawTitle.trim() ? rawTitle.trim() : file.name.trim() || null;
+
+  if (!title) {
     return;
   }
 
   const bytes = Buffer.from(await file.arrayBuffer());
-  const mimeType = file.type || "application/octet-stream";
+  const mimeType = inferKnowledgeMimeType(file.name, file.type || "application/octet-stream");
   if (!isAllowedKnowledgeUpload(mimeType, bytes.length)) {
     return;
   }
-  const sourceType =
-    mimeType === "application/pdf"
-      ? "PDF"
-      : mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        ? "DOCX"
-        : "TXT";
+  const sourceType = knowledgeSourceTypeFromMime(mimeType);
 
   const saved = await saveObject({
     workspaceId: workspace.id,
@@ -109,7 +115,7 @@ export async function uploadDocumentAction(formData: FormData) {
     .values({
       id: randomUUID(),
       workspaceId: workspace.id,
-      title: title.trim(),
+      title,
       sourceType,
       storageKey: saved.storageKey,
       mimeType,
