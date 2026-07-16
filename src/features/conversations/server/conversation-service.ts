@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Db } from "@/lib/db/client";
+import { runDbWriteOperation, type Db } from "@/lib/db/client";
 import { conversation, visitorSession as visitorSessionTable, contact } from "@/lib/db/schema";
 import type { widget as widgetTable } from "@/lib/db/schema";
 import { eq, sql } from "drizzle-orm";
@@ -207,9 +207,9 @@ export async function recordVisitorMessage({
   text: string;
   clientMessageId: string;
 }) {
-  return db.transaction(async (tx) => {
-    return appendVisitorMessage(tx as any, visitorSession, text, clientMessageId);
-  });
+  return runDbWriteOperation(db, (executor) =>
+    appendVisitorMessage(executor, visitorSession, text, clientMessageId),
+  );
 }
 
 export async function startVisitorConversation({
@@ -233,7 +233,7 @@ export async function startVisitorConversation({
   text: string;
   clientMessageId: string;
 }) {
-  return db.transaction(async (tx) => {
+  return runDbWriteOperation(db, async (tx) => {
     const now = new Date();
     const nowIso = now.toISOString();
     const existing = await tx.query.visitorSession.findFirst({
@@ -329,12 +329,7 @@ export async function startVisitorConversation({
         workspace: { id: widgetContext.workspace.id },
       },
     };
-    const messageResult = await appendVisitorMessage(
-      tx as any,
-      sessionContext,
-      text,
-      clientMessageId,
-    );
+    const messageResult = await appendVisitorMessage(tx, sessionContext, text, clientMessageId);
 
     return {
       ...messageResult,
@@ -376,7 +371,7 @@ export async function recordAiMessage({
   text: string;
   replyToMessageId: string;
 }) {
-  return db.transaction(async (tx) => {
+  return runDbWriteOperation(db, async (tx) => {
     const conversationData = await tx.query.conversation.findFirst({
       where: (convo, { eq }) => eq(convo.id, conversationId),
     });

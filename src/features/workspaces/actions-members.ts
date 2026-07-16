@@ -12,7 +12,7 @@ import {
 } from "@/lib/db/schema";
 import { requireAuth, requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { getAuth } from "@/lib/auth/server";
-import { getDb } from "@/lib/db/client";
+import { getDb, runDbWriteOperation } from "@/lib/db/client";
 import {
   getWorkspaceInviteByToken,
   upsertWorkspaceInvite,
@@ -270,7 +270,7 @@ export async function acceptInviteAction(
     return { error: "This invite belongs to a different email address." };
   }
 
-  await db.transaction(async (tx) => {
+  await runDbWriteOperation(db, async (tx) => {
     await tx
       .insert(workspaceMemberTable)
       .values({
@@ -333,7 +333,7 @@ export async function transferOwnershipAction(formData: FormData) {
   }
 
   const now = new Date().toISOString();
-  await db.transaction(async (tx) => {
+  await runDbWriteOperation(db, async (tx) => {
     await tx
       .update(workspaceMemberTable)
       .set({

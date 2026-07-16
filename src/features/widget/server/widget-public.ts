@@ -8,6 +8,7 @@ import {
   validateEmbedOrigin,
 } from "@/features/widget/server/widget-service";
 import { getRequestOrigin } from "@/features/widget/server/widget-utils";
+import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 
 export async function assertPublicWidgetAccess(
   db: Db,
@@ -33,6 +34,22 @@ export async function assertPublicWidgetAccess(
     origin,
     allowedDomains,
   };
+}
+
+export async function assertPreviewWidgetAccess(db: Db, publicKey: string, request: Request) {
+  try {
+    const { workspace } = await requireDashboardContext();
+    const access = await assertPublicWidgetAccess(db, publicKey, request, { preview: true });
+    if ("error" in access) return access;
+
+    if (access.widget.workspaceId !== workspace.id) {
+      return { error: Response.json({ error: "Preview access denied." }, { status: 403 }) };
+    }
+
+    return access;
+  } catch {
+    return { error: Response.json({ error: "Preview access denied." }, { status: 403 }) };
+  }
 }
 
 export function bearerToken(request: Request) {

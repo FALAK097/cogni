@@ -4,6 +4,7 @@
   "account_id": "598a393819cd44e21ef2145dabea9a2f",
   "main": "cloudflare-worker.ts",
   "minify": true,
+  "keep_vars": true,
   "compatibility_date": "2026-06-26",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
@@ -26,6 +27,8 @@
     "D1_DATABASE_ID": "c0e9cc6e-438a-4b4f-9bf1-73c24d4417a4",
     "R2_BUCKET_NAME": "widget-prod-uploads",
     "SEARCH_INDEX": "widget-prod-search",
+    "WIDGET_MODEL_PROVIDER": "GOOGLE",
+    "WIDGET_MODEL_NAME": "gemini-2.5-flash",
   },
   "r2_buckets": [
     {

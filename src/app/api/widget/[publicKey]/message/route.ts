@@ -1,5 +1,6 @@
 import {
   assertPublicWidgetAccess,
+  assertPreviewWidgetAccess,
   requireAuthorizedVisitorSession,
 } from "@/features/widget/server/widget-public";
 import {
@@ -10,6 +11,15 @@ import {
 import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
 import { getDb } from "@/lib/db/client";
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
+import { z } from "zod";
+
+const messageSchema = z.object({
+  sessionId: z.string().min(1),
+  role: z.literal("assistant"),
+  content: z.string().trim().min(1),
+  preview: z.boolean().default(false),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
 
 export function OPTIONS(request: Request) {
   return widgetPreflightResponse(request);
@@ -21,22 +31,20 @@ export async function POST(
 ) {
   const { publicKey } = await params;
   const db = getDb();
-  const access = await assertPublicWidgetAccess(db, publicKey, request);
+  const parsed = messageSchema.safeParse(await request.json());
+  if (!parsed.success) {
+    return Response.json({ error: "Invalid message payload." }, { status: 400 });
+  }
+  const body = parsed.data;
+
+  const access = body.preview
+    ? await assertPreviewWidgetAccess(db, publicKey, request)
+    : await assertPublicWidgetAccess(db, publicKey, request);
   if ("error" in access) return access.error;
   const authorized = await requireAuthorizedVisitorSession(db, publicKey, request);
   if ("error" in authorized) return authorized.error;
 
-  const body = (await request.json()) as {
-    sessionId?: string;
-    role?: string;
-    content?: string;
-  };
-
-  if (
-    body.sessionId !== authorized.session.id ||
-    body.role !== "assistant" ||
-    !body.content?.trim()
-  ) {
+  if (body.sessionId !== authorized.session.id) {
     return Response.json({ error: "Invalid message payload." }, { status: 400 });
   }
 
@@ -64,6 +72,6 @@ export async function POST(
   return withWidgetCors(
     Response.json({ message: { id: matchedMessage.id } }),
     origin,
-    validateEmbedOrigin(origin, access.allowedDomains),
+    body.preview || validateEmbedOrigin(origin, access.allowedDomains),
   );
 }
