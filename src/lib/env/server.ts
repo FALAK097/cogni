@@ -1,8 +1,6 @@
 import { createEnv } from "@t3-oss/env-nextjs";
 import { z } from "zod";
 
-const isProd = process.env.NODE_ENV === "production" || process.env.ENV === "production";
-
 export const env = createEnv({
   server: {
     ENV: z.enum(["development", "production"]),
@@ -26,5 +24,5 @@ export const env = createEnv({
   },
   experimental__runtimeEnv: process.env,
   emptyStringAsUndefined: true,
-  skipValidation: Boolean(process.env.SKIP_ENV_VALIDATION) || isProd,
+  skipValidation: Boolean(process.env.SKIP_ENV_VALIDATION),
 });

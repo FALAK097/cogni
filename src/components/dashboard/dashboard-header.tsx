@@ -46,7 +46,7 @@ function initials(name: string) {
 
 function formatSegment(segment: string) {
   if (segment === "dashboard") return "Dashboard";
-  if (segment === "widget") return "Widget";
+  if (segment === "widget") return "Chat widget";
   if (segment === "inbox") return "Inbox";
   if (segment === "new") return "New";
   if (segment === "contacts") return "Contacts";

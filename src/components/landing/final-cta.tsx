@@ -26,21 +26,21 @@ export function FinalCta() {
             <span className="text-blue-200">in minutes.</span>
           </h2>
 
-          <p className="mx-auto mt-6 max-w-lg text-lg leading-relaxed text-white/70">
+          <p className="text-pretty mx-auto mt-6 max-w-lg text-lg leading-relaxed text-white/75">
             Join 1,200+ modern teams delivering exceptional support at scale. Free to start.
           </p>
 
           <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link
               href="/sign-in"
-              className="flex h-12 items-center gap-2 rounded-xl bg-primary px-8 text-[15px] font-semibold text-white shadow-lg shadow-primary/40 transition-all duration-150 ease-out hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/50 active:scale-[0.98]"
+              className="flex h-12 items-center gap-2 rounded-xl bg-primary px-8 text-[15px] font-semibold text-white shadow-lg shadow-primary/40 transition-[transform,background-color,box-shadow] duration-150 ease-out hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/50 active:scale-[0.96]"
             >
               Get started free
               <ArrowRight className="size-4" />
             </Link>
             <a
               href="mailto:hi@falakgala.dev"
-              className="flex h-12 items-center rounded-xl border border-white/30 bg-white/10 px-8 text-[15px] font-medium text-white backdrop-blur-sm transition-all duration-150 ease-out hover:-translate-y-0.5 hover:bg-white/20"
+              className="flex h-12 items-center rounded-xl border border-white/30 bg-white/10 px-8 text-[15px] font-medium text-white backdrop-blur-sm transition-[transform,background-color] duration-150 ease-out hover:-translate-y-0.5 active:scale-[0.96] hover:bg-white/20"
             >
               Talk to us
             </a>

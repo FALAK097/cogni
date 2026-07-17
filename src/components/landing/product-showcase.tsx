@@ -138,7 +138,7 @@ const showcases = [
             {[40, 70, 45, 90, 65, 80, 100].map((h, i) => (
               <div
                 key={i}
-                className="flex-1 bg-primary/40 rounded-t-sm transition-all hover:bg-primary/60"
+                className="flex-1 rounded-t-sm bg-primary/40 transition-colors hover:bg-primary/60"
                 style={{ height: `${h}%` }}
               />
             ))}

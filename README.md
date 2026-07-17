@@ -1,6 +1,6 @@
-# widget
+# Cogni
 
-widget is an AI-first customer support platform with an embedded chat widget, shared team inbox, knowledge-grounded answers, human handoff, integrations, and durable workflows.
+Cogni is an AI-first customer support platform with an embedded chat widget, shared team inbox, knowledge-grounded answers, human handoff, integrations, and durable workflows.
 
 ## Stack
 

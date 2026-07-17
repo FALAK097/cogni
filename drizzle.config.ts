@@ -5,6 +5,6 @@ export default defineConfig({
   schema: "./src/lib/db/schema.ts",
   out: "./drizzle",
   dbCredentials: {
-    url: process.env.DATABASE_URL ?? "postgresql://postgres:postgres@localhost:5432/widget",
+    url: process.env.DATABASE_URL ?? "postgresql://postgres:postgres@localhost:5432/cogni",
   },
 });

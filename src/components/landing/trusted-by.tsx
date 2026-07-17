@@ -64,7 +64,7 @@ export function TrustedBy() {
         <p className="mb-8 text-center text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
           Trusted by teams at world-class companies
         </p>
-        <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-6 opacity-50 grayscale transition-all duration-500 hover:opacity-70">
+        <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-6 opacity-50 grayscale transition-[opacity,filter] duration-500 hover:opacity-70">
           {logos.map((logo) => (
             <div key={logo.name} className="flex items-center justify-center" title={logo.name}>
               {logo.svg}
