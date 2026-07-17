@@ -29,6 +29,8 @@ accessed through public APIs instead of Worker bindings.
 4. Add the remaining variables from `.env.example` to Vercel. R2 credentials must have object read
    and write access only to the uploads bucket. The AI Search token must have access to the selected
    search instance.
+   Before deleting anything in Cloudflare, verify the live inventory from Wrangler rather than
+   relying on stale notes.
 5. Set `BETTER_AUTH_URL` to the final production URL and add this Google OAuth redirect URI:
 
    ```text
