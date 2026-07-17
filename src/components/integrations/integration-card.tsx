@@ -26,7 +26,7 @@ export function IntegrationCard({ integration, isConnected, onClick }: Integrati
       type="button"
       disabled={isComingSoon}
       className={cn(
-        "group relative flex h-full w-full flex-col rounded-xl border border-border/70 bg-card p-4 sm:p-5 text-left transition-all duration-200",
+        "group relative flex h-full w-full flex-col rounded-xl border border-border/70 bg-card p-4 sm:p-5 text-left transition-[transform,background-color,border-color,box-shadow] duration-200",
         isComingSoon
           ? "opacity-75"
           : "cursor-pointer hover:border-primary/40 hover:shadow-[0_4px_20px_-8px_rgba(0,0,0,0.08)] hover:-translate-y-0.5",

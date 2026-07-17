@@ -33,7 +33,9 @@ export function SheetMenu() {
                   "font-bold text-lg whitespace-nowrap transition-[transform,opacity,display] ease-in-out duration-300",
                 )}
               >
-                <span className="text-base font-bold transition-all sm:text-lg">{SITE_NAME}</span>
+                <span className="text-base font-bold transition-[transform,opacity] sm:text-lg">
+                  {SITE_NAME}
+                </span>
               </h1>
             </Link>
           </div>

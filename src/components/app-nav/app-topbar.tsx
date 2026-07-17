@@ -43,7 +43,7 @@ const LABELS: Record<string, string> = {
   conversations: "Conversations",
 
   dashboard: "Dashboard",
-  widget: "Widget",
+  widget: "Chat widget",
   integrations: "Integrations",
   settings: "Settings",
   usage: "Usage",

@@ -61,7 +61,7 @@ export function Pricing() {
           <h2 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
             Simple, transparent pricing
           </h2>
-          <p className="mt-4 text-lg text-muted-foreground">
+          <p className="text-pretty mt-4 text-lg text-muted-foreground">
             Start for free, scale as your volume grows. No hidden fees.
           </p>
         </div>
@@ -70,7 +70,7 @@ export function Pricing() {
           {plans.map((plan) => (
             <div
               key={plan.name}
-              className={`relative flex flex-col rounded-2xl border p-8 transition-all ${
+              className={`relative flex flex-col rounded-2xl border p-8 transition-[border-color,box-shadow] duration-200 ${
                 plan.highlight
                   ? "border-primary/40 bg-primary shadow-xl shadow-primary/10"
                   : "border-border/60 bg-card hover:border-border hover:shadow-md hover:shadow-black/5"
@@ -97,7 +97,7 @@ export function Pricing() {
 
               <div className="mb-8 flex items-baseline gap-1">
                 <span
-                  className={`text-4xl font-bold tracking-tight ${plan.highlight ? "text-primary-foreground" : "text-foreground"}`}
+                  className={`text-4xl font-bold tracking-tight tabular-nums ${plan.highlight ? "text-primary-foreground" : "text-foreground"}`}
                 >
                   {plan.price}
                 </span>
@@ -137,7 +137,7 @@ export function Pricing() {
 
               <Link
                 href={plan.href}
-                className={`flex h-11 items-center justify-center rounded-xl text-sm font-medium transition-all ${
+                className={`flex h-11 items-center justify-center rounded-xl text-sm font-medium transition-[scale,background-color,border-color] duration-150 ease-out active:scale-[0.96] ${
                   plan.highlight
                     ? "bg-primary-foreground text-primary hover:bg-primary-foreground/90"
                     : "border border-border/70 bg-background hover:border-border hover:bg-muted/50"

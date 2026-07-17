@@ -56,7 +56,7 @@ export function Integrations() {
             <br />
             for your stack.
           </h2>
-          <p className="mt-5 text-lg leading-relaxed text-gray-500">
+          <p className="text-pretty mt-5 text-lg leading-relaxed text-gray-600">
             Save time and start faster with pre-built integrations for every tool your support team
             already uses.
           </p>
@@ -69,7 +69,7 @@ export function Integrations() {
               <Tooltip key={item.name}>
                 <TooltipTrigger
                   render={
-                    <div className="group flex aspect-square cursor-default items-center justify-center rounded-2xl border border-gray-100 bg-white p-3 shadow-sm transition-all duration-200 ease-out hover:-translate-y-1 hover:border-gray-200 hover:shadow-[0_8px_20px_rgba(0,0,0,0.08)]" />
+                    <div className="surface-depth group flex aspect-square cursor-default items-center justify-center rounded-2xl bg-white p-3 transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-1" />
                   }
                 >
                   <Image

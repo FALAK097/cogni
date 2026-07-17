@@ -102,7 +102,7 @@ export function createWidget() {
 				<input type="text" class="oc-input" placeholder="${escapeHtml(config.inputPlaceholder)}" />
 				<button class="oc-send-btn" disabled>${ICONS.send}</button>
 			</div>
-			${config.showBranding ? '<div class="oc-branding">Powered by <strong>widget</strong></div>' : ""}
+			${config.showBranding ? '<div class="oc-branding">Powered by <strong>Cogni</strong></div>' : ""}
 		</div>
 	`;
 

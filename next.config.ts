@@ -6,12 +6,18 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ["@hugeicons/core-free-icons"],
   },
-  images: {
-    loader: "custom",
-    loaderFile: "./src/lib/cloudflare/image-loader.ts",
-  },
   reactCompiler: true,
-  serverExternalPackages: ["better-sqlite3"],
+  async headers() {
+    return [
+      {
+        source: "/widget.bundle.js",
+        headers: [
+          { key: "Cache-Control", value: "public,max-age=300,stale-while-revalidate=3600" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

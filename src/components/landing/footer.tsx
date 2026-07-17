@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Sparkles } from "@/components/icons";
+import { ThemeLogo } from "@/components/theme-logo";
 
 const FOOTER_LINKS = [
   { label: "Features", href: "#features" },
@@ -18,10 +18,7 @@ export function Footer() {
         <div className="flex flex-col items-start justify-between gap-8 py-12 sm:flex-row sm:items-center">
           {/* Brand */}
           <Link href="/" className="flex shrink-0 items-center gap-2.5">
-            <span className="flex size-8 items-center justify-center rounded-xl bg-primary text-white shadow-sm shadow-primary/30">
-              <Sparkles className="size-4" />
-            </span>
-            <span className="text-[15px] font-semibold tracking-tight text-gray-900">widget</span>
+            <ThemeLogo showWordmark wordmarkClassName="text-gray-900" />
           </Link>
 
           {/* Nav links */}
@@ -41,7 +38,7 @@ export function Footer() {
         {/* Bottom divider + copyright */}
         <div className="border-t border-gray-100 py-6">
           <p className="text-sm text-gray-400">
-            &copy; {new Date().getFullYear()} Widget Inc. All rights reserved.
+            &copy; {new Date().getFullYear()} Cogni Inc. All rights reserved.
           </p>
         </div>
       </div>

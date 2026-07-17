@@ -1,20 +1,31 @@
-import { MessageCircle } from "@/components/icons";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 interface ThemeLogoProps {
   className?: string;
+  showWordmark?: boolean;
+  wordmarkClassName?: string;
 }
 
-export function ThemeLogo({ className }: ThemeLogoProps) {
+export function ThemeLogo({ className, showWordmark = false, wordmarkClassName }: ThemeLogoProps) {
   return (
-    <span
-      aria-label="Widget"
-      className={cn(
-        "inline-flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground",
-        className,
-      )}
-    >
-      <MessageCircle className="size-4" aria-hidden="true" />
+    <span className="inline-flex shrink-0 items-center gap-2.5" aria-label="Cogni">
+      <Image
+        src="/assets/cogni.png"
+        alt=""
+        width={40}
+        height={40}
+        className={cn(
+          "size-8 rounded-[10px] object-cover outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10",
+          className,
+        )}
+        aria-hidden="true"
+      />
+      {showWordmark ? (
+        <span className={cn("text-[15px] font-semibold tracking-tight", wordmarkClassName)}>
+          Cogni
+        </span>
+      ) : null}
     </span>
   );
 }

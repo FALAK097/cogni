@@ -94,7 +94,9 @@ export function Sidebar({ initialOpen = true }: { initialOpen?: boolean }) {
                       : "translate-x-0 opacity-100",
                   )}
                 >
-                  <span className="text-base font-bold transition-all sm:text-lg">{appName}</span>
+                  <span className="text-base font-bold transition-[transform,opacity] sm:text-lg">
+                    {appName}
+                  </span>
                 </h1>
               </Link>
             </div>

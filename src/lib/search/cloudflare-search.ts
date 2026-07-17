@@ -1,8 +1,5 @@
 import "server-only";
 
-import { getCloudflareContext } from "@opennextjs/cloudflare";
-import type { AiSearchInstance } from "@cloudflare/workers-types";
-
 import { env } from "@/lib/env/server";
 
 type CloudflareSearchMetadata = Record<string, string | number | boolean>;
@@ -28,31 +25,12 @@ export type CloudflareSearchChunk = {
 
 const maxSearchTextCharacters = 3_500_000;
 
-type CloudflareSearchEnv = {
-  AI_SEARCH?: AiSearchInstance;
-};
-
 function getCloudflareSearchToken() {
   return env.CLOUDFLARE_AI_SEARCH_TOKEN ?? env.CLOUDFLARE_API_TOKEN;
 }
 
-function getCloudflareSearchBinding() {
-  if (env.ENV !== "production") {
-    return null;
-  }
-
-  try {
-    return (getCloudflareContext().env as unknown as CloudflareSearchEnv).AI_SEARCH ?? null;
-  } catch {
-    return null;
-  }
-}
-
 export function isCloudflareSearchConfigured() {
-  return Boolean(
-    getCloudflareSearchBinding() ||
-    (env.CLOUDFLARE_ACCOUNT_ID && getCloudflareSearchToken() && env.SEARCH_INDEX),
-  );
+  return Boolean(env.CLOUDFLARE_ACCOUNT_ID && getCloudflareSearchToken() && env.SEARCH_INDEX);
 }
 
 function getCloudflareSearchBaseUrl() {
@@ -86,15 +64,6 @@ export async function uploadCloudflareSearchDocument({
     workspaceid: workspaceId,
     title,
   };
-
-  const searchBinding = getCloudflareSearchBinding();
-  if (searchBinding) {
-    await searchBinding.items.uploadAndPoll(`${documentId}.txt`, indexedText, {
-      metadata,
-      timeoutMs: 60_000,
-    });
-    return;
-  }
 
   const token = getCloudflareSearchToken();
   const baseUrl = getCloudflareSearchBaseUrl();
@@ -139,16 +108,6 @@ export async function searchCloudflareIndex({
       filters,
     },
   };
-  const searchBinding = getCloudflareSearchBinding();
-  if (searchBinding) {
-    const response = await searchBinding.search({
-      query,
-      ai_search_options: searchOptions,
-    });
-
-    return response.chunks ?? [];
-  }
-
   const token = getCloudflareSearchToken();
   const baseUrl = getCloudflareSearchBaseUrl();
   if (!token || !baseUrl) {

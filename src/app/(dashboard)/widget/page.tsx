@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 
 export const metadata = {
-  title: `Widget | ${SITE_NAME}`,
+  title: `Chat widget | ${SITE_NAME}`,
   description: "Customize your AI chat widget",
 };
 
