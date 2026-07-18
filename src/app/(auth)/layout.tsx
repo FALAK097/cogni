@@ -19,7 +19,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
         {/* Copyright */}
         <p className="shrink-0 pb-2 text-center text-xs text-gray-400">
-          &copy; {new Date().getFullYear()} Cogni Inc. All rights reserved.
+          &copy; {new Date().getFullYear()} cogni Inc. All rights reserved.
         </p>
       </div>
 

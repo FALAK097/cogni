@@ -94,7 +94,7 @@ export function ContactForm() {
           required
           disabled={pending}
           rows={6}
-          placeholder="Tell us about your support workflow, team size, or questions about Cogni."
+          placeholder="Tell us about your support workflow, team size, or questions about cogni."
           className="min-h-36 rounded-xl border-border/70 bg-background px-4 py-3 text-sm placeholder:text-muted-foreground/60 focus-visible:ring-primary/30"
         />
       </div>

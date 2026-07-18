@@ -8,7 +8,7 @@ import { FinalCta } from "@/components/landing/final-cta";
 import { Footer } from "@/components/landing/footer";
 
 export const metadata = {
-  title: "Cogni — AI customer support",
+  title: "cogni — AI customer support",
   description:
     "AI-powered customer support trained on your knowledge. Resolve 70% of tickets instantly with seamless human handoff.",
 };

@@ -55,7 +55,7 @@ export function AuthDialog({
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Continue to Cogni</DialogTitle>
+          <DialogTitle>Continue to cogni</DialogTitle>
           <DialogDescription>
             Use Google to create or access your workspace. No password needed.
           </DialogDescription>

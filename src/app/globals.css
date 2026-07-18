@@ -68,7 +68,7 @@
 }
 
 :root {
-  /* Cogni blue with cool, low-chroma neutrals. */
+  /* cogni blue with cool, low-chroma neutrals. */
   --background: oklch(0.99 0.002 259);
   --foreground: oklch(0.18 0.012 259);
   --card: oklch(0.998 0.001 259);

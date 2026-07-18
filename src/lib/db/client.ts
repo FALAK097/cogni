@@ -1,8 +1,7 @@
 import "server-only";
 
-import { neonConfig, Pool } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-serverless";
-import ws from "ws";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 
 import * as schema from "./schema";
 import * as relations from "./relations";
@@ -10,13 +9,15 @@ import { env } from "@/lib/env/server";
 
 const fullSchema = { ...schema, ...relations };
 
-neonConfig.webSocketConstructor = ws;
-
 let db: ReturnType<typeof createDb> | undefined;
 
 function createDb() {
-  const pool = new Pool({ connectionString: env.DATABASE_URL });
-  return drizzle(pool, { schema: fullSchema });
+  const client = postgres(env.DATABASE_URL, {
+    max: 1,
+    prepare: false,
+  });
+
+  return drizzle(client, { schema: fullSchema });
 }
 
 export type Db = ReturnType<typeof createDb>;

@@ -38,7 +38,7 @@ export function Footer() {
         {/* Bottom divider + copyright */}
         <div className="border-t border-gray-100 py-6">
           <p className="text-sm text-gray-400">
-            &copy; {new Date().getFullYear()} Cogni Inc. All rights reserved.
+            &copy; {new Date().getFullYear()} cogni Inc. All rights reserved.
           </p>
         </div>
       </div>

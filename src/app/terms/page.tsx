@@ -2,7 +2,7 @@ import { LegalDocument } from "@/components/marketing/legal-document";
 
 export const metadata = {
   title: "Terms of Service",
-  description: "Terms of Service for the Cogni AI customer support platform.",
+  description: "Terms of Service for the cogni AI customer support platform.",
 };
 
 const effectiveDate = "June 30, 2026";
@@ -11,7 +11,7 @@ export default function TermsPage() {
   return (
     <LegalDocument
       title="Terms of Service"
-      description="These Terms govern your access to and use of Cogni, our AI customer support platform, embedded chat widget, dashboard, and related services."
+      description="These Terms govern your access to and use of cogni, our AI customer support platform, embedded chat widget, dashboard, and related services."
       effectiveDate={effectiveDate}
       sections={[
         {
@@ -20,12 +20,12 @@ export default function TermsPage() {
             <>
               <p>
                 These Terms of Service (&quot;Terms&quot;) are a binding agreement between you and
-                Cogni Inc. (&quot;Cogni,&quot; &quot;we,&quot; &quot;us,&quot; or &quot;our&quot;).
-                By creating an account, accessing the dashboard, embedding our Cogni, or otherwise
+                cogni Inc. (&quot;cogni,&quot; &quot;we,&quot; &quot;us,&quot; or &quot;our&quot;).
+                By creating an account, accessing the dashboard, embedding our cogni, or otherwise
                 using our services, you agree to these Terms and our Privacy Policy.
               </p>
               <p>
-                If you use Cogni on behalf of a company or organization, you represent that you have
+                If you use cogni on behalf of a company or organization, you represent that you have
                 authority to bind that organization, and &quot;you&quot; refers to that
                 organization.
               </p>
@@ -37,7 +37,7 @@ export default function TermsPage() {
           content: (
             <>
               <p>
-                Cogni provides software that helps teams deliver AI-assisted customer support,
+                cogni provides software that helps teams deliver AI-assisted customer support,
                 including an embeddable chat widget, workspace dashboard, conversation inbox,
                 knowledge base ingestion, integrations, analytics, and human handoff workflows.
               </p>
@@ -56,7 +56,7 @@ export default function TermsPage() {
               <p>
                 You must create an account to use the dashboard. Authentication is provided through
                 Google OAuth. You are responsible for maintaining the security of the Google account
-                used to access Cogni and for all activity that occurs under your workspace.
+                used to access cogni and for all activity that occurs under your workspace.
               </p>
               <p>
                 You must provide accurate account information and promptly update it if it changes.
@@ -70,14 +70,14 @@ export default function TermsPage() {
           content: (
             <>
               <p>
-                You retain ownership of content you submit to Cogni, including knowledge base
+                You retain ownership of content you submit to cogni, including knowledge base
                 materials, website content, conversation data, visitor messages, files, and
                 configuration settings (&quot;Customer Content&quot;).
               </p>
               <p>
-                You grant Cogni a limited license to host, process, transmit, and display Customer
+                You grant cogni a limited license to host, process, transmit, and display Customer
                 Content solely to provide, secure, and improve the services. You are responsible for
-                ensuring you have all rights necessary to submit Customer Content and to use Cogni
+                ensuring you have all rights necessary to submit Customer Content and to use cogni
                 with your website visitors and end users.
               </p>
             </>
@@ -89,7 +89,7 @@ export default function TermsPage() {
             <>
               <p>You agree not to:</p>
               <ul className="list-disc space-y-2 pl-5">
-                <li>Use Cogni in violation of law or third-party rights</li>
+                <li>Use cogni in violation of law or third-party rights</li>
                 <li>Upload malware, abusive content, or unlawful material</li>
                 <li>
                   Attempt to probe, scan, or test the vulnerability of our systems without
@@ -98,7 +98,7 @@ export default function TermsPage() {
                 <li>
                   Reverse engineer, copy, or resell the services except as expressly permitted
                 </li>
-                <li>Use Cogni to send spam or deceptive communications</li>
+                <li>Use cogni to send spam or deceptive communications</li>
                 <li>
                   Misrepresent AI-generated responses as human when doing so would be misleading or
                   unlawful
@@ -106,7 +106,7 @@ export default function TermsPage() {
               </ul>
               <p>
                 We may suspend or terminate access if we reasonably believe your use violates these
-                Terms or creates risk for Cogni, other customers, or third parties.
+                Terms or creates risk for cogni, other customers, or third parties.
               </p>
             </>
           ),
@@ -116,13 +116,13 @@ export default function TermsPage() {
           content: (
             <>
               <p>
-                Cogni uses artificial intelligence to generate responses based on your configured
+                cogni uses artificial intelligence to generate responses based on your configured
                 knowledge, prompts, and conversation context. AI output may be inaccurate,
                 incomplete, or inappropriate. You are responsible for reviewing AI behavior,
                 configuring guardrails, and providing human handoff where required.
               </p>
               <p>
-                Cogni does not guarantee that AI responses will be correct, lawful, or suitable for
+                cogni does not guarantee that AI responses will be correct, lawful, or suitable for
                 every situation. You use AI features at your own discretion and risk.
               </p>
             </>
@@ -133,7 +133,7 @@ export default function TermsPage() {
           content: (
             <>
               <p>
-                Cogni may connect with third-party services such as Google, Slack, Gmail, and other
+                cogni may connect with third-party services such as Google, Slack, Gmail, and other
                 integrations you enable. Your use of third-party services is subject to their terms
                 and privacy policies. We are not responsible for third-party services or for
                 outages, data handling, or changes made by third parties.
@@ -172,8 +172,8 @@ export default function TermsPage() {
           content: (
             <>
               <p>
-                Cogni and its software, branding, documentation, and underlying technology are owned
-                by Cogni Inc. or its licensors and are protected by intellectual property laws.
+                cogni and its software, branding, documentation, and underlying technology are owned
+                by cogni Inc. or its licensors and are protected by intellectual property laws.
                 These Terms do not grant you any rights to our trademarks or branding except as
                 needed to use the service in accordance with our guidelines.
               </p>
@@ -216,7 +216,7 @@ export default function TermsPage() {
           content: (
             <>
               <p>
-                You may stop using Cogni at any time. We may suspend or terminate your access if you
+                You may stop using cogni at any time. We may suspend or terminate your access if you
                 materially breach these Terms, if required by law, or if continued provision of the
                 services becomes impractical. Upon termination, your right to access the dashboard
                 ends, subject to any data export or retention obligations described in our Privacy
