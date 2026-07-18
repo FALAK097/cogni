@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { getVisitorConversationMessages } from "@/features/conversations/server/conversation-service";
 import { parseJsonArray } from "@/features/widget/domain";
+import { getHasWidgetConversationCond } from "@/features/widget/server/widget-data-filters";
 import { assertPublicWidgetAccess, bearerToken } from "@/features/widget/server/widget-public";
 import { createWidgetBootstrapToken } from "@/features/widget/server/widget-bootstrap";
 import { getPublicWidget, validateEmbedOrigin } from "@/features/widget/server/widget-service";
@@ -13,7 +14,6 @@ import {
 } from "@/features/widget/server/widget-utils";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { getDb } from "@/lib/db/client";
-import { conversation as conversationTable } from "@/lib/db/schema";
 
 const PREVIEW_HOSTNAME = "dashboard-preview";
 
@@ -63,19 +63,14 @@ export async function POST(
       const visitorId = parsed.data.visitorId ?? randomUUID();
       const nowIso = new Date().toISOString();
       const visitorSession = await db.query.visitorSession.findFirst({
-        where: (fields, { eq, and, gt, sql }) =>
+        where: (fields, { eq, and, gt }) =>
           and(
             eq(fields.widgetId, widget.id),
             eq(fields.browserSessionId, browserSessionId),
             eq(fields.hostname, PREVIEW_HOSTNAME),
             gt(fields.messageCount, 0),
             gt(fields.expiresAt, nowIso),
-            sql`exists (
-              select 1 from ${conversationTable}
-              where ${conversationTable.visitorSessionId} = ${fields.id}
-                and ${conversationTable.channel} = 'WIDGET'
-                and ${conversationTable.messages} like '%"authorType":"VISITOR"%'
-            )`,
+            getHasWidgetConversationCond(fields),
           ),
       });
 
@@ -123,19 +118,14 @@ export async function POST(
   const visitorSession =
     parsed.data.sessionId && token
       ? await db.query.visitorSession.findFirst({
-          where: (fields, { eq, and, gt, sql }) => {
+          where: (fields, { eq, and, gt }) => {
             const conds = [
               eq(fields.widgetId, widget.id),
               eq(fields.browserSessionId, parsed.data.sessionId!),
               eq(fields.token, token),
               gt(fields.messageCount, 0),
               gt(fields.expiresAt, nowIso),
-              sql`exists (
-                select 1 from ${conversationTable}
-                where ${conversationTable.visitorSessionId} = ${fields.id}
-                and ${conversationTable.channel} = 'WIDGET'
-                and ${conversationTable.messages} like '%"authorType":"VISITOR"%'
-              )`,
+              getHasWidgetConversationCond(fields),
             ];
             if (parsed.data.visitorId) {
               conds.push(eq(fields.visitorId, parsed.data.visitorId));

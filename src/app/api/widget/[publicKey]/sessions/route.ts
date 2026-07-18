@@ -1,4 +1,5 @@
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
+import { getHasWidgetConversationCond } from "@/features/widget/server/widget-data-filters";
 import {
   assertPublicWidgetAccess,
   requireAuthorizedVisitorSession,
@@ -10,7 +11,6 @@ import {
 } from "@/features/widget/server/widget-utils";
 import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
 import { getDb } from "@/lib/db/client";
-import { conversation as conversationTable } from "@/lib/db/schema";
 
 export function OPTIONS(request: Request) {
   return widgetPreflightResponse(request);
@@ -58,18 +58,13 @@ export async function GET(
   const nowIso = new Date().toISOString();
 
   const sessions = await db.query.visitorSession.findMany({
-    where: (fields, { eq, and, gt, sql }) =>
+    where: (fields, { eq, and, gt }) =>
       and(
         eq(fields.widgetId, access.widget.id),
         eq(fields.visitorId, visitorId),
         gt(fields.messageCount, 0),
         gt(fields.expiresAt, nowIso),
-        sql`exists (
-          select 1 from ${conversationTable}
-          where ${conversationTable.visitorSessionId} = ${fields.id}
-            and ${conversationTable.channel} = 'WIDGET'
-            and ${conversationTable.messages} like '%"authorType":"VISITOR"%'
-        )`,
+        getHasWidgetConversationCond(fields),
       ),
     orderBy: (fields, { desc }) => [desc(fields.lastSeenAt)],
     limit: 20,
