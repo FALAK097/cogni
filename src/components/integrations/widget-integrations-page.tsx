@@ -5,7 +5,7 @@ import { useMemo } from "react";
 import { IntegrationCategorySection } from "@/components/integrations/integration-category-section";
 import { PendingActionsCard } from "@/features/integrations/components/pending-actions-card";
 import { useToast } from "@/components/ui/use-toast";
-import { useConnectIntegration, useDisconnectIntegration, useIntegrations } from "@/hooks/query";
+import { useConnectIntegration, useIntegrations } from "@/hooks/query";
 import { INTEGRATION_CATEGORIES } from "@/lib/integrations/categories";
 import { getAllIntegrations, getIntegrationsByCategory } from "@/lib/integrations/registry";
 
@@ -13,7 +13,6 @@ export function WidgetIntegrationsPage() {
   const { toast } = useToast();
   const integrationsQuery = useIntegrations();
   const connectMutation = useConnectIntegration();
-  const disconnectMutation = useDisconnectIntegration();
 
   const connectedSlugs = useMemo(() => {
     const entries = integrationsQuery.data?.workspaceIntegrations ?? [];
@@ -27,15 +26,13 @@ export function WidgetIntegrationsPage() {
 
   async function handleSelect(slug: string) {
     const connected = connectedSlugs.has(slug);
+    if (connected) {
+      window.location.assign(`/integrations/${slug}`);
+      return;
+    }
     try {
-      if (connected) {
-        await disconnectMutation.mutateAsync(slug);
-        toast({ title: "Disconnected", description: `${slug} disconnected.` });
-      } else {
-        await connectMutation.mutateAsync({ slug });
-        return;
-      }
-      await integrationsQuery.refetch();
+      await connectMutation.mutateAsync({ slug });
+      return;
     } catch (error) {
       toast({
         title: "Integration error",
