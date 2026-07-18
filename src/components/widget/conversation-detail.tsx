@@ -2,6 +2,8 @@
 
 import { format, formatDistanceToNow, isToday, isYesterday } from "date-fns";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { z } from "zod";
 import { Streamdown } from "streamdown";
 import {
   ArrowLeft,
@@ -65,6 +67,26 @@ interface ConversationDetailProps {
   conversationId: string;
   onBack: () => void;
   part?: "chat" | "details";
+}
+
+const copilotResultSchema = z.object({
+  runId: z.string().uuid(),
+  summary: z.string().min(1),
+  draftReply: z.string().min(1),
+  nextActions: z.array(z.string()),
+  sources: z.array(z.object({ documentId: z.string().min(1), title: z.string().min(1) })),
+});
+
+async function generateCopilotDraft(conversationId: string) {
+  const response = await fetch(`/api/dashboard/conversations/${conversationId}/copilot`, {
+    method: "POST",
+  });
+  const body = (await response.json().catch(() => null)) as unknown;
+  if (!response.ok) {
+    const error = z.object({ error: z.string() }).safeParse(body);
+    throw new Error(error.success ? error.data.error : "Could not generate a draft.");
+  }
+  return copilotResultSchema.parse(body);
 }
 
 function getDisplayName(session: ConversationDetailData) {
@@ -180,6 +202,16 @@ export function ConversationDetail({
   const deleteConversationMutation = useDeleteConversation();
   const assignMutation = useAssignConversation();
   const sendMessageMutation = useSendConversationMessage();
+  const copilotMutation = useMutation({
+    mutationFn: () => generateCopilotDraft(conversationId),
+    onError: (error) => {
+      toast({
+        title: "Copilot failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const messages = session?.messages;
 
@@ -466,6 +498,41 @@ export function ConversationDetail({
         </div>
 
         <div className="shrink-0 px-3 pb-3 sm:px-4">
+          {copilotMutation.data ? (
+            <div className="mb-2 space-y-2 rounded-xl border border-primary/20 bg-primary/[0.03] p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="flex items-center gap-1.5 text-xs font-semibold">
+                  <Bot className="h-3.5 w-3.5" /> Copilot draft
+                </p>
+                <span className="text-[10px] text-muted-foreground">Never sent automatically</span>
+              </div>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                {copilotMutation.data.summary}
+              </p>
+              {copilotMutation.data.nextActions.length > 0 ? (
+                <ul className="list-inside list-disc text-[11px] text-muted-foreground">
+                  {copilotMutation.data.nextActions.map((action) => (
+                    <li key={action}>{action}</li>
+                  ))}
+                </ul>
+              ) : null}
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => setComposerText(copilotMutation.data.draftReply)}
+                >
+                  Use editable draft
+                </Button>
+                {copilotMutation.data.sources.length > 0 ? (
+                  <span className="text-[10px] text-muted-foreground">
+                    Sources: {copilotMutation.data.sources.map((source) => source.title).join(", ")}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
           <div className={composerBoxClassName}>
             <Textarea
               value={composerText}
@@ -482,6 +549,17 @@ export function ConversationDetail({
 
             <div className="mt-2 flex items-center justify-between gap-2">
               <div className="flex items-center gap-0.5">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 gap-1 px-2 text-[11px] text-muted-foreground"
+                  disabled={copilotMutation.isPending}
+                  onClick={() => copilotMutation.mutate()}
+                >
+                  <Bot className="h-3 w-3" />
+                  {copilotMutation.isPending ? "Thinking…" : "Copilot"}
+                </Button>
                 <Button
                   variant="ghost"
                   size="icon"
