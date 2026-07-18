@@ -32,7 +32,7 @@ export function WidgetIntegrationsPage() {
         toast({ title: "Disconnected", description: `${slug} disconnected.` });
       } else {
         await connectMutation.mutateAsync({ slug });
-        toast({ title: "Connected", description: `${slug} connected.` });
+        return;
       }
       await integrationsQuery.refetch();
     } catch (error) {

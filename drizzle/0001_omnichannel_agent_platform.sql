@@ -32,8 +32,6 @@ CREATE TABLE "workflow_step" (
 	"workspaceId" text NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "lead" DISABLE ROW LEVEL SECURITY;--> statement-breakpoint
-ALTER TABLE "widget_lead_capture" DISABLE ROW LEVEL SECURITY;--> statement-breakpoint
 DROP TABLE "lead" CASCADE;--> statement-breakpoint
 DROP TABLE "widget_lead_capture" CASCADE;--> statement-breakpoint
 DROP INDEX "integration_action_idempotencyKey_key";--> statement-breakpoint

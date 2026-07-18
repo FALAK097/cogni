@@ -1,8 +1,15 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { eq, and } from "drizzle-orm";
+import {
+  COMPOSIO_TOOLKITS,
+  createComposioClient,
+  getOrCreateManagedAuthConfig,
+  type ComposioProvider,
+} from "@/features/integrations/server/composio-connections";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { integration as integrationTable } from "@/lib/db/schema";
+import { env } from "@/lib/env/server";
 
 const PROVIDER_SLUGS: Record<string, string> = {
   GMAIL: "gmail",
@@ -25,15 +32,38 @@ export async function GET() {
     orderBy: (fields, { asc }) => [asc(fields.provider)],
   });
 
+  const composio = env.COMPOSIO_API_KEY ? createComposioClient() : null;
+  const verified = await Promise.all(
+    integrations.map(async (integration) => {
+      if (!composio || !integration.connectedAccountId) {
+        return integration.status === "DISCONNECTED"
+          ? integration
+          : { ...integration, status: "ERROR" };
+      }
+      try {
+        const account = await composio.connectedAccounts.get(integration.connectedAccountId, {
+          signal: AbortSignal.timeout(5_000),
+        });
+        const expectedToolkit = COMPOSIO_TOOLKITS[integration.provider as ComposioProvider];
+        const isActive = account.status === "ACTIVE" && account.toolkit.slug === expectedToolkit;
+        return { ...integration, status: isActive ? "CONNECTED" : "ERROR" };
+      } catch {
+        return { ...integration, status: "ERROR" };
+      }
+    }),
+  );
+
   return NextResponse.json(
-    integrations.map((integration) => ({
+    verified.map((integration) => ({
       id: integration.id,
       integrationSlug: PROVIDER_SLUGS[integration.provider] ?? integration.provider.toLowerCase(),
       slug: PROVIDER_SLUGS[integration.provider] ?? integration.provider.toLowerCase(),
       provider: integration.provider,
       status: integration.status,
       connectedAt: integration.updatedAt,
-      metadata: {},
+      metadata: {
+        lastError: integration.lastError,
+      },
     })),
   );
 }
@@ -43,10 +73,28 @@ export async function POST(request: Request) {
   const body = (await request.json()) as { slug?: string };
   const slug = body.slug?.toLowerCase();
 
-  const provider = slug ? SLUG_PROVIDERS[slug] : null;
+  const provider = slug ? (SLUG_PROVIDERS[slug] as ComposioProvider | undefined) : undefined;
 
   if (!provider) {
     return NextResponse.json({ error: "Unsupported integration." }, { status: 400 });
+  }
+
+  const composio = createComposioClient();
+  const toolkit = COMPOSIO_TOOLKITS[provider];
+  const authConfigId = await getOrCreateManagedAuthConfig(composio, toolkit);
+  const callbackUrl = new URL("/api/dashboard/integrations/callback", new URL(request.url).origin);
+  callbackUrl.searchParams.set("slug", slug!);
+  const connection = await composio.connectedAccounts.link(
+    workspace.id,
+    authConfigId,
+    { callbackUrl: callbackUrl.toString(), alias: `cogni-${workspace.id}-${slug}` },
+    { signal: AbortSignal.timeout(15_000) },
+  );
+  if (!connection.redirectUrl) {
+    return NextResponse.json(
+      { error: "Composio did not return an authorization URL." },
+      { status: 502 },
+    );
   }
 
   await db
@@ -55,20 +103,24 @@ export async function POST(request: Request) {
       id: randomUUID(),
       workspaceId: workspace.id,
       provider,
-      status: "CONNECTED",
-      config: JSON.stringify({ webhookToken: crypto.randomUUID() }),
+      status: "CONNECTING",
+      connectedAccountId: connection.id,
+      config: JSON.stringify({ toolkit, authConfigId }),
+      lastError: null,
       updatedAt: new Date().toISOString(),
     })
     .onConflictDoUpdate({
       target: [integrationTable.workspaceId, integrationTable.provider],
       set: {
-        status: "CONNECTED",
-        config: JSON.stringify({ webhookToken: crypto.randomUUID() }),
+        status: "CONNECTING",
+        connectedAccountId: connection.id,
+        config: JSON.stringify({ toolkit, authConfigId }),
+        lastError: null,
         updatedAt: new Date().toISOString(),
       },
     });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, redirectUrl: connection.redirectUrl });
 }
 
 export async function DELETE(request: Request) {
@@ -86,10 +138,24 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "Unsupported integration." }, { status: 400 });
   }
 
+  const existing = await db.query.integration.findFirst({
+    where: (fields, { and, eq }) =>
+      and(eq(fields.workspaceId, workspace.id), eq(fields.provider, provider)),
+  });
+  if (existing?.connectedAccountId) {
+    const composio = createComposioClient();
+    await composio.connectedAccounts.delete(existing.connectedAccountId, {
+      signal: AbortSignal.timeout(10_000),
+    });
+  }
+
   await db
     .update(integrationTable)
     .set({
       status: "DISCONNECTED",
+      connectedAccountId: null,
+      externalAccountId: null,
+      lastError: null,
       updatedAt: new Date().toISOString(),
     })
     .where(
