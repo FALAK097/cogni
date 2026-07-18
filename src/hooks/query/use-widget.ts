@@ -87,6 +87,26 @@ export interface WidgetPreviousConversation {
   lastMessageAt: string;
 }
 
+export interface WidgetWorkflowRun {
+  id: string;
+  name: string;
+  status: string;
+  input: Record<string, unknown> | null;
+  errorMessage: string | null;
+  startedAt: string;
+  finishedAt: string | null;
+  steps: {
+    id: string;
+    position: number;
+    name: string;
+    kind: string;
+    status: string;
+    errorMessage: string | null;
+    startedAt: string | null;
+    finishedAt: string | null;
+  }[];
+}
+
 export interface WidgetSessionDetail {
   id: string;
   visitorId: string;
@@ -124,6 +144,7 @@ export interface WidgetSessionDetail {
   previousConversations?: WidgetPreviousConversation[];
   contactNotes?: WidgetContactNote[];
   internalNotes?: WidgetInternalNote[];
+  workflows?: WidgetWorkflowRun[];
 }
 
 export interface WidgetSessionsResponse {

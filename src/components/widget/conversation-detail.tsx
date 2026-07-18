@@ -130,6 +130,20 @@ function formatStatusLabel(status: string) {
   return status.charAt(0) + status.slice(1).toLowerCase();
 }
 
+function workflowStatusVariant(
+  status: string,
+): "default" | "secondary" | "outline" | "destructive" {
+  if (status === "COMPLETED") return "secondary";
+  if (status === "FAILED" || status === "CANCELLED") return "destructive";
+  if (status === "WAITING_APPROVAL" || status === "WAITING_USER") return "outline";
+  return "default";
+}
+
+function workflowInputString(input: Record<string, unknown> | null, key: string) {
+  const value = input?.[key];
+  return typeof value === "string" ? value : null;
+}
+
 function statusBadgeVariant(status: string): "default" | "secondary" | "outline" | "destructive" {
   switch (status) {
     case "OPEN":
@@ -855,6 +869,66 @@ function SessionDetailsContent({
                 </Badge>
               </div>
             ))}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {(session.workflows?.length ?? 0) > 0 ? (
+        <Card className={cn(detailCardClassName, "shrink-0")}>
+          <CardHeader className={detailCardHeaderClassName()}>
+            <CardTitle className="text-xs font-semibold">Workflows</CardTitle>
+          </CardHeader>
+          <CardContent className={cn("space-y-3 pb-3", detailCardContentClassName())}>
+            {session.workflows?.map((workflow) => {
+              const startAt = workflowInputString(workflow.input, "startAt");
+              const attendeeEmail = workflowInputString(workflow.input, "attendeeEmail");
+              return (
+                <div key={workflow.id} className="rounded-lg border border-border/60 p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-medium">
+                        {workflow.name === "appointment.booking"
+                          ? "Appointment booking"
+                          : workflow.name}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {format(new Date(workflow.startedAt), "MMM d, h:mm a")}
+                      </p>
+                    </div>
+                    <Badge variant={workflowStatusVariant(workflow.status)} className="text-[9px]">
+                      {formatStatusLabel(workflow.status.replaceAll("_", " "))}
+                    </Badge>
+                  </div>
+                  {startAt || attendeeEmail ? (
+                    <p className="mt-2 text-[11px] text-muted-foreground">
+                      {startAt ? format(new Date(startAt), "MMM d, yyyy h:mm a") : null}
+                      {startAt && attendeeEmail ? " · " : null}
+                      {attendeeEmail}
+                    </p>
+                  ) : null}
+                  <div className="mt-3 space-y-2 border-l pl-3">
+                    {workflow.steps.map((step) => (
+                      <div key={step.id}>
+                        <div className="flex items-center justify-between gap-2 text-[11px]">
+                          <span className="truncate">{step.name}</span>
+                          <span className="shrink-0 text-[10px] text-muted-foreground">
+                            {formatStatusLabel(step.status.replaceAll("_", " "))}
+                          </span>
+                        </div>
+                        {step.errorMessage ? (
+                          <p className="mt-0.5 text-[10px] text-destructive">{step.errorMessage}</p>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                  {workflow.errorMessage ? (
+                    <p className="mt-2 rounded bg-destructive/10 p-2 text-[10px] text-destructive">
+                      {workflow.errorMessage}
+                    </p>
+                  ) : null}
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
       ) : null}

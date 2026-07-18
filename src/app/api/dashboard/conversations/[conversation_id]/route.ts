@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
 import {
@@ -85,6 +85,36 @@ export async function GET(_request: Request, context: RouteContext) {
       : new Date().toISOString(),
   }));
 
+  const workflowRuns = await db.query.workflowRun.findMany({
+    where: (fields, { and, eq }) =>
+      and(eq(fields.workspaceId, workspace.id), eq(fields.conversationId, conversation.id)),
+    orderBy: (fields, { desc }) => [desc(fields.startedAt)],
+    limit: 10,
+  });
+  const workflowRunIds = workflowRuns.map((run) => run.id);
+  const workflowSteps =
+    workflowRunIds.length > 0
+      ? await db.query.workflowStep.findMany({
+          where: (fields, { and, eq }) =>
+            and(
+              eq(fields.workspaceId, workspace.id),
+              inArray(fields.workflowRunId, workflowRunIds),
+            ),
+          orderBy: (fields, { asc }) => [asc(fields.position)],
+        })
+      : [];
+
+  function parseObject(value: string) {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>)
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
   return NextResponse.json({
     id: conversation.id,
     visitorSessionId: conversation.visitorSessionId,
@@ -135,6 +165,27 @@ export async function GET(_request: Request, context: RouteContext) {
         authorName: note.authorUser.name,
       })) ?? [],
     internalNotes,
+    workflows: workflowRuns.map((run) => ({
+      id: run.id,
+      name: run.name,
+      status: run.status,
+      input: parseObject(run.input),
+      errorMessage: run.errorMessage,
+      startedAt: run.startedAt,
+      finishedAt: run.finishedAt,
+      steps: workflowSteps
+        .filter((step) => step.workflowRunId === run.id)
+        .map((step) => ({
+          id: step.id,
+          position: step.position,
+          name: step.name,
+          kind: step.kind,
+          status: step.status,
+          errorMessage: step.errorMessage,
+          startedAt: step.startedAt,
+          finishedAt: step.finishedAt,
+        })),
+    })),
   });
 }
 
