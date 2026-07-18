@@ -57,7 +57,7 @@ export const INTEGRATION_MANIFESTS: IntegrationManifest[] = [
     slug: "discord",
     name: "Discord",
     subtitle: "Omnichannel",
-    description: "Handle Discord mentions and direct messages in Conversations.",
+    description: "Connect a Discord user account for approved Composio actions.",
     category: "COMMUNICATION",
     icon: "/assets/icons/discord.svg",
     auth: { type: "api_key" },
@@ -65,8 +65,9 @@ export const INTEGRATION_MANIFESTS: IntegrationManifest[] = [
     features: ["NOTIFICATIONS"],
     permissions: ["send_messages"],
     content: {
-      whatItDoes: ["Receive and answer Discord conversations."],
-      useCases: ["Community support and escalation."],
+      whatItDoes: ["Run actions available to the connected Discord user."],
+      useCases: ["Workspace automation that does not require a bot identity."],
+      setupGuideUrl: "https://composio.dev/toolkits/discord",
     },
   },
   {
@@ -74,7 +75,7 @@ export const INTEGRATION_MANIFESTS: IntegrationManifest[] = [
     slug: "discord-bot",
     name: "Discord Bot",
     subtitle: "Omnichannel bot",
-    description: "Install a bot that can receive and answer Discord support messages.",
+    description: "Install a bot for approved outbound Discord messages and channel replies.",
     category: "COMMUNICATION",
     icon: "/assets/icons/discord.svg",
     auth: { type: "oauth" },
@@ -82,8 +83,9 @@ export const INTEGRATION_MANIFESTS: IntegrationManifest[] = [
     features: ["NOTIFICATIONS"],
     permissions: ["send_messages"],
     content: {
-      whatItDoes: ["Receive mentions and send Discord channel replies."],
+      whatItDoes: ["Send messages through a dedicated Discord bot identity."],
       useCases: ["Community support, incident updates, and team escalation."],
+      setupGuideUrl: "https://docs.composio.dev/toolkits/discordbot",
     },
   },
   {
@@ -108,7 +110,7 @@ export const INTEGRATION_MANIFESTS: IntegrationManifest[] = [
     slug: "whatsapp",
     name: "WhatsApp",
     subtitle: "Omnichannel",
-    description: "Handle WhatsApp customer messages in Conversations.",
+    description: "Send approved WhatsApp messages and templates through Cloud API.",
     category: "COMMUNICATION",
     icon: "/assets/icons/whatsapp.svg",
     auth: { type: "api_key" },
@@ -116,8 +118,9 @@ export const INTEGRATION_MANIFESTS: IntegrationManifest[] = [
     features: ["NOTIFICATIONS"],
     permissions: ["send_messages"],
     content: {
-      whatItDoes: ["Receive and answer WhatsApp conversations."],
+      whatItDoes: ["Send session messages and approved templates."],
       useCases: ["Sales and customer support."],
+      setupGuideUrl: "https://docs.composio.dev/toolkits/whatsapp",
     },
   },
   {
