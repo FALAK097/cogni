@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 
 import { IntegrationCategorySection } from "@/components/integrations/integration-category-section";
+import { PendingActionsCard } from "@/features/integrations/components/pending-actions-card";
 import { useToast } from "@/components/ui/use-toast";
 import { useConnectIntegration, useDisconnectIntegration, useIntegrations } from "@/hooks/query";
 import { INTEGRATION_CATEGORIES } from "@/lib/integrations/categories";
@@ -50,6 +51,7 @@ export function WidgetIntegrationsPage() {
 
   return (
     <div className="space-y-10 pb-10">
+      <PendingActionsCard />
       {INTEGRATION_CATEGORIES.map((category) => {
         const integrations = getIntegrationsByCategory(category.id);
         if (integrations.length === 0) return null;

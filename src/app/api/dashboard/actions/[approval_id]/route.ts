@@ -32,6 +32,9 @@ export async function PATCH(request: Request, context: RouteContext) {
       decision: parsed.data.decision,
       userId: session.user.id,
     });
+    if (approval.status !== parsed.data.decision) {
+      throw new Error(`This action was already ${approval.status.toLowerCase()}.`);
+    }
     if (parsed.data.decision === "REJECTED") {
       if (approval.workflowRunId && approval.workflowStepId) {
         await updateWorkflowStep({

@@ -143,7 +143,7 @@ export async function POST(request: Request, context: RouteContext) {
           .update(approvalRequest)
           .set({
             payload: JSON.stringify(calendarPayload),
-            summary: "Approve and create calendar event",
+            summary: `Create calendar event and email confirmation to ${parsed.data.attendeeEmail}`,
           })
           .where(
             and(
@@ -253,7 +253,7 @@ export async function POST(request: Request, context: RouteContext) {
     workflowStepId: actionStep.id,
     actionType: actionInput.actionType,
     input: actionInput.payload,
-    summary: actionStep.name,
+    summary: `Create calendar event and email confirmation to ${parsed.data.attendeeEmail}`,
   });
   if (!approval.created) {
     return corsResponse(

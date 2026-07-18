@@ -20,17 +20,33 @@ const proposeActionSchema = z.object({
 export async function GET() {
   const { db, workspace } = await requireDashboardContext();
   const approvals = await db.query.approvalRequest.findMany({
-    where: (fields, { and, eq, gt }) =>
+    where: (fields, { and, eq, gt, or }) =>
       and(
         eq(fields.workspaceId, workspace.id),
-        eq(fields.status, "PENDING"),
+        or(eq(fields.status, "PENDING"), eq(fields.status, "APPROVED")),
         gt(fields.expiresAt, new Date().toISOString()),
       ),
     orderBy: (fields, { desc }) => [desc(fields.createdAt)],
     limit: 100,
   });
+  const actionable = (
+    await Promise.all(
+      approvals.map(async (approval) => {
+        if (approval.status === "PENDING") return approval;
+        const action = await db.query.integrationAction.findFirst({
+          where: (fields, { and, eq }) =>
+            and(
+              eq(fields.workspaceId, workspace.id),
+              eq(fields.idempotencyKey, `approval:${approval.id}`),
+            ),
+          columns: { status: true },
+        });
+        return action?.status === "COMPLETED" || action?.status === "RUNNING" ? null : approval;
+      }),
+    )
+  ).filter((approval): approval is (typeof approvals)[number] => approval !== null);
   return NextResponse.json({
-    approvals: approvals.map((approval) => ({
+    approvals: actionable.map((approval) => ({
       ...approval,
       token: getApprovalToken(approval),
       tokenHash: undefined,

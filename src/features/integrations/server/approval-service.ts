@@ -108,7 +108,6 @@ export async function decideApprovalRequest({
       and(eq(fields.id, approvalId), eq(fields.workspaceId, workspaceId)),
   });
   if (!approval) throw new Error("Approval request not found.");
-  if (approval.status !== "PENDING") return approval;
   if (new Date(approval.expiresAt).getTime() <= Date.now()) {
     await db
       .update(approvalRequest)
@@ -117,6 +116,7 @@ export async function decideApprovalRequest({
     throw new Error("Approval request expired.");
   }
   if (!tokensMatch(token, approval.tokenHash)) throw new Error("Invalid approval token.");
+  if (approval.status !== "PENDING") return approval;
 
   const [updated] = await db
     .update(approvalRequest)
@@ -129,5 +129,11 @@ export async function decideApprovalRequest({
       ),
     )
     .returning();
-  return updated ?? approval;
+  if (updated) return updated;
+  const current = await db.query.approvalRequest.findFirst({
+    where: (fields, { eq, and }) =>
+      and(eq(fields.id, approvalId), eq(fields.workspaceId, workspaceId)),
+  });
+  if (!current) throw new Error("Approval request not found.");
+  return current;
 }

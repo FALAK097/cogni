@@ -1,0 +1,123 @@
+"use client";
+
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/components/ui/use-toast";
+
+type PendingApproval = {
+  id: string;
+  actionType: string;
+  riskLevel: string;
+  summary: string;
+  status: string;
+  expiresAt: string;
+  token: string;
+};
+
+async function readResponse<T>(response: Response): Promise<T> {
+  const body = (await response.json().catch(() => ({}))) as T & { error?: string };
+  if (!response.ok) throw new Error(body.error ?? "Request failed.");
+  return body;
+}
+
+export function PendingActionsCard() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const query = useQuery<{ approvals: PendingApproval[] }>({
+    queryKey: ["integration-approvals"],
+    queryFn: async () => readResponse(await fetch("/api/dashboard/actions")),
+    refetchInterval: 15_000,
+  });
+  const decision = useMutation({
+    mutationFn: async ({
+      approval,
+      value,
+    }: {
+      approval: PendingApproval;
+      value: "APPROVED" | "REJECTED";
+    }) =>
+      readResponse(
+        await fetch(`/api/dashboard/actions/${approval.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: approval.token, decision: value }),
+        }),
+      ),
+    onSuccess: async (_result, variables) => {
+      toast({
+        title: variables.value === "APPROVED" ? "Action completed" : "Action rejected",
+        description: variables.approval.summary,
+      });
+      await queryClient.invalidateQueries({ queryKey: ["integration-approvals"] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Could not process action",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  if (query.isLoading || !query.data || query.data.approvals.length === 0) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Actions awaiting approval</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Review external writes requested by the widget or an automated workflow.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {query.data.approvals.map((approval) => {
+          const isPending = decision.isPending && decision.variables.approval.id === approval.id;
+          return (
+            <div
+              key={approval.id}
+              className="flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div className="min-w-0 space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-medium">{approval.summary}</p>
+                  <Badge variant={approval.riskLevel === "HIGH" ? "destructive" : "secondary"}>
+                    {approval.riskLevel.toLowerCase()} risk
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {approval.actionType} · expires {new Date(approval.expiresAt).toLocaleString()}
+                </p>
+              </div>
+              <div className="flex shrink-0 gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isPending || approval.status === "APPROVED"}
+                  onClick={() => decision.mutate({ approval, value: "REJECTED" })}
+                >
+                  Reject
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={isPending}
+                  onClick={() => decision.mutate({ approval, value: "APPROVED" })}
+                >
+                  {isPending
+                    ? "Running…"
+                    : approval.status === "APPROVED"
+                      ? "Retry action"
+                      : "Approve and run"}
+                </Button>
+              </div>
+            </div>
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
+}
