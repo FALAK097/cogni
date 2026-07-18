@@ -10,6 +10,7 @@ import {
 } from "@/features/widget/server/widget-utils";
 import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
 import { getDb } from "@/lib/db/client";
+import { conversation as conversationTable } from "@/lib/db/schema";
 
 export function OPTIONS(request: Request) {
   return widgetPreflightResponse(request);
@@ -64,10 +65,10 @@ export async function GET(
         gt(fields.messageCount, 0),
         gt(fields.expiresAt, nowIso),
         sql`exists (
-          select 1 from conversation
-          where conversation.visitorSessionId = ${fields.id}
-            and conversation.channel = 'WIDGET'
-            and conversation.messages like '%"authorType":"VISITOR"%'
+          select 1 from ${conversationTable}
+          where ${conversationTable.visitorSessionId} = ${fields.id}
+            and ${conversationTable.channel} = 'WIDGET'
+            and ${conversationTable.messages} like '%"authorType":"VISITOR"%'
         )`,
       ),
     orderBy: (fields, { desc }) => [desc(fields.lastSeenAt)],

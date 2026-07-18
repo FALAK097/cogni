@@ -13,6 +13,7 @@ import {
 } from "@/features/widget/server/widget-utils";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { getDb } from "@/lib/db/client";
+import { conversation as conversationTable } from "@/lib/db/schema";
 
 const PREVIEW_HOSTNAME = "dashboard-preview";
 
@@ -70,10 +71,10 @@ export async function POST(
             gt(fields.messageCount, 0),
             gt(fields.expiresAt, nowIso),
             sql`exists (
-              select 1 from conversation
-              where conversation.visitorSessionId = ${fields.id}
-                and conversation.channel = 'WIDGET'
-                and conversation.messages like '%"authorType":"VISITOR"%'
+              select 1 from ${conversationTable}
+              where ${conversationTable.visitorSessionId} = ${fields.id}
+                and ${conversationTable.channel} = 'WIDGET'
+                and ${conversationTable.messages} like '%"authorType":"VISITOR"%'
             )`,
           ),
       });
@@ -130,10 +131,10 @@ export async function POST(
               gt(fields.messageCount, 0),
               gt(fields.expiresAt, nowIso),
               sql`exists (
-                select 1 from conversation 
-                where conversation.visitorSessionId = ${fields.id} 
-                and conversation.channel = 'WIDGET' 
-                and conversation.messages like '%"authorType":"VISITOR"%'
+                select 1 from ${conversationTable}
+                where ${conversationTable.visitorSessionId} = ${fields.id}
+                and ${conversationTable.channel} = 'WIDGET'
+                and ${conversationTable.messages} like '%"authorType":"VISITOR"%'
               )`,
             ];
             if (parsed.data.visitorId) {
