@@ -57,16 +57,12 @@ export async function POST(request: Request) {
     })
     .returning();
 
-  try {
-    await enqueueDocumentProcessing({
-      db,
-      workspaceId: workspace.id,
-      documentId: document.id,
-      idempotencyKey: `document:upload:${document.id}`,
-    });
-  } catch {
-    // processDocument updates status on failure
-  }
+  const job = await enqueueDocumentProcessing({
+    db,
+    workspaceId: workspace.id,
+    documentId: document.id,
+    idempotencyKey: `document:upload:${document.id}`,
+  });
 
-  return NextResponse.json({ documentId: document.id });
+  return NextResponse.json({ documentId: document.id, job }, { status: 202 });
 }

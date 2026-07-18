@@ -10,6 +10,18 @@ import {
   addUrlSourceAction,
   importSitemapSourceAction,
 } from "@/features/knowledge/actions";
+import { z } from "zod";
+
+const okResponseSchema = z.object({ ok: z.boolean() });
+const retrySourceResponseSchema = okResponseSchema.extend({ status: z.literal("processing") });
+const uploadSourceResponseSchema = z.object({
+  documentId: z.string().uuid(),
+  job: z.object({
+    mode: z.literal("queued"),
+    created: z.boolean(),
+    workflowRunId: z.string().uuid().nullable(),
+  }),
+});
 
 export type KnowledgeBaseSource = {
   id: string;
@@ -96,82 +108,20 @@ export function useKnowledgeBaseSources(
   });
 }
 
-export function useCreateKnowledgeBase() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (body: { name: string }) => {
-      const { data, error } = await api.POST<{ knowledgeBase: KnowledgeBase }>(
-        "/api/knowledge-base",
-        { body },
-      );
-      return requireData(data, error, "Failed to create knowledge base");
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeBase.all });
-    },
-  });
-}
-
-export function useUpdateKnowledgeBase() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (_body: { id: string; name: string }) => ({ ok: true }),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeBase.all });
-    },
-  });
-}
-
-export function useDeleteKnowledgeBase() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (_id: string) => ({ ok: true }),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeBase.all });
-    },
-  });
-}
-
-export function useCreateRagSource() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (body: { url: string | string[]; knowledgeBaseId?: string }) => {
-      const { data, error } = await api.POST<{ source: KnowledgeBaseSource }>(
-        "/api/knowledge-base/sources/website",
-        { body },
-      );
-      return requireData(data, error, "Failed to add website source");
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeBase.all });
-    },
-  });
-}
-
-export function useCreateKnowledgeBaseApiSource() {
-  return useMutation({
-    mutationFn: async () => {
-      throw new Error("API sources are not supported yet.");
-    },
-  });
-}
-
 export function useDeleteKnowledgeBaseSource() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (sourceId: string) => {
-      const { data, error } = await api.DELETE<{ ok: boolean }>(
-        "/api/knowledge-base/sources/{source_id}",
-        {
-          params: { path: { source_id: sourceId } },
-        },
-      );
-      return requireData(data, error, "Failed to delete source");
+      const response = await fetch(`/api/dashboard/knowledge-base/sources/${sourceId}`, {
+        method: "DELETE",
+      });
+      const body = (await response.json().catch(() => null)) as unknown;
+      if (!response.ok) {
+        const error = z.object({ error: z.string() }).safeParse(body);
+        throw new Error(error.success ? error.data.error : "Failed to delete source");
+      }
+      return okResponseSchema.parse(body);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeBase.all });
@@ -189,20 +139,15 @@ export function useRetryKnowledgeBaseSource() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "retry" }),
       });
-      const body = (await response.json().catch(() => ({}))) as { error?: string };
-      if (!response.ok) throw new Error(body.error ?? "Failed to retry source");
-      return body;
+      const body = (await response.json().catch(() => null)) as unknown;
+      if (!response.ok) {
+        const error = z.object({ error: z.string() }).safeParse(body);
+        throw new Error(error.success ? error.data.error : "Failed to retry source");
+      }
+      return retrySourceResponseSchema.parse(body);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeBase.all });
-    },
-  });
-}
-
-export function useUpdateKnowledgeBaseSource() {
-  return useMutation({
-    mutationFn: async () => {
-      throw new Error("Source editing is not supported yet.");
     },
   });
 }
@@ -216,11 +161,12 @@ export function useUploadRagDocument() {
         method: "POST",
         body: formData,
       });
+      const body = (await response.json().catch(() => null)) as unknown;
       if (!response.ok) {
-        const json = (await response.json().catch(() => ({}))) as { error?: string };
-        throw new Error(json.error ?? "Failed to upload file");
+        const error = z.object({ error: z.string() }).safeParse(body);
+        throw new Error(error.success ? error.data.error : "Failed to upload file");
       }
-      return response.json();
+      return uploadSourceResponseSchema.parse(body);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeBase.all });
@@ -292,11 +238,5 @@ export function useImportSitemapSource() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeBase.all });
     },
-  });
-}
-
-export function useResyncAllKnowledgeBaseSources() {
-  return useMutation({
-    mutationFn: async () => ({ ok: true }),
   });
 }

@@ -12,7 +12,6 @@ import {
   type SortingState,
 } from "@tanstack/react-table";
 import { type ComponentType, type FormEvent, type RefObject, useRef, useState } from "react";
-import { create } from "zustand";
 import { z } from "zod";
 
 import {
@@ -168,36 +167,6 @@ const FALLBACK_STATUS = {
   className: "border-slate-500/15 bg-slate-500/10 text-slate-700 dark:text-slate-300",
 };
 
-type KnowledgeManagerState = {
-  addDialog: AddDialog;
-  addMenuOpen: boolean;
-  deleteTarget: KnowledgeBaseSource | null;
-  deleteError: string | null;
-  addError: string | null;
-  setAddDialog: (value: AddDialog) => void;
-  setAddMenuOpen: (value: boolean) => void;
-  setDeleteTarget: (value: KnowledgeBaseSource | null) => void;
-  setDeleteError: (value: string | null) => void;
-  setAddError: (value: string | null) => void;
-  startAddDialog: (value: Exclude<AddDialog, null>) => void;
-  closeDeleteDialog: () => void;
-};
-
-const useKnowledgeManagerStore = create<KnowledgeManagerState>((set) => ({
-  addDialog: null,
-  addMenuOpen: false,
-  deleteTarget: null,
-  deleteError: null,
-  addError: null,
-  setAddDialog: (value) => set({ addDialog: value }),
-  setAddMenuOpen: (value) => set({ addMenuOpen: value }),
-  setDeleteTarget: (value) => set({ deleteTarget: value }),
-  setDeleteError: (value) => set({ deleteError: value }),
-  setAddError: (value) => set({ addError: value }),
-  startAddDialog: (value) => set({ addDialog: value, addMenuOpen: false, addError: null }),
-  closeDeleteDialog: () => set({ deleteTarget: null, deleteError: null }),
-}));
-
 function getSourceTypeMeta(sourceType: string): SourceTypeMeta {
   return SOURCE_TYPE_META[sourceType.toLowerCase()] ?? FALLBACK_SOURCE_TYPE;
 }
@@ -241,18 +210,11 @@ export function WidgetKnowledgeManager() {
   const deleteMutation = useDeleteKnowledgeBaseSource();
   const retryMutation = useRetryKnowledgeBaseSource();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const addDialog = useKnowledgeManagerStore((store) => store.addDialog);
-  const addMenuOpen = useKnowledgeManagerStore((store) => store.addMenuOpen);
-  const deleteTarget = useKnowledgeManagerStore((store) => store.deleteTarget);
-  const deleteError = useKnowledgeManagerStore((store) => store.deleteError);
-  const addError = useKnowledgeManagerStore((store) => store.addError);
-  const setAddDialog = useKnowledgeManagerStore((store) => store.setAddDialog);
-  const setAddMenuOpen = useKnowledgeManagerStore((store) => store.setAddMenuOpen);
-  const setDeleteTarget = useKnowledgeManagerStore((store) => store.setDeleteTarget);
-  const setDeleteError = useKnowledgeManagerStore((store) => store.setDeleteError);
-  const setAddError = useKnowledgeManagerStore((store) => store.setAddError);
-  const startAddDialog = useKnowledgeManagerStore((store) => store.startAddDialog);
-  const closeDeleteDialog = useKnowledgeManagerStore((store) => store.closeDeleteDialog);
+  const [addDialog, setAddDialog] = useState<AddDialog>(null);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<KnowledgeBaseSource | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [addError, setAddError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useQueryState("kbSort", sortParser);
 
   const sources = sourcesQuery.data?.sources ?? [];
@@ -278,6 +240,17 @@ export function WidgetKnowledgeManager() {
 
   function handleSourceError(message: string) {
     setAddError(message);
+  }
+
+  function startAddDialog(value: Exclude<AddDialog, null>) {
+    setAddDialog(value);
+    setAddMenuOpen(false);
+    setAddError(null);
+  }
+
+  function closeDeleteDialog() {
+    setDeleteTarget(null);
+    setDeleteError(null);
   }
 
   return (

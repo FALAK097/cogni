@@ -21,6 +21,7 @@ export const env = createEnv({
     GEMINI_API_KEY: z.string().min(1).optional(),
     COMPOSIO_API_KEY: z.string().min(1).optional(),
     COMPOSIO_WEBHOOK_SECRET: z.string().min(16).optional(),
+    CRON_SECRET: z.string().min(16).optional(),
     DISCORD_CLIENT_ID: z.string().min(1).optional(),
     DISCORD_CLIENT_SECRET: z.string().min(1).optional(),
     DISCORD_BOT_TOKEN: z.string().min(1).optional(),
