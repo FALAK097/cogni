@@ -21,6 +21,9 @@
     "db:migrate": "drizzle-kit migrate",
     "db:migrate:remote": "drizzle-kit migrate --config drizzle.remote.config.ts",
     "db:studio": "drizzle-kit studio",
+    "cf:types": "wrangler types --config workers/ingestion-queue/wrangler.jsonc workers/ingestion-queue/worker-configuration.d.ts",
+    "cf:check": "pnpm cf:types && tsc --noEmit -p workers/ingestion-queue/tsconfig.json",
+    "cf:deploy": "wrangler deploy --config workers/ingestion-queue/wrangler.jsonc",
     "prepare": "husky"
   },
   "dependencies": {
@@ -87,7 +90,8 @@
     "oxfmt": "^0.55.0",
     "oxlint": "^1.70.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wrangler": "^4.112.0"
   },
   "lint-staged": {
     "*": "oxfmt --no-error-on-unmatched-pattern",

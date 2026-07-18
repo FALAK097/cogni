@@ -13,6 +13,8 @@ export const env = createEnv({
     CLOUDFLARE_ACCOUNT_ID: z.string().min(1).optional(),
     CLOUDFLARE_API_TOKEN: z.string().min(1).optional(),
     CLOUDFLARE_AI_SEARCH_TOKEN: z.string().min(1).optional(),
+    CLOUDFLARE_INGESTION_QUEUE_URL: z.url().optional(),
+    INGESTION_SHARED_SECRET: z.string().min(32).optional(),
     R2_BUCKET_NAME: z.string().min(1).optional(),
     R2_ACCESS_KEY_ID: z.string().min(1).optional(),
     R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
