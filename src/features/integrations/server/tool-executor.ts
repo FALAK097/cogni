@@ -5,7 +5,12 @@ import { and, eq } from "drizzle-orm";
 import { Resend } from "resend";
 
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
-import { parseToolInput } from "@/features/integrations/server/tool-registry";
+import {
+  getIntegrationTool,
+  parseToolInput,
+  toComposioArguments,
+  type ToolActionType,
+} from "@/features/integrations/server/tool-registry";
 import type { Db } from "@/lib/db/client";
 import { contact, conversation, integrationAction } from "@/lib/db/schema";
 import { env } from "@/lib/env/server";
@@ -79,13 +84,49 @@ async function executeInternalTool({
   if (actionType === "contact.update") {
     const name = typeof input.name === "string" ? input.name : currentConversation.contact.name;
     const email = typeof input.email === "string" ? input.email : currentConversation.contact.email;
+    const phone = typeof input.phone === "string" ? input.phone : currentConversation.contact.phone;
     await db
       .update(contact)
-      .set({ name, email, updatedAt: new Date().toISOString() })
+      .set({ name, email, phone, updatedAt: new Date().toISOString() })
       .where(
         and(eq(contact.id, currentConversation.contactId), eq(contact.workspaceId, workspaceId)),
       );
-    return { contactId: currentConversation.contactId, name, email };
+    return { contactId: currentConversation.contactId, name, email, phone };
+  }
+
+  if (actionType === "contact.add_tag") {
+    const tag = requiredString(input, "tag").toLowerCase();
+    const currentTags = JSON.parse(currentConversation.contact.tags) as unknown;
+    const tags = Array.isArray(currentTags)
+      ? currentTags.filter((value): value is string => typeof value === "string")
+      : [];
+    const nextTags = [...new Set([...tags, tag])].slice(0, 50);
+    await db
+      .update(contact)
+      .set({ tags: JSON.stringify(nextTags), updatedAt: new Date().toISOString() })
+      .where(
+        and(eq(contact.id, currentConversation.contactId), eq(contact.workspaceId, workspaceId)),
+      );
+    return { contactId: currentConversation.contactId, tags: nextTags };
+  }
+
+  if (actionType === "conversation.set_status") {
+    const status = requiredString(input, "status");
+    await db
+      .update(conversation)
+      .set({ status, updatedAt: new Date().toISOString() })
+      .where(and(eq(conversation.id, conversationId), eq(conversation.workspaceId, workspaceId)));
+    return { conversationId, status };
+  }
+
+  if (actionType === "conversation.set_ai_paused") {
+    const paused = input.paused;
+    if (typeof paused !== "boolean") throw new Error("Missing paused state.");
+    await db
+      .update(conversation)
+      .set({ aiPaused: paused, updatedAt: new Date().toISOString() })
+      .where(and(eq(conversation.id, conversationId), eq(conversation.workspaceId, workspaceId)));
+    return { conversationId, paused };
   }
 
   throw new Error("Unsupported internal tool.");
@@ -130,10 +171,14 @@ async function executeComposioTool({
   db: Db;
   workspaceId: string;
   provider: string;
-  actionType: string;
+  actionType: ToolActionType;
   input: Record<string, unknown>;
 }) {
   if (!env.COMPOSIO_API_KEY) throw new Error("Composio is not configured.");
+  const tool = getIntegrationTool(actionType);
+  if (!tool?.composioToolSlug || tool.provider !== provider) {
+    throw new Error(`Unsupported ${provider} action.`);
+  }
   const connection = await db.query.integration.findFirst({
     where: (fields, { eq, and }) =>
       and(eq(fields.workspaceId, workspaceId), eq(fields.provider, provider)),
@@ -141,17 +186,15 @@ async function executeComposioTool({
   if (!connection?.connectedAccountId || connection.status !== "CONNECTED") {
     throw new Error(`${provider} is not connected.`);
   }
-  const toolSlug =
-    actionType === "calendar.create" ? "GOOGLECALENDAR_CREATE_EVENT" : "SLACK_SEND_MESSAGE";
   const composio = new Composio({ apiKey: env.COMPOSIO_API_KEY });
   return composio.tools.execute(
-    toolSlug,
+    tool.composioToolSlug,
     {
       userId: workspaceId,
       connectedAccountId: connection.connectedAccountId,
       version: connection.toolkitVersion ?? "latest",
       dangerouslySkipVersionCheck: connection.toolkitVersion === null,
-      arguments: input,
+      arguments: toComposioArguments(actionType, input),
     },
     { signal: AbortSignal.timeout(20_000) },
   );
@@ -220,7 +263,7 @@ export async function executeApprovedTool({
               db,
               workspaceId,
               provider: parsed.tool.provider,
-              actionType,
+              actionType: parsed.tool.actionType,
               input: parsed.input,
             });
     const [completed] = await db

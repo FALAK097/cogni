@@ -5,6 +5,8 @@ import {
   createApprovalRequest,
   getApprovalToken,
 } from "@/features/integrations/server/approval-service";
+import { executeApprovedTool } from "@/features/integrations/server/tool-executor";
+import { parseToolInput } from "@/features/integrations/server/tool-registry";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 
 const proposeActionSchema = z.object({
@@ -37,7 +39,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const { db, workspace } = await requireDashboardContext();
+  const { db, session, workspace } = await requireDashboardContext();
   const parsed = proposeActionSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 });
@@ -53,6 +55,18 @@ export async function POST(request: Request) {
   }
 
   try {
+    const parsedTool = parseToolInput(parsed.data.actionType, parsed.data.input);
+    if (!parsedTool.tool.requiresApproval) {
+      const action = await executeApprovedTool({
+        db,
+        workspaceId: workspace.id,
+        actionType: parsedTool.tool.actionType,
+        input: parsedTool.input,
+        idempotencyKey: `dashboard:${session.user.id}:${crypto.randomUUID()}`,
+        requestedById: session.user.id,
+      });
+      return NextResponse.json({ action, approval: null });
+    }
     const result = await createApprovalRequest({
       db,
       workspaceId: workspace.id,

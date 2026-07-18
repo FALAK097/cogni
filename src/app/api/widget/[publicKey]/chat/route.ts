@@ -396,6 +396,9 @@ export async function POST(
         memoryContext,
         documentIds: null,
         runTimeoutMs: runtimeContext.runTimeoutMs,
+        db,
+        conversationId: conversation.id,
+        agentRunId: run?.id ?? null,
       },
       messages: historyMessages,
       onFinish: async ({ text, inputTokens, outputTokens, totalTokens, finishReason, sources }) => {

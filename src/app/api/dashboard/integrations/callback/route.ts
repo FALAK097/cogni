@@ -14,6 +14,7 @@ const SLUG_PROVIDERS: Record<string, ComposioProvider> = {
   "google-calendar": "GOOGLE_CALENDAR",
   slack: "SLACK",
   discord: "DISCORD",
+  "discord-bot": "DISCORD_BOT",
   "google-chat": "GCHAT",
   whatsapp: "WHATSAPP",
   "microsoft-teams": "TEAMS",

@@ -1,8 +1,10 @@
-import { streamText } from "ai";
+import { stepCountIs, streamText } from "ai";
 
 import type { WidgetModelProvider } from "@/features/widget/domain";
 import { retrieveKnowledgeContext } from "@/features/knowledge/server/retrieval";
+import { createWidgetAgentTools } from "@/features/integrations/server/widget-agent-tools";
 import { getWidgetModel } from "@/lib/ai/providers";
+import type { Db } from "@/lib/db/client";
 
 type WidgetAgentConfig = {
   displayName: string;
@@ -16,6 +18,9 @@ type WidgetAgentConfig = {
   memoryContext?: string;
   documentIds?: string[] | null;
   runTimeoutMs?: number;
+  db: Db;
+  conversationId: string;
+  agentRunId: string | null;
 };
 
 export async function streamWidgetAgent({
@@ -64,6 +69,9 @@ export async function streamWidgetAgent({
       config.instructions,
       "Use retrieved knowledge when it is relevant. Cite sources inline like [Source: Title].",
       "If knowledge is insufficient, say you do not know and offer human help.",
+      "You may check calendar availability when asked. Never invent availability.",
+      "Creating a calendar event requires the visitor's explicit confirmation and workspace approval. Clearly say when a request is pending approval.",
+      "Never claim an external action succeeded unless its tool result says it completed.",
       "Be concise and helpful.",
       config.memoryContext ? `\nConversation memory:\n${config.memoryContext}` : "",
       `\nRetrieved knowledge:\n${sourceBlock}`,
@@ -71,6 +79,13 @@ export async function streamWidgetAgent({
       .filter(Boolean)
       .join("\n"),
     messages: await convertToModelMessages(messages),
+    tools: createWidgetAgentTools({
+      db: config.db,
+      workspaceId: config.workspaceId,
+      conversationId: config.conversationId,
+      agentRunId: config.agentRunId,
+    }),
+    stopWhen: stepCountIs(4),
     onEnd: async ({ text, usage, finishReason }) => {
       clearTimeout(timeout);
       const citationSuffix =

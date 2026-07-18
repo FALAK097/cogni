@@ -1,13 +1,10 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import type { MessageJson } from "@/features/conversations/server/conversation-service";
-import { executeIntegrationAction } from "@/features/integrations/server/execute-action";
+import { createApprovalRequest } from "@/features/integrations/server/approval-service";
+import { executeApprovedTool } from "@/features/integrations/server/tool-executor";
 import { getIntegrationTool } from "@/features/integrations/server/tool-registry";
-import { eq, and } from "drizzle-orm";
-import { conversation as conversationTable } from "@/lib/db/schema";
 import { requireAuth, requireDashboardContext } from "@/lib/auth/dashboard-context";
 
 export type IntegrationRunState = {
@@ -60,91 +57,26 @@ export async function runIntegrationToolAction(
     return { error: "Action payload must be valid JSON." };
   }
 
-  if (tool.actionType === "conversation.assign") {
-    const membershipId = typeof payload.membershipId === "string" ? payload.membershipId : null;
-    if (!membershipId) {
-      return { error: "Select a teammate to assign." };
-    }
-
-    const membership = await db.query.workspaceMember.findFirst({
-      where: (fields, { eq, and }) =>
-        and(eq(fields.id, membershipId), eq(fields.workspaceId, workspace.id)),
-      columns: { id: true },
-    });
-    if (!membership) {
-      return { error: "Teammate is not in this workspace." };
-    }
-
-    await db
-      .update(conversationTable)
-      .set({
-        assignedMemberId: membershipId,
-        status: "ASSIGNED",
-        updatedAt: new Date().toISOString(),
-      })
-      .where(
-        and(
-          eq(conversationTable.id, conversation.id),
-          eq(conversationTable.workspaceId, workspace.id),
-        ),
-      );
-
-    revalidatePath("/conversations");
-    return { savedAt: Date.now() };
-  }
-
-  if (tool.actionType === "conversation.note") {
-    const message = typeof payload.message === "string" ? payload.message.trim() : "";
-    if (!message) {
-      return { error: "Enter a note before saving." };
-    }
-
-    const conv = await db.query.conversation.findFirst({
-      where: (fields, { eq, and }) =>
-        and(eq(fields.id, conversation.id), eq(fields.workspaceId, workspace.id)),
-      columns: { messages: true },
-    });
-
-    if (conv) {
-      const messagesList = JSON.parse(conv.messages || "[]") as MessageJson[];
-      const newMessage: MessageJson = {
-        id: randomUUID(),
-        body: message,
-        authorType: "TEAM",
-        visibility: "INTERNAL",
-        createdAt: new Date().toISOString(),
-      };
-      await db
-        .update(conversationTable)
-        .set({
-          messages: JSON.stringify([...messagesList, newMessage]),
-          updatedAt: new Date().toISOString(),
-        })
-        .where(
-          and(
-            eq(conversationTable.id, conversation.id),
-            eq(conversationTable.workspaceId, workspace.id),
-          ),
-        );
-    }
-
-    revalidatePath("/conversations");
-    return { savedAt: Date.now() };
-  }
-
-  await executeIntegrationAction({
-    db,
-    workspaceId: workspace.id,
-    provider: tool.provider,
-    actionType: tool.actionType,
-    requestedById: session.user.id,
-    payload: {
+  const input = { conversationId: conversation.id, ...payload };
+  if (tool.requiresApproval) {
+    await createApprovalRequest({
+      db,
+      workspaceId: workspace.id,
       conversationId: conversation.id,
-      contactEmail: conversation.contact.email,
-      contactName: conversation.contact.name,
-      ...payload,
-    },
-  });
+      actionType: tool.actionType,
+      input,
+      summary: tool.label,
+    });
+  } else {
+    await executeApprovedTool({
+      db,
+      workspaceId: workspace.id,
+      actionType: tool.actionType,
+      input,
+      idempotencyKey: `dashboard:${session.user.id}:${crypto.randomUUID()}`,
+      requestedById: session.user.id,
+    });
+  }
 
   revalidatePath("/integrations");
   revalidatePath("/conversations");
