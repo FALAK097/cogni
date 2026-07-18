@@ -4,18 +4,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api, requireData } from "@/lib/api/client";
 import { useActiveWorkspaceId } from "@/hooks/use-auth";
-import { getAllIntegrations } from "@/lib/integrations/registry";
+import { getAllIntegrations } from "@/features/integrations/registry";
+import { workspaceIntegrationSchema } from "@/features/integrations/schemas";
 import { queryKeys } from "@/lib/query-keys";
-
-export interface WorkspaceIntegration {
-  id: string;
-  integrationSlug: string;
-  slug: string;
-  provider: string;
-  status: string;
-  connectedAt: string;
-  metadata: Record<string, unknown>;
-}
 
 export function useIntegrations() {
   const activeWorkspaceId = useActiveWorkspaceId();
@@ -29,12 +20,10 @@ export function useIntegrations() {
         return { integrations: getAllIntegrations(), workspaceIntegrations: [] };
       }
 
-      const { data, error } = await api.GET<WorkspaceIntegration[]>("/api/dashboard/integrations");
-      const workspaceIntegrations = requireData(
-        data,
-        error,
-        "Failed to fetch workspace integrations",
-      );
+      const { data, error } = await api.GET<unknown>("/api/dashboard/integrations");
+      const workspaceIntegrations = workspaceIntegrationSchema
+        .array()
+        .parse(requireData(data, error, "Failed to fetch workspace integrations"));
 
       return {
         integrations: getAllIntegrations(),
@@ -92,14 +81,6 @@ export function useDisconnectIntegration() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.integrations.all });
-    },
-  });
-}
-
-export function useSendIntegrationTestEmail() {
-  return useMutation({
-    mutationFn: async () => {
-      throw new Error("Test email is not configured for this integration.");
     },
   });
 }

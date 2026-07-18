@@ -1,4 +1,5 @@
 import { after } from "next/server";
+import { z } from "zod";
 
 import { createChannelBot, isChatSdkChannel } from "@/features/integrations/server/chat-sdk";
 import { getDb } from "@/lib/db/client";
@@ -6,6 +7,10 @@ import { getDb } from "@/lib/db/client";
 type RouteContext = {
   params: Promise<{ channel: string; integrationId: string }>;
 };
+
+const channelIntegrationConfigSchema = z.object({
+  webhookToken: z.string().min(64),
+});
 
 export async function POST(request: Request, context: RouteContext) {
   const { channel, integrationId } = await context.params;
@@ -20,8 +25,21 @@ export async function POST(request: Request, context: RouteContext) {
     columns: { id: true, workspaceId: true, status: true, config: true },
   });
   const token = new URL(request.url).searchParams.get("token");
-  const config = integration ? (JSON.parse(integration.config) as { webhookToken?: string }) : {};
-  if (!integration || integration.status !== "CONNECTED" || token !== config.webhookToken) {
+  const storedConfig = (() => {
+    if (!integration) return null;
+    try {
+      return JSON.parse(integration.config) as unknown;
+    } catch {
+      return null;
+    }
+  })();
+  const config = channelIntegrationConfigSchema.safeParse(storedConfig);
+  if (
+    !integration ||
+    integration.status !== "CONNECTED" ||
+    !config.success ||
+    token !== config.data.webhookToken
+  ) {
     return Response.json({ error: "Webhook not found." }, { status: 404 });
   }
 

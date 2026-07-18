@@ -28,8 +28,7 @@ workspace approval executes it.
 | Google Calendar | Free-slot lookup; approved event creation           | Not applicable                                              |
 | Gmail           | Approved draft creation and email send              | Not enabled                                                 |
 | Slack           | Approved channel notification                       | Chat SDK webhook route                                      |
-| Discord user    | Connected-account actions exposed by Composio       | No Composio message trigger                                 |
-| Discord Bot     | Approved bot message with mentions disabled         | Chat SDK/Discord webhook requires bot credentials           |
+| Discord         | Approved bot message with mentions disabled         | Chat SDK/Discord webhook requires bot credentials           |
 | WhatsApp        | Approved session message; approved template message | Chat SDK/Meta webhook requires Cloud API credentials        |
 | Google Chat     | Connected account                                   | Chat SDK/Google Chat webhook requires a verified Google app |
 | Teams           | Connected account                                   | Chat SDK/Teams webhook requires Azure app credentials       |
@@ -48,8 +47,9 @@ Provider webhook adapters remain necessary for inbound messages.
   and persists only non-sensitive delivery fields.
 - Google Chat needs custom OAuth credentials and Google's production verification for restricted
   Chat scopes.
-- Discord Bot needs `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, and `DISCORD_BOT_TOKEN`. Keep the
-  default least-privilege permission integer unless the product needs another permission.
+- Discord needs `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `DISCORD_BOT_TOKEN`, and
+  `DISCORD_PUBLIC_KEY`. Keep the default least-privilege permission integer unless the product
+  needs another permission.
 - WhatsApp needs Meta Business/Cloud API configuration, a phone-number ID, approved templates, and
   a Meta webhook for inbound messages. Free-form outbound messages are limited to the customer
   service window; use an approved template outside it.

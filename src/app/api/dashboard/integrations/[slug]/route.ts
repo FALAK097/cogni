@@ -1,31 +1,19 @@
 import { NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
 
 import {
   COMPOSIO_TOOLKITS,
   createComposioClient,
-  type ComposioProvider,
+  getComposioProviderBySlug,
 } from "@/features/integrations/server/composio-connections";
 import { integrationTools } from "@/features/integrations/server/tool-registry";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
-import { integration as integrationTable } from "@/lib/db/schema";
 
 type RouteContext = { params: Promise<{ slug: string }> };
 
-const providersBySlug: Record<string, ComposioProvider> = {
-  gmail: "GMAIL",
-  "google-calendar": "GOOGLE_CALENDAR",
-  slack: "SLACK",
-  "discord-bot": "DISCORD_BOT",
-  "google-chat": "GCHAT",
-  whatsapp: "WHATSAPP",
-  "microsoft-teams": "TEAMS",
-};
-
-export async function GET(_request: Request, context: RouteContext) {
+export async function GET(request: Request, context: RouteContext) {
   const { db, workspace } = await requireDashboardContext();
   const { slug } = await context.params;
-  const provider = providersBySlug[slug];
+  const provider = getComposioProviderBySlug(slug);
   if (!provider) return NextResponse.json({ error: "Integration not found." }, { status: 404 });
 
   const integration = await db.query.integration.findFirst({
@@ -57,17 +45,6 @@ export async function GET(_request: Request, context: RouteContext) {
   }
   const checkedAt = new Date().toISOString();
   const healthStatus = healthError ? "ERROR" : "CONNECTED";
-  await db
-    .update(integrationTable)
-    .set({
-      status: healthStatus,
-      lastHealthCheckAt: checkedAt,
-      lastError: healthError,
-      updatedAt: checkedAt,
-    })
-    .where(
-      and(eq(integrationTable.id, integration.id), eq(integrationTable.workspaceId, workspace.id)),
-    );
 
   const actions = await db.query.integrationAction.findMany({
     where: (fields, { and, eq }) =>
@@ -83,6 +60,27 @@ export async function GET(_request: Request, context: RouteContext) {
       updatedAt: true,
     },
   });
+  const config = (() => {
+    try {
+      const parsed = JSON.parse(integration.config) as unknown;
+      return typeof parsed === "object" && parsed !== null
+        ? (parsed as Record<string, unknown>)
+        : {};
+    } catch {
+      return {};
+    }
+  })();
+  const webhookToken =
+    typeof config.webhookToken === "string" && config.webhookToken.length >= 64
+      ? config.webhookToken
+      : null;
+  const supportsInboundWebhook = ["SLACK", "DISCORD", "GCHAT", "WHATSAPP", "TEAMS"].includes(
+    provider,
+  );
+  const inboundWebhookUrl =
+    webhookToken && supportsInboundWebhook
+      ? `${new URL(request.url).origin}/api/channels/${provider.toLowerCase()}/${integration.id}/webhook?token=${webhookToken}`
+      : null;
 
   return NextResponse.json({
     integration: {
@@ -95,6 +93,7 @@ export async function GET(_request: Request, context: RouteContext) {
       connectedAt: integration.updatedAt,
       lastHealthCheckAt: checkedAt,
       lastError: healthError,
+      inboundWebhookUrl,
       capabilities: integrationTools
         .filter((tool) => tool.provider === provider)
         .map((tool) => ({

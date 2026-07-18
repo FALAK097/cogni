@@ -23,7 +23,18 @@ function channelName(channel: ChatSdkChannel): SupportedChatChannel {
 
 function createAdapter(channel: ChatSdkChannel): Adapter {
   if (channel === "slack") return createSlackAdapter();
-  if (channel === "discord") return createDiscordAdapter();
+  if (channel === "discord") {
+    if (!env.DISCORD_CLIENT_ID || !env.DISCORD_BOT_TOKEN || !env.DISCORD_PUBLIC_KEY) {
+      throw new Error(
+        "Discord inbound messaging requires DISCORD_CLIENT_ID, DISCORD_BOT_TOKEN, and DISCORD_PUBLIC_KEY.",
+      );
+    }
+    return createDiscordAdapter({
+      applicationId: env.DISCORD_CLIENT_ID,
+      botToken: env.DISCORD_BOT_TOKEN,
+      publicKey: env.DISCORD_PUBLIC_KEY,
+    });
+  }
   if (channel === "gchat") return createGoogleChatAdapter();
   if (channel === "teams") return createTeamsAdapter({ appType: "SingleTenant" });
   return createWhatsAppAdapter();

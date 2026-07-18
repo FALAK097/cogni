@@ -2,12 +2,12 @@
 
 import { useMemo } from "react";
 
-import { IntegrationCategorySection } from "@/components/integrations/integration-category-section";
+import { IntegrationCategorySection } from "@/features/integrations/components/integration-category-section";
 import { PendingActionsCard } from "@/features/integrations/components/pending-actions-card";
 import { useToast } from "@/components/ui/use-toast";
 import { useConnectIntegration, useIntegrations } from "@/hooks/query";
-import { INTEGRATION_CATEGORIES } from "@/lib/integrations/categories";
-import { getAllIntegrations, getIntegrationsByCategory } from "@/lib/integrations/registry";
+import { INTEGRATION_CATEGORIES } from "@/features/integrations/categories";
+import { getAllIntegrations, getIntegrationsByCategory } from "@/features/integrations/registry";
 
 export function WidgetIntegrationsPage() {
   const { toast } = useToast();

@@ -1,9 +1,9 @@
 "use client";
 
 import { CheckCircle2 } from "@/components/icons";
-import { IntegrationIcon } from "@/components/integrations/integration-icon";
+import { IntegrationIcon } from "@/features/integrations/components/integration-icon";
 import { buttonVariants } from "@/components/ui/button-variants";
-import type { IntegrationManifest } from "@/lib/integrations/types";
+import type { IntegrationManifest } from "@/features/integrations/types";
 import { cn } from "@/lib/utils";
 
 type IntegrationCardProps = {

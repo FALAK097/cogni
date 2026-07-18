@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { queryKeys } from "@/lib/query-keys";
 
 type BookingSettings = {
   enabled: boolean;
@@ -18,7 +19,7 @@ type BookingSettings = {
 
 export function BookingSettingsCard() {
   const query = useQuery<{ settings: BookingSettings }>({
-    queryKey: ["booking-settings"],
+    queryKey: queryKeys.integrations.bookingSettings(),
     queryFn: async () => {
       const response = await fetch("/api/dashboard/booking");
       if (!response.ok) throw new Error("Could not load booking settings.");

@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { ChevronRight } from "@/components/icons";
 
-import { IntegrationCard } from "@/components/integrations/integration-card";
-import type { CategoryDefinition, IntegrationManifest } from "@/lib/integrations/types";
+import { IntegrationCard } from "@/features/integrations/components/integration-card";
+import type { CategoryDefinition, IntegrationManifest } from "@/features/integrations/types";
 import { cn } from "@/lib/utils";
 
 type IntegrationCategorySectionProps = {

@@ -8,14 +8,28 @@ export const COMPOSIO_TOOLKITS = {
   GMAIL: "gmail",
   GOOGLE_CALENDAR: "googlecalendar",
   SLACK: "slack",
-  DISCORD: "discord",
-  DISCORD_BOT: "discordbot",
+  DISCORD: "discordbot",
   GCHAT: "google_chat",
   WHATSAPP: "whatsapp",
   TEAMS: "microsoft_teams",
 } as const;
 
 export type ComposioProvider = keyof typeof COMPOSIO_TOOLKITS;
+
+export const COMPOSIO_PROVIDER_SLUGS: Record<ComposioProvider, string> = {
+  GMAIL: "gmail",
+  GOOGLE_CALENDAR: "google-calendar",
+  SLACK: "slack",
+  DISCORD: "discord",
+  GCHAT: "google-chat",
+  WHATSAPP: "whatsapp",
+  TEAMS: "microsoft-teams",
+};
+
+export function getComposioProviderBySlug(slug: string): ComposioProvider | null {
+  const entry = Object.entries(COMPOSIO_PROVIDER_SLUGS).find(([, value]) => value === slug);
+  return (entry?.[0] as ComposioProvider | undefined) ?? null;
+}
 
 export function createComposioClient() {
   if (!env.COMPOSIO_API_KEY) {
@@ -26,7 +40,7 @@ export function createComposioClient() {
 
 export async function getOrCreateAuthConfig(composio: Composio, toolkit: string) {
   const usesCustomGoogleAuth = toolkit === COMPOSIO_TOOLKITS.GCHAT;
-  const usesCustomDiscordBotAuth = toolkit === COMPOSIO_TOOLKITS.DISCORD_BOT;
+  const usesCustomDiscordBotAuth = toolkit === COMPOSIO_TOOLKITS.DISCORD;
   const existing = await composio.authConfigs.list({
     toolkit,
     isComposioManaged: !usesCustomGoogleAuth && !usesCustomDiscordBotAuth,

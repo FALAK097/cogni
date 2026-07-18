@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ContentLayout } from "@/components/app-nav/content-layout";
 import { IntegrationDetail } from "@/features/integrations/components/integration-detail";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
-import { getIntegrationBySlug } from "@/lib/integrations/registry";
+import { getIntegrationBySlug } from "@/features/integrations/registry";
 
 export default async function IntegrationDetailPage({
   params,

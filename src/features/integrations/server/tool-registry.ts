@@ -12,7 +12,7 @@ export const toolProviders = [
   "GOOGLE_CALENDAR",
   "SLACK",
   "WHATSAPP",
-  "DISCORD_BOT",
+  "DISCORD",
 ] as const;
 export type ToolProvider = (typeof toolProviders)[number];
 
@@ -141,7 +141,7 @@ const toolSchemas = {
   "slack.notify": slackNotifySchema,
   "whatsapp.send_message": whatsappSendSchema,
   "whatsapp.send_template": whatsappTemplateSchema,
-  "discord_bot.send_message": discordMessageSchema,
+  "discord.send_message": discordMessageSchema,
 } as const;
 
 export type ToolActionType = keyof typeof toolSchemas;
@@ -322,8 +322,8 @@ export const integrationTools: IntegrationToolDefinition[] = [
     inputSchema: whatsappTemplateSchema,
   }),
   defineTool({
-    actionType: "discord_bot.send_message",
-    provider: "DISCORD_BOT",
+    actionType: "discord.send_message",
+    provider: "DISCORD",
     label: "Send Discord message",
     description: "Post a message through the connected Discord Bot without triggering mentions.",
     riskLevel: "HIGH",
@@ -397,7 +397,7 @@ export function toComposioArguments(actionType: ToolActionType, input: Record<st
       components: parameters.length > 0 ? [{ type: "body", parameters }] : [],
     };
   }
-  if (actionType === "discord_bot.send_message") {
+  if (actionType === "discord.send_message") {
     return {
       channel_id: input.channelId,
       content: input.message,

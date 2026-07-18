@@ -4,27 +4,16 @@ import { and, eq } from "drizzle-orm";
 import {
   COMPOSIO_TOOLKITS,
   createComposioClient,
-  type ComposioProvider,
+  getComposioProviderBySlug,
 } from "@/features/integrations/server/composio-connections";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { integration as integrationTable } from "@/lib/db/schema";
-
-const SLUG_PROVIDERS: Record<string, ComposioProvider> = {
-  gmail: "GMAIL",
-  "google-calendar": "GOOGLE_CALENDAR",
-  slack: "SLACK",
-  discord: "DISCORD",
-  "discord-bot": "DISCORD_BOT",
-  "google-chat": "GCHAT",
-  whatsapp: "WHATSAPP",
-  "microsoft-teams": "TEAMS",
-};
 
 export async function GET(request: Request) {
   const { db, workspace } = await requireDashboardContext();
   const url = new URL(request.url);
   const slug = url.searchParams.get("slug") ?? "";
-  const provider = SLUG_PROVIDERS[slug];
+  const provider = getComposioProviderBySlug(slug);
   const destination = new URL("/integrations", url.origin);
 
   if (!provider) {

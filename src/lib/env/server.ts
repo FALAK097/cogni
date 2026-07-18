@@ -24,6 +24,7 @@ export const env = createEnv({
     DISCORD_CLIENT_ID: z.string().min(1).optional(),
     DISCORD_CLIENT_SECRET: z.string().min(1).optional(),
     DISCORD_BOT_TOKEN: z.string().min(1).optional(),
+    DISCORD_PUBLIC_KEY: z.string().min(1).optional(),
     DISCORD_BOT_PERMISSIONS: z.string().regex(/^\d+$/).default("274878221376"),
     RESEND_API_KEY: z.string().min(1).optional(),
     RESEND_FROM_EMAIL: z.string().min(3).optional(),

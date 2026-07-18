@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { z } from "zod";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,43 +22,18 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { useDisconnectIntegration } from "@/hooks/query";
-import { getIntegrationBySlug } from "@/lib/integrations/registry";
-
-type IntegrationDetailResponse = {
-  integration: {
-    id: string;
-    slug: string;
-    provider: string;
-    status: string;
-    providerStatus: string | null;
-    toolkit: string;
-    connectedAt: string;
-    lastHealthCheckAt: string | null;
-    lastError: string | null;
-    capabilities: {
-      actionType: string;
-      label: string;
-      riskLevel: string;
-      requiresApproval: boolean;
-    }[];
-  };
-  actions: {
-    id: string;
-    actionType: string;
-    status: string;
-    errorMessage: string | null;
-    createdAt: string;
-    updatedAt: string;
-  }[];
-};
+import { getIntegrationBySlug } from "@/features/integrations/registry";
+import { integrationDetailResponseSchema } from "@/features/integrations/schemas";
+import { queryKeys } from "@/lib/query-keys";
 
 async function loadIntegration(slug: string) {
   const response = await fetch(`/api/dashboard/integrations/${slug}`);
-  const body = (await response.json().catch(() => ({}))) as IntegrationDetailResponse & {
-    error?: string;
-  };
-  if (!response.ok) throw new Error(body.error ?? "Could not load integration.");
-  return body;
+  const body = (await response.json().catch(() => null)) as unknown;
+  if (!response.ok) {
+    const error = z.object({ error: z.string() }).safeParse(body);
+    throw new Error(error.success ? error.data.error : "Could not load integration.");
+  }
+  return integrationDetailResponseSchema.parse(body);
 }
 
 export function IntegrationDetail({ slug }: { slug: string }) {
@@ -67,7 +43,7 @@ export function IntegrationDetail({ slug }: { slug: string }) {
   const [search, setSearch] = useState("");
   const manifest = getIntegrationBySlug(slug);
   const query = useQuery({
-    queryKey: ["integration-detail", slug],
+    queryKey: queryKeys.integrations.detail(slug),
     queryFn: () => loadIntegration(slug),
     refetchInterval: 30_000,
   });
@@ -125,6 +101,17 @@ export function IntegrationDetail({ slug }: { slug: string }) {
               <p className="rounded-lg bg-destructive/10 p-3 text-destructive">
                 {detail.lastError}
               </p>
+            ) : null}
+            {detail.inboundWebhookUrl ? (
+              <div className="space-y-1 pt-2">
+                <p className="font-medium">Inbound webhook URL</p>
+                <p className="break-all rounded-lg bg-muted p-3 font-mono text-xs">
+                  {detail.inboundWebhookUrl}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Treat this URL as a secret and configure it in the provider console.
+                </p>
+              </div>
             ) : null}
           </CardContent>
         </Card>

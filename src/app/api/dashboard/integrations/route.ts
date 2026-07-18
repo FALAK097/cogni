@@ -2,29 +2,19 @@ import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { eq, and } from "drizzle-orm";
 import {
+  COMPOSIO_PROVIDER_SLUGS,
   COMPOSIO_TOOLKITS,
   createComposioClient,
+  getComposioProviderBySlug,
   getOrCreateAuthConfig,
   type ComposioProvider,
 } from "@/features/integrations/server/composio-connections";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { integration as integrationTable } from "@/lib/db/schema";
 import { env } from "@/lib/env/server";
+import { z } from "zod";
 
-const PROVIDER_SLUGS: Record<string, string> = {
-  GMAIL: "gmail",
-  GOOGLE_CALENDAR: "google-calendar",
-  SLACK: "slack",
-  DISCORD: "discord",
-  DISCORD_BOT: "discord-bot",
-  GCHAT: "google-chat",
-  WHATSAPP: "whatsapp",
-  TEAMS: "microsoft-teams",
-};
-
-const SLUG_PROVIDERS = Object.fromEntries(
-  Object.entries(PROVIDER_SLUGS).map(([provider, slug]) => [slug, provider]),
-) as Record<string, string>;
+const connectIntegrationSchema = z.object({ slug: z.string().trim().min(1).max(100) });
 
 export async function GET() {
   const { db, workspace } = await requireDashboardContext();
@@ -57,8 +47,12 @@ export async function GET() {
   return NextResponse.json(
     verified.map((integration) => ({
       id: integration.id,
-      integrationSlug: PROVIDER_SLUGS[integration.provider] ?? integration.provider.toLowerCase(),
-      slug: PROVIDER_SLUGS[integration.provider] ?? integration.provider.toLowerCase(),
+      integrationSlug:
+        COMPOSIO_PROVIDER_SLUGS[integration.provider as ComposioProvider] ??
+        integration.provider.toLowerCase(),
+      slug:
+        COMPOSIO_PROVIDER_SLUGS[integration.provider as ComposioProvider] ??
+        integration.provider.toLowerCase(),
       provider: integration.provider,
       status: integration.status,
       connectedAt: integration.updatedAt,
@@ -71,10 +65,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const { db, workspace } = await requireDashboardContext();
-  const body = (await request.json()) as { slug?: string };
-  const slug = body.slug?.toLowerCase();
-
-  const provider = slug ? (SLUG_PROVIDERS[slug] as ComposioProvider | undefined) : undefined;
+  const body = connectIntegrationSchema.safeParse(await request.json().catch(() => null));
+  const slug = body.success ? body.data.slug.toLowerCase() : "";
+  const provider = getComposioProviderBySlug(slug);
 
   if (!provider) {
     return NextResponse.json({ error: "Unsupported integration." }, { status: 400 });
@@ -88,7 +81,7 @@ export async function POST(request: Request) {
       "/api/dashboard/integrations/callback",
       new URL(request.url).origin,
     );
-    callbackUrl.searchParams.set("slug", slug!);
+    callbackUrl.searchParams.set("slug", slug);
     const workspaceAlias = workspace.name
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
@@ -110,15 +103,18 @@ export async function POST(request: Request) {
       );
     }
 
+    const integrationId = randomUUID();
+    const webhookToken = `${randomUUID()}${randomUUID()}`;
+
     await db
       .insert(integrationTable)
       .values({
-        id: randomUUID(),
+        id: integrationId,
         workspaceId: workspace.id,
         provider,
         status: "CONNECTING",
         connectedAccountId: connection.id,
-        config: JSON.stringify({ toolkit, authConfigId }),
+        config: JSON.stringify({ toolkit, authConfigId, webhookToken }),
         lastError: null,
         updatedAt: new Date().toISOString(),
       })
@@ -127,7 +123,7 @@ export async function POST(request: Request) {
         set: {
           status: "CONNECTING",
           connectedAccountId: connection.id,
-          config: JSON.stringify({ toolkit, authConfigId }),
+          config: JSON.stringify({ toolkit, authConfigId, webhookToken }),
           lastError: null,
           updatedAt: new Date().toISOString(),
         },
@@ -149,7 +145,7 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "Integration slug is required." }, { status: 400 });
   }
 
-  const provider = SLUG_PROVIDERS[slug];
+  const provider = getComposioProviderBySlug(slug);
 
   if (!provider) {
     return NextResponse.json({ error: "Unsupported integration." }, { status: 400 });

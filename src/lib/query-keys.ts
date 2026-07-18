@@ -47,6 +47,8 @@ export const queryKeys = {
     workspace: (workspaceId: string) =>
       [...queryKeys.integrations.all, "workspace", workspaceId] as const,
     detail: (slug: string) => [...queryKeys.integrations.all, "detail", slug] as const,
+    approvals: () => [...queryKeys.integrations.all, "approvals"] as const,
+    bookingSettings: () => [...queryKeys.integrations.all, "booking-settings"] as const,
   },
   conversations: {
     all: ["conversations"] as const,

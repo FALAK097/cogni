@@ -1,5 +1,5 @@
 import { ContentLayout } from "@/components/app-nav/content-layout";
-import { WidgetIntegrationsPage } from "@/components/integrations/widget-integrations-page";
+import { WidgetIntegrationsPage } from "@/features/integrations/components/widget-integrations-page";
 import { SITE_NAME } from "@/lib/constants";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 

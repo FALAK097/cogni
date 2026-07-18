@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
+import { queryKeys } from "@/lib/query-keys";
 
 type PendingApproval = {
   id: string;
@@ -27,7 +28,7 @@ export function PendingActionsCard() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const query = useQuery<{ approvals: PendingApproval[] }>({
-    queryKey: ["integration-approvals"],
+    queryKey: queryKeys.integrations.approvals(),
     queryFn: async () => readResponse(await fetch("/api/dashboard/actions")),
     refetchInterval: 15_000,
   });
@@ -51,7 +52,7 @@ export function PendingActionsCard() {
         title: variables.value === "APPROVED" ? "Action completed" : "Action rejected",
         description: variables.approval.summary,
       });
-      await queryClient.invalidateQueries({ queryKey: ["integration-approvals"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.integrations.approvals() });
     },
     onError: (error) => {
       toast({

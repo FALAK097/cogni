@@ -13,8 +13,6 @@ export type IntegrationCategory =
 
 export type IntegrationAuthType = "oauth" | "api_key" | "credentials" | "internal";
 
-export type IntegrationStatus = "DISCONNECTED" | "CONNECTING" | "CONNECTED" | "ERROR";
-
 export type IntegrationMetadataField = {
   label: string;
   type: "text" | "password" | "select" | "url";
@@ -56,16 +54,4 @@ export type CategoryDefinition = {
   label: string;
   description: string;
   order: number;
-};
-
-export type WorkspaceIntegration = {
-  id: string;
-  integrationId: string;
-  slug: string;
-  isConnected: boolean;
-  status: IntegrationStatus;
-  connectedAt?: string;
-  lastSyncedAt?: string;
-  connectedAccount?: string;
-  metadata?: Record<string, string | number | boolean>;
 };
