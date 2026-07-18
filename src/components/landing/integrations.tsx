@@ -2,51 +2,13 @@
 
 import Image from "next/image";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useReveal } from "@/hooks/use-reveal";
-import { cn } from "@/lib/utils";
 import { SectionLayout } from "./section-layout";
 
-/* ─── Decorative nature-themed elements ─────────────────────────────── */
-
-function LeafDecor({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 32 32"
-      fill="none"
-      className={cn("pointer-events-none select-none sway", className)}
-      aria-hidden="true"
-    >
-      <path
-        d="M16 2C10 8 4 16 8 24c2 4 6 6 8 6s6-2 8-6c4-8-2-16-8-22z"
-        fill="currentColor"
-        fillOpacity="0.08"
-      />
-      <path
-        d="M16 6v22M12 10c2 2 4 4 4 8M20 10c-2 2-4 4-4 8"
-        stroke="currentColor"
-        strokeOpacity="0.12"
-        strokeWidth="0.8"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function CloudDecor({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 120 40"
-      fill="none"
-      className={cn("pointer-events-none select-none float-gentle", className)}
-      aria-hidden="true"
-    >
-      <ellipse cx="60" cy="24" rx="50" ry="14" fill="currentColor" fillOpacity="0.04" />
-      <ellipse cx="40" cy="18" rx="28" ry="16" fill="currentColor" fillOpacity="0.05" />
-      <ellipse cx="80" cy="20" rx="24" ry="12" fill="currentColor" fillOpacity="0.04" />
-    </svg>
-  );
-}
-
+/**
+ * All icons sourced from /public/assets/icons/.
+ * Light-variant files (cal-com-light, pipedrive-light, resend-light, typeform-light)
+ * are excluded: they render invisibly on a white background.
+ */
 const INTEGRATIONS = [
   { name: "Gmail", src: "/assets/icons/gmail.svg" },
   { name: "Slack", src: "/assets/icons/slack.svg" },
@@ -81,25 +43,12 @@ const INTEGRATIONS = [
 ] as const;
 
 export function Integrations() {
-  const { ref: leftRef, revealed: leftRevealed } = useReveal({ threshold: 0.15 });
-  const { ref: rightRef, revealed: rightRevealed } = useReveal({ threshold: 0.1 });
-
   return (
-    <SectionLayout id="integrations" className="relative overflow-hidden">
-      {/* Decorative nature SVGs */}
-      <CloudDecor className="absolute left-6 top-10 w-32 text-sky-400 opacity-50" />
-      <LeafDecor className="absolute right-4 top-24 size-16 text-emerald-500 opacity-40 rotate-12" />
-
+    <SectionLayout id="integrations">
       <div className="flex flex-col gap-12 lg:flex-row lg:items-center lg:gap-16">
         {/* ── Left: text content ── */}
-        <div
-          ref={leftRef}
-          className={cn(
-            "flex-shrink-0 lg:w-[36%] transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)]",
-            leftRevealed ? "reveal-left" : "opacity-0",
-          )}
-        >
-          <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-[#7c3aed]">
+        <div className="flex-shrink-0 lg:w-[36%]">
+          <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-primary">
             Integrations
           </p>
           <h2 className="text-3xl font-bold tracking-[-0.025em] text-gray-900 sm:text-4xl lg:text-[2.5rem] lg:leading-[1.15]">
@@ -107,31 +56,20 @@ export function Integrations() {
             <br />
             for your stack.
           </h2>
-          <p className="mt-5 text-lg leading-relaxed text-gray-500">
+          <p className="text-pretty mt-5 text-lg leading-relaxed text-gray-600">
             Save time and start faster with pre-built integrations for every tool your support team
             already uses.
           </p>
         </div>
 
         {/* ── Right: icon grid with tooltips ── */}
-        <div
-          ref={rightRef}
-          className={cn(
-            "flex-1 transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)]",
-            rightRevealed ? "reveal-scale" : "opacity-0",
-          )}
-        >
+        <div className="flex-1">
           <div className="grid grid-cols-4 gap-2.5 sm:grid-cols-5 sm:gap-3 md:grid-cols-6 lg:grid-cols-5 xl:grid-cols-6">
-            {INTEGRATIONS.map((item, idx) => (
+            {INTEGRATIONS.map((item) => (
               <Tooltip key={item.name}>
                 <TooltipTrigger
                   render={
-                    <div
-                      className={cn(
-                        "group flex aspect-square cursor-default items-center justify-center rounded-2xl border border-gray-100 bg-white p-3 shadow-sm transition-all duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] hover:-translate-y-1.5 hover:border-gray-250 hover:shadow-[0_8px_20px_rgba(0,0,0,0.06)] active:scale-[0.95]",
-                      )}
-                      style={{ transitionDelay: rightRevealed ? `${idx * 15}ms` : undefined }}
-                    />
+                    <div className="surface-depth group flex aspect-square cursor-default items-center justify-center rounded-2xl bg-white p-3 transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-1" />
                   }
                 >
                   <Image
@@ -140,7 +78,7 @@ export function Integrations() {
                     width={36}
                     height={36}
                     unoptimized
-                    className="size-full max-h-8 max-w-8 object-contain transition-transform duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] group-hover:scale-110"
+                    className="size-full max-h-8 max-w-8 object-contain transition-transform duration-200 group-hover:scale-110"
                   />
                 </TooltipTrigger>
                 <TooltipContent side="top">{item.name}</TooltipContent>

@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Menu, Sparkles } from "@/components/icons";
+import { Menu } from "@/components/icons";
+import { ThemeLogo } from "@/components/theme-logo";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
@@ -19,24 +20,20 @@ function useActiveSection(sectionIds: readonly string[]) {
   const [active, setActive] = useState<string | null>(null);
 
   useEffect(() => {
-    const observers: IntersectionObserver[] = [];
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visibleSection = entries.find((entry) => entry.isIntersecting);
+        if (visibleSection) setActive(visibleSection.target.id);
+      },
+      { rootMargin: "-20% 0px -65% 0px", threshold: 0 },
+    );
 
     sectionIds.forEach((id) => {
-      const el = document.getElementById(id);
-      if (!el) return;
-
-      const observer = new IntersectionObserver(
-        ([entry]) => {
-          if (entry.isIntersecting) setActive(id);
-        },
-        { rootMargin: "-20% 0px -65% 0px", threshold: 0 },
-      );
-
-      observer.observe(el);
-      observers.push(observer);
+      const section = document.getElementById(id);
+      if (section) observer.observe(section);
     });
 
-    return () => observers.forEach((o) => o.disconnect());
+    return () => observer.disconnect();
   }, [sectionIds]);
 
   return active;
@@ -59,7 +56,7 @@ export function Navbar() {
     <header className="fixed inset-x-0 top-4 z-50 flex justify-center px-4 sm:px-5">
       <nav
         className={cn(
-          "flex w-full max-w-5xl items-center gap-3 rounded-2xl border px-4 py-2.5 transition-all duration-300 sm:gap-6 sm:px-5",
+          "flex w-full max-w-5xl items-center gap-3 rounded-2xl border px-4 py-2.5 transition-[background-color,border-color,box-shadow] duration-300 sm:gap-6 sm:px-5",
           scrolled
             ? "border-white/60 bg-white/90 shadow-[0_8px_32px_rgba(0,0,0,0.10)] backdrop-blur-xl"
             : "border-white/40 bg-white/60 backdrop-blur-md",
@@ -67,10 +64,7 @@ export function Navbar() {
       >
         {/* Logo */}
         <Link href="/" className="flex shrink-0 items-center gap-2.5 font-semibold">
-          <span className="flex size-8 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm shadow-primary/30">
-            <Sparkles className="size-4" />
-          </span>
-          <span className="text-[15px] tracking-tight text-gray-900">widget</span>
+          <ThemeLogo showWordmark wordmarkClassName="text-gray-900" />
         </Link>
 
         {/* Nav links with active highlight — desktop */}
@@ -82,7 +76,7 @@ export function Navbar() {
                 key={label}
                 href={href}
                 className={cn(
-                  "relative rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-150",
+                  "relative flex min-h-10 items-center rounded-lg px-3 py-1.5 text-sm font-medium transition-colors duration-150",
                   isActive
                     ? "bg-primary/8 text-primary"
                     : "text-gray-600 hover:bg-gray-100/80 hover:text-gray-900",
@@ -111,7 +105,7 @@ export function Navbar() {
 
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger
-              className="inline-flex size-9 items-center justify-center rounded-lg border border-gray-200/80 bg-white/80 text-gray-700 transition-colors hover:bg-white md:hidden"
+              className="inline-flex size-11 items-center justify-center rounded-xl border border-gray-200/80 bg-white/80 text-gray-700 transition-colors hover:bg-white md:hidden"
               aria-label="Open navigation menu"
             >
               <Menu className="size-5" />
@@ -123,10 +117,7 @@ export function Navbar() {
             >
               <SheetHeader className="border-b border-gray-100 px-5 pb-4">
                 <SheetTitle className="flex items-center gap-2.5 text-left">
-                  <span className="flex size-8 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-                    <Sparkles className="size-4" />
-                  </span>
-                  widget
+                  <ThemeLogo showWordmark wordmarkClassName="text-gray-900" />
                 </SheetTitle>
               </SheetHeader>
               <nav className="flex flex-col gap-1 px-3 py-4">

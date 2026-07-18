@@ -9,7 +9,7 @@ import {
   markConversationAsRead,
 } from "@/features/conversations/server/queries";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { isChatSdkChannel, postChannelReply } from "@/features/integrations/server/chat-sdk";
 import {
   conversation as conversationTable,
   visitorSession as visitorSessionTable,
@@ -202,22 +202,15 @@ export async function PATCH(request: Request, context: RouteContext) {
           { status: 409 },
         );
       }
-      const environment = getCloudflareContext().env as CloudflareEnv & {
-        CONVERSATION_ROOMS: DurableObjectNamespace;
-      };
-      const room = environment.CONVERSATION_ROOMS.getByName(conversation.id) as unknown as {
-        postExternalReply(input: {
-          workspaceId: string;
-          integrationId: string;
-          channel: string;
-          externalThreadId: string;
-          text: string;
-        }): Promise<void>;
-      };
-      await room.postExternalReply({
+      const channel = conversation.channel.toLowerCase();
+      if (!isChatSdkChannel(channel)) {
+        return NextResponse.json({ error: "Unsupported channel." }, { status: 409 });
+      }
+      await postChannelReply({
+        channel,
+        db,
         workspaceId: workspace.id,
         integrationId: integration.id,
-        channel: conversation.channel,
         externalThreadId: conversation.externalThreadId,
         text: message,
       });

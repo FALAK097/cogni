@@ -12,17 +12,17 @@ function createAuth() {
   const db = getDb();
 
   return betterAuth({
-    appName: "widget",
-    baseURL: env.BETTER_AUTH_URL ?? "http://localhost:3000",
-    secret: env.BETTER_AUTH_SECRET ?? "build-only-secret-not-valid-at-runtime",
+    appName: "cogni",
+    baseURL: env.BETTER_AUTH_URL,
+    secret: env.BETTER_AUTH_SECRET,
     database: drizzleAdapter(db, {
-      provider: "sqlite",
+      provider: "pg",
       schema: schema,
     }),
     socialProviders: {
       google: {
-        clientId: env.GOOGLE_CLIENT_ID ?? "build-only-google-client-id",
-        clientSecret: env.GOOGLE_CLIENT_SECRET ?? "build-only-google-client-secret",
+        clientId: env.GOOGLE_CLIENT_ID,
+        clientSecret: env.GOOGLE_CLIENT_SECRET,
       },
     },
     databaseHooks: {

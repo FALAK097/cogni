@@ -15,6 +15,7 @@ import {
   TrendingUp,
 } from "@/components/icons";
 import { buttonVariants } from "@/components/ui/button-variants";
+import { ThemeLogo } from "@/components/theme-logo";
 import { cn } from "@/lib/utils";
 
 const SIDEBAR_NAV = [
@@ -128,10 +129,11 @@ function DashboardMockup() {
           {/* Brand */}
           <div className="mb-4 flex items-center justify-between px-2 py-1">
             <div className="flex items-center gap-2">
-              <div className="flex size-[26px] items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <Sparkles className="size-3.5" />
-              </div>
-              <span className="text-sm font-semibold text-gray-900">widget</span>
+              <ThemeLogo
+                showWordmark
+                className="size-[26px] rounded-lg"
+                wordmarkClassName="text-sm text-gray-900"
+              />
             </div>
             <button
               type="button"
@@ -466,7 +468,7 @@ export function Hero() {
             actually <span className="text-blue-200">understands</span>
           </h1>
 
-          <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-white/85">
+          <p className="text-pretty mx-auto mt-6 max-w-xl text-lg leading-relaxed text-white/85">
             Answer questions, resolve issues, and keep your customers happy.
             <br className="hidden sm:block" />
             All from one intelligent AI agent trained on your content.
@@ -479,7 +481,7 @@ export function Hero() {
             href="/sign-in"
             className={cn(
               buttonVariants({ size: "lg" }),
-              "h-12 rounded-xl px-8 text-[15px] shadow-lg shadow-primary/30 transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/35",
+              "h-12 rounded-xl px-8 text-[15px] shadow-lg shadow-primary/30 transition-[transform,box-shadow,background-color] hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/35",
             )}
           >
             Get started for free
@@ -487,7 +489,7 @@ export function Hero() {
           </Link>
           <a
             href="#features"
-            className="flex h-12 items-center gap-2 rounded-xl border border-white/40 bg-white/15 px-8 text-[15px] font-medium text-white backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:bg-white/25"
+            className="flex h-12 items-center gap-2 rounded-xl border border-white/40 bg-white/15 px-8 text-[15px] font-medium text-white backdrop-blur-sm transition-[transform,background-color] duration-150 ease-out hover:-translate-y-0.5 active:scale-[0.96] hover:bg-white/25"
           >
             See how it works
           </a>
@@ -512,7 +514,7 @@ export function Hero() {
                   strokeLinejoin="round"
                 />
               </svg>
-              {text}
+              <span className="whitespace-nowrap">{text}</span>
             </div>
           ))}
         </div>

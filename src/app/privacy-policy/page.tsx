@@ -2,7 +2,7 @@ import { LegalDocument } from "@/components/marketing/legal-document";
 
 export const metadata = {
   title: "Privacy Policy",
-  description: "Privacy Policy for the widget AI customer support platform.",
+  description: "Privacy Policy for the cogni AI customer support platform.",
 };
 
 const effectiveDate = "June 30, 2026";
@@ -11,17 +11,17 @@ export default function PrivacyPolicyPage() {
   return (
     <LegalDocument
       title="Privacy Policy"
-      description="This Privacy Policy explains how Widget Inc. collects, uses, shares, and protects information when you use widget."
+      description="This Privacy Policy explains how cogni Inc. collects, uses, shares, and protects information when you use cogni."
       effectiveDate={effectiveDate}
       sections={[
         {
           title: "1. Who we are",
           content: (
             <p>
-              Widget Inc. (&quot;widget,&quot; &quot;we,&quot; &quot;us,&quot; or &quot;our&quot;)
+              cogni Inc. (&quot;cogni,&quot; &quot;we,&quot; &quot;us,&quot; or &quot;our&quot;)
               provides an AI customer support platform for businesses. This policy applies to
               visitors of our website, account holders, workspace members, and end users who
-              interact with the widget embedded on our customers&apos; websites.
+              interact with the cogni widget embedded on our customers&apos; websites.
             </p>
           ),
         },
@@ -29,7 +29,7 @@ export default function PrivacyPolicyPage() {
           title: "2. Information we collect",
           content: (
             <>
-              <p>Depending on how you interact with widget, we may collect:</p>
+              <p>Depending on how you interact with cogni, we may collect:</p>
               <ul className="list-disc space-y-2 pl-5">
                 <li>
                   <strong className="text-foreground">Account information:</strong> name, email
@@ -65,7 +65,7 @@ export default function PrivacyPolicyPage() {
             <>
               <p>We use information to:</p>
               <ul className="list-disc space-y-2 pl-5">
-                <li>Provide, operate, and maintain the widget platform and dashboard</li>
+                <li>Provide, operate, and maintain the cogni platform and dashboard</li>
                 <li>Authenticate users and manage workspace access</li>
                 <li>
                   Generate AI-assisted responses based on customer-configured knowledge and settings
@@ -83,7 +83,7 @@ export default function PrivacyPolicyPage() {
           content: (
             <>
               <p>
-                widget processes conversation content and knowledge base materials to generate
+                cogni processes conversation content and knowledge base materials to generate
                 support responses and related features. Our customers control what content is
                 uploaded and how the widget behaves on their sites.
               </p>
@@ -103,7 +103,7 @@ export default function PrivacyPolicyPage() {
               <ul className="list-disc space-y-2 pl-5">
                 <li>
                   <strong className="text-foreground">Service providers:</strong> infrastructure,
-                  hosting, storage, analytics, and AI providers that help us operate widget
+                  hosting, storage, analytics, and AI providers that help us operate cogni
                 </li>
                 <li>
                   <strong className="text-foreground">Integrations you enable:</strong> third-party
@@ -149,10 +149,10 @@ export default function PrivacyPolicyPage() {
           title: "8. International transfers",
           content: (
             <p>
-              widget may process and store information in the United States and other countries
-              where we or our service providers operate. When information is transferred
-              internationally, we take steps designed to provide appropriate protections consistent
-              with applicable law.
+              cogni may process and store information in the United States and other countries where
+              we or our service providers operate. When information is transferred internationally,
+              we take steps designed to provide appropriate protections consistent with applicable
+              law.
             </p>
           ),
         },
@@ -185,10 +185,10 @@ export default function PrivacyPolicyPage() {
           title: "10. End users and website visitors",
           content: (
             <p>
-              If you interact with widget on a customer&apos;s website, that customer is generally
-              the controller of your interaction data. widget processes that data on the
+              If you interact with the cogni widget on a customer&apos;s website, that customer is
+              generally the controller of your interaction data. cogni processes that data on the
               customer&apos;s instructions to provide the embedded support experience. Privacy
-              questions about a specific website&apos;s use of widget should be directed to that
+              questions about a specific website&apos;s use of the widget should be directed to that
               website operator, who may also provide their own privacy policy in the widget.
             </p>
           ),
@@ -197,7 +197,7 @@ export default function PrivacyPolicyPage() {
           title: "11. Children",
           content: (
             <p>
-              widget is not directed to children under 13, and we do not knowingly collect personal
+              cogni is not directed to children under 13, and we do not knowingly collect personal
               information from children under 13. If you believe a child has provided us personal
               information, contact us and we will take appropriate steps.
             </p>
@@ -209,7 +209,7 @@ export default function PrivacyPolicyPage() {
             <p>
               We may update this Privacy Policy from time to time. If we make material changes, we
               will post the updated policy on this page and update the effective date. Your
-              continued use of widget after changes become effective constitutes acceptance of the
+              continued use of cogni after changes become effective constitutes acceptance of the
               revised policy.
             </p>
           ),

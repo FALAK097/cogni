@@ -139,9 +139,9 @@ function countUnreadMessages(messages: MessageJson[]): number {
 
 function hasUnreadVisitorMessagesSql(c: typeof conversationTable) {
   return sql`exists (
-    select 1 from json_each(${c.messages})
-    where json_extract(value, '$.authorType') = 'VISITOR'
-      and json_extract(value, '$.readAt') is null
+    select 1 from jsonb_array_elements(${c.messages}::jsonb) as message
+    where message->>'authorType' = 'VISITOR'
+      and message->>'readAt' is null
   )`;
 }
 

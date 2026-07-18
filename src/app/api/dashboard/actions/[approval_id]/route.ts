@@ -4,8 +4,8 @@ import { z } from "zod";
 import { decideApprovalRequest } from "@/features/integrations/server/approval-service";
 import { executeApprovedTool } from "@/features/integrations/server/tool-executor";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
-import { completeWorkflowRun, failWorkflowRun, updateWorkflowStep } from "@/lib/workflows/runner";
-import { workflowRun } from "@/lib/db/schema";
+import { completeWorkflowRun, updateWorkflowStep } from "@/lib/workflows/runner";
+import { approvalRequest, workflowRun } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 
 type RouteContext = { params: Promise<{ approval_id: string }> };
@@ -47,7 +47,7 @@ export async function PATCH(request: Request, context: RouteContext) {
           .set({ status: "CANCELLED", finishedAt: new Date().toISOString() })
           .where(
             and(
-              eq(workflowRun.id, approval.workflowRunId),
+              eq(workflowRun.id, approval.workflowRunId!),
               eq(workflowRun.workspaceId, workspace.id),
             ),
           );
@@ -110,13 +110,27 @@ export async function PATCH(request: Request, context: RouteContext) {
         } catch (error) {
           const message =
             error instanceof Error ? error.message : "Booking confirmation email failed.";
-          await failWorkflowRun({
-            db,
-            workspaceId: workspace.id,
-            runId: approval.workflowRunId,
-            errorMessage: message,
+          await db.transaction(async (tx) => {
+            await tx
+              .update(approvalRequest)
+              .set({ status: "PENDING", decidedAt: null, decidedByUserId: null })
+              .where(
+                and(
+                  eq(approvalRequest.id, approval.id),
+                  eq(approvalRequest.workspaceId, workspace.id),
+                ),
+              );
+            await tx
+              .update(workflowRun)
+              .set({ status: "WAITING_APPROVAL", errorMessage: message, finishedAt: null })
+              .where(
+                and(
+                  eq(workflowRun.id, approval.workflowRunId!),
+                  eq(workflowRun.workspaceId, workspace.id),
+                ),
+              );
           });
-          throw error;
+          throw new Error(message + " You can retry this approval.");
         }
       }
       const remainingStep = await db.query.workflowStep.findFirst({
@@ -133,7 +147,7 @@ export async function PATCH(request: Request, context: RouteContext) {
           .set({ status: "RUNNING" })
           .where(
             and(
-              eq(workflowRun.id, approval.workflowRunId),
+              eq(workflowRun.id, approval.workflowRunId!),
               eq(workflowRun.workspaceId, workspace.id),
             ),
           );

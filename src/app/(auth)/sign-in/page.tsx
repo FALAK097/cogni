@@ -2,7 +2,7 @@ import { AuthForm } from "@/components/auth/auth-form";
 
 export const metadata = {
   title: "Sign In",
-  description: "Sign in to your Widget workspace with Google.",
+  description: "Sign in to your cogni workspace with Google.",
 };
 
 export default function SignInPage() {

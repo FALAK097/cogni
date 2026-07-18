@@ -1,10 +1,9 @@
 import "server-only";
 
-import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { z } from "zod";
 
-import type { Db } from "@/lib/db/client";
 import { processDocument } from "@/features/knowledge/server/process-document";
+import type { Db } from "@/lib/db/client";
 
 export const ingestionJobSchema = z.object({
   type: z.literal("document.process"),
@@ -14,19 +13,6 @@ export const ingestionJobSchema = z.object({
 });
 
 export type IngestionJob = z.infer<typeof ingestionJobSchema>;
-
-type IngestionEnv = {
-  INGESTION_QUEUE?: Queue<IngestionJob>;
-};
-
-function getIngestionQueue() {
-  try {
-    const environment = getCloudflareContext().env as IngestionEnv;
-    return environment.INGESTION_QUEUE ?? null;
-  } catch {
-    return null;
-  }
-}
 
 export async function enqueueDocumentProcessing({
   db,
@@ -45,14 +31,7 @@ export async function enqueueDocumentProcessing({
     documentId,
     idempotencyKey,
   });
-  const queue = getIngestionQueue();
-
-  if (queue) {
-    await queue.send(job, { contentType: "json" });
-    return { mode: "queued" as const };
-  }
-
-  await processDocument({ db, ...job });
+  await processIngestionJob(db, job);
   return { mode: "synchronous" as const };
 }
 

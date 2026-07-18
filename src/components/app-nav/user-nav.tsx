@@ -60,7 +60,7 @@ export function UserNav({ userData, trigger, isSidebarOpen }: UserNavProps) {
             <div className="flex gap-2 justify-between items-center">
               <div className="flex gap-3 items-center min-w-0">
                 <Avatar
-                  className="flex-shrink-0 w-9 h-9 cursor-pointer hover:scale-105 active:scale-95 transition-transform duration-200"
+                  className="size-10 flex-shrink-0 cursor-pointer transition-transform duration-200 hover:scale-105 active:scale-[0.96]"
                   onClick={() => setIsAvatarDialogOpen(true)}
                   title="Edit Avatar"
                 >

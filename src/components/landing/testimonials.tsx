@@ -47,7 +47,7 @@ export function Testimonials() {
           {testimonials.map((t, i) => (
             <div
               key={i}
-              className="relative flex flex-col rounded-2xl border border-border/60 bg-card p-8 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md hover:shadow-black/5"
+              className="relative flex flex-col rounded-2xl border border-border/60 bg-card p-8 shadow-sm transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-1 hover:shadow-md hover:shadow-black/5"
             >
               {/* Stars */}
               <div className="mb-5 flex gap-0.5">

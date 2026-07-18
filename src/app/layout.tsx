@@ -10,11 +10,15 @@ const THEME_INIT_SCRIPT = `(function(){try{var e=document.documentElement,t=loca
 
 export const metadata: Metadata = {
   title: {
-    default: "widget — AI customer support",
-    template: "%s · widget",
+    default: "cogni — AI customer support",
+    template: "%s · cogni",
   },
   description:
     "AI-first customer support with a shared inbox, grounded answers, and human handoff.",
+  icons: {
+    icon: "/assets/cogni.png",
+    apple: "/assets/cogni.png",
+  },
 };
 
 export default function RootLayout({

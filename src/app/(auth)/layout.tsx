@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Sparkles } from "@/components/icons";
+import { ThemeLogo } from "@/components/theme-logo";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -9,10 +9,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <div className="flex h-full flex-col bg-white px-6 py-8 sm:px-10 lg:px-16">
         {/* Logo */}
         <Link href="/" className="flex shrink-0 items-center gap-2.5">
-          <span className="flex size-8 items-center justify-center rounded-xl bg-primary text-white shadow-sm shadow-primary/30">
-            <Sparkles className="size-4" />
-          </span>
-          <span className="text-[15px] font-semibold tracking-tight text-gray-900">widget</span>
+          <ThemeLogo showWordmark wordmarkClassName="text-gray-900" />
         </Link>
 
         {/* Centered form */}
@@ -22,7 +19,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
         {/* Copyright */}
         <p className="shrink-0 pb-2 text-center text-xs text-gray-400">
-          &copy; {new Date().getFullYear()} Widget Inc. All rights reserved.
+          &copy; {new Date().getFullYear()} cogni Inc. All rights reserved.
         </p>
       </div>
 

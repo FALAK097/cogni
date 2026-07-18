@@ -5,36 +5,20 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import { queryKeys } from "@/lib/query-keys";
 
+const POLL_INTERVAL_MS = 3_000;
+
 export function useConversationRealtime(conversationId: string | null) {
   const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!conversationId) return;
-    let retryTimer: ReturnType<typeof setTimeout> | null = null;
-    let socket: WebSocket | null = null;
-    let stopped = false;
-
-    const connect = () => {
-      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      socket = new WebSocket(
-        `${protocol}//${window.location.host}/api/dashboard/conversations/${conversationId}/realtime`,
-      );
-      socket.onmessage = () => {
-        void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all });
-        void queryClient.invalidateQueries({
-          queryKey: queryKeys.conversations.detail(conversationId),
-        });
-      };
-      socket.onclose = () => {
-        if (!stopped) retryTimer = setTimeout(connect, 2_000);
-      };
+    const refresh = () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.conversations.detail(conversationId),
+      });
     };
-
-    connect();
-    return () => {
-      stopped = true;
-      if (retryTimer) clearTimeout(retryTimer);
-      socket?.close();
-    };
+    const interval = window.setInterval(refresh, POLL_INTERVAL_MS);
+    return () => window.clearInterval(interval);
   }, [conversationId, queryClient]);
 }

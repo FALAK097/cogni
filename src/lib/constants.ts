@@ -1,4 +1,4 @@
-export const SITE_NAME = "widget";
+export const SITE_NAME = "cogni";
 
 export function getVisitorName(visitorId: string) {
   if (!visitorId) return "Visitor";

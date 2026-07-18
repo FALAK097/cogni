@@ -1,10 +1,10 @@
 import { createDiscordAdapter } from "@chat-adapter/discord";
 import { createGoogleChatAdapter } from "@chat-adapter/gchat";
 import { createSlackAdapter } from "@chat-adapter/slack";
+import { createPostgresState } from "@chat-adapter/state-pg";
 import { createTeamsAdapter } from "@chat-adapter/teams";
 import { createWhatsAppAdapter } from "@chat-adapter/whatsapp";
 import { Chat, type Adapter, type Message, type Thread } from "chat";
-import { createCloudflareState, type ChatStateDO } from "chat-state-cloudflare-do";
 
 import {
   answerOmnichannelMessage,
@@ -12,6 +12,7 @@ import {
   type SupportedChatChannel,
 } from "@/features/integrations/server/omnichannel";
 import type { Db } from "@/lib/db/client";
+import { env } from "@/lib/env/server";
 
 export const chatSdkChannelSchema = ["slack", "discord", "gchat", "teams", "whatsapp"] as const;
 export type ChatSdkChannel = (typeof chatSdkChannelSchema)[number];
@@ -30,24 +31,22 @@ function createAdapter(channel: ChatSdkChannel): Adapter {
 
 export function createChannelBot({
   channel,
-  namespace,
   db,
   workspaceId,
   integrationId,
 }: {
   channel: ChatSdkChannel;
-  namespace: DurableObjectNamespace<ChatStateDO>;
   db: Db;
   workspaceId: string;
   integrationId: string;
 }) {
   const adapter = createAdapter(channel);
   const bot = new Chat({
-    userName: "widget",
+    userName: "cogni",
     adapters: { [channel]: adapter },
-    state: createCloudflareState({
-      namespace,
-      shardKey: (threadId) => threadId.split(":")[0] ?? "default",
+    state: createPostgresState({
+      url: env.DATABASE_URL,
+      keyPrefix: `cogni:${workspaceId}:${integrationId}`,
     }),
     concurrency: "queue",
     logger: "info",
@@ -89,7 +88,6 @@ export function isChatSdkChannel(value: string): value is ChatSdkChannel {
 export async function postChannelReply({
   channel,
   externalThreadId,
-  namespace,
   db,
   workspaceId,
   integrationId,
@@ -97,13 +95,12 @@ export async function postChannelReply({
 }: {
   channel: ChatSdkChannel;
   externalThreadId: string;
-  namespace: DurableObjectNamespace<ChatStateDO>;
   db: Db;
   workspaceId: string;
   integrationId: string;
   text: string;
 }) {
-  const bot = createChannelBot({ channel, namespace, db, workspaceId, integrationId });
+  const bot = createChannelBot({ channel, db, workspaceId, integrationId });
   await bot.initialize();
   try {
     await bot.thread(externalThreadId).post(text);

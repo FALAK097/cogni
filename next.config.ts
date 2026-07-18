@@ -3,30 +3,31 @@ import type { NextConfig } from "next";
 import "./src/lib/env/server";
 
 const nextConfig: NextConfig = {
-  experimental: {
-    optimizePackageImports: ["@hugeicons/core-free-icons"],
-  },
-  images: {
-    loader: "custom",
-    loaderFile: "./src/lib/cloudflare/image-loader.ts",
-  },
-  reactCompiler: true,
   serverExternalPackages: [
-    "better-sqlite3",
     "chat",
-    "chat-state-cloudflare-do",
+    "pdf-parse",
     "@chat-adapter/discord",
     "@chat-adapter/gchat",
     "@chat-adapter/slack",
+    "@chat-adapter/state-pg",
     "@chat-adapter/teams",
     "@chat-adapter/whatsapp",
-    "discord.js",
-    "@discordjs/ws",
-    "pdf-parse",
-    "pdfjs-dist",
-    "@napi-rs/canvas",
-    "mammoth",
   ],
+  experimental: {
+    optimizePackageImports: ["@hugeicons/core-free-icons"],
+  },
+  reactCompiler: true,
+  async headers() {
+    return [
+      {
+        source: "/widget.bundle.js",
+        headers: [
+          { key: "Cache-Control", value: "public,max-age=300,stale-while-revalidate=3600" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
