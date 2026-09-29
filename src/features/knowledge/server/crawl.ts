@@ -1,3 +1,5 @@
+import { assertPublicHttpUrl, fetchPublicText } from "@/features/knowledge/server/safe-fetch";
+
 const maxCrawlPages = 25;
 const maxPageBytes = 1_000_000;
 const maxTotalCharacters = 2_500_000;
@@ -33,36 +35,6 @@ const ignoredExtensions = new Set([
   ".zip",
 ]);
 
-function assertCrawlableUrl(sourceUrl: string) {
-  const url = new URL(sourceUrl);
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error("Only HTTP and HTTPS URLs are supported.");
-  }
-
-  const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
-  const isIpv6 = hostname.includes(":");
-  if (
-    hostname === "localhost" ||
-    hostname.endsWith(".localhost") ||
-    hostname === "0.0.0.0" ||
-    hostname.startsWith("127.") ||
-    hostname.startsWith("10.") ||
-    hostname.startsWith("169.254.") ||
-    hostname.startsWith("192.168.") ||
-    /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname) ||
-    (isIpv6 &&
-      (hostname === "::1" ||
-        hostname.startsWith("fc") ||
-        hostname.startsWith("fd") ||
-        hostname.startsWith("fe80:")))
-  ) {
-    throw new Error("Private or local URLs are not supported.");
-  }
-
-  url.hash = "";
-  return url;
-}
-
 function normalizeUrl(url: URL) {
   url.hash = "";
   if (
@@ -85,53 +57,7 @@ function shouldVisitUrl(url: URL) {
 }
 
 async function fetchText(url: string, acceptedTypes: string[]) {
-  const response = await fetch(url, { signal: AbortSignal.timeout(fetchTimeoutMs) });
-  if (!response.ok) return null;
-
-  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
-  if (!acceptedTypes.some((acceptedType) => contentType.includes(acceptedType))) {
-    return null;
-  }
-
-  const contentLength = Number(response.headers.get("content-length") ?? "0");
-  if (contentLength > maxPageBytes) {
-    return null;
-  }
-
-  return readLimitedResponse(response);
-}
-
-async function readLimitedResponse(response: Response) {
-  if (!response.body) {
-    const text = await response.text();
-    return text.length > maxPageBytes ? null : text;
-  }
-
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (!value) continue;
-
-    total += value.byteLength;
-    if (total > maxPageBytes) {
-      await reader.cancel();
-      return null;
-    }
-    chunks.push(value);
-  }
-
-  const bytes = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-
-  return new TextDecoder().decode(bytes);
+  return fetchPublicText(url, acceptedTypes, maxPageBytes, fetchTimeoutMs);
 }
 
 function extractLinks(html: string, pageUrl: string, root: URL) {
@@ -213,7 +139,7 @@ async function discoverSitemapUrls(root: URL) {
 }
 
 export async function crawlWebsiteText(sourceUrl: string, stripHtml: (html: string) => string) {
-  const root = assertCrawlableUrl(sourceUrl);
+  const root = assertPublicHttpUrl(sourceUrl);
   const queue = [normalizeUrl(root), ...(await discoverSitemapUrls(root))];
   const seen = new Set<string>();
   const pages: string[] = [];
@@ -257,7 +183,7 @@ export async function crawlWebsiteText(sourceUrl: string, stripHtml: (html: stri
 }
 
 export async function crawlSitemapText(sitemapUrl: string, stripHtml: (html: string) => string) {
-  const root = assertCrawlableUrl(sitemapUrl);
+  const root = assertPublicHttpUrl(sitemapUrl);
   const xml = await fetchText(root.href, ["application/xml", "text/xml", "application/rss+xml"]);
   if (!xml) {
     throw new Error("Could not fetch the sitemap.");

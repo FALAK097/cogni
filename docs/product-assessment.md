@@ -153,9 +153,17 @@ Synthetic testing added one clearly named QA-only Atlas policy source and a loca
 
 Independent review of the incremental diff found the SDK error/abort and terminal-persistence gaps. Both were corrected and verified with installed-SDK mocks; the reviewer approved the scoped changes after those fixes. This does not establish full product readiness.
 
+The knowledge URL SSRF boundary is implemented in the current PR branch for both website crawling
+and direct URL extraction. One server-only fetcher rejects credentials, local names, nonstandard
+ports, and non-public IPv4/IPv6 answers; pins the selected DNS address per request; rechecks each
+redirect; and caps streamed bodies. Seven focused tests cover address ranges, mixed-answer DNS,
+redirect rebinding, redirect policy, and byte limits. The CI workflow now runs them. This proves
+local policy behavior; external-host runtime acceptance and deployment remain unverified.
+
 ## Verdict
 
-**Block production parity claim.** The first corrections improve trust and usability,
-but the high-priority source-access, concurrency, distributed-budget and human-handoff
-risks in the roadmap remain. Ship subsequent slices only after their specific gates
-pass. This assessment does not approve untested domains or certify security.
+**Block production parity claim.** The first corrections improve trust and usability.
+The URL-ingestion boundary has focused local tests, while production acceptance remains
+unverified. High-priority concurrency, distributed-budget and human-handoff risks in the
+roadmap remain. Ship subsequent slices only after their specific gates pass. This assessment
+does not approve untested domains or certify security.
