@@ -329,7 +329,7 @@ export function WidgetAppearancePanel({
             }}
           />
 
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 @md:grid-cols-2">
             <div className="space-y-1.5">
               <Label className="text-sm font-medium text-foreground">Position on screen</Label>
               <WidgetSegmentedControl
@@ -492,7 +492,7 @@ export function WidgetAgentPanel({
   modelName: string | null;
   onUpdate: (
     key: "agentName" | "instructions" | "escalationKeywords" | "modelProvider" | "modelName",
-    value: any,
+    value: string,
   ) => void;
 }) {
   const provider = (modelProvider === "GOOGLE" ? "GOOGLE" : "OPENAI") as WidgetModelProvider;
@@ -505,7 +505,7 @@ export function WidgetAgentPanel({
         description="Configure your AI assistant's identity and behavior instructions."
       />
       <div className="space-y-6">
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-6 @md:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="model-provider" className="text-sm font-medium text-foreground">
               Model Provider
@@ -513,6 +513,7 @@ export function WidgetAgentPanel({
             <Select
               value={provider}
               onValueChange={(value) => {
+                if (value !== "OPENAI" && value !== "GOOGLE") return;
                 onUpdate("modelProvider", value);
                 const defaultModel =
                   widgetModelOptions[value as WidgetModelProvider][0]?.value ?? "";
@@ -520,7 +521,9 @@ export function WidgetAgentPanel({
               }}
             >
               <SelectTrigger id="model-provider" className={FIELD_CLASS}>
-                <SelectValue placeholder="Select provider" />
+                <SelectValue placeholder="Select provider">
+                  {provider === "GOOGLE" ? "Google Gemini" : "OpenAI"}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent className="rounded-lg">
                 <SelectItem value="OPENAI">OpenAI</SelectItem>
@@ -532,9 +535,18 @@ export function WidgetAgentPanel({
             <Label htmlFor="model-name" className="text-sm font-medium text-foreground">
               Model Name
             </Label>
-            <Select value={modelName} onValueChange={(value) => onUpdate("modelName", value)}>
+            <Select
+              value={modelName}
+              onValueChange={(value) => {
+                if (value !== null) onUpdate("modelName", value);
+              }}
+            >
               <SelectTrigger id="model-name" className={FIELD_CLASS}>
-                <SelectValue placeholder="Select model" />
+                <SelectValue placeholder="Select model">
+                  {models.find((model) => model.value === modelName)?.label ??
+                    modelName ??
+                    "Select model"}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent className="rounded-lg">
                 {models.map((model) => (

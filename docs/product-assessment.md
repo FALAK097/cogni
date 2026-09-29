@@ -68,6 +68,33 @@ transition, Agent navigation closes it, and resizing to 1024px closes it. Cmd+B 
 reply field and delete confirmation unchanged; the confirmation was cancelled. The 320px
 document stayed 320px wide. Independent review approved the scoped source changes.
 
+Agent setup follow-up keeps all configuration in the existing page:
+
+| Before                                                                                    | After                                                                                 | Why                                                                 |
+| ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Configure & test opens appearance; the current section is hidden behind an icon           | Opens instructions; the settings trigger names the current section                    | Start with agent behavior and make its settings discoverable        |
+| Custom popup has no roving keyboard behavior; local section state ignores browser history | Base UI radio menu and section derived from route props                               | Keyboard navigation and Back/Forward agree with the visible section |
+| Model provider/name omitted from the save payload                                         | Both included in the actual request body; two serializer regression tests added to CI | Model choices must survive a save                                   |
+| Load errors can remain a skeleton; autosave errors are silent                             | Load retry, save status and Retry save                                                | Show whether changes reached the server and provide recovery        |
+
+The mutation callback now depends on its stable mutate function so status rerenders do
+not restart the debounce or automatically repeat a failed save. Existing queued saves remain.
+The serializer tests verify request JSON for both supported providers, not live provider
+availability or model-answer quality. Browser testing on localhost PostgreSQL confirmed a
+temporary Google/Gemini 2.5 Flash selection survived reload; the original OpenAI/GPT-4o mini
+choice was restored and verified after reload. No model call was made. Back/Forward restored
+Instructions and Appearance, and the preview toggle worked at 320px. The browser pass also
+led to menu dismissal on selection, human-readable model labels and four booking-field label
+associations. A controlled local server outage retained an edited agent-name draft and
+showed Changes not saved with Retry save. After restart, Retry save completed successfully;
+the original name was restored. Query-load error recovery remains unverified.
+At 1024px the labeled settings trigger initially squeezed the form when placed in its
+own column. Controls now sit above the form/preview split, and model fields use the form
+container's width for their two-column breakpoint.
+The final production build showed the model selector fully visible at 1024px. At 320px,
+the document remained 320px wide and the model control stayed inside the viewport. The
+temporary viewport override was reset after capturing the final Agent view.
+
 | Location                               | Before                                                                                                | After                                                                                | Why                                                                                         |
 | -------------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
 | `src/lib/menu-list.ts`, app navigation | Five peer destinations plus a detached widget menu                                                    | Three primary destinations, bottom Settings, contextual Agent sections               | Keep everyday work easy to locate and preserve existing routes                              |

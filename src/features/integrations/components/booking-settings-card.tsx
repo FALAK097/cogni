@@ -79,8 +79,9 @@ function BookingForm({ initial }: { initial: BookingSettings }) {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <form.Field name="timezone">
           {(field) => (
-            <Field label="Timezone">
+            <Field label="Timezone" htmlFor="booking-timezone">
               <Input
+                id="booking-timezone"
                 value={field.state.value}
                 onChange={(event) => field.handleChange(event.target.value)}
                 placeholder="Asia/Kolkata"
@@ -90,8 +91,9 @@ function BookingForm({ initial }: { initial: BookingSettings }) {
         </form.Field>
         <form.Field name="durationMinutes">
           {(field) => (
-            <Field label="Duration (minutes)">
+            <Field label="Duration (minutes)" htmlFor="booking-duration">
               <Input
+                id="booking-duration"
                 type="number"
                 min={15}
                 max={240}
@@ -103,8 +105,9 @@ function BookingForm({ initial }: { initial: BookingSettings }) {
         </form.Field>
         <form.Field name="workingHours.start">
           {(field) => (
-            <Field label="Start">
+            <Field label="Start" htmlFor="booking-start">
               <Input
+                id="booking-start"
                 type="time"
                 value={field.state.value}
                 onChange={(event) => field.handleChange(event.target.value)}
@@ -114,8 +117,9 @@ function BookingForm({ initial }: { initial: BookingSettings }) {
         </form.Field>
         <form.Field name="workingHours.end">
           {(field) => (
-            <Field label="End">
+            <Field label="End" htmlFor="booking-end">
               <Input
+                id="booking-end"
                 type="time"
                 value={field.state.value}
                 onChange={(event) => field.handleChange(event.target.value)}
@@ -137,10 +141,18 @@ function BookingForm({ initial }: { initial: BookingSettings }) {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  htmlFor,
+  children,
+}: {
+  label: string;
+  htmlFor: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="space-y-2">
-      <Label>{label}</Label>
+      <Label htmlFor={htmlFor}>{label}</Label>
       {children}
     </div>
   );

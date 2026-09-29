@@ -7,13 +7,11 @@ import {
   Bot,
   Code,
   Eye,
-  ExternalLink,
   Menu,
   MessageCircle,
   MessageSquare,
   Sliders,
   Sparkles,
-  X,
 } from "@/components/icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/use-toast";
@@ -24,6 +22,17 @@ import { getWidgetAccentVars, WIDGET_BRAND_COLOR } from "@/lib/widget-accent";
 import { normalizeFontFamily, normalizeFontSize, normalizeLogoUrl } from "@/features/widget/domain";
 import { BookingSettingsCard } from "@/features/integrations/components/booking-settings-card";
 import { cn } from "@/lib/utils";
+
+import { toSavePayload, type WidgetCustomizerConfig } from "./widget-settings-payload";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
 
 import { WidgetPreviewPanel } from "./widget-preview-panel";
 import {
@@ -49,53 +58,6 @@ const WIDGET_SETTINGS_TABS = [
 
 type WidgetSettingsTab = (typeof WIDGET_SETTINGS_TABS)[number];
 
-type WidgetCustomizerConfig = Pick<
-  DashboardWidgetConfig,
-  | "publicKey"
-  | "position"
-  | "theme"
-  | "agentName"
-  | "welcomeMessage"
-  | "logoUrl"
-  | "primaryColor"
-  | "backgroundColor"
-  | "textColor"
-  | "userBubbleColor"
-  | "userBubbleTextColor"
-  | "botBubbleColor"
-  | "botBubbleTextColor"
-  | "headerGradientFrom"
-  | "headerGradientTo"
-  | "launcherSize"
-  | "borderRadius"
-  | "shadowSize"
-  | "inputPlaceholder"
-  | "suggestions"
-  | "hideSuggestionsOnInteract"
-  | "previewMessages"
-  | "autoShowPreviewDelay"
-  | "showBranding"
-  | "privacyPolicyUrl"
-  | "enableLeadCapture"
-  | "leadCaptureKeywords"
-  | "leadCaptureMinutesThreshold"
-  | "leadCaptureMessageThreshold"
-  | "enableBrochure"
-  | "brochureSuggestionText"
-  | "allowedDomains"
-  | "instructions"
-  | "escalationKeywords"
-  | "borderColor"
-  | "fontFamily"
-  | "fontSize"
-  | "modelProvider"
-  | "modelName"
-> & {
-  workspaceId: string;
-  secondaryTextColor: string;
-  linkColor: string;
-};
-
 const LEGACY_TAB_MAP: Record<string, WidgetSettingsTab> = {
   general: "agent",
   appearance: "appearance",
@@ -110,7 +72,7 @@ const NAV_ITEMS: {
   icon: typeof Sparkles;
 }[] = [
   { id: "appearance", label: "Appearance", icon: Sparkles },
-  { id: "agent", label: "Agent", icon: Bot },
+  { id: "agent", label: "Instructions", icon: Bot },
   { id: "behaviour", label: "Behaviour", icon: Sliders },
   { id: "conversation-starter", label: "Conversation Starter", icon: MessageCircle },
   { id: "suggested-questions", label: "Suggested Questions", icon: MessageSquare },
@@ -122,11 +84,11 @@ const WIDGET_CARD_CLASS = "rounded-xl border border-border";
 const WIDGET_SETTINGS_CARD_CLASS = `${WIDGET_CARD_CLASS} overflow-hidden`;
 
 function resolveInitialTab(initialSubtab?: string | null): WidgetSettingsTab {
-  if (!initialSubtab) return "appearance";
+  if (!initialSubtab) return "agent";
   if (WIDGET_SETTINGS_TABS.includes(initialSubtab as WidgetSettingsTab)) {
     return initialSubtab as WidgetSettingsTab;
   }
-  return LEGACY_TAB_MAP[initialSubtab] ?? "appearance";
+  return LEGACY_TAB_MAP[initialSubtab] ?? "agent";
 }
 
 function mergeWidgetConfig(
@@ -179,132 +141,6 @@ function setConfigOverride<K extends keyof WidgetCustomizerConfig>(
   value: WidgetCustomizerConfig[K] | undefined,
 ) {
   target[key] = value;
-}
-
-function toSavePayload(config: WidgetCustomizerConfig) {
-  return {
-    agentName: config.agentName,
-    welcomeMessage: config.welcomeMessage,
-    logoUrl: normalizeLogoUrl(config.logoUrl?.trim() ? config.logoUrl.trim() : null),
-    primaryColor: config.primaryColor,
-    backgroundColor: config.backgroundColor,
-    textColor: config.textColor,
-    userBubbleColor: config.userBubbleColor,
-    userBubbleTextColor: config.userBubbleTextColor,
-    botBubbleColor: config.botBubbleColor,
-    botBubbleTextColor: config.secondaryTextColor,
-    headerGradientFrom: config.headerGradientFrom,
-    headerGradientTo: config.headerGradientFrom,
-    theme: config.theme,
-    position: config.position,
-    launcherSize: config.launcherSize,
-    borderRadius: config.borderRadius,
-    shadowSize: config.shadowSize,
-    inputPlaceholder: config.inputPlaceholder,
-    suggestions: config.suggestions.filter((item) => item.trim()),
-    previewMessages: config.previewMessages.filter((item) => item.trim()),
-    hideSuggestionsOnInteract: config.hideSuggestionsOnInteract,
-    autoShowPreviewDelay: config.autoShowPreviewDelay,
-    showBranding: config.showBranding,
-    privacyPolicyUrl: config.privacyPolicyUrl,
-    enableLeadCapture: config.enableLeadCapture,
-    leadCaptureKeywords: config.leadCaptureKeywords.filter((item) => item.trim()),
-    leadCaptureMinutesThreshold: config.leadCaptureMinutesThreshold,
-    leadCaptureMessageThreshold: config.leadCaptureMessageThreshold,
-    enableBrochure: config.enableBrochure,
-    brochureSuggestionText: config.brochureSuggestionText,
-    allowedDomains: config.allowedDomains || [],
-    instructions: config.instructions,
-    escalationKeywords: config.escalationKeywords,
-    borderColor: config.borderColor,
-    fontFamily: config.fontFamily,
-    fontSize: config.fontSize,
-  };
-}
-
-function WidgetSettingsMenu({
-  activeTab,
-  isOpen,
-  onClose,
-  onTabChange,
-  menuRef,
-}: {
-  activeTab: WidgetSettingsTab;
-  isOpen: boolean;
-  onClose: () => void;
-  onTabChange: (tab: WidgetSettingsTab) => void;
-  menuRef: React.RefObject<HTMLDivElement | null>;
-}) {
-  if (!isOpen) return null;
-
-  return (
-    <div
-      ref={menuRef}
-      className={cn(
-        WIDGET_CARD_CLASS,
-        "absolute top-full left-0 z-50 mt-2 flex w-[248px] flex-col bg-popover shadow-md",
-      )}
-    >
-      <div className="flex items-center justify-between border-b border-border px-4 py-3">
-        <div>
-          <p className="text-sm font-semibold text-foreground">Widget</p>
-          <p className="mt-0.5 text-xs leading-4 text-muted-foreground">
-            Customize your AI assistant
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-          aria-label="Close menu"
-        >
-          <X className="size-4" />
-        </button>
-      </div>
-
-      <ul className="flex flex-col gap-0.5 p-2">
-        {NAV_ITEMS.map((item) => {
-          const Icon = item.icon;
-          const isActive = activeTab === item.id;
-          return (
-            <li key={item.id}>
-              <button
-                type="button"
-                onClick={() => onTabChange(item.id)}
-                className={cn(
-                  "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-[var(--widget-accent-muted)] text-[var(--widget-accent)]"
-                    : "text-foreground hover:bg-muted",
-                )}
-              >
-                <Icon
-                  className={cn(
-                    "size-4 shrink-0",
-                    isActive ? "text-[var(--widget-accent)]" : "text-muted-foreground",
-                  )}
-                />
-                {item.label}
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-
-      <div className="border-t border-border px-4 py-3">
-        <p className="text-xs text-muted-foreground">Need help?</p>
-        <a
-          href="https://docs.widget.app"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-0.5 inline-flex items-center gap-1 text-xs font-medium text-[var(--widget-accent)] hover:opacity-80"
-        >
-          View documentation
-          <ExternalLink className="size-3" />
-        </a>
-      </div>
-    </div>
-  );
 }
 
 function WidgetCustomizerSkeleton() {
@@ -363,10 +199,8 @@ export function WidgetCustomizer({
   const activeWorkspaceId = workspaceId || "";
   const { toast } = useToast();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<WidgetSettingsTab>(() =>
-    resolveInitialTab(initialSubtab),
-  );
-  const [menuOpen, setMenuOpen] = useState(false);
+  const activeTab = resolveInitialTab(initialSubtab);
+  const activeLabel = NAV_ITEMS.find((item) => item.id === activeTab)?.label ?? "Instructions";
   const [showMobilePreview, setShowMobilePreview] = useState(false);
   const [copied, setCopied] = useState(false);
   const [domainInput, setDomainInput] = useState("");
@@ -376,15 +210,15 @@ export function WidgetCustomizer({
   const pendingSaveRef = useRef(false);
   const savedOverridesRef = useRef<Partial<WidgetCustomizerConfig>>({});
   const configOverridesRef = useRef(configOverrides);
-  const menuContainerRef = useRef<HTMLDivElement>(null);
-  const menuPanelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     configOverridesRef.current = configOverrides;
   }, [configOverrides]);
 
-  const { data: widgetConfigData, isLoading } = useWidgetConfig(activeWorkspaceId);
+  const widgetConfigQuery = useWidgetConfig(activeWorkspaceId);
+  const { data: widgetConfigData, isLoading } = widgetConfigQuery;
   const saveWidgetConfigMutation = useSaveWidgetConfig();
+  const saveWidgetConfig = saveWidgetConfigMutation.mutate;
 
   const isReady = Boolean(activeWorkspaceId) && Boolean(widgetConfigData) && !isLoading;
 
@@ -405,27 +239,10 @@ export function WidgetCustomizer({
   }, []);
 
   const handleSubTabChange = (value: WidgetSettingsTab) => {
-    setActiveTab(value);
-    setMenuOpen(false);
     const url = new URL(window.location.href);
     url.searchParams.set("subtab", value);
     router.push(`${url.pathname}?${url.searchParams.toString()}`, { scroll: false });
   };
-
-  useEffect(() => {
-    if (!menuOpen) return;
-
-    const handlePointerDown = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (menuContainerRef.current?.contains(target) || menuPanelRef.current?.contains(target)) {
-        return;
-      }
-      setMenuOpen(false);
-    };
-
-    document.addEventListener("mousedown", handlePointerDown);
-    return () => document.removeEventListener("mousedown", handlePointerDown);
-  }, [menuOpen]);
 
   const handleArrayChange = (
     key: "suggestions" | "previewMessages" | "leadCaptureKeywords",
@@ -479,7 +296,7 @@ export function WidgetCustomizer({
       savedOverridesRef.current = { ...configOverridesRef.current };
       isSavingRef.current = true;
 
-      saveWidgetConfigMutation.mutate(
+      saveWidgetConfig(
         {
           workspaceId: activeWorkspaceId,
           body: buildSavePayload(),
@@ -515,7 +332,7 @@ export function WidgetCustomizer({
         },
       );
     },
-    [activeWorkspaceId, buildSavePayload, saveWidgetConfigMutation, toast, widgetConfigData],
+    [activeWorkspaceId, buildSavePayload, saveWidgetConfig, toast, widgetConfigData],
   );
 
   useEffect(() => {
@@ -593,6 +410,24 @@ export function WidgetCustomizer({
       allowedDomains: config.allowedDomains,
     };
   }, [config]);
+
+  if (widgetConfigQuery.isError) {
+    return (
+      <div className="m-3 rounded-xl border border-border bg-card p-6" role="alert">
+        <h2 className="text-base font-semibold">Couldn't load agent settings</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Try again to load your workspace's configuration.
+        </p>
+        <Button
+          className="mt-4"
+          disabled={widgetConfigQuery.isFetching}
+          onClick={() => void widgetConfigQuery.refetch()}
+        >
+          {widgetConfigQuery.isFetching ? "Retrying…" : "Try again"}
+        </Button>
+      </div>
+    );
+  }
 
   if (!isReady || !config || !liveConfig) {
     return <WidgetCustomizerSkeleton />;
@@ -691,29 +526,43 @@ export function WidgetCustomizer({
 
   return (
     <div
-      className="flex h-full min-h-0 w-full flex-col gap-2 overflow-hidden p-2 sm:gap-3 sm:p-3 lg:flex-row lg:items-stretch"
+      className="flex h-full min-h-0 w-full flex-col gap-2 overflow-hidden p-2 sm:gap-3 sm:p-3"
       style={getWidgetAccentVars(WIDGET_BRAND_COLOR)}
     >
-      <div className="flex shrink-0 items-center gap-2 lg:block lg:self-start lg:pt-1">
-        <div ref={menuContainerRef} className="relative">
-          <button
-            type="button"
-            onClick={() => setMenuOpen((open) => !open)}
-            className="inline-flex size-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground shadow-xs transition-colors hover:bg-muted hover:text-foreground"
-            aria-label="Open widget settings menu"
-            aria-expanded={menuOpen}
-          >
-            <Menu className="size-5" />
-          </button>
-
-          <WidgetSettingsMenu
-            activeTab={activeTab}
-            isOpen={menuOpen}
-            onClose={() => setMenuOpen(false)}
-            onTabChange={handleSubTabChange}
-            menuRef={menuPanelRef}
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                variant="outline"
+                className="h-9 gap-2 rounded-lg"
+                aria-label={`Agent settings: ${activeLabel}`}
+              >
+                <Menu className="size-4" />
+                {activeLabel}
+              </Button>
+            }
           />
-        </div>
+          <DropdownMenuContent className="w-64 rounded-xl motion-reduce:animate-none" align="start">
+            <DropdownMenuLabel>Agent settings</DropdownMenuLabel>
+            <DropdownMenuRadioGroup
+              value={activeTab}
+              onValueChange={(value) => handleSubTabChange(resolveInitialTab(value))}
+            >
+              {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
+                <DropdownMenuRadioItem
+                  key={id}
+                  value={id}
+                  closeOnClick
+                  className="min-h-10 rounded-md focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring"
+                >
+                  <Icon className="size-4" />
+                  {label}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <button
           type="button"
@@ -728,97 +577,118 @@ export function WidgetCustomizer({
           <Eye className="size-4" />
           Preview
         </button>
+        <output
+          className="ml-auto flex min-w-0 items-center gap-2 text-xs text-muted-foreground"
+          aria-live="polite"
+        >
+          <span>
+            {saveWidgetConfigMutation.isPending
+              ? "Saving…"
+              : saveWidgetConfigMutation.isError
+                ? "Changes not saved"
+                : Object.keys(configOverrides).length > 0
+                  ? "Unsaved changes"
+                  : "Saved"}
+          </span>
+          {saveWidgetConfigMutation.isError && (
+            <Button variant="outline" size="sm" onClick={() => persistConfig()}>
+              Retry save
+            </Button>
+          )}
+        </output>
       </div>
 
-      <div
-        className={cn(
-          WIDGET_SETTINGS_CARD_CLASS,
-          "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden",
-          showMobilePreview ? "hidden lg:flex" : "flex",
-        )}
-      >
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
-          {activeTab === "appearance" ? (
-            <WidgetAppearancePanel
-              config={appearanceConfig}
-              onUpdate={handleAppearanceUpdate}
-              onBatchUpdate={handleAppearanceBatchUpdate}
-              onReset={handleResetAppearance}
-            />
-          ) : null}
-
-          {activeTab === "agent" ? (
-            <div className="space-y-8">
-              <WidgetAgentPanel
-                agentName={config.agentName}
-                instructions={config.instructions}
-                escalationKeywords={config.escalationKeywords}
-                modelProvider={config.modelProvider}
-                modelName={config.modelName}
-                onUpdate={(key, value) => updateConfig(key, value)}
+      <div className="flex min-h-0 flex-1 flex-col gap-2 lg:flex-row lg:gap-3">
+        <div
+          className={cn(
+            WIDGET_SETTINGS_CARD_CLASS,
+            "@container flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden",
+            showMobilePreview ? "hidden lg:flex" : "flex",
+          )}
+        >
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
+            {activeTab === "appearance" ? (
+              <WidgetAppearancePanel
+                config={appearanceConfig}
+                onUpdate={handleAppearanceUpdate}
+                onBatchUpdate={handleAppearanceBatchUpdate}
+                onReset={handleResetAppearance}
               />
-              <BookingSettingsCard />
-            </div>
-          ) : null}
+            ) : null}
 
-          {activeTab === "behaviour" ? (
-            <WidgetBehaviourPanel
-              inputPlaceholder={config.inputPlaceholder}
-              autoShowPreviewDelay={config.autoShowPreviewDelay}
-              hideSuggestionsOnInteract={config.hideSuggestionsOnInteract}
-              enableLeadCapture={config.enableLeadCapture}
-              leadCaptureMinutesThreshold={config.leadCaptureMinutesThreshold}
-              leadCaptureMessageThreshold={config.leadCaptureMessageThreshold}
-              leadCaptureKeywords={config.leadCaptureKeywords}
-              enableBrochure={config.enableBrochure}
-              brochureSuggestionText={config.brochureSuggestionText}
-              privacyPolicyUrl={config.privacyPolicyUrl}
-              onUpdate={handleBehaviourUpdate}
-              onKeywordsChange={(value) => handleArrayChange("leadCaptureKeywords", value)}
-            />
-          ) : null}
+            {activeTab === "agent" ? (
+              <div className="space-y-8">
+                <WidgetAgentPanel
+                  agentName={config.agentName}
+                  instructions={config.instructions}
+                  escalationKeywords={config.escalationKeywords}
+                  modelProvider={config.modelProvider}
+                  modelName={config.modelName}
+                  onUpdate={(key, value) => updateConfig(key, value)}
+                />
+                <BookingSettingsCard />
+              </div>
+            ) : null}
 
-          {activeTab === "conversation-starter" ? (
-            <WidgetConversationStarterPanel
-              welcomeMessage={config.welcomeMessage}
-              previewMessages={config.previewMessages}
-              onUpdateWelcome={(value) => updateConfig("welcomeMessage", value)}
-              onPreviewMessagesChange={(value) => handleArrayChange("previewMessages", value)}
-            />
-          ) : null}
+            {activeTab === "behaviour" ? (
+              <WidgetBehaviourPanel
+                inputPlaceholder={config.inputPlaceholder}
+                autoShowPreviewDelay={config.autoShowPreviewDelay}
+                hideSuggestionsOnInteract={config.hideSuggestionsOnInteract}
+                enableLeadCapture={config.enableLeadCapture}
+                leadCaptureMinutesThreshold={config.leadCaptureMinutesThreshold}
+                leadCaptureMessageThreshold={config.leadCaptureMessageThreshold}
+                leadCaptureKeywords={config.leadCaptureKeywords}
+                enableBrochure={config.enableBrochure}
+                brochureSuggestionText={config.brochureSuggestionText}
+                privacyPolicyUrl={config.privacyPolicyUrl}
+                onUpdate={handleBehaviourUpdate}
+                onKeywordsChange={(value) => handleArrayChange("leadCaptureKeywords", value)}
+              />
+            ) : null}
 
-          {activeTab === "suggested-questions" ? (
-            <WidgetSuggestedQuestionsPanel
-              suggestions={config.suggestions}
-              onChange={(value) => handleArrayChange("suggestions", value)}
-            />
-          ) : null}
+            {activeTab === "conversation-starter" ? (
+              <WidgetConversationStarterPanel
+                welcomeMessage={config.welcomeMessage}
+                previewMessages={config.previewMessages}
+                onUpdateWelcome={(value) => updateConfig("welcomeMessage", value)}
+                onPreviewMessagesChange={(value) => handleArrayChange("previewMessages", value)}
+              />
+            ) : null}
 
-          {activeTab === "installation" ? (
-            <WidgetInstallationPanel
-              allowedDomains={config.allowedDomains}
-              domainInput={domainInput}
-              copied={copied}
-              embedScript={generateScript()}
-              onDomainInputChange={setDomainInput}
-              onAddDomain={handleAddDomain}
-              onRemoveDomain={handleRemoveDomain}
-              onCopyScript={copyScript}
-            />
-          ) : null}
+            {activeTab === "suggested-questions" ? (
+              <WidgetSuggestedQuestionsPanel
+                suggestions={config.suggestions}
+                onChange={(value) => handleArrayChange("suggestions", value)}
+              />
+            ) : null}
+
+            {activeTab === "installation" ? (
+              <WidgetInstallationPanel
+                allowedDomains={config.allowedDomains}
+                domainInput={domainInput}
+                copied={copied}
+                embedScript={generateScript()}
+                onDomainInputChange={setDomainInput}
+                onAddDomain={handleAddDomain}
+                onRemoveDomain={handleRemoveDomain}
+                onCopyScript={copyScript}
+              />
+            ) : null}
+          </div>
         </div>
-      </div>
 
-      <div
-        className={cn(
-          WIDGET_CARD_CLASS,
-          "flex min-h-0 w-full shrink-0 flex-col overflow-hidden",
-          showMobilePreview
-            ? "h-[min(70vh,520px)] flex-1 lg:h-full lg:flex-1 lg:w-[380px] xl:w-[420px]"
-            : "hidden lg:flex lg:h-full lg:w-[380px] xl:w-[420px]",
-        )}
-      >
-        <WidgetPreviewPanel liveConfig={liveConfig} />
+        <div
+          className={cn(
+            WIDGET_CARD_CLASS,
+            "flex min-h-0 w-full shrink-0 flex-col overflow-hidden",
+            showMobilePreview
+              ? "h-[min(70vh,520px)] flex-1 lg:h-full lg:flex-1 lg:w-[380px] xl:w-[420px]"
+              : "hidden lg:flex lg:h-full lg:w-[380px] xl:w-[420px]",
+          )}
+        >
+          <WidgetPreviewPanel liveConfig={liveConfig} />
+        </div>
       </div>
     </div>
   );
