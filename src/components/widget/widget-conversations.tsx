@@ -187,9 +187,7 @@ export function WidgetConversations({ initialConversationId = null }: WidgetConv
           )}
         </div>
 
-        <div
-          className={cn(detailsColumnClassName, "hidden w-[272px] shrink-0 lg:flex xl:w-[292px]")}
-        >
+        <div className={cn(detailsColumnClassName, "hidden w-[292px] shrink-0 xl:flex")}>
           {selectedConversationId ? (
             <ConversationDetail
               conversationId={selectedConversationId}

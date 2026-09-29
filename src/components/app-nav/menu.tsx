@@ -1,10 +1,11 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
+import Link from "next/link";
 import { Ellipsis } from "@/components/icons";
 
 import { CollapseMenuButton } from "@/components/app-nav/collapse-menu-button";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button-variants";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { closeMobileSidebar } from "@/hooks/use-sidebar";
 import { buildMenuList } from "@/lib/menu-list";
@@ -31,7 +32,6 @@ const isMenuActive = (pathname: string, href: string) => {
 
 export function Menu({ isOpen }: MenuProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const menuItems = buildMenuList();
 
   return (
@@ -73,19 +73,17 @@ export function Menu({ isOpen }: MenuProps) {
 
               if (!submenus || submenus.length === 0) {
                 const button = (
-                  <Button
-                    variant={isCurrentActive ? "secondary" : "ghost"}
+                  <Link
+                    href={href}
                     aria-label={label}
                     aria-current={isCurrentActive ? "page" : false}
                     className={cn(
+                      buttonVariants({ variant: isCurrentActive ? "secondary" : "ghost" }),
                       "w-full h-10 mb-1 relative overflow-hidden group cursor-pointer flex items-center transition-colors duration-150",
                       isOpen === false ? "justify-center px-0" : "justify-start px-4",
                       isCurrentActive && "bg-sidebar-accent text-sidebar-accent-foreground",
                     )}
-                    onClick={() => {
-                      closeMobileSidebar();
-                      router.push(href);
-                    }}
+                    onClick={() => closeMobileSidebar()}
                   >
                     <span
                       className={cn(
@@ -110,7 +108,7 @@ export function Menu({ isOpen }: MenuProps) {
                         {submenus.length}
                       </span>
                     )}
-                  </Button>
+                  </Link>
                 );
 
                 return (

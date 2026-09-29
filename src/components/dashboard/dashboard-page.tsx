@@ -859,7 +859,7 @@ function MetricCard({
       <div className="mt-auto flex items-center gap-1.5 pt-3 text-xs">
         <span
           className={cn(
-            "inline-flex items-center gap-0.5 font-medium",
+            "inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap font-medium",
             !hasTrend
               ? "text-muted-foreground"
               : isPositive
@@ -876,7 +876,10 @@ function MetricCard({
           )}
           {metric.changePercent === 0 ? "No change" : formatChangePercent(metric.changePercent)}
         </span>
-        <span className="truncate text-muted-foreground">
+        <span
+          className="truncate text-muted-foreground"
+          title={formatComparisonRange(previousRange.start, previousRange.end)}
+        >
           vs {formatComparisonRange(previousRange.start, previousRange.end)}
         </span>
       </div>

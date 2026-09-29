@@ -8,12 +8,9 @@ import { Streamdown } from "streamdown";
 import {
   ArrowLeft,
   Bot,
-  ChevronDown,
   Clock,
   Download,
-  File,
   FileText,
-  LinkIcon,
   MoreVertical,
   Pencil,
   ThumbsDown,
@@ -32,7 +29,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -137,10 +134,6 @@ function splitMessageSources(content: string) {
   return { content, sources: [] };
 }
 
-function isOnline(lastActivityAt: string) {
-  return Date.now() - new Date(lastActivityAt).getTime() < 5 * 60 * 1000;
-}
-
 function formatDateSeparator(timestamp: string) {
   const date = new Date(timestamp);
   if (isToday(date)) return "Today";
@@ -222,7 +215,6 @@ export function ConversationDetail({
   }, [messages]);
 
   const displayName = session ? getDisplayName(session) : "";
-  const online = session ? isOnline(session.lastActivityAt) : false;
 
   const groupedMessages = useMemo(() => {
     if (!messages) return [];
@@ -276,7 +268,7 @@ export function ConversationDetail({
 
   const handleSend = () => {
     const text = composerText.trim();
-    if (!text) return;
+    if (!text || sendMessageMutation.isPending) return;
 
     sendMessageMutation.mutate(
       { conversationId, message: text, action: "reply" },
@@ -381,21 +373,13 @@ export function ConversationDetail({
               <AvatarFallback className="bg-primary/10 text-[10px] font-medium text-primary">
                 {getInitials(displayName)}
               </AvatarFallback>
-              {online ? (
-                <AvatarBadge className="size-2 bg-emerald-500 ring-2 ring-background" />
-              ) : null}
             </Avatar>
 
             <div className="min-w-0">
               <h3 className="truncate text-sm font-semibold text-foreground">{displayName}</h3>
-              <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                <span
-                  className={cn(
-                    "inline-block size-1.5 rounded-full",
-                    online ? "bg-emerald-500" : "bg-muted-foreground/40",
-                  )}
-                />
-                {online ? "Online" : "Offline"}
+              <p className="text-xs text-muted-foreground">
+                Last activity{" "}
+                {formatDistanceToNow(new Date(session.lastActivityAt), { addSuffix: true })}
               </p>
             </div>
           </div>
@@ -537,6 +521,7 @@ export function ConversationDetail({
             <Textarea
               value={composerText}
               onChange={(event) => setComposerText(event.target.value)}
+              aria-label="Reply to customer"
               placeholder="Type your reply..."
               className="min-h-[64px] resize-none rounded-lg border-border/50 bg-[#fafafa] px-3 py-2 text-sm leading-relaxed shadow-none dark:bg-zinc-900/50"
               onKeyDown={(event) => {
@@ -553,63 +538,23 @@ export function ConversationDetail({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-6 gap-1 px-2 text-[11px] text-muted-foreground"
+                  className="h-9 gap-1.5 px-2 text-sm text-muted-foreground"
                   disabled={copilotMutation.isPending}
                   onClick={() => copilotMutation.mutate()}
                 >
                   <Bot className="h-3 w-3" />
                   {copilotMutation.isPending ? "Thinking…" : "Copilot"}
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 text-muted-foreground"
-                  aria-label="Formatting"
-                >
-                  <span className="text-[10px] font-semibold">T</span>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 text-muted-foreground"
-                  aria-label="Add emoji"
-                >
-                  <span className="text-[11px]">☺</span>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 text-muted-foreground"
-                  aria-label="Attach file"
-                >
-                  <File className="h-3 w-3" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 text-muted-foreground"
-                  aria-label="Add link"
-                >
-                  <LinkIcon className="h-3 w-3" />
-                </Button>
               </div>
 
               <div className="flex items-center">
                 <Button
                   size="sm"
-                  className="h-7 rounded-r-none px-3 text-xs"
+                  className="h-9 rounded-md px-4 text-sm"
                   onClick={handleSend}
                   disabled={!composerText.trim() || sendMessageMutation.isPending}
                 >
                   Send
-                </Button>
-                <Button
-                  size="sm"
-                  variant="default"
-                  className="h-7 rounded-l-none border-l border-primary-foreground/20 px-1.5"
-                  aria-label="Send options"
-                >
-                  <ChevronDown className="h-3 w-3" />
                 </Button>
               </div>
             </div>
@@ -790,7 +735,7 @@ function SessionDetailsContent({
 
   const handleSaveNote = () => {
     const text = noteText.trim();
-    if (!text) return;
+    if (!text || sendMessageMutation.isPending) return;
 
     sendMessageMutation.mutate(
       { conversationId, message: text, action: "note" },
@@ -814,9 +759,6 @@ function SessionDetailsContent({
           className={cn("flex flex-row items-center justify-between", detailCardHeaderClassName())}
         >
           <CardTitle className="text-xs font-semibold">Contact</CardTitle>
-          <Button variant="ghost" size="icon" className="h-6 w-6" aria-label="Edit contact">
-            <Pencil className="h-3 w-3" />
-          </Button>
         </CardHeader>
         <CardContent className={detailCardContentClassName()}>
           <div className="flex items-start gap-3">
@@ -1030,6 +972,7 @@ function SessionDetailsContent({
               <Textarea
                 value={noteText}
                 onChange={(event) => setNoteText(event.target.value)}
+                aria-label="Internal note"
                 placeholder="Add an internal note..."
                 className="min-h-[72px] resize-none text-xs leading-relaxed"
                 onKeyDown={(event) => {

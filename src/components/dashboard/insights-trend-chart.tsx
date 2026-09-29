@@ -16,6 +16,9 @@ import { cn } from "@/lib/utils";
 
 type TrendPoint = { label: string; value: number };
 
+const formatDefaultValue = (value: number) => value.toLocaleString();
+const formatDefaultLabel = (label: string) => label;
+
 // Gradient areas, sparse axes and restrained active dots follow EvilCharts' area
 // chart design: https://evilcharts.com/docs/recharts/area-chart/static
 // Keep this adapter typed and use workspace analytics rather than sample data.
@@ -24,8 +27,8 @@ export function InsightsTrendChart({
   className,
   height = 240,
   showArea = false,
-  valueFormatter = (value: number) => value.toLocaleString(),
-  labelFormatter = (label: string) => label,
+  valueFormatter = formatDefaultValue,
+  labelFormatter = formatDefaultLabel,
   ariaLabel,
 }: {
   data: TrendPoint[];

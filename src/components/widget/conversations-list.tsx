@@ -204,17 +204,15 @@ export function ConversationsList({
                 <button
                   key={conversation.id}
                   type="button"
+                  aria-pressed={selected}
                   onClick={() => onSelectConversation(conversation.id)}
                   className={cn(
-                    "flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left transition-colors",
+                    "flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
                     selected ? "bg-primary/5" : "hover:bg-muted/40",
                   )}
                 >
                   <Avatar className="h-10 w-10">
-                    <AvatarImage
-                      src={generateAvatarUrl(conversation.visitorId)}
-                      alt={displayName}
-                    />
+                    <AvatarImage src={generateAvatarUrl(conversation.visitorId)} alt="" />
                     <AvatarFallback className="bg-primary/10 text-xs font-medium text-primary">
                       {getInitials(displayName)}
                     </AvatarFallback>
@@ -225,15 +223,12 @@ export function ConversationsList({
                       <span className="truncate text-sm font-semibold text-foreground">
                         {displayName}
                       </span>
-                      <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[9px] font-medium uppercase text-muted-foreground">
-                        {conversation.channel}
-                      </span>
                       <span className="shrink-0 text-[11px] text-muted-foreground">
                         {formatListTime(conversation.lastMessageAt)}
                       </span>
                     </div>
                     <div className="mt-0.5 flex items-end justify-between gap-2">
-                      <p className="line-clamp-1 text-xs text-muted-foreground">
+                      <p className="line-clamp-1 text-sm text-muted-foreground">
                         {conversation.preview}
                       </p>
                       {unreadCount > 0 ? (
@@ -242,6 +237,9 @@ export function ConversationsList({
                         </span>
                       ) : null}
                     </div>
+                    <span className="mt-1 inline-flex rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
+                      {conversation.channel}
+                    </span>
                   </div>
                 </button>
               );

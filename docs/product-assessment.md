@@ -18,7 +18,7 @@ are local changes. This is a product/screen assessment, not a formal change-scop
 | Accessibility | Landing FAQ markup, signed-in settings accessibility tree, inbox search and error branches         | Native disclosure and names fixed; broader field associations/keyboard testing remain                      |
 | Layout        | Public/reference screenshots, sign-in viewport constraints, settings screenshot, inbox pane source | Sign-in can scroll; navigation and pane redesign specified; full responsive acceptance remains             |
 | Writing       | Metadata, hero, features, FAQ, sign-in, integration registry, CTA, inbox errors                    | Unsupported outcomes/customer claims removed from active pages; retry and setup expectations made explicit |
-| Typography    | Geist tokens, rendered settings/reference hierarchy, inbox sizes                                   | App type hierarchy specified; tiny inbox metadata remains for a later density pass                         |
+| Typography    | Geist tokens, rendered settings/reference hierarchy, inbox sizes                                   | Inbox previews/channel labels enlarged; remaining small detail metadata still needs a density pass         |
 | Colors        | Existing OKLCH ramps, hard-coded purple landing/widget colors, theme rules                         | Blue app/purple widget ownership documented; rendered contrast measurements remain required                |
 | UI            | FAQ interaction source, settings controls, inbox affordances/presence, public sample cards         | Fake actions/presence removed; sample data labeled; delivery/reconnect states remain                       |
 
@@ -41,6 +41,19 @@ are local changes. This is a product/screen assessment, not a formal change-scop
 
 ## Verification record
 
+Follow-up inbox pass: preserve customer replies, copilot, assignment, notes and export while
+removing inert formatting, emoji, attachment, link, send-options and contact-edit controls.
+Timestamp-based Online/Offline is replaced with Last activity. The context column appears
+only at 1280px and above; narrower layouts expose the existing Details drawer. Conversation
+rows have visible focus, selected state and readable channel labels; reply/note fields have
+accessible names. Workspace destinations are native links. Main metric trend labels no longer
+wrap, and chart default formatters are compatible with React Compiler. Independent source
+review approved this incremental follow-up; it does not establish missing feature parity.
+Production-build browser checks at 1024px and 375px confirmed the Details drawer is
+reachable; Escape closes it and restores focus to its trigger. At 375px, an unsent draft
+enabled Send and clearing it disabled Send. The transcript and composer fit the viewport.
+The temporary viewport override was reset; no reply was sent.
+
 | Location                               | Before                                                                                                | After                                                                                | Why                                                                                         |
 | -------------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
 | `src/lib/menu-list.ts`, app navigation | Five peer destinations plus a detached widget menu                                                    | Three primary destinations, bottom Settings, contextual Agent sections               | Keep everyday work easy to locate and preserve existing routes                              |
@@ -51,7 +64,7 @@ are local changes. This is a product/screen assessment, not a formal change-scop
 - `pnpm build` completed successfully: widget bundle, optimized Next.js build, TypeScript, static generation and traces.
 - Initial repository checks passed: Oxlint, TypeScript and Oxfmt. A later check exposed
   unformatted new Markdown files; those were formatted before final verification.
-- React Doctor: `npx -y react-doctor@latest . --verbose --diff` scanned 102 branch
+- React Doctor: `npx -y react-doctor@latest . --verbose --diff` scanned 107 branch
   files against `origin/main`, scored **100/100**, and reported no diagnostics.
   This is static analysis, not a security audit or runtime acceptance test.
 - Google OAuth initially rejected the preview on port 3001 because Better Auth was
