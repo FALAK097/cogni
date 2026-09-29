@@ -89,34 +89,81 @@ export async function* readWidgetModelText<TOOLS extends ToolSet>(
   if (!completed) throw new Error("The assistant stream ended before completion.");
 }
 
+export async function* interruptWidgetTextStream(
+  textStream: AsyncIterable<string>,
+  signal: AbortSignal,
+): AsyncGenerator<string> {
+  const iterator = textStream[Symbol.asyncIterator]();
+  let removeAbortListener = () => {};
+  const interrupted = new Promise<never>((_, reject) => {
+    const rejectOnAbort = () =>
+      reject(new Error("The response stopped because a teammate took over."));
+    if (signal.aborted) {
+      rejectOnAbort();
+      return;
+    }
+    signal.addEventListener("abort", rejectOnAbort, { once: true });
+    removeAbortListener = () => signal.removeEventListener("abort", rejectOnAbort);
+  });
+
+  try {
+    while (true) {
+      const next = await Promise.race([iterator.next(), interrupted]);
+      if (next.done) return;
+      yield next.value;
+    }
+  } finally {
+    removeAbortListener();
+    if (signal.aborted) await iterator.return?.();
+  }
+}
+
 export function createWidgetSseStream(
   textStream: AsyncIterable<string>,
-  options?: { onComplete?: () => Promise<void> },
+  options?: {
+    onComplete?: () => Promise<void>;
+    onFinally?: () => void;
+    onCancel?: () => void;
+  },
 ) {
   const encoder = new TextEncoder();
+  let cancelled = false;
 
   return new ReadableStream({
-    async start(controller) {
-      try {
-        let hasText = false;
-        for await (const chunk of textStream) {
-          if (chunk) {
-            hasText ||= Boolean(chunk.trim());
-            const frame = chunk
-              .split("\n")
-              .map((line) => `data: ${line}`)
-              .join("\n");
-            controller.enqueue(encoder.encode(`${frame}\n\n`));
+    start(controller) {
+      void (async () => {
+        try {
+          let hasText = false;
+          for await (const chunk of textStream) {
+            if (cancelled) return;
+            if (chunk) {
+              hasText ||= Boolean(chunk.trim());
+              const frame = chunk
+                .split("\n")
+                .map((line) => `data: ${line}`)
+                .join("\n");
+              controller.enqueue(encoder.encode(`${frame}\n\n`));
+            }
           }
+          if (!hasText) throw new Error("The assistant returned an empty response.");
+          await options?.onComplete?.();
+          if (cancelled) return;
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          controller.close();
+        } catch {
+          if (!cancelled) {
+            controller.enqueue(encoder.encode("data: [ERROR]\n\n"));
+            controller.close();
+          }
+        } finally {
+          options?.onFinally?.();
         }
-        if (!hasText) throw new Error("The assistant returned an empty response.");
-        await options?.onComplete?.();
-        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-        controller.close();
-      } catch {
-        controller.enqueue(encoder.encode("data: [ERROR]\n\n"));
-        controller.close();
-      }
+      })();
+    },
+    cancel() {
+      cancelled = true;
+      options?.onCancel?.();
+      options?.onFinally?.();
     },
   });
 }

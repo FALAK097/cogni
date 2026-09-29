@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import {
   recordAiMessage,
@@ -20,6 +20,7 @@ import { streamWidgetAgent } from "@/features/widget/server/widget-agent";
 import { getPublicWidget, validateEmbedOrigin } from "@/features/widget/server/widget-service";
 import {
   createWidgetSseStream,
+  interruptWidgetTextStream,
   readWidgetModelText,
   getRequestOrigin,
   widgetHistoryToUiMessages,
@@ -271,7 +272,8 @@ export async function POST(
   const widget = visitorSession.widget;
   if (replayed) {
     const conv = await db.query.conversation.findFirst({
-      where: (fields, { eq }) => eq(fields.id, conversation.id),
+      where: (fields, { eq, and }) =>
+        and(eq(fields.id, conversation.id), eq(fields.workspaceId, widget.workspace.id)),
       columns: { messages: true },
     });
     const list = JSON.parse(conv?.messages || "[]") as MessageJson[];
@@ -294,7 +296,8 @@ export async function POST(
   }
 
   const activeConversation = await db.query.conversation.findFirst({
-    where: (fields, { eq }) => eq(fields.id, conversation.id),
+    where: (fields, { eq, and }) =>
+      and(eq(fields.id, conversation.id), eq(fields.workspaceId, widget.workspace.id)),
     columns: { aiPaused: true, status: true },
   });
   const shouldEscalate = matchesEscalationKeywords(body.message, widget.escalationKeywords);
@@ -307,7 +310,12 @@ export async function POST(
         aiPaused: true,
         updatedAt: new Date().toISOString(),
       })
-      .where(eq(conversationTable.id, conversation.id));
+      .where(
+        and(
+          eq(conversationTable.id, conversation.id),
+          eq(conversationTable.workspaceId, widget.workspace.id),
+        ),
+      );
     await notifyWorkspaceMembers({
       db,
       workspaceId: widget.workspace.id,
@@ -363,6 +371,19 @@ export async function POST(
       conversationId: conversation.id,
       contactId: conversation.contactId,
     });
+    const latestConversationState = await db.query.conversation.findFirst({
+      where: (fields, { eq, and }) =>
+        and(eq(fields.id, conversation.id), eq(fields.workspaceId, widget.workspace.id)),
+      columns: { aiPaused: true, status: true },
+    });
+    if (
+      !latestConversationState ||
+      latestConversationState.aiPaused ||
+      latestConversationState.status === "ESCALATED"
+    ) {
+      return respondWithText(handoffReply);
+    }
+
     const runtimeContext = buildWidgetAgentRuntimeContext({
       workspaceId: widget.workspace.id,
       widgetId: widget.id,
@@ -462,11 +483,43 @@ export async function POST(
       },
     });
 
+    let monitoring = true;
+    let checkInProgress = false;
+    const stopMonitoring = () => {
+      monitoring = false;
+      clearInterval(pauseMonitor);
+    };
+    const checkForHumanTakeover = async () => {
+      if (!monitoring || checkInProgress) return;
+      checkInProgress = true;
+      try {
+        const latest = await db.query.conversation.findFirst({
+          where: (fields, { eq, and }) =>
+            and(eq(fields.id, conversation.id), eq(fields.workspaceId, widget.workspace.id)),
+          columns: { aiPaused: true, status: true },
+        });
+        if (monitoring && (!latest || latest.aiPaused || latest.status === "ESCALATED")) {
+          result.interruptForTakeover();
+        }
+      } catch {
+        if (monitoring) result.interruptForTakeover();
+      } finally {
+        checkInProgress = false;
+      }
+    };
+    const pauseMonitor = setInterval(() => void checkForHumanTakeover(), 1_000);
+    void checkForHumanTakeover();
+
     return withWidgetCors(
       new Response(
-        createWidgetSseStream(readWidgetModelText(result.fullStream), {
-          onComplete: result.waitForCompletion,
-        }),
+        createWidgetSseStream(
+          interruptWidgetTextStream(readWidgetModelText(result.fullStream), result.abortSignal),
+          {
+            onComplete: result.waitForCompletion,
+            onFinally: stopMonitoring,
+            onCancel: result.interruptForTakeover,
+          },
+        ),
         {
           headers: streamHeaders(visitorSession),
         },

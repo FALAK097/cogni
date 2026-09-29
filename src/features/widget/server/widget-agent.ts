@@ -60,6 +60,7 @@ export async function streamWidgetAgent({
 
   const { convertToModelMessages } = await import("ai");
   const abortController = new AbortController();
+  let interruptedForTakeover = false;
   const timeout = setTimeout(() => abortController.abort(), config.runTimeoutMs ?? 55_000);
   const completion = createWidgetCompletion();
 
@@ -90,6 +91,7 @@ export async function streamWidgetAgent({
     stopWhen: stepCountIs(4),
     onEnd: async ({ text, usage, finishReason }) => {
       clearTimeout(timeout);
+      if (interruptedForTakeover) return;
       if (!text.trim()) {
         const error = new Error("The assistant returned an empty response.");
         completion.fail(error);
@@ -132,7 +134,15 @@ export async function streamWidgetAgent({
       onError(error);
     },
   });
-  return { fullStream: result.fullStream, waitForCompletion: completion.waitForCompletion };
+  return {
+    fullStream: result.fullStream,
+    waitForCompletion: completion.waitForCompletion,
+    abortSignal: abortController.signal,
+    interruptForTakeover: () => {
+      interruptedForTakeover = true;
+      abortController.abort(new Error("A teammate took over this conversation."));
+    },
+  };
 }
 
 export async function streamHandoffMessage({

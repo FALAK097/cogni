@@ -24,7 +24,12 @@ const compiled = await build({
     },
   ],
 });
-const { createWidgetSseStream, readWidgetModelText, createWidgetCompletion } = await import(
+const {
+  createWidgetSseStream,
+  readWidgetModelText,
+  createWidgetCompletion,
+  interruptWidgetTextStream,
+} = await import(
   `data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString("base64")}`
 );
 const encoder = new TextEncoder();
@@ -97,6 +102,39 @@ test("interrupted responses never become completed messages", async () => {
   assert.equal(partial, "partial");
 });
 
+test("human takeover interrupts an active stream and prevents successful completion", async () => {
+  const controller = new AbortController();
+  let releasePendingChunk = () => {};
+  const pendingChunk = new Promise((resolve) => {
+    releasePendingChunk = resolve;
+  });
+  async function* source() {
+    yield "Partial answer";
+    await pendingChunk;
+    yield " should not arrive";
+  }
+
+  let completed = false;
+  let received = "";
+  const response = createWidgetSseStream(interruptWidgetTextStream(source(), controller.signal), {
+    onComplete: async () => {
+      completed = true;
+    },
+  });
+  await assert.rejects(
+    readWidgetTextStream(response, (text) => {
+      received = text;
+      if (text === "Partial answer") {
+        controller.abort();
+        releasePendingChunk();
+      }
+    }),
+    /could not complete/,
+  );
+  assert.equal(received, "Partial answer");
+  assert.equal(completed, false);
+});
+
 test("model stream failure emits an error after partial text", async () => {
   async function* failure() {
     yield "Partial";
@@ -165,11 +203,14 @@ test("installed SDK abort after text never becomes successful SSE completion", a
   let completed = false;
   await assert.rejects(
     readWidgetTextStream(
-      createWidgetSseStream(readWidgetModelText(result.fullStream), {
-        onComplete: async () => {
-          completed = true;
+      createWidgetSseStream(
+        interruptWidgetTextStream(readWidgetModelText(result.fullStream), abortController.signal),
+        {
+          onComplete: async () => {
+            completed = true;
+          },
         },
-      }),
+      ),
       (text) => {
         partial = text;
         abortController.abort();
