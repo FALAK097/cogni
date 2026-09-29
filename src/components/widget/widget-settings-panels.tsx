@@ -141,18 +141,21 @@ function WidgetColorInput({
 }
 
 function WidgetSegmentedControl<T extends string>({
+  label,
   value,
   options,
   onChange,
   className,
 }: {
+  label: string;
   value: T;
   options: { value: T; label: string; icon?: ReactNode }[];
   onChange: (value: T) => void;
   className?: string;
 }) {
   return (
-    <div className={cn("flex gap-2", className)}>
+    <fieldset className={cn("flex gap-2", className)}>
+      <legend className="sr-only">{label}</legend>
       {options.map((option) => {
         const isActive = value === option.value;
         return (
@@ -160,8 +163,9 @@ function WidgetSegmentedControl<T extends string>({
             key={option.value}
             type="button"
             onClick={() => onChange(option.value)}
+            aria-pressed={isActive}
             className={cn(
-              "inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-medium transition-[background-color,border-color,color,box-shadow] duration-150",
+              "inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-medium transition-[background-color,border-color,color,box-shadow] duration-150 ease-out focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none",
               isActive
                 ? "border-[var(--widget-accent)] bg-[var(--widget-accent-muted)] text-[var(--widget-accent)] shadow-xs"
                 : "border-border bg-card text-foreground hover:bg-muted",
@@ -172,7 +176,7 @@ function WidgetSegmentedControl<T extends string>({
           </button>
         );
       })}
-    </div>
+    </fieldset>
   );
 }
 
@@ -333,6 +337,7 @@ export function WidgetAppearancePanel({
             <div className="space-y-1.5">
               <Label className="text-sm font-medium text-foreground">Position on screen</Label>
               <WidgetSegmentedControl
+                label="Widget position"
                 value={config.position}
                 onChange={(value) => onUpdate("position", value)}
                 options={[
@@ -344,6 +349,7 @@ export function WidgetAppearancePanel({
             <div className="space-y-1.5">
               <Label className="text-sm font-medium text-foreground">Theme</Label>
               <WidgetSegmentedControl
+                label="Widget theme"
                 value={config.theme}
                 onChange={(value) => onUpdate("theme", value)}
                 options={[
