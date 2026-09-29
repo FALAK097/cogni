@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useKnowledgeBases } from "@/hooks/query";
-import { useSidebar } from "@/hooks/use-sidebar";
+import { useIsMobileSidebar, useSidebar } from "@/hooks/use-sidebar";
 import { cn } from "@/lib/utils";
 
 type AppTopbarProps = {
@@ -209,6 +209,11 @@ function Breadcrumbs() {
 export function AppTopbar({ userData, className }: AppTopbarProps) {
   const toggleOpen = useSidebar((state) => state.toggleOpen);
   const sidebarDisabled = useSidebar((state) => state.settings.disabled);
+  const isMobile = useIsMobileSidebar();
+  const mobileDrawerOpen = useSidebar((state) => state.mobileDrawerOpen);
+  const isOpen = useSidebar((state) => state.isOpen);
+  const isHover = useSidebar((state) => state.isHover);
+  const isHoverOpen = useSidebar((state) => state.settings.isHoverOpen);
   const normalizedUserData = {
     avatar: userData?.avatar ?? "",
     name: userData?.name ?? "Unknown",
@@ -221,6 +226,16 @@ export function AppTopbar({ userData, className }: AppTopbarProps) {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (
+        sidebarDisabled ||
+        event.defaultPrevented ||
+        event.altKey ||
+        (event.target instanceof HTMLElement && event.target.isContentEditable) ||
+        (event.target instanceof Element &&
+          event.target.closest("input, textarea, select, [role='dialog'], [role='alertdialog']"))
+      ) {
+        return;
+      }
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "b") {
         event.preventDefault();
         toggleOpen();
@@ -229,7 +244,7 @@ export function AppTopbar({ userData, className }: AppTopbarProps) {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [toggleOpen]);
+  }, [toggleOpen, sidebarDisabled]);
 
   return (
     <header
@@ -252,6 +267,14 @@ export function AppTopbar({ userData, className }: AppTopbarProps) {
                       className="size-9 shrink-0"
                       onClick={() => toggleOpen()}
                       aria-label={`Toggle sidebar (${shortcutLabel})`}
+                      aria-expanded={
+                        isMobile ? mobileDrawerOpen : isOpen || (isHoverOpen && isHover)
+                      }
+                      {...(!isMobile
+                        ? { "aria-controls": "workspace-desktop-navigation" }
+                        : mobileDrawerOpen
+                          ? { "aria-controls": "workspace-mobile-navigation" }
+                          : {})}
                     >
                       <PanelLeft className="size-5" />
                     </Button>

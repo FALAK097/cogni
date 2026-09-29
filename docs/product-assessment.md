@@ -54,6 +54,20 @@ reachable; Escape closes it and restores focus to its trigger. At 375px, an unse
 enabled Send and clearing it disabled Send. The transcript and composer fit the viewport.
 The temporary viewport override was reset; no reply was sent.
 
+Navigation follow-up: the mobile sidebar now uses the existing Base UI Sheet instead of
+an off-screen translated aside. Closed mobile navigation leaves the tab order; the open
+drawer uses modal focus management, Escape dismissal and a named close button. Desktop
+navigation stays inline. Skip to content precedes workspace chrome, the brand is no longer
+a page heading, and the sidebar toggle exposes its expanded state. The keyboard shortcut
+ignores text fields, editable content and both ordinary and confirmation dialogs. The drawer
+uses reduced-motion overrides. This adds no product pages or primary destinations.
+Production-build checks at 375px and 320px confirmed closed navigation is absent from the
+accessibility tree; first Tab reaches Skip to content and Enter focuses workspace content.
+The open drawer wraps focus in both directions, Escape restores the toggle after its exit
+transition, Agent navigation closes it, and resizing to 1024px closes it. Cmd+B leaves the
+reply field and delete confirmation unchanged; the confirmation was cancelled. The 320px
+document stayed 320px wide. Independent review approved the scoped source changes.
+
 | Location                               | Before                                                                                                | After                                                                                | Why                                                                                         |
 | -------------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
 | `src/lib/menu-list.ts`, app navigation | Five peer destinations plus a detached widget menu                                                    | Three primary destinations, bottom Settings, contextual Agent sections               | Keep everyday work easy to locate and preserve existing routes                              |

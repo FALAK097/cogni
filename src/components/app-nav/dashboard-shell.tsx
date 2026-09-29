@@ -45,6 +45,12 @@ export function DashboardShell({
 
   return (
     <>
+      <a
+        href="#workspace-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[60] focus:rounded-md focus:bg-background focus:px-4 focus:py-2 focus:text-foreground focus:outline-2 focus:outline-offset-2 focus:outline-ring"
+      >
+        Skip to content
+      </a>
       <Sidebar initialOpen={initialSidebarOpen} />
       <main
         className={cn(
@@ -54,12 +60,6 @@ export function DashboardShell({
           isFullBleedPage ? "flex h-svh flex-col overflow-hidden" : "min-h-screen",
         )}
       >
-        <a
-          href="#workspace-content"
-          className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:rounded-md focus:bg-background focus:px-4 focus:py-2 focus:text-foreground"
-        >
-          Skip to content
-        </a>
         <AppTopbar userData={userData} className={cn(isFullBleedPage && "lg:hidden")} />
         {(pathname === "/playground" || pathname === "/knowledge-base") && <AgentNavigation />}
         <div
