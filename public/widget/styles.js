@@ -154,6 +154,12 @@ export function injectStyles() {
 			transform: scale(1.05);
 		}
 
+		#widget-container button:focus-visible,
+		#widget-container a:focus-visible {
+			outline: 2px solid Highlight;
+			outline-offset: 2px;
+		}
+
 		.oc-launcher svg {
 			width: ${config.launcherSize === "lg" ? "28px" : config.launcherSize === "sm" ? "20px" : "24px"};
 			height: ${config.launcherSize === "lg" ? "28px" : config.launcherSize === "sm" ? "20px" : "24px"};
@@ -1032,6 +1038,16 @@ export function injectStyles() {
 		@keyframes oc-fadeIn {
 			from { opacity: 0; transform: translateY(-4px); }
 			to { opacity: 1; transform: translateY(0); }
+		}
+
+		@media (prefers-reduced-motion: reduce) {
+			#widget-container *,
+			#widget-container *::before,
+			#widget-container *::after {
+				animation: none !important;
+				transition-duration: 0.01ms !important;
+				scroll-behavior: auto !important;
+			}
 		}
 
 		.oc-menu-item {

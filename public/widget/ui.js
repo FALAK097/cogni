@@ -71,23 +71,23 @@ export function createWidget() {
 				</div>
 			</div>
 			<div class="oc-header-actions">
-				<button class="oc-menu-btn">${ICONS.menu}</button>
+				<button type="button" class="oc-menu-btn" aria-label="Conversation menu" aria-expanded="false" aria-controls="oc-menu-dropdown"><span aria-hidden="true">${ICONS.menu}</span></button>
 			</div>
-			<div class="oc-menu-dropdown" id="oc-menu-dropdown">
+			<div class="oc-menu-dropdown" id="oc-menu-dropdown" role="group" aria-label="Conversation actions">
 				<button class="oc-menu-item" data-action="new_chat">
-					${ICONS.plus}
+					<span aria-hidden="true">${ICONS.plus}</span>
 					<span>Start a new chat</span>
 				</button>
 				<button class="oc-menu-item" data-action="recent_chats">
-					${ICONS.history}
+					<span aria-hidden="true">${ICONS.history}</span>
 					<span>Recent chats</span>
 				</button>
 				<button class="oc-menu-item" data-action="view_tickets">
-					${ICONS.ticket}
+					<span aria-hidden="true">${ICONS.ticket}</span>
 					<span>View tickets</span>
 				</button>
 				<button class="oc-menu-item" data-action="end_chat">
-					${ICONS.x}
+					<span aria-hidden="true">${ICONS.x}</span>
 					<span>End chat</span>
 				</button>
 			</div>
@@ -99,7 +99,7 @@ export function createWidget() {
 			</div>
 			<div class="oc-input-container">
 				<input type="file" class="oc-file-input" accept="image/*,.pdf,.txt,.docx" hidden />
-				<button type="button" class="oc-upload-btn" title="Upload file">${ICONS.fileText}</button>
+				<button type="button" class="oc-upload-btn" aria-label="Upload file">${ICONS.fileText}</button>
 				<input type="text" class="oc-input" aria-label="Ask a question" placeholder="${escapeHtml(config.inputPlaceholder)}" />
 				<button class="oc-send-btn" aria-label="Send message" disabled>${ICONS.send}</button>
 			</div>
@@ -110,14 +110,19 @@ export function createWidget() {
   // Launcher Button
   state.launcher = document.createElement("button");
   state.launcher.className = "oc-launcher";
+  state.launcher.setAttribute("type", "button");
+  state.launcher.setAttribute("aria-label", "Open chat");
+  state.launcher.setAttribute("aria-expanded", "false");
+  state.launcher.setAttribute("aria-controls", "widget-chat-window");
+  state.windowEl.id = "widget-chat-window";
   state.launcher.innerHTML = `
-		<span class="oc-launcher-chat-icon">
+		<span class="oc-launcher-chat-icon" aria-hidden="true">
 			<span class="oc-launcher-icon-wrapper">
 				${ICONS.chat}
 				<span class="oc-launcher-sparkle">${ICONS.sparkleSmall}</span>
 			</span>
 		</span>
-		<span class="oc-launcher-close-icon">${ICONS.close}</span>
+		<span class="oc-launcher-close-icon" aria-hidden="true">${ICONS.close}</span>
 	`;
 
   state.container.appendChild(state.windowEl);
@@ -134,6 +139,7 @@ export function createWidget() {
  */
 export function attachEvents() {
   state.launcher.addEventListener("click", toggleChat);
+  document.addEventListener("keydown", handleWidgetKeydown);
 
   const sendBtn = state.windowEl.querySelector(".oc-send-btn");
   sendBtn.addEventListener("click", sendMessage);
@@ -155,15 +161,11 @@ export function attachEvents() {
     e.stopPropagation();
     state.isMenuOpen = !state.isMenuOpen;
     menuDropdown.classList.toggle("is-open", state.isMenuOpen);
+    menuBtn.setAttribute("aria-expanded", String(state.isMenuOpen));
   });
 
   // Close menu when clicking outside
-  document.addEventListener("click", () => {
-    if (state.isMenuOpen) {
-      state.isMenuOpen = false;
-      menuDropdown.classList.remove("is-open");
-    }
-  });
+  document.addEventListener("click", closeWidgetMenuOnOutsideClick);
 
   // Handle menu item clicks
   const menuItems = state.windowEl.querySelectorAll(".oc-menu-item");
@@ -172,8 +174,7 @@ export function attachEvents() {
       e.stopPropagation();
       const action = item.getAttribute("data-action");
       handleMenuAction(action);
-      state.isMenuOpen = false;
-      menuDropdown.classList.remove("is-open");
+      closeWidgetMenu();
     });
   });
 
@@ -196,6 +197,50 @@ export function attachEvents() {
         console.error("widget: upload failed", error);
       }
     });
+  }
+}
+
+function closeWidgetMenu() {
+  if (!state.windowEl) return;
+  state.isMenuOpen = false;
+  state.windowEl.querySelector(".oc-menu-dropdown")?.classList.remove("is-open");
+  state.windowEl.querySelector(".oc-menu-btn")?.setAttribute("aria-expanded", "false");
+}
+
+function closeWidgetMenuOnOutsideClick() {
+  closeWidgetMenu();
+}
+
+function handleWidgetKeydown(event) {
+  if (event.key !== "Escape" || event.defaultPrevented) return;
+
+  const feedbackModal = state.container?.querySelector(".oc-feedback-modal");
+  if (feedbackModal) {
+    const feedbackButton = feedbackModal
+      .closest(".oc-feedback")
+      ?.querySelector('.oc-feedback-btn[data-feedback="negative"]');
+    feedbackModal.remove();
+    feedbackButton?.focus();
+    event.preventDefault();
+    return;
+  }
+
+  if (state.activePanel) {
+    state.windowEl?.querySelector(".oc-panel-back")?.click();
+    event.preventDefault();
+    return;
+  }
+
+  if (state.isMenuOpen) {
+    closeWidgetMenu();
+    state.windowEl?.querySelector(".oc-menu-btn")?.focus();
+    event.preventDefault();
+    return;
+  }
+
+  if (state.isOpen) {
+    toggleChat();
+    event.preventDefault();
   }
 }
 
@@ -271,6 +316,7 @@ function attachPanelHandlers(container, handlers = {}) {
     void handlers.onBack?.();
   });
   handlers.onAttach?.(container);
+  container.querySelector(".oc-panel-back")?.focus();
 }
 
 function renderRecentChatsEmptyState() {
@@ -477,6 +523,8 @@ export function toggleChat() {
   if (!state.windowEl || !state.launcher) return;
 
   state.isOpen = !state.isOpen;
+  state.launcher.setAttribute("aria-expanded", String(state.isOpen));
+  state.launcher.setAttribute("aria-label", state.isOpen ? "Close chat" : "Open chat");
   if (state.isOpen) {
     state.windowEl.classList.add("is-open");
     state.launcher.classList.add("is-open");
@@ -484,6 +532,8 @@ export function toggleChat() {
     setTimeout(() => state.input.focus(), 100);
     startMessagePolling();
   } else {
+    closeWidgetMenu();
+    state.launcher.focus();
     state.windowEl.classList.remove("is-open");
     state.launcher.classList.remove("is-open");
     stopMessagePolling();
@@ -1033,6 +1083,8 @@ function openPreviewWidget() {
   if (!state.preview || !state.windowEl || !state.launcher) return;
   if (state.isOpen) return;
   state.isOpen = true;
+  state.launcher.setAttribute("aria-expanded", "true");
+  state.launcher.setAttribute("aria-label", "Close chat");
   state.windowEl.classList.add("is-open");
   state.launcher.classList.add("is-open");
   hidePreviewMessages();
@@ -1042,6 +1094,8 @@ function openPreviewWidget() {
  * Tear down widget DOM and in-memory state (dashboard preview remounts).
  */
 export function destroyWidget() {
+  document.removeEventListener("click", closeWidgetMenuOnOutsideClick);
+  document.removeEventListener("keydown", handleWidgetKeydown);
   hidePreviewMessages();
   const container = document.getElementById("widget-container");
   if (container) container.remove();
