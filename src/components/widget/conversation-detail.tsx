@@ -14,6 +14,7 @@ import {
   MoreVertical,
   Pencil,
   Pause,
+  Play,
   ThumbsDown,
   ThumbsUp,
   Trash2,
@@ -46,10 +47,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import {
-  useAssignConversation,
   useConversation,
   useDeleteConversation,
+  useSetConversationAiPaused,
   useSendConversationMessage,
+  useTakeOverConversation,
 } from "@/hooks/query";
 import type { ConversationDetail as ConversationDetailData, WidgetMessage } from "@/hooks/query";
 import { generateAvatarUrl } from "@/lib/avatar-generator";
@@ -194,7 +196,8 @@ export function ConversationDetail({
 
   const { data: session, isLoading, isError, error } = useConversation(conversationId);
   const deleteConversationMutation = useDeleteConversation();
-  const assignMutation = useAssignConversation();
+  const takeOverMutation = useTakeOverConversation();
+  const aiPausedMutation = useSetConversationAiPaused();
   const sendMessageMutation = useSendConversationMessage();
   const copilotMutation = useMutation({
     mutationFn: () => generateCopilotDraft(conversationId),
@@ -261,10 +264,21 @@ export function ConversationDetail({
   };
 
   const handleAssign = () => {
-    assignMutation.mutate(conversationId, {
-      onSuccess: () => toast({ title: "Conversation assigned to you" }),
-      onError: () => toast({ title: "Failed to assign conversation", variant: "destructive" }),
+    takeOverMutation.mutate(conversationId, {
+      onSuccess: () =>
+        toast({ title: "You took over this conversation", description: "AI replies are paused." }),
+      onError: () => toast({ title: "Failed to take over conversation", variant: "destructive" }),
     });
+  };
+
+  const handleToggleAi = (isPaused: boolean) => {
+    aiPausedMutation.mutate(
+      { conversationId, paused: !isPaused },
+      {
+        onSuccess: () => toast({ title: isPaused ? "AI replies resumed" : "AI replies paused" }),
+        onError: () => toast({ title: "Could not update AI replies", variant: "destructive" }),
+      },
+    );
   };
 
   const handleSend = () => {
@@ -392,10 +406,10 @@ export function ConversationDetail({
                 size="sm"
                 className="hidden h-7 rounded-md border-border/60 px-2.5 text-[11px] shadow-none sm:inline-flex"
                 onClick={handleAssign}
-                disabled={assignMutation.isPending}
+                disabled={takeOverMutation.isPending}
               >
                 <UserPlus className="mr-1 h-3 w-3" />
-                Assign to me
+                Take over
               </Button>
             ) : null}
 
@@ -441,10 +455,25 @@ export function ConversationDetail({
                   <Download className="mr-2 h-4 w-4" />
                   Export JSON
                 </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => handleToggleAi(session.aiPaused ?? false)}
+                  disabled={aiPausedMutation.isPending}
+                >
+                  {session.aiPaused ? (
+                    <Play className="mr-2 h-4 w-4" />
+                  ) : (
+                    <Pause className="mr-2 h-4 w-4" />
+                  )}
+                  {session.aiPaused ? "Resume AI replies" : "Pause AI replies"}
+                </DropdownMenuItem>
                 {!isAssignedToMe ? (
-                  <DropdownMenuItem onClick={handleAssign} className="sm:hidden">
+                  <DropdownMenuItem
+                    onClick={handleAssign}
+                    disabled={takeOverMutation.isPending}
+                    className="sm:hidden"
+                  >
                     <UserPlus className="mr-2 h-4 w-4" />
-                    Assign to me
+                    Take over
                   </DropdownMenuItem>
                 ) : null}
                 <DropdownMenuItem

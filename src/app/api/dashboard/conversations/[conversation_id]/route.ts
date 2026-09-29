@@ -194,9 +194,9 @@ export async function PATCH(request: Request, context: RouteContext) {
   const { db, workspace, membership } = await requireDashboardContext();
   const { conversation_id: conversationId } = await context.params;
 
-  let body: { action?: string; message?: string };
+  let body: { action?: string; message?: string; paused?: boolean };
   try {
-    body = (await request.json()) as { action?: string; message?: string };
+    body = (await request.json()) as { action?: string; message?: string; paused?: boolean };
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
@@ -210,10 +210,15 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Conversation not found." }, { status: 404 });
   }
 
-  if (body.action === "assign") {
+  if (body.action === "assign" || body.action === "takeover") {
+    const takeOver = body.action === "takeover";
     await db
       .update(conversationTable)
-      .set({ assignedMemberId: membership.id, status: "ASSIGNED" })
+      .set({
+        assignedMemberId: membership.id,
+        status: "ASSIGNED",
+        ...(takeOver ? { aiPaused: true } : {}),
+      })
       .where(
         and(
           eq(conversationTable.id, conversation.id),
@@ -221,6 +226,27 @@ export async function PATCH(request: Request, context: RouteContext) {
         ),
       );
     await broadcastConversationChanged(conversation.id, "ASSIGNED", membership.id);
+    return NextResponse.json({ ok: true });
+  }
+
+  if (body.action === "set_ai_paused") {
+    if (typeof body.paused !== "boolean") {
+      return NextResponse.json({ error: "A valid AI reply state is required." }, { status: 400 });
+    }
+    await db
+      .update(conversationTable)
+      .set({ aiPaused: body.paused })
+      .where(
+        and(
+          eq(conversationTable.id, conversation.id),
+          eq(conversationTable.workspaceId, workspace.id),
+        ),
+      );
+    await broadcastConversationChanged(
+      conversation.id,
+      conversation.status,
+      conversation.assignedMemberId,
+    );
     return NextResponse.json({ ok: true });
   }
 

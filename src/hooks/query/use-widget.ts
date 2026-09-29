@@ -444,7 +444,38 @@ export function useDeleteConversation() {
   });
 }
 
-export function useAssignConversation() {
+export function useTakeOverConversation() {
+  return useConversationStateAction("takeover");
+}
+
+export function useSetConversationAiPaused() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ conversationId, paused }: { conversationId: string; paused: boolean }) => {
+      const { data, error } = await api.PATCH<{ ok: boolean }>(
+        "/api/conversations/{conversation_id}",
+        {
+          params: { path: { conversation_id: conversationId } },
+          body: { action: "set_ai_paused", paused },
+        },
+      );
+      return requireData(data, error, "Failed to update AI replies");
+    },
+    onSuccess: (_data, variables) =>
+      invalidateConversationQueries(queryClient, variables.conversationId),
+  });
+}
+
+function invalidateConversationQueries(
+  queryClient: ReturnType<typeof useQueryClient>,
+  conversationId: string,
+) {
+  void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.detail(conversationId) });
+}
+
+function useConversationStateAction(action: "assign" | "takeover") {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -453,16 +484,19 @@ export function useAssignConversation() {
         "/api/conversations/{conversation_id}",
         {
           params: { path: { conversation_id: conversationId } },
-          body: { action: "assign" },
+          body: { action },
         },
       );
-      return requireData(data, error, "Failed to assign conversation");
+      return requireData(
+        data,
+        error,
+        action === "takeover"
+          ? "Failed to take over conversation"
+          : "Failed to assign conversation",
+      );
     },
     onSuccess: (_data, conversationId) => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all });
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.conversations.detail(conversationId),
-      });
+      invalidateConversationQueries(queryClient, conversationId);
     },
   });
 }
