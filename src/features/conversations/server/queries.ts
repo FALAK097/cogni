@@ -414,6 +414,7 @@ export function mapConversationToListItem(conversation: ParsedConversation) {
     contactName: conversation.contact.name,
     contactEmail: conversation.contact.email,
     status: conversation.status,
+    aiPaused: conversation.aiPaused,
     assigneeName: conversation.assignedMember?.user.name ?? null,
     assigneeId: conversation.assignedMemberId,
     unreadCount: countUnreadMessages(conversation.messages),

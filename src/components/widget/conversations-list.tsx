@@ -2,7 +2,7 @@
 
 import { format, isToday, isYesterday } from "date-fns";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Search } from "@/components/icons";
+import { Bot, Pause, Search, User } from "@/components/icons";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -237,9 +237,32 @@ export function ConversationsList({
                         </span>
                       ) : null}
                     </div>
-                    <span className="mt-1 inline-flex rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
-                      {conversation.channel}
-                    </span>
+                    <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="inline-flex rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
+                        {conversation.channel === "WIDGET" ? "Widget" : conversation.channel}
+                      </span>
+                      <span
+                        className={cn(
+                          "inline-flex items-center gap-1 text-[11px] font-medium",
+                          conversation.aiPaused
+                            ? "text-amber-700 dark:text-amber-400"
+                            : "text-muted-foreground",
+                        )}
+                      >
+                        {conversation.aiPaused ? (
+                          <Pause className="size-3 shrink-0" aria-hidden="true" />
+                        ) : (
+                          <Bot className="size-3 shrink-0" aria-hidden="true" />
+                        )}
+                        {conversation.aiPaused ? "AI paused" : "AI enabled"}
+                      </span>
+                      <span className="inline-flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground">
+                        <User className="size-3 shrink-0" aria-hidden="true" />
+                        <span className="truncate">
+                          {conversation.assigneeName ?? "Unassigned"}
+                        </span>
+                      </span>
+                    </div>
                   </div>
                 </button>
               );

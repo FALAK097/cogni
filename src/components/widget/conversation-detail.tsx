@@ -13,6 +13,7 @@ import {
   FileText,
   MoreVertical,
   Pencil,
+  Pause,
   ThumbsDown,
   ThumbsUp,
   Trash2,
@@ -827,6 +828,23 @@ function SessionDetailsContent({
               className="text-[10px]"
             >
               {formatStatusLabel(session.conversationStatus ?? "OPEN")}
+            </Badge>
+          </DetailRow>
+          <DetailRow label="AI replies">
+            <Badge
+              variant={session.aiPaused ? "outline" : "secondary"}
+              className={cn(
+                "inline-flex items-center gap-1 text-[10px]",
+                session.aiPaused &&
+                  "border-amber-300 text-amber-800 dark:border-amber-800 dark:text-amber-300",
+              )}
+            >
+              {session.aiPaused ? (
+                <Pause className="size-3" aria-hidden="true" />
+              ) : (
+                <Bot className="size-3" aria-hidden="true" />
+              )}
+              {session.aiPaused ? "Paused" : "Enabled"}
             </Badge>
           </DetailRow>
           <DetailRow label="Ticket">{session.conversationSubject ?? "Customer request"}</DetailRow>

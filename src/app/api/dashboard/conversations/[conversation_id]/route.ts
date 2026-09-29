@@ -149,6 +149,7 @@ export async function GET(_request: Request, context: RouteContext) {
     contactCaptureContext: JSON.parse(conversation.contact.captureContext) as unknown,
     conversationId: conversation.id,
     conversationStatus: conversation.status,
+    aiPaused: conversation.aiPaused,
     conversationChannel: conversation.channel,
     conversationStartedAt: new Date(conversation.createdAt).toISOString(),
     conversationSubject: conversation.subject,

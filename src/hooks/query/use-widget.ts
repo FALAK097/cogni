@@ -134,6 +134,7 @@ export interface WidgetSessionDetail {
   contactCaptureContext?: Record<string, unknown> | null;
   conversationId?: string | null;
   conversationStatus?: string;
+  aiPaused?: boolean;
   conversationChannel?: string;
   conversationStartedAt?: string;
   conversationSubject?: string;
@@ -339,6 +340,7 @@ export interface ConversationSummary {
   contactName: string;
   contactEmail: string | null;
   status: string;
+  aiPaused: boolean;
   assigneeName: string | null;
   assigneeId: string | null;
   unreadCount: number;
