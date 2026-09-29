@@ -27,6 +27,8 @@ export function InsightsTrendChart({
   className,
   height = 240,
   showArea = false,
+  empty = false,
+  emptyMessage = "No data for this period",
   valueFormatter = formatDefaultValue,
   labelFormatter = formatDefaultLabel,
   ariaLabel,
@@ -35,6 +37,8 @@ export function InsightsTrendChart({
   className?: string;
   height?: number;
   showArea?: boolean;
+  empty?: boolean;
+  emptyMessage?: string;
   valueFormatter?: (value: number) => string;
   labelFormatter?: (label: string) => string;
   ariaLabel: string;
@@ -88,57 +92,63 @@ export function InsightsTrendChart({
   );
   return (
     <figure className={cn("min-w-0 w-full", className)} aria-label={ariaLabel}>
-      <div style={{ height }}>
-        <ResponsiveContainer
-          width="100%"
-          height="100%"
-          minWidth={0}
-          initialDimension={{ width: 640, height }}
-        >
-          {showArea ? (
-            <AreaChart
-              data={data}
-              margin={{ top: 12, right: 12, bottom: 8, left: 0 }}
-              accessibilityLayer
-            >
-              <defs>
-                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.22} />
-                  <stop offset="100%" stopColor="var(--primary)" stopOpacity={0.01} />
-                </linearGradient>
-              </defs>
-              {axes}
-              <Area
-                type="linear"
-                dataKey="value"
-                stroke="var(--primary)"
-                strokeWidth={2}
-                fill={`url(#${gradientId})`}
-                isAnimationActive={false}
-                dot={data.length === 1}
-                activeDot={{ r: 4, stroke: "var(--background)", strokeWidth: 2 }}
-              />
-            </AreaChart>
-          ) : (
-            <LineChart
-              data={data}
-              margin={{ top: 12, right: 12, bottom: 8, left: 0 }}
-              accessibilityLayer
-            >
-              {axes}
-              <Line
-                type="linear"
-                dataKey="value"
-                stroke="var(--primary)"
-                strokeWidth={2}
-                dot={data.length === 1}
-                activeDot={{ r: 4, stroke: "var(--background)", strokeWidth: 2 }}
-                isAnimationActive={false}
-              />
-            </LineChart>
-          )}
-        </ResponsiveContainer>
-      </div>
+      {empty ? (
+        <div className="flex h-60 items-center justify-center text-sm text-muted-foreground">
+          {emptyMessage}
+        </div>
+      ) : (
+        <div style={{ height }}>
+          <ResponsiveContainer
+            width="100%"
+            height="100%"
+            minWidth={0}
+            initialDimension={{ width: 640, height }}
+          >
+            {showArea ? (
+              <AreaChart
+                data={data}
+                margin={{ top: 12, right: 12, bottom: 8, left: 0 }}
+                accessibilityLayer
+              >
+                <defs>
+                  <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.22} />
+                    <stop offset="100%" stopColor="var(--primary)" stopOpacity={0.01} />
+                  </linearGradient>
+                </defs>
+                {axes}
+                <Area
+                  type="linear"
+                  dataKey="value"
+                  stroke="var(--primary)"
+                  strokeWidth={2}
+                  fill={`url(#${gradientId})`}
+                  isAnimationActive={false}
+                  dot={data.length === 1}
+                  activeDot={{ r: 4, stroke: "var(--background)", strokeWidth: 2 }}
+                />
+              </AreaChart>
+            ) : (
+              <LineChart
+                data={data}
+                margin={{ top: 12, right: 12, bottom: 8, left: 0 }}
+                accessibilityLayer
+              >
+                {axes}
+                <Line
+                  type="linear"
+                  dataKey="value"
+                  stroke="var(--primary)"
+                  strokeWidth={2}
+                  dot={data.length === 1}
+                  activeDot={{ r: 4, stroke: "var(--background)", strokeWidth: 2 }}
+                  isAnimationActive={false}
+                />
+              </LineChart>
+            )}
+          </ResponsiveContainer>
+        </div>
+      )}
       <details className="mt-2 text-xs text-muted-foreground">
         <summary className="w-fit cursor-pointer rounded-sm py-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
           View data

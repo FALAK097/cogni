@@ -856,7 +856,7 @@ function MetricCard({
           {value}
         </p>
       </div>
-      <div className="mt-auto flex items-center gap-1.5 pt-3 text-xs">
+      <div className="mt-auto flex flex-col items-start gap-0.5 pt-3 text-xs">
         <span
           className={cn(
             "inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap font-medium",
@@ -876,10 +876,7 @@ function MetricCard({
           )}
           {metric.changePercent === 0 ? "No change" : formatChangePercent(metric.changePercent)}
         </span>
-        <span
-          className="truncate text-muted-foreground"
-          title={formatComparisonRange(previousRange.start, previousRange.end)}
-        >
+        <span className="text-muted-foreground">
           vs {formatComparisonRange(previousRange.start, previousRange.end)}
         </span>
       </div>
@@ -1134,6 +1131,8 @@ export function DashboardPage() {
             <InsightsTrendChart
               data={convChartData}
               showArea
+              empty={convChartData.length > 0 && convChartData.every((point) => point.value === 0)}
+              emptyMessage="No conversations in this period"
               labelFormatter={formatChartDate}
               ariaLabel="Conversations over time"
             />
