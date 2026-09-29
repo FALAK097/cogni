@@ -10,7 +10,7 @@ import { Footer } from "@/components/landing/footer";
 export const metadata = {
   title: "cogni — AI customer support",
   description:
-    "AI-powered customer support trained on your knowledge. Resolve 70% of tickets instantly with seamless human handoff.",
+    "AI customer support grounded in your knowledge, with a branded widget and shared inbox for human handoff.",
 };
 
 export default function HomePage() {

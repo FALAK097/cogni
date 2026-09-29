@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 
 export const metadata = {
-  title: `Playground | ${SITE_NAME}`,
+  title: `Agent | ${SITE_NAME}`,
   description: "Configure and test your AI customer agent",
 };
 

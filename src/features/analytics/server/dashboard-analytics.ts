@@ -237,7 +237,9 @@ function aggregatePeriod(conversations: ConversationRow[]) {
     uniqueUserCount,
     resolvedConversations,
     avgResponseTimeMs,
+    responseTimeSamples: responseTimes.length,
     satisfactionScore,
+    feedbackTotal,
     messagesSent,
     messagesReceived,
     engagementRate,
@@ -376,11 +378,20 @@ export async function getDashboardAnalytics(
       ),
       avgResponseTime: {
         ...toMetric(current.avgResponseTimeMs, previous.avgResponseTimeMs),
-        formatted: formatDuration(current.avgResponseTimeMs),
+        formatted:
+          current.responseTimeSamples > 0 ? formatDuration(current.avgResponseTimeMs) : "—",
+        changePercent:
+          current.responseTimeSamples > 0 && previous.responseTimeSamples > 0
+            ? toMetric(current.avgResponseTimeMs, previous.avgResponseTimeMs).changePercent
+            : null,
       },
       satisfactionScore: {
         ...toMetric(current.satisfactionScore, previous.satisfactionScore),
-        formatted: formatDecimal(current.satisfactionScore, 1),
+        formatted: current.feedbackTotal > 0 ? formatDecimal(current.satisfactionScore, 1) : "—",
+        changePercent:
+          current.feedbackTotal > 0 && previous.feedbackTotal > 0
+            ? toMetric(current.satisfactionScore, previous.satisfactionScore).changePercent
+            : null,
         max: 5,
       },
     },

@@ -4,21 +4,21 @@ import { ThemeLogo } from "@/components/theme-logo";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="light grid h-svh overflow-hidden bg-white text-gray-900 lg:grid-cols-2">
+    <main className="light grid min-h-svh bg-white text-gray-900 lg:grid-cols-2">
       {/* ── Left: form panel ── */}
-      <div className="flex h-full flex-col bg-white px-6 py-8 sm:px-10 lg:px-16">
+      <div className="flex min-h-svh flex-col gap-8 bg-white px-6 py-8 sm:px-10 lg:px-16">
         {/* Logo */}
         <Link href="/" className="flex shrink-0 items-center gap-2.5">
           <ThemeLogo showWordmark wordmarkClassName="text-gray-900" />
         </Link>
 
         {/* Centered form */}
-        <div className="flex flex-1 items-center justify-center">
+        <div className="flex flex-1 items-center justify-center py-8">
           <div className="w-full max-w-[380px]">{children}</div>
         </div>
 
         {/* Copyright */}
-        <p className="shrink-0 pb-2 text-center text-xs text-gray-400">
+        <p className="shrink-0 pb-2 text-center text-xs text-gray-600">
           &copy; {new Date().getFullYear()} cogni Inc. All rights reserved.
         </p>
       </div>
@@ -62,9 +62,9 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           {/* Metric cards */}
           <div className="mt-10 grid grid-cols-1 gap-3 sm:grid-cols-3">
             {[
-              { label: "Ticket deflection", value: "94%" },
-              { label: "Avg. response", value: "8s" },
-              { label: "Setup time", value: "5 min" },
+              { label: "Knowledge", value: "Grounded AI" },
+              { label: "Conversations", value: "Shared inbox" },
+              { label: "Widget", value: "Your brand" },
             ].map((metric) => (
               <div
                 key={metric.label}
@@ -77,6 +77,6 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

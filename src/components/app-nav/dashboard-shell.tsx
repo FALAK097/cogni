@@ -5,6 +5,7 @@ import { useLayoutEffect } from "react";
 import { usePathname } from "next/navigation";
 
 import { AppTopbar } from "@/components/app-nav/app-topbar";
+import { AgentNavigation } from "@/components/app-nav/agent-navigation";
 import { Sidebar } from "@/components/app-nav/sidebar";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { cn } from "@/lib/utils";
@@ -47,14 +48,28 @@ export function DashboardShell({
       <Sidebar initialOpen={initialSidebarOpen} />
       <main
         className={cn(
-          "bg-sidebar text-foreground transition-[margin-left] ease-in-out duration-300",
+          "bg-sidebar text-foreground transition-[margin-left] duration-150 motion-reduce:transition-none",
           !settings.disabled && (!desktopOpenState ? "lg:ml-[90px]" : "lg:ml-56"),
           "print:ml-0 print:w-full print:overflow-visible",
           isFullBleedPage ? "flex h-svh flex-col overflow-hidden" : "min-h-screen",
         )}
       >
+        <a
+          href="#workspace-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:rounded-md focus:bg-background focus:px-4 focus:py-2 focus:text-foreground"
+        >
+          Skip to content
+        </a>
         <AppTopbar userData={userData} className={cn(isFullBleedPage && "lg:hidden")} />
-        <div className={cn(isFullBleedPage && "flex min-h-0 flex-1 flex-col overflow-hidden")}>
+        {(pathname === "/playground" || pathname === "/knowledge-base") && <AgentNavigation />}
+        <div
+          id="workspace-content"
+          tabIndex={-1}
+          className={cn(
+            "outline-none",
+            isFullBleedPage && "flex min-h-0 flex-1 flex-col overflow-hidden",
+          )}
+        >
           {children}
         </div>
       </main>

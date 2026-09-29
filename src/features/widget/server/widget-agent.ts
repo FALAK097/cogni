@@ -5,6 +5,7 @@ import { retrieveKnowledgeContext } from "@/features/knowledge/server/retrieval"
 import { createWidgetAgentTools } from "@/features/integrations/server/widget-agent-tools";
 import { getWidgetModel } from "@/lib/ai/providers";
 import type { Db } from "@/lib/db/client";
+import { createWidgetCompletion } from "./widget-utils";
 
 type WidgetAgentConfig = {
   displayName: string;
@@ -60,8 +61,9 @@ export async function streamWidgetAgent({
   const { convertToModelMessages } = await import("ai");
   const abortController = new AbortController();
   const timeout = setTimeout(() => abortController.abort(), config.runTimeoutMs ?? 55_000);
+  const completion = createWidgetCompletion();
 
-  return streamText({
+  const result = streamText({
     model: getWidgetModel(config.modelProvider, config.modelName),
     abortSignal: abortController.signal,
     instructions: [
@@ -88,29 +90,49 @@ export async function streamWidgetAgent({
     stopWhen: stepCountIs(4),
     onEnd: async ({ text, usage, finishReason }) => {
       clearTimeout(timeout);
+      if (!text.trim()) {
+        const error = new Error("The assistant returned an empty response.");
+        completion.fail(error);
+        onError(error);
+        return;
+      }
       const citationSuffix =
         sources.length > 0
           ? `\n\nSources:\n${sources.map((source: { title: string }) => `- ${source.title}`).join("\n")}`
           : "";
       const finalText = text.includes("Sources:") ? text : `${text}${citationSuffix}`;
 
-      await onFinish({
-        text: finalText,
-        inputTokens: usage.inputTokens ?? null,
-        outputTokens: usage.outputTokens ?? null,
-        totalTokens: usage.totalTokens ?? null,
-        finishReason: finishReason ?? null,
-        sources: sources.map((source: { documentId: string; title: string }) => ({
-          documentId: source.documentId,
-          title: source.title,
-        })),
-      });
+      try {
+        await onFinish({
+          text: finalText,
+          inputTokens: usage.inputTokens ?? null,
+          outputTokens: usage.outputTokens ?? null,
+          totalTokens: usage.totalTokens ?? null,
+          finishReason: finishReason ?? null,
+          sources: sources.map((source: { documentId: string; title: string }) => ({
+            documentId: source.documentId,
+            title: source.title,
+          })),
+        });
+        completion.succeed();
+      } catch (error) {
+        completion.fail(error);
+        onError(error);
+      }
     },
     onError: ({ error }) => {
       clearTimeout(timeout);
+      completion.fail(error);
+      onError(error);
+    },
+    onAbort: () => {
+      clearTimeout(timeout);
+      const error = new Error("The assistant response was interrupted or timed out.");
+      completion.fail(error);
       onError(error);
     },
   });
+  return { fullStream: result.fullStream, waitForCompletion: completion.waitForCompletion };
 }
 
 export async function streamHandoffMessage({

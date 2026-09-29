@@ -11,7 +11,8 @@ const STEPS = [
   {
     num: "02",
     title: "Import your knowledge",
-    description: "Sync your docs, Help Center, PDFs, and Notion pages with one click.",
+    description:
+      "Add website URLs, sitemaps, text, and supported files. Check that each source is ready.",
     color: "#10b981",
     bg: "#ecfdf5",
   },
@@ -24,7 +25,7 @@ const STEPS = [
   },
   {
     num: "04",
-    title: "Go live instantly",
+    title: "Test and go live",
     description: "Your AI agent handles questions 24/7. Your team steps in only when it matters.",
     color: "#8b5cf6",
     bg: "#f5f3ff",
@@ -36,8 +37,8 @@ export function HowItWorks() {
     <SectionLayout id="how-it-works">
       <SectionHeader
         label="Setup"
-        heading={<>Live in under 5 minutes.</>}
-        sub="No engineers, no complex configuration, no waiting."
+        heading={<>From knowledge to customer support.</>}
+        sub="Add your sources, test your answers, and install your widget."
         center
       />
 

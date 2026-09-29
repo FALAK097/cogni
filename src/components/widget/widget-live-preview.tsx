@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { getBackendOrigin } from "@/lib/api/client";
 
 const WIDGET_SCRIPT_ID = "widget-widget-preview";
-const WIDGET_BUNDLE_VERSION = "13";
+const WIDGET_BUNDLE_VERSION = "14";
 const REMOUNT_DEBOUNCE_MS = 300;
 const CONFIG_SYNC_DEBOUNCE_MS = 50;
 

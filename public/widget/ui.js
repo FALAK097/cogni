@@ -32,6 +32,7 @@ import {
   getStoredLeadInfo,
 } from "./storage.js";
 import { applyWidgetStyles } from "./styles.js";
+import { readWidgetTextStream } from "./sse.js";
 import {
   escapeHtml,
   formatTimestamp,
@@ -99,8 +100,8 @@ export function createWidget() {
 			<div class="oc-input-container">
 				<input type="file" class="oc-file-input" accept="image/*,.pdf,.txt,.docx" hidden />
 				<button type="button" class="oc-upload-btn" title="Upload file">${ICONS.fileText}</button>
-				<input type="text" class="oc-input" placeholder="${escapeHtml(config.inputPlaceholder)}" />
-				<button class="oc-send-btn" disabled>${ICONS.send}</button>
+				<input type="text" class="oc-input" aria-label="Ask a question" placeholder="${escapeHtml(config.inputPlaceholder)}" />
+				<button class="oc-send-btn" aria-label="Send message" disabled>${ICONS.send}</button>
 			</div>
 			${config.showBranding ? '<div class="oc-branding">Powered by <strong>cogni</strong></div>' : ""}
 		</div>
@@ -832,6 +833,7 @@ export async function sendMessage() {
  * Call Widget chat API
  */
 async function callWidgetChat(userMessage, interactionId) {
+  let streamingMessage = null;
   try {
     const leadInfo = state.savedLeadInfo
       ? {
@@ -861,34 +863,13 @@ async function callWidgetChat(userMessage, interactionId) {
 			<div class="oc-timestamp">${getCurrentTime()}</div>
 		`;
     state.messagesContainer.appendChild(msg);
+    streamingMessage = msg;
     const bubble = msg.querySelector(".oc-bubble");
 
-    let fullResponse = "";
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      const chunk = decoder.decode(value, { stream: true });
-      const lines = chunk.split("\n");
-
-      for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          const data = line.slice(6);
-          if (data === "[DONE]") {
-            break;
-          } else if (data === "[ERROR]") {
-            throw new Error("Stream error from server");
-          } else if (data) {
-            fullResponse += data;
-            bubble.innerHTML = formatBotMessage(fullResponse);
-            scrollToBottom();
-          }
-        }
-      }
-    }
+    const fullResponse = await readWidgetTextStream(response.body, (text) => {
+      bubble.innerHTML = formatBotMessage(text);
+      scrollToBottom();
+    });
 
     // Remove streaming class when done
     bubble.classList.remove("oc-streaming");
@@ -925,6 +906,9 @@ async function callWidgetChat(userMessage, interactionId) {
     await detectLeadCapture();
   } catch (error) {
     console.error("Widget: chat stream error", error);
+    const bubble = streamingMessage?.querySelector(".oc-bubble");
+    if (!bubble?.textContent?.trim()) streamingMessage?.remove();
+    else bubble.classList.remove("oc-streaming");
     removeTypingIndicator();
     addBotMessage("Sorry, I'm having trouble responding right now. Please try again.");
 

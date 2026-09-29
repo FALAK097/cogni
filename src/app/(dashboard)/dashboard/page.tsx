@@ -5,7 +5,7 @@ import { ContentLayout } from "@/components/app-nav/content-layout";
 import { SITE_NAME } from "@/lib/constants";
 
 export const metadata: Metadata = {
-  title: `Dashboard | ${SITE_NAME}`,
+  title: `Insights | ${SITE_NAME}`,
 };
 
 export default function DashboardHomePage() {

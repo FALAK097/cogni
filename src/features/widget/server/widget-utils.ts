@@ -1,4 +1,5 @@
 import "server-only";
+import type { TextStreamPart, ToolSet } from "ai";
 
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
 
@@ -57,6 +58,37 @@ export function widgetHistoryToUiMessages(value: unknown) {
   }));
 }
 
+/** The SDK's textStream drops error/abort events; retain them until completion. */
+export function createWidgetCompletion() {
+  const completion = Promise.withResolvers<Error | null>();
+  return {
+    succeed: () => completion.resolve(null),
+    fail: (error: unknown) =>
+      completion.resolve(error instanceof Error ? error : new Error(String(error))),
+    waitForCompletion: async () => {
+      const error = await completion.promise;
+      if (error) throw error;
+    },
+  };
+}
+
+/** Preserve model failures that the SDK omits from its text-only stream. */
+export async function* readWidgetModelText<TOOLS extends ToolSet>(
+  events: AsyncIterable<TextStreamPart<TOOLS>>,
+): AsyncGenerator<string> {
+  let completed = false;
+  for await (const event of events) {
+    if (event.type === "error") throw event.error;
+    if (event.type === "abort") throw new Error("The assistant response was interrupted.");
+    if (event.type === "text-delta") yield event.text;
+    if (event.type === "finish") {
+      if (event.finishReason === "error") throw new Error("The assistant response failed.");
+      completed = true;
+    }
+  }
+  if (!completed) throw new Error("The assistant stream ended before completion.");
+}
+
 export function createWidgetSseStream(
   textStream: AsyncIterable<string>,
   options?: { onComplete?: () => Promise<void> },
@@ -66,11 +98,18 @@ export function createWidgetSseStream(
   return new ReadableStream({
     async start(controller) {
       try {
+        let hasText = false;
         for await (const chunk of textStream) {
           if (chunk) {
-            controller.enqueue(encoder.encode(`data: ${chunk}\n\n`));
+            hasText ||= Boolean(chunk.trim());
+            const frame = chunk
+              .split("\n")
+              .map((line) => `data: ${line}`)
+              .join("\n");
+            controller.enqueue(encoder.encode(`${frame}\n\n`));
           }
         }
+        if (!hasText) throw new Error("The assistant returned an empty response.");
         await options?.onComplete?.();
         controller.enqueue(encoder.encode("data: [DONE]\n\n"));
         controller.close();

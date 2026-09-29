@@ -2,9 +2,9 @@
 
 import { format, isToday, isYesterday } from "date-fns";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Filter, Search } from "@/components/icons";
+import { Search } from "@/components/icons";
 
-import { Avatar, AvatarBadge, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -43,10 +43,6 @@ function getInitials(name: string) {
     return `${parts[0]?.[0] ?? ""}${parts[1]?.[0] ?? ""}`.toUpperCase();
   }
   return name.slice(0, 2).toUpperCase();
-}
-
-function isOnline(lastActivityAt: string) {
-  return Date.now() - new Date(lastActivityAt).getTime() < 5 * 60 * 1000;
 }
 
 function formatListTime(timestamp: string) {
@@ -96,6 +92,8 @@ export function ConversationsList({
     isLoading,
     isFetching,
     isPlaceholderData,
+    isError,
+    refetch,
   } = useConversations({
     page,
     limit: PAGE_SIZE,
@@ -151,25 +149,35 @@ export function ConversationsList({
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search conversations..."
+              aria-label="Search conversations"
+              placeholder="Search conversations…"
               className="h-9 rounded-lg border-border/50 bg-white pl-9 text-sm shadow-none dark:bg-zinc-950"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
           </div>
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-9 w-9 shrink-0 rounded-lg border-border/50 bg-white shadow-none dark:bg-zinc-950"
-            aria-label="Filter conversations"
-          >
-            <Filter className="h-4 w-4" />
-          </Button>
         </div>
       </div>
 
+      {isError && conversations.length > 0 ? (
+        <div role="alert" className="mx-4 mb-2 space-y-2 text-sm text-muted-foreground">
+          <p>Conversations could not refresh. Showing previously loaded results.</p>
+          <Button variant="outline" onClick={() => void refetch()} disabled={isFetching}>
+            Retry loading
+          </Button>
+        </div>
+      ) : null}
       <div className={cn("min-h-0 flex-1", hideScrollbarClassName)}>
-        {isLoading && conversations.length === 0 ? (
+        {isError && conversations.length === 0 ? (
+          <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
+            <p role="alert" className="text-sm text-muted-foreground">
+              Unable to load conversations. Check your connection and try again.
+            </p>
+            <Button variant="outline" onClick={() => void refetch()} disabled={isFetching}>
+              Retry loading
+            </Button>
+          </div>
+        ) : isLoading && conversations.length === 0 ? (
           <div className="space-y-1 px-2 pb-2">
             {Array.from({ length: 6 }).map((_, index) => (
               <div key={index} className="flex items-start gap-3 rounded-lg px-3 py-3">
@@ -190,7 +198,6 @@ export function ConversationsList({
             {conversations.map((conversation) => {
               const displayName = getDisplayName(conversation);
               const selected = selectedConversationId === conversation.id;
-              const online = isOnline(conversation.lastMessageAt);
               const unreadCount = selected ? 0 : conversation.unreadCount;
 
               return (
@@ -211,9 +218,6 @@ export function ConversationsList({
                     <AvatarFallback className="bg-primary/10 text-xs font-medium text-primary">
                       {getInitials(displayName)}
                     </AvatarFallback>
-                    {online ? (
-                      <AvatarBadge className="size-2.5 bg-emerald-500 ring-2 ring-background" />
-                    ) : null}
                   </Avatar>
 
                   <div className="min-w-0 flex-1">

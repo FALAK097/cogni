@@ -30,6 +30,7 @@ import type {
   TimeSeriesPoint,
   TopQuestion,
 } from "@/features/analytics/types";
+import { InsightsTrendChart } from "@/components/dashboard/insights-trend-chart";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -103,8 +104,6 @@ const STATUS_COLORS: Record<string, string> = {
 const POPOVER_PANEL_CLASS =
   "w-auto rounded-xl border border-border/50 bg-zinc-50 p-4 text-foreground shadow-none ring-0 dark:bg-zinc-900";
 
-const CHART_PADDING = { top: 12, right: 8, bottom: 28, left: 40 };
-
 const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"] as const;
 
 const EXPORT_SECTIONS = [
@@ -121,7 +120,6 @@ type ExportSectionId = (typeof EXPORT_SECTIONS)[number]["id"];
 type ExportFormat = "csv" | "excel";
 type DateRangeValue = { start: Date; end: Date };
 type Granularity = "daily" | "weekly";
-type LineChartPoint = { label: string; value: number };
 type ExportSection = { title: string; headers: string[]; rows: string[][] };
 
 const DEFAULT_EXPORT_SELECTION = Object.fromEntries(
@@ -365,11 +363,6 @@ function runDashboardExport(
   return true;
 }
 
-function formatAxisValue(value: number): string {
-  if (value >= 1000) return `${Math.round(value / 1000)}K`;
-  return String(Math.round(value));
-}
-
 function aggregateWeeklyCounts(data: TimeSeriesPoint[]): TimeSeriesPoint[] {
   if (data.length === 0) return [];
   const buckets = new Map<string, number>();
@@ -426,138 +419,6 @@ function CardSkeleton({ className }: { className?: string }) {
         className ?? "h-[156px]",
       )}
     />
-  );
-}
-
-const defaultLabelFormatter = (label: string) => label;
-
-function LineChart({
-  data,
-  className,
-  height = 240,
-  showArea = false,
-  valueFormatter = formatAxisValue,
-  labelFormatter = defaultLabelFormatter,
-  ariaLabel,
-}: {
-  data: LineChartPoint[];
-  className?: string;
-  height?: number;
-  showArea?: boolean;
-  valueFormatter?: (value: number) => string;
-  labelFormatter?: (label: string) => string;
-  ariaLabel: string;
-}) {
-  const chart = useMemo(() => {
-    if (data.length === 0) return null;
-    const width = 640;
-    const innerWidth = width - CHART_PADDING.left - CHART_PADDING.right;
-    const innerHeight = height - CHART_PADDING.top - CHART_PADDING.bottom;
-    const maxValue = Math.max(...data.map((point) => point.value), 1);
-    const yTicks = [0, maxValue * 0.25, maxValue * 0.5, maxValue * 0.75, maxValue];
-    const points = data.map((point, index) => {
-      const x =
-        data.length === 1
-          ? CHART_PADDING.left + innerWidth / 2
-          : CHART_PADDING.left + (index / (data.length - 1)) * innerWidth;
-      const y = CHART_PADDING.top + innerHeight - (point.value / maxValue) * innerHeight;
-      return { ...point, x, y };
-    });
-    const linePath = points
-      .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`)
-      .join(" ");
-    const areaPath = `${linePath} L ${points[points.length - 1]?.x ?? 0} ${
-      CHART_PADDING.top + innerHeight
-    } L ${points[0]?.x ?? 0} ${CHART_PADDING.top + innerHeight} Z`;
-    const xLabelIndexes =
-      data.length <= 4
-        ? data.map((_, index) => index)
-        : [0, Math.floor((data.length - 1) / 2), data.length - 1];
-    return { width, innerHeight, yTicks, points, linePath, areaPath, xLabelIndexes, maxValue };
-  }, [data, height]);
-
-  if (!chart) {
-    return (
-      <div
-        className={cn(
-          "flex h-60 items-center justify-center text-sm text-muted-foreground",
-          className,
-        )}
-        aria-label={`${ariaLabel}: no data`}
-      >
-        No data for this period
-      </div>
-    );
-  }
-
-  return (
-    <div className={cn("h-60 w-full", className)}>
-      <svg
-        viewBox={`0 0 ${chart.width} ${height}`}
-        className="h-auto w-full"
-        aria-label={ariaLabel}
-      >
-        {chart.yTicks.map((tick) => {
-          const y =
-            CHART_PADDING.top + chart.innerHeight - (tick / chart.maxValue) * chart.innerHeight;
-          return (
-            <g key={tick}>
-              <line
-                x1={CHART_PADDING.left}
-                y1={y}
-                x2={chart.width - CHART_PADDING.right}
-                y2={y}
-                className="stroke-border/60"
-                strokeWidth={1}
-                strokeDasharray="4 4"
-              />
-              <text
-                x={CHART_PADDING.left - 8}
-                y={y + 4}
-                textAnchor="end"
-                className="fill-muted-foreground text-[11px]"
-              >
-                {valueFormatter(tick)}
-              </text>
-            </g>
-          );
-        })}
-        {showArea ? <path d={chart.areaPath} className="fill-primary/10" /> : null}
-        <path
-          d={chart.linePath}
-          fill="none"
-          className="stroke-primary"
-          strokeWidth={2.5}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        {chart.points.map((point) => (
-          <circle
-            key={point.label}
-            cx={point.x}
-            cy={point.y}
-            r={3}
-            className="fill-primary stroke-background"
-            strokeWidth={2}
-          />
-        ))}
-        {chart.xLabelIndexes.map((index) => {
-          const point = chart.points[index];
-          if (!point) return null;
-          return (
-            <text
-              key={point.label}
-              x={point.x}
-              y={height - 8}
-              textAnchor="middle"
-              className="fill-muted-foreground text-[11px]"
-            >
-              {labelFormatter(point.label)}
-            </text>
-          );
-        })}
-      </svg>
-    </div>
   );
 }
 
@@ -979,6 +840,7 @@ function MetricCard({
 }) {
   const rawPositive = (metric.changePercent ?? 0) >= 0;
   const isPositive = invertTrend ? !rawPositive : rawPositive;
+  const hasTrend = metric.changePercent !== null && metric.changePercent !== 0;
 
   return (
     <DashboardCard className="flex h-full flex-col p-6">
@@ -998,17 +860,21 @@ function MetricCard({
         <span
           className={cn(
             "inline-flex items-center gap-0.5 font-medium",
-            isPositive
-              ? "text-emerald-600 dark:text-emerald-400"
-              : "text-rose-600 dark:text-rose-400",
+            !hasTrend
+              ? "text-muted-foreground"
+              : isPositive
+                ? "text-emerald-600 dark:text-emerald-400"
+                : "text-rose-600 dark:text-rose-400",
           )}
         >
-          <HugeiconsIcon
-            icon={isPositive ? ArrowUp01Icon : ArrowDown01Icon}
-            strokeWidth={2}
-            className="size-3"
-          />
-          {formatChangePercent(metric.changePercent)}
+          {hasTrend && (
+            <HugeiconsIcon
+              icon={isPositive ? ArrowUp01Icon : ArrowDown01Icon}
+              strokeWidth={2}
+              className="size-3"
+            />
+          )}
+          {metric.changePercent === 0 ? "No change" : formatChangePercent(metric.changePercent)}
         </span>
         <span className="truncate text-muted-foreground">
           vs {formatComparisonRange(previousRange.start, previousRange.end)}
@@ -1149,9 +1015,9 @@ export function DashboardPage() {
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-6 pb-8">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Dashboard</h1>
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Insights</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Overview of your AI assistant performance and usage.
+            Understand conversation volume, response times and customer feedback.
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -1206,7 +1072,11 @@ export function DashboardPage() {
             />
             <MetricCard
               label="Avg. Response Time"
-              value={analytics.kpis.avgResponseTime.formatted}
+              value={
+                analytics.kpis.avgResponseTime.formatted === "—"
+                  ? "No data"
+                  : analytics.kpis.avgResponseTime.formatted
+              }
               metric={analytics.kpis.avgResponseTime}
               previousRange={analytics.previousDateRange}
               icon={<HugeiconsIcon icon={Clock01Icon} strokeWidth={2} className="size-[18px]" />}
@@ -1214,7 +1084,11 @@ export function DashboardPage() {
             />
             <MetricCard
               label="Satisfaction Score"
-              value={`${analytics.kpis.satisfactionScore.formatted} / ${analytics.kpis.satisfactionScore.max}`}
+              value={
+                analytics.kpis.satisfactionScore.formatted === "—"
+                  ? "No data"
+                  : `${analytics.kpis.satisfactionScore.formatted} / ${analytics.kpis.satisfactionScore.max}`
+              }
               metric={analytics.kpis.satisfactionScore}
               previousRange={analytics.previousDateRange}
               icon={<HugeiconsIcon icon={StarIcon} strokeWidth={2} className="size-[18px]" />}
@@ -1254,7 +1128,7 @@ export function DashboardPage() {
           {isLoading ? (
             <Skeleton className="h-60 w-full rounded-lg border border-border/50 bg-transparent" />
           ) : (
-            <LineChart
+            <InsightsTrendChart
               data={convChartData}
               showArea
               labelFormatter={formatChartDate}
@@ -1412,7 +1286,7 @@ export function DashboardPage() {
               No satisfaction feedback in this period.
             </div>
           ) : (
-            <LineChart
+            <InsightsTrendChart
               data={satChartData}
               labelFormatter={formatChartDate}
               valueFormatter={(v) => v.toFixed(1)}

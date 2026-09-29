@@ -135,10 +135,9 @@ function DashboardMockup() {
                 wordmarkClassName="text-sm text-gray-900"
               />
             </div>
-            <button
-              type="button"
-              className="flex size-5 items-center justify-center rounded text-gray-400 hover:bg-gray-200"
-              aria-label="Add"
+            <span
+              aria-hidden="true"
+              className="flex size-5 items-center justify-center rounded text-gray-400"
             >
               <svg viewBox="0 0 12 12" className="size-3 fill-current">
                 <path
@@ -148,7 +147,7 @@ function DashboardMockup() {
                   strokeLinecap="round"
                 />
               </svg>
-            </button>
+            </span>
           </div>
 
           {/* Nav items */}
@@ -202,9 +201,7 @@ function DashboardMockup() {
           <div className="flex shrink-0 flex-col gap-2 border-b border-gray-100 px-3 py-3 sm:flex-row sm:items-start sm:justify-between sm:px-5 sm:py-3.5">
             <div className="min-w-0">
               <h2 className="text-[14px] font-semibold text-gray-900">Dashboard</h2>
-              <p className="text-[11px] text-gray-400">
-                Overview of your AI support agent performance
-              </p>
+              <p className="text-[11px] text-gray-400">Illustrative preview · sample data</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[11px] text-gray-500 shadow-xs">
@@ -497,7 +494,7 @@ export function Hero() {
 
         {/* ── Trust badges ── */}
         <div className="mt-5 flex flex-wrap items-center justify-center gap-x-7 gap-y-2 text-[13px] text-white/80">
-          {["No credit card required", "Setup in 5 minutes", "Cancel anytime"].map((text) => (
+          {["No credit card required", "Test before going live", "Cancel anytime"].map((text) => (
             <div key={text} className="flex items-center gap-1.5">
               <svg
                 className="size-[14px] shrink-0 text-white"

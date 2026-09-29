@@ -286,8 +286,8 @@ function OmnichannelVisual() {
     { name: "Slack", src: "/assets/icons/slack.svg" },
     { name: "Teams", src: "/assets/icons/microsoft-teams.svg" },
     { name: "WhatsApp", src: "/assets/icons/whatsapp.svg" },
-    { name: "Telegram", src: "/assets/icons/telegram.svg" },
-    { name: "Messenger", src: "/assets/icons/messenger.webp" },
+    { name: "Discord", src: "/assets/icons/discord.svg" },
+    { name: "Google Chat", src: "/assets/icons/google-chat.svg" },
   ];
 
   return (
@@ -347,7 +347,7 @@ const FEATURES = [
       </>
     ),
     description:
-      "Train on your docs, website, and files. Resolves 70% of questions automatically, no human needed.",
+      "Train on your docs, website, and files. Test knowledge-grounded answers before putting your agent in front of customers.",
     bg: "#F7ECFF",
     color: "#7B35F0",
     Visual: AiAgentVisual,
@@ -371,12 +371,13 @@ const FEATURES = [
     tag: "Knowledge Base",
     title: (
       <>
-        Ingest anything.
+        Bring your knowledge.
         <br />
-        Stay in sync.
+        Track each source.
       </>
     ),
-    description: "Websites, PDFs, Notion pages. Auto-synced as your content changes.",
+    description:
+      "Add website URLs, sitemaps, text, and supported files. Track processing status in your knowledge base.",
     bg: "#FFF2DF",
     color: "#C64E27",
     Visual: KnowledgeVisual,
@@ -391,7 +392,7 @@ const FEATURES = [
       </>
     ),
     description:
-      "Resolution rates, topic clustering, and conversation metrics, updated in real time.",
+      "Review conversation volume, response times, and customer feedback in your dashboard.",
     bg: "#EEFFE8",
     color: "#064E2A",
     Visual: AnalyticsVisual,
@@ -400,13 +401,13 @@ const FEATURES = [
     tag: "Omnichannel",
     title: (
       <>
-        Every channel.
+        Connect your tools.
         <br />
         One inbox.
       </>
     ),
     description:
-      "Meet customers where they are — Slack, Teams, WhatsApp, Messenger, and Telegram, all managed from a single dashboard.",
+      "Connect supported integrations for approved actions. Inbound channel messaging requires additional provider setup.",
     bg: "#F2EEFF",
     color: "#5E29C4",
     Visual: OmnichannelVisual,
@@ -440,8 +441,8 @@ export function Features() {
             Everything support teams need.
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-lg leading-relaxed text-gray-500">
-            One platform to automate answers, manage conversations, and surface insights — all in
-            real time.
+            One platform to automate answers, manage conversations, and surface insights — in one
+            workspace.
           </p>
         </div>
 
@@ -490,7 +491,10 @@ export function Features() {
                       {feature.description}
                     </p>
                   </div>
-                  <feature.Visual />
+                  <div>
+                    <feature.Visual />
+                    <p className="mt-2 text-xs text-gray-600">Illustrative preview · sample data</p>
+                  </div>
                 </div>
               </Reveal>
             );

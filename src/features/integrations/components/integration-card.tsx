@@ -35,7 +35,7 @@ export function IntegrationCard({ integration, isConnected, onClick }: Integrati
       aria-label={
         isComingSoon
           ? `${integration.name} coming soon`
-          : `View ${integration.name} integration details`
+          : `${isConnected ? "Manage" : "Connect"} ${integration.name}`
       }
     >
       {/* Status Indicator */}

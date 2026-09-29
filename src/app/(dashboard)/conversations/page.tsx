@@ -3,7 +3,7 @@ import { SITE_NAME } from "@/lib/constants";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 
 export const metadata = {
-  title: `Conversations | ${SITE_NAME}`,
+  title: `Inbox | ${SITE_NAME}`,
   description: "View widget conversations",
 };
 

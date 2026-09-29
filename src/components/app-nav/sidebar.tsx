@@ -6,6 +6,7 @@ import { useEffect, useLayoutEffect, useState } from "react";
 import { Menu } from "@/components/app-nav/menu";
 import { WorkspaceSwitcher } from "@/components/app-nav/workspace-switcher";
 import { ThemeLogo } from "@/components/theme-logo";
+import { Settings } from "@/components/icons";
 import { closeMobileSidebar, useSidebar } from "@/hooks/use-sidebar";
 import { SITE_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
@@ -123,7 +124,23 @@ export function Sidebar({ initialOpen = true }: { initialOpen?: boolean }) {
             <Menu isOpen={sidebarExpanded} />
           </div>
 
-          <div className="h-3 flex-none" />
+          <div className="flex-none border-t border-sidebar-border p-3">
+            <Link
+              href="/integrations"
+              onClick={() => closeMobileSidebar()}
+              aria-label="Settings: connections"
+              aria-current={pathname.startsWith("/integrations") ? "page" : false}
+              title={sidebarExpanded ? "Workspace connections" : "Settings"}
+              className={cn(
+                "flex min-h-10 items-center gap-4 rounded-md px-4 text-sm transition-colors duration-150 hover:bg-sidebar-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                !sidebarExpanded && "justify-center px-0",
+                pathname.startsWith("/integrations") && "bg-sidebar-accent font-medium",
+              )}
+            >
+              <Settings className="size-[18px] shrink-0" />
+              {sidebarExpanded && <span>Settings</span>}
+            </Link>
+          </div>
         </div>
       </aside>
     </>

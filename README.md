@@ -25,9 +25,16 @@ Cogni is an AI-first customer support platform with an embedded chat widget, sha
    ```
 
 3. Run the development server:
+
    ```bash
    pnpm dev
    ```
+
+   Development is pinned to `http://localhost:3000`. Keep `BETTER_AUTH_URL`, Google's
+   authorized JavaScript origin, and the redirect URI
+   `http://localhost:3000/api/auth/callback/google` on that same origin. If port 3000
+   is occupied, stop the other local server or explicitly update all three settings
+   before changing ports; the dev command does not silently select another port.
 
 ## Environment Variables
 
@@ -60,6 +67,7 @@ GEMINI_API_KEY=""
 
 ```bash
 pnpm dev             # Start development server
+pnpm test:widget-stream # Check widget stream framing and failure recovery
 pnpm build           # Build the production bundle
 pnpm start           # Run the built application
 pnpm check           # Run formatting + types + linting checks

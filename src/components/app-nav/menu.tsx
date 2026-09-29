@@ -24,6 +24,7 @@ const getHrefPathname = (href: string) => {
 
 const isMenuActive = (pathname: string, href: string) => {
   const hrefPathname = getHrefPathname(href);
+  if (hrefPathname === "/playground" && pathname === "/knowledge-base") return true;
   if (hrefPathname === "/") return pathname === "/" || pathname === "/dashboard";
   return pathname === hrefPathname || pathname.startsWith(`${hrefPathname}/`);
 };
@@ -34,8 +35,8 @@ export function Menu({ isOpen }: MenuProps) {
   const menuItems = buildMenuList();
 
   return (
-    <nav className="w-full h-full">
-      <ul className="flex flex-col w-full min-h-[calc(100vh-48px-36px-16px-56px)] lg:min-h-[calc(100vh-32px-40px-56px)] items-stretch px-3">
+    <nav className="w-full" aria-label="Workspace">
+      <ul className="flex flex-col w-full items-stretch px-3">
         {menuItems.map(({ groupLabel, menus }) => (
           <li
             className={cn("w-full", groupLabel ? "py-2" : "")}
@@ -74,24 +75,18 @@ export function Menu({ isOpen }: MenuProps) {
                 const button = (
                   <Button
                     variant={isCurrentActive ? "secondary" : "ghost"}
+                    aria-label={label}
+                    aria-current={isCurrentActive ? "page" : false}
                     className={cn(
-                      "w-full h-10 mb-2 relative overflow-hidden group cursor-pointer flex items-center transition-[justify-content,padding]",
+                      "w-full h-10 mb-1 relative overflow-hidden group cursor-pointer flex items-center transition-colors duration-150",
                       isOpen === false ? "justify-center px-0" : "justify-start px-4",
-                      isCurrentActive && "shadow-sm",
+                      isCurrentActive && "bg-sidebar-accent text-sidebar-accent-foreground",
                     )}
                     onClick={() => {
                       closeMobileSidebar();
                       router.push(href);
                     }}
                   >
-                    {isCurrentActive && (
-                      <div className="absolute inset-0 transition-opacity duration-300 opacity-100">
-                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,0,0,0.02)_1px,transparent_1px)] dark:bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[length:4px_4px]" />
-                      </div>
-                    )}
-                    {isCurrentActive && (
-                      <div className="absolute inset-0 p-px transition-opacity duration-300 rounded-md opacity-100 -z-10 bg-gradient-to-br from-transparent via-border to-transparent" />
-                    )}
                     <span
                       className={cn(
                         isOpen === false ? "" : "mr-4",

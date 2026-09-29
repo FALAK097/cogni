@@ -462,10 +462,11 @@ export function WidgetAppearancePanel({
           <div>
             <p className="text-sm font-medium text-foreground">Remove branding</p>
             <p className="mt-0.5 text-sm text-muted-foreground">
-              Remove &apos;Powered by Acme&apos; from the widget
+              Remove &apos;Powered by cogni&apos; from the widget
             </p>
           </div>
           <Switch
+            aria-label="Remove branding"
             checked={!config.showBranding}
             onCheckedChange={(checked) => onUpdate("showBranding", !checked)}
             className="data-checked:bg-[var(--widget-accent)]"
@@ -673,6 +674,7 @@ export function WidgetBehaviourPanel({
             </p>
           </div>
           <Switch
+            aria-label="Hide suggestions on interact"
             checked={hideSuggestionsOnInteract}
             onCheckedChange={(checked) => onUpdate("hideSuggestionsOnInteract", checked)}
             className="data-checked:bg-[var(--widget-accent)]"
@@ -686,6 +688,7 @@ export function WidgetBehaviourPanel({
             </p>
           </div>
           <Switch
+            aria-label="Enable lead capture"
             checked={enableLeadCapture}
             onCheckedChange={(checked) => onUpdate("enableLeadCapture", checked)}
             className="data-checked:bg-[var(--widget-accent)]"
@@ -742,6 +745,7 @@ export function WidgetBehaviourPanel({
             </p>
           </div>
           <Switch
+            aria-label="Enable brochure feature"
             checked={enableBrochure}
             onCheckedChange={(checked) => onUpdate("enableBrochure", checked)}
             className="data-checked:bg-[var(--widget-accent)]"

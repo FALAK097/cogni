@@ -20,6 +20,7 @@ import { streamWidgetAgent } from "@/features/widget/server/widget-agent";
 import { getPublicWidget, validateEmbedOrigin } from "@/features/widget/server/widget-service";
 import {
   createWidgetSseStream,
+  readWidgetModelText,
   getRequestOrigin,
   widgetHistoryToUiMessages,
   widgetPreflightResponse,
@@ -462,9 +463,14 @@ export async function POST(
     });
 
     return withWidgetCors(
-      new Response(createWidgetSseStream(result.textStream), {
-        headers: streamHeaders(visitorSession),
-      }),
+      new Response(
+        createWidgetSseStream(readWidgetModelText(result.fullStream), {
+          onComplete: result.waitForCompletion,
+        }),
+        {
+          headers: streamHeaders(visitorSession),
+        },
+      ),
       origin,
       corsAllowed,
     );

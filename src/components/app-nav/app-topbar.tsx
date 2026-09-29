@@ -40,12 +40,13 @@ type AppTopbarProps = {
 const LABELS: Record<string, string> = {
   analytics: "Analytics",
   "knowledge-base": "Knowledge Base",
-  conversations: "Conversations",
+  conversations: "Inbox",
   tickets: "Tickets",
 
-  dashboard: "Dashboard",
+  dashboard: "Insights",
+  playground: "Agent",
   widget: "Chat widget",
-  integrations: "Integrations",
+  integrations: "Settings · Connections",
   settings: "Settings",
   usage: "Usage",
   whatsapp: "WhatsApp",
