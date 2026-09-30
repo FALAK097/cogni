@@ -231,15 +231,22 @@ function EvilBrush({
   const lastCommittedRef = React.useRef<EvilBrushRange>(internalRange);
 
   useEffect(() => {
-    if (!isControlled) {
-      setInternalRange((prev) => {
-        const adjusted = {
-          startIndex: Math.min(prev.startIndex, Math.max(0, totalPoints - 1)),
-          endIndex: Math.min(prev.endIndex, Math.max(0, totalPoints - 1)),
-        };
-        lastCommittedRef.current = adjusted;
-        return adjusted;
-      });
+    if (isControlled) return;
+
+    const previousRange = lastCommittedRef.current;
+    const maxIndex = Math.max(0, totalPoints - 1);
+    const adjusted = {
+      startIndex: Math.min(previousRange.startIndex, maxIndex),
+      endIndex: Math.min(previousRange.endIndex, maxIndex),
+    };
+
+    lastCommittedRef.current = adjusted;
+    if (
+      adjusted.startIndex !== previousRange.startIndex ||
+      adjusted.endIndex !== previousRange.endIndex
+    ) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setInternalRange(adjusted);
     }
   }, [totalPoints, isControlled]);
 
@@ -329,8 +336,11 @@ function EvilBrush({
   // Drive all moving brush UI from the same springed edge values.
   const leftTarget = useMotionValue(leftPct);
   const rightTarget = useMotionValue(rightPct);
-  if (leftTarget.get() !== leftPct) leftTarget.set(leftPct);
-  if (rightTarget.get() !== rightPct) rightTarget.set(rightPct);
+
+  useEffect(() => {
+    leftTarget.set(leftPct);
+    rightTarget.set(rightPct);
+  }, [leftPct, leftTarget, rightPct, rightTarget]);
 
   const leftSpring = useSpring(leftTarget, SPRING_CONFIG);
   const rightSpring = useSpring(rightTarget, SPRING_CONFIG);
