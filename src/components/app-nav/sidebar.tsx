@@ -28,17 +28,17 @@ function SidebarContent({ expanded }: { expanded: boolean }) {
             expanded ? "w-fit px-2.5" : "w-full justify-center",
           )}
         >
-          <ThemeLogo className={cn("shrink-0", expanded ? "size-6" : "size-8")} />
+          <ThemeLogo className="size-6 shrink-0" />
           {expanded && <span className="whitespace-nowrap text-lg font-bold">{SITE_NAME}</span>}
         </Link>
       </div>
-      <div className="flex-none px-3 pb-1">
+      <div className={cn("flex-none pb-1", expanded ? "px-3" : "px-2")}>
         <WorkspaceSwitcher isOpen={expanded} />
       </div>
       <div className="w-full min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <Menu isOpen={expanded} />
       </div>
-      <div className="flex-none border-t border-sidebar-border p-3">
+      <div className={cn("flex-none border-t border-sidebar-border", expanded ? "p-3" : "p-2")}>
         <Link
           href="/integrations"
           onClick={closeMobileSidebar}
@@ -83,7 +83,7 @@ export function Sidebar({ initialOpen = true }: { initialOpen?: boolean }) {
         id="workspace-desktop-navigation"
         className={cn(
           "fixed top-0 left-0 z-40 hidden h-svh border-r border-sidebar-border bg-sidebar lg:block print:hidden motion-safe:transition-[width] motion-safe:duration-150",
-          desktopOpen ? "w-56" : "w-[90px]",
+          desktopOpen ? "w-56" : "w-14",
         )}
       >
         <div

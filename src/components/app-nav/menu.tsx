@@ -36,7 +36,7 @@ export function Menu({ isOpen }: MenuProps) {
 
   return (
     <nav className="w-full" aria-label="Workspace">
-      <ul className="flex flex-col w-full items-stretch px-3">
+      <ul className={cn("flex w-full flex-col items-stretch", isOpen === false ? "px-2" : "px-3")}>
         {menuItems.map(({ groupLabel, menus }) => (
           <li
             className={cn("w-full", groupLabel ? "py-2" : "")}

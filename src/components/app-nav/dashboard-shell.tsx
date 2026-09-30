@@ -55,7 +55,7 @@ export function DashboardShell({
       <main
         className={cn(
           "bg-sidebar text-foreground transition-[margin-left] duration-150 motion-reduce:transition-none",
-          !settings.disabled && (!desktopOpenState ? "lg:ml-[90px]" : "lg:ml-56"),
+          !settings.disabled && (!desktopOpenState ? "lg:ml-14" : "lg:ml-56"),
           "print:ml-0 print:w-full print:overflow-visible",
           isFullBleedPage ? "flex h-svh flex-col overflow-hidden" : "min-h-screen",
         )}
