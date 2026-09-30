@@ -9,6 +9,7 @@ import {
   ArrowLeft,
   Bot,
   Clock,
+  Copy,
   Download,
   FileText,
   Loader2,
@@ -868,6 +869,8 @@ function SessionDetailsContent({
   session: ConversationDetailData;
   displayName: string;
 }) {
+  const { toast } = useToast();
+  const userId = session.contactExternalId ?? session.visitorId;
   const locationLabel = [session.city, session.country].filter(Boolean).join(", ");
   const localTime = session.timezone
     ? new Intl.DateTimeFormat("en-US", {
@@ -946,8 +949,26 @@ function SessionDetailsContent({
         </CardHeader>
         <CardContent className={cn("space-y-0 pb-3", detailCardContentClassName())}>
           <DetailRow label="User ID">
-            <span className="font-mono text-[11px]">
-              {session.contactExternalId ?? session.visitorId.slice(0, 12)}
+            <span className="inline-flex items-center gap-1">
+              <span className="font-mono text-[11px]">{userId.slice(0, 12)}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Copy user ID"
+                title="Copy user ID"
+                className="-my-1 text-muted-foreground hover:text-foreground"
+                onClick={() => {
+                  void navigator.clipboard
+                    .writeText(userId)
+                    .then(() => toast({ title: "User ID copied" }))
+                    .catch(() =>
+                      toast({ title: "Could not copy user ID", variant: "destructive" }),
+                    );
+                }}
+              >
+                <Copy className="size-3.5" aria-hidden="true" />
+              </Button>
             </span>
           </DetailRow>
           {session.contactCreatedAt ? (
