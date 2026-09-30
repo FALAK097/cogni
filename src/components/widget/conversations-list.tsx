@@ -3,7 +3,17 @@
 import { format, isToday, isYesterday } from "date-fns";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Bot, Loader2, MessageSquare, Pause, Search, User, X } from "@/components/icons";
+import {
+  AlertCircle,
+  Bot,
+  CheckCircle2,
+  Loader2,
+  MessageSquare,
+  Pause,
+  Search,
+  User,
+  X,
+} from "@/components/icons";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -309,6 +319,17 @@ export function ConversationsList({
                       <span className="inline-flex rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
                         {conversation.channel === "WIDGET" ? "Widget" : conversation.channel}
                       </span>
+                      {conversation.status === "CLOSED" ? (
+                        <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
+                          <CheckCircle2 className="size-3 shrink-0" aria-hidden="true" />
+                          Closed
+                        </span>
+                      ) : conversation.status === "ESCALATED" ? (
+                        <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
+                          <AlertCircle className="size-3 shrink-0" aria-hidden="true" />
+                          Escalated
+                        </span>
+                      ) : null}
                       <span
                         className={cn(
                           "inline-flex items-center gap-1 text-[11px] font-medium",
