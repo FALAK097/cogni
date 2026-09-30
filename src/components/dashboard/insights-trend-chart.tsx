@@ -52,7 +52,7 @@ export function InsightsTrendChart({
           className,
         )}
       >
-        No data for this period
+        {emptyMessage}
       </div>
     );
   }

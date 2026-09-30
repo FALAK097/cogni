@@ -102,7 +102,17 @@ metadata. Privileged buttons follow role policy; denied states explain required 
 
 ## Agent lifecycle
 
-Keep `/playground` working, evolve its label to Agent with four tabs:
+Keep `/playground` working and label it Agent. The current builder groups its working controls into
+three visible steps: **Build** (instructions, behavior and connected actions), **Customize**
+(appearance and conversation prompts), and **Deploy** (installation and allowed domains). Keep the
+live widget preview beside these steps. Legacy `subtab` URLs resolve to the matching step.
+
+Add separate **Test** and **Optimize** steps only when they perform real work: Test needs repeatable
+conversations with source/tool/handoff evidence and safe side-effect handling; Optimize needs
+unanswered-question and feedback signals linked to a reviewed source or policy change. Until then,
+do not label the current appearance preview as an agent evaluation or add placeholder steps.
+
+The target lifecycle remains:
 
 1. **Build**: instructions, language/tone, knowledge selection, escalation and allowed actions.
    Separate basic settings from advanced model/runtime policy; explicit validation and unsaved state.

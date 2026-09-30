@@ -3,16 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import {
-  Bot,
-  Code,
-  Eye,
-  Menu,
-  MessageCircle,
-  MessageSquare,
-  Sliders,
-  Sparkles,
-} from "@/components/icons";
+import { Bot, Code, Eye, Sparkles } from "@/components/icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/use-toast";
 import type { DashboardWidgetConfig } from "@/hooks/query";
@@ -25,14 +16,7 @@ import { cn } from "@/lib/utils";
 
 import { toSavePayload, type WidgetCustomizerConfig } from "./widget-settings-payload";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuLabel,
-} from "@/components/ui/dropdown-menu";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { WidgetPreviewPanel } from "./widget-preview-panel";
 import {
@@ -47,48 +31,40 @@ import {
   type AppearanceConfig,
 } from "./widget-settings-panels";
 
-const WIDGET_SETTINGS_TABS = [
-  "appearance",
-  "agent",
-  "behaviour",
-  "conversation-starter",
-  "suggested-questions",
-  "installation",
-] as const;
-
-type WidgetSettingsTab = (typeof WIDGET_SETTINGS_TABS)[number];
-
-const LEGACY_TAB_MAP: Record<string, WidgetSettingsTab> = {
-  general: "agent",
-  appearance: "appearance",
-  content: "conversation-starter",
-  "lead-capture": "behaviour",
-  embed: "installation",
-};
+const AGENT_SECTIONS = ["build", "customize", "deploy"] as const;
+type AgentSection = (typeof AGENT_SECTIONS)[number];
 
 const NAV_ITEMS: {
-  id: WidgetSettingsTab;
+  id: AgentSection;
   label: string;
   icon: typeof Sparkles;
 }[] = [
-  { id: "appearance", label: "Appearance", icon: Sparkles },
-  { id: "agent", label: "Instructions", icon: Bot },
-  { id: "behaviour", label: "Behaviour", icon: Sliders },
-  { id: "conversation-starter", label: "Conversation Starter", icon: MessageCircle },
-  { id: "suggested-questions", label: "Suggested Questions", icon: MessageSquare },
-  { id: "installation", label: "Installation", icon: Code },
+  { id: "build", label: "Build", icon: Bot },
+  { id: "customize", label: "Customize", icon: Sparkles },
+  { id: "deploy", label: "Deploy", icon: Code },
 ];
+
+const LEGACY_TAB_MAP: Record<string, AgentSection> = {
+  general: "build",
+  agent: "build",
+  behaviour: "build",
+  appearance: "customize",
+  "conversation-starter": "customize",
+  "suggested-questions": "customize",
+  content: "customize",
+  "lead-capture": "build",
+  installation: "deploy",
+  embed: "deploy",
+};
 
 const WIDGET_CARD_CLASS = "rounded-xl border border-border";
 
 const WIDGET_SETTINGS_CARD_CLASS = `${WIDGET_CARD_CLASS} overflow-hidden`;
 
-function resolveInitialTab(initialSubtab?: string | null): WidgetSettingsTab {
-  if (!initialSubtab) return "agent";
-  if (WIDGET_SETTINGS_TABS.includes(initialSubtab as WidgetSettingsTab)) {
-    return initialSubtab as WidgetSettingsTab;
-  }
-  return LEGACY_TAB_MAP[initialSubtab] ?? "agent";
+function resolveInitialSection(initialSubtab?: string | null): AgentSection {
+  if (!initialSubtab) return "build";
+  if (AGENT_SECTIONS.includes(initialSubtab as AgentSection)) return initialSubtab as AgentSection;
+  return LEGACY_TAB_MAP[initialSubtab] ?? "build";
 }
 
 function mergeWidgetConfig(
@@ -199,8 +175,7 @@ export function WidgetCustomizer({
   const activeWorkspaceId = workspaceId || "";
   const { toast } = useToast();
   const router = useRouter();
-  const activeTab = resolveInitialTab(initialSubtab);
-  const activeLabel = NAV_ITEMS.find((item) => item.id === activeTab)?.label ?? "Instructions";
+  const activeSection = resolveInitialSection(initialSubtab);
   const [showMobilePreview, setShowMobilePreview] = useState(false);
   const [copied, setCopied] = useState(false);
   const [domainInput, setDomainInput] = useState("");
@@ -238,7 +213,8 @@ export function WidgetCustomizer({
     setConfigOverrides((current) => ({ ...current, ...updates }));
   }, []);
 
-  const handleSubTabChange = (value: WidgetSettingsTab) => {
+  const handleSubTabChange = (value: string | number) => {
+    if (typeof value !== "string" || !AGENT_SECTIONS.includes(value as AgentSection)) return;
     const url = new URL(window.location.href);
     url.searchParams.set("subtab", value);
     router.push(`${url.pathname}?${url.searchParams.toString()}`, { scroll: false });
@@ -530,40 +506,6 @@ export function WidgetCustomizer({
       style={getWidgetAccentVars(WIDGET_BRAND_COLOR)}
     >
       <div className="flex shrink-0 flex-wrap items-center gap-2">
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <Button
-                variant="outline"
-                className="h-9 gap-2 rounded-lg"
-                aria-label={`Agent settings: ${activeLabel}`}
-              >
-                <Menu className="size-4" />
-                {activeLabel}
-              </Button>
-            }
-          />
-          <DropdownMenuContent className="w-64 rounded-xl motion-reduce:animate-none" align="start">
-            <DropdownMenuLabel>Agent settings</DropdownMenuLabel>
-            <DropdownMenuRadioGroup
-              value={activeTab}
-              onValueChange={(value) => handleSubTabChange(resolveInitialTab(value))}
-            >
-              {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
-                <DropdownMenuRadioItem
-                  key={id}
-                  value={id}
-                  closeOnClick
-                  className="min-h-10 rounded-md focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring"
-                >
-                  <Icon className="size-4" />
-                  {label}
-                </DropdownMenuRadioItem>
-              ))}
-            </DropdownMenuRadioGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
         <button
           type="button"
           onClick={() => setShowMobilePreview((open) => !open)}
@@ -606,18 +548,25 @@ export function WidgetCustomizer({
             showMobilePreview ? "hidden lg:flex" : "flex",
           )}
         >
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
-            {activeTab === "appearance" ? (
-              <WidgetAppearancePanel
-                config={appearanceConfig}
-                onUpdate={handleAppearanceUpdate}
-                onBatchUpdate={handleAppearanceBatchUpdate}
-                onReset={handleResetAppearance}
-              />
-            ) : null}
-
-            {activeTab === "agent" ? (
-              <div className="space-y-8">
+          <Tabs
+            value={activeSection}
+            onValueChange={handleSubTabChange}
+            className="flex min-h-0 min-w-0 flex-1 flex-col gap-0"
+          >
+            <TabsList
+              variant="line"
+              aria-label="Agent setup steps"
+              className="mx-4 h-12 w-auto shrink-0 justify-start gap-1 rounded-none border-b border-border bg-transparent px-0 sm:mx-6"
+            >
+              {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
+                <TabsTrigger key={id} value={id} className="h-10 gap-2 px-3">
+                  <Icon className="size-4" />
+                  {label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
+              <TabsContent value="build" keepMounted={false} className="space-y-8">
                 <WidgetAgentPanel
                   agentName={config.agentName}
                   instructions={config.instructions}
@@ -626,56 +575,56 @@ export function WidgetCustomizer({
                   modelName={config.modelName}
                   onUpdate={(key, value) => updateConfig(key, value)}
                 />
+                <WidgetBehaviourPanel
+                  inputPlaceholder={config.inputPlaceholder}
+                  autoShowPreviewDelay={config.autoShowPreviewDelay}
+                  hideSuggestionsOnInteract={config.hideSuggestionsOnInteract}
+                  enableLeadCapture={config.enableLeadCapture}
+                  leadCaptureMinutesThreshold={config.leadCaptureMinutesThreshold}
+                  leadCaptureMessageThreshold={config.leadCaptureMessageThreshold}
+                  leadCaptureKeywords={config.leadCaptureKeywords}
+                  enableBrochure={config.enableBrochure}
+                  brochureSuggestionText={config.brochureSuggestionText}
+                  privacyPolicyUrl={config.privacyPolicyUrl}
+                  onUpdate={handleBehaviourUpdate}
+                  onKeywordsChange={(value) => handleArrayChange("leadCaptureKeywords", value)}
+                />
                 <BookingSettingsCard />
-              </div>
-            ) : null}
+              </TabsContent>
 
-            {activeTab === "behaviour" ? (
-              <WidgetBehaviourPanel
-                inputPlaceholder={config.inputPlaceholder}
-                autoShowPreviewDelay={config.autoShowPreviewDelay}
-                hideSuggestionsOnInteract={config.hideSuggestionsOnInteract}
-                enableLeadCapture={config.enableLeadCapture}
-                leadCaptureMinutesThreshold={config.leadCaptureMinutesThreshold}
-                leadCaptureMessageThreshold={config.leadCaptureMessageThreshold}
-                leadCaptureKeywords={config.leadCaptureKeywords}
-                enableBrochure={config.enableBrochure}
-                brochureSuggestionText={config.brochureSuggestionText}
-                privacyPolicyUrl={config.privacyPolicyUrl}
-                onUpdate={handleBehaviourUpdate}
-                onKeywordsChange={(value) => handleArrayChange("leadCaptureKeywords", value)}
-              />
-            ) : null}
+              <TabsContent value="customize" keepMounted={false} className="space-y-8">
+                <WidgetAppearancePanel
+                  config={appearanceConfig}
+                  onUpdate={handleAppearanceUpdate}
+                  onBatchUpdate={handleAppearanceBatchUpdate}
+                  onReset={handleResetAppearance}
+                />
+                <WidgetConversationStarterPanel
+                  welcomeMessage={config.welcomeMessage}
+                  previewMessages={config.previewMessages}
+                  onUpdateWelcome={(value) => updateConfig("welcomeMessage", value)}
+                  onPreviewMessagesChange={(value) => handleArrayChange("previewMessages", value)}
+                />
+                <WidgetSuggestedQuestionsPanel
+                  suggestions={config.suggestions}
+                  onChange={(value) => handleArrayChange("suggestions", value)}
+                />
+              </TabsContent>
 
-            {activeTab === "conversation-starter" ? (
-              <WidgetConversationStarterPanel
-                welcomeMessage={config.welcomeMessage}
-                previewMessages={config.previewMessages}
-                onUpdateWelcome={(value) => updateConfig("welcomeMessage", value)}
-                onPreviewMessagesChange={(value) => handleArrayChange("previewMessages", value)}
-              />
-            ) : null}
-
-            {activeTab === "suggested-questions" ? (
-              <WidgetSuggestedQuestionsPanel
-                suggestions={config.suggestions}
-                onChange={(value) => handleArrayChange("suggestions", value)}
-              />
-            ) : null}
-
-            {activeTab === "installation" ? (
-              <WidgetInstallationPanel
-                allowedDomains={config.allowedDomains}
-                domainInput={domainInput}
-                copied={copied}
-                embedScript={generateScript()}
-                onDomainInputChange={setDomainInput}
-                onAddDomain={handleAddDomain}
-                onRemoveDomain={handleRemoveDomain}
-                onCopyScript={copyScript}
-              />
-            ) : null}
-          </div>
+              <TabsContent value="deploy" keepMounted={false}>
+                <WidgetInstallationPanel
+                  allowedDomains={config.allowedDomains}
+                  domainInput={domainInput}
+                  copied={copied}
+                  embedScript={generateScript()}
+                  onDomainInputChange={setDomainInput}
+                  onAddDomain={handleAddDomain}
+                  onRemoveDomain={handleRemoveDomain}
+                  onCopyScript={copyScript}
+                />
+              </TabsContent>
+            </div>
+          </Tabs>
         </div>
 
         <div

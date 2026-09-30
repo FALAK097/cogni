@@ -6,8 +6,8 @@ import { Bot, BookOpen } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
 const sections = [
-  { href: "/playground", label: "Configure & test", icon: Bot },
-  { href: "/knowledge-base", label: "Knowledge", icon: BookOpen },
+  { href: "/playground", label: "Build & preview", icon: Bot },
+  { href: "/knowledge-base", label: "Sources", icon: BookOpen },
 ] as const;
 
 export function AgentNavigation() {
