@@ -151,10 +151,32 @@ export async function POST(
 
   if (isPreview) {
     try {
-      const { workspace } = await requireDashboardContext();
+      const { workspace, session } = await requireDashboardContext();
       const widget = await getPublicWidget(db, publicKey);
       if (!widget || widget.workspaceId !== workspace.id) {
         return Response.json({ error: "Preview access denied." }, { status: 403 });
+      }
+
+      const rateLimit = await checkRateLimits([
+        { key: `widget-preview:user:${session.user.id}`, limit: 30, windowMs: 60_000 },
+        { key: `widget-preview:workspace:${workspace.id}`, limit: 300, windowMs: 60_000 },
+        {
+          key: `widget-preview:ip:${getTrustedClientIp(request.headers)}`,
+          limit: 60,
+          windowMs: 60_000,
+        },
+      ]);
+      if (!rateLimit.allowed) {
+        if (rateLimit.unavailable) {
+          return Response.json({ error: "Preview is temporarily unavailable." }, { status: 503 });
+        }
+        return Response.json(
+          { error: "Too many preview messages. Wait a moment before trying again." },
+          {
+            status: 429,
+            headers: { "Retry-After": String(Math.ceil(rateLimit.retryAfterMs / 1000)) },
+          },
+        );
       }
 
       access = {
@@ -245,46 +267,53 @@ export async function POST(
     return Response.json({ error: "Widget session is already active." }, { status: 401 });
   }
 
-  const started = authorizedSession
-    ? {
-        visitorSession: authorizedSession,
-        ...(await recordVisitorMessage({
-          db,
-          visitorSession: authorizedSession,
-          text: body.message,
-          clientMessageId: body.interactionId,
-        })),
-      }
-    : bootstrapSession.session && bootstrapSession.conversation
+  const started = isPreview
+    ? null
+    : authorizedSession
       ? {
-          visitorSession: bootstrapSession.session,
-          conversation: bootstrapSession.conversation,
-          visitorMessageId: bootstrapSession.visitorMessageId,
-          replayed: true,
+          visitorSession: authorizedSession,
+          ...(await recordVisitorMessage({
+            db,
+            visitorSession: authorizedSession,
+            text: body.message,
+            clientMessageId: body.interactionId,
+          })),
         }
-      : await startVisitorConversation({
-          db,
-          widget: access.widget,
-          hostname,
-          browserSessionId: body.sessionId,
-          visitorId: bootstrapClaims?.visitorId ?? body.visitorId ?? randomUUID(),
-          metadata: {
-            ...body.metadata,
-            country: body.metadata.country ?? request.headers.get("x-vercel-ip-country"),
-            city: body.metadata.city ?? request.headers.get("x-vercel-ip-city"),
-            timezone: body.metadata.timezone ?? request.headers.get("x-vercel-ip-timezone"),
-          },
-          identity: {
-            name: body.leadInfo?.name ?? null,
-            email: body.leadInfo?.email ?? null,
-          },
-          text: body.message,
-          clientMessageId: body.interactionId,
-        });
+      : bootstrapSession.session && bootstrapSession.conversation
+        ? {
+            visitorSession: bootstrapSession.session,
+            conversation: bootstrapSession.conversation,
+            visitorMessageId: bootstrapSession.visitorMessageId,
+            replayed: true,
+          }
+        : await startVisitorConversation({
+            db,
+            widget: access.widget,
+            hostname,
+            browserSessionId: body.sessionId,
+            visitorId: bootstrapClaims?.visitorId ?? body.visitorId ?? randomUUID(),
+            metadata: {
+              ...body.metadata,
+              country: body.metadata.country ?? request.headers.get("x-vercel-ip-country"),
+              city: body.metadata.city ?? request.headers.get("x-vercel-ip-city"),
+              timezone: body.metadata.timezone ?? request.headers.get("x-vercel-ip-timezone"),
+            },
+            identity: {
+              name: body.leadInfo?.name ?? null,
+              email: body.leadInfo?.email ?? null,
+            },
+            text: body.message,
+            clientMessageId: body.interactionId,
+          });
 
-  const { visitorSession, conversation, visitorMessageId, replayed } = started;
-  const widget = visitorSession.widget;
-  if (replayed) {
+  const visitorSession = started?.visitorSession ?? null;
+  const conversation = started?.conversation ?? null;
+  const conversationId = conversation?.id ?? randomUUID();
+  const contactId = conversation?.contactId ?? null;
+  const visitorMessageId = started?.visitorMessageId ?? body.interactionId;
+  const replayed = started?.replayed ?? false;
+  const widget = access.widget;
+  if (replayed && conversation) {
     const conv = await db.query.conversation.findFirst({
       where: (fields, { eq, and }) =>
         and(eq(fields.id, conversation.id), eq(fields.workspaceId, widget.workspace.id)),
@@ -301,7 +330,7 @@ export async function POST(
               yield existingReply.body;
             })(),
           ),
-          { headers: streamHeaders(visitorSession) },
+          { headers: streamHeaders(visitorSession ?? undefined) },
         ),
         origin,
         validateEmbedOrigin(origin, access.allowedDomains),
@@ -309,14 +338,16 @@ export async function POST(
     }
   }
 
-  const activeConversation = await db.query.conversation.findFirst({
-    where: (fields, { eq, and }) =>
-      and(eq(fields.id, conversation.id), eq(fields.workspaceId, widget.workspace.id)),
-    columns: { aiPaused: true, status: true },
-  });
+  const activeConversation = isPreview
+    ? null
+    : await db.query.conversation.findFirst({
+        where: (fields, { eq, and }) =>
+          and(eq(fields.id, conversationId), eq(fields.workspaceId, widget.workspace.id)),
+        columns: { aiPaused: true, status: true },
+      });
   const shouldEscalate = matchesEscalationKeywords(body.message, widget.escalationKeywords);
 
-  if (shouldEscalate && activeConversation?.status !== "ESCALATED") {
+  if (!isPreview && shouldEscalate && activeConversation?.status !== "ESCALATED") {
     await db
       .update(conversationTable)
       .set({
@@ -326,7 +357,7 @@ export async function POST(
       })
       .where(
         and(
-          eq(conversationTable.id, conversation.id),
+          eq(conversationTable.id, conversationId),
           eq(conversationTable.workspaceId, widget.workspace.id),
         ),
       );
@@ -341,7 +372,7 @@ export async function POST(
       db,
       workspaceId: widget.workspace.id,
       type: "escalation.triggered",
-      entityId: conversation.id,
+      entityId: conversationId,
     });
   }
 
@@ -354,18 +385,20 @@ export async function POST(
       })(),
       {
         onComplete: async () => {
-          await recordAiMessage({
-            db,
-            conversationId: conversation.id,
-            text,
-            replyToMessageId: visitorMessageId,
-          });
+          if (!isPreview) {
+            await recordAiMessage({
+              db,
+              conversationId,
+              text,
+              replyToMessageId: visitorMessageId,
+            });
+          }
         },
       },
     );
     return withWidgetCors(
       new Response(stream, {
-        headers: streamHeaders(visitorSession),
+        headers: streamHeaders(visitorSession ?? undefined),
       }),
       origin,
       corsAllowed,
@@ -379,21 +412,26 @@ export async function POST(
   let run: { id: string; startedAtMs: number } | null = null;
 
   try {
-    const memoryContext = await buildAgentMemoryContext({
-      db,
-      workspaceId: widget.workspace.id,
-      conversationId: conversation.id,
-      contactId: conversation.contactId,
-    });
-    const latestConversationState = await db.query.conversation.findFirst({
-      where: (fields, { eq, and }) =>
-        and(eq(fields.id, conversation.id), eq(fields.workspaceId, widget.workspace.id)),
-      columns: { aiPaused: true, status: true },
-    });
+    const memoryContext = isPreview
+      ? ""
+      : await buildAgentMemoryContext({
+          db,
+          workspaceId: widget.workspace.id,
+          conversationId,
+          contactId: contactId ?? "",
+        });
+    const latestConversationState = isPreview
+      ? null
+      : await db.query.conversation.findFirst({
+          where: (fields, { eq, and }) =>
+            and(eq(fields.id, conversationId), eq(fields.workspaceId, widget.workspace.id)),
+          columns: { aiPaused: true, status: true },
+        });
     if (
-      !latestConversationState ||
-      latestConversationState.aiPaused ||
-      latestConversationState.status === "ESCALATED"
+      !isPreview &&
+      (!latestConversationState ||
+        latestConversationState.aiPaused ||
+        latestConversationState.status === "ESCALATED")
     ) {
       return respondWithText(handoffReply);
     }
@@ -401,9 +439,9 @@ export async function POST(
     const runtimeContext = buildWidgetAgentRuntimeContext({
       workspaceId: widget.workspace.id,
       widgetId: widget.id,
-      conversationId: conversation.id,
-      contactId: conversation.contactId,
-      visitorSessionId: isPreview ? null : visitorSession.id,
+      conversationId,
+      contactId: contactId ?? "",
+      visitorSessionId: isPreview ? null : (visitorSession?.id ?? null),
       locale: body.metadata.language,
     });
 
@@ -430,10 +468,11 @@ export async function POST(
         workspaceId: widget.workspace.id,
         latestUserMessage: body.message,
         memoryContext,
+        allowActions: !isPreview,
         documentIds: null,
         runTimeoutMs: runtimeContext.runTimeoutMs,
         db,
-        conversationId: conversation.id,
+        conversationId,
         agentRunId: run?.id ?? null,
       },
       messages: historyMessages,
@@ -451,12 +490,14 @@ export async function POST(
           }
           return;
         }
-        const persistedMessage = await recordAiMessage({
-          db,
-          conversationId: conversation.id,
-          text,
-          replyToMessageId: visitorMessageId,
-        });
+        const persistedMessage = isPreview
+          ? null
+          : await recordAiMessage({
+              db,
+              conversationId,
+              text,
+              replyToMessageId: visitorMessageId,
+            });
         if (run) {
           await completeAgentRun({
             db,
@@ -467,11 +508,11 @@ export async function POST(
             sources,
           });
         }
-        if (!persistedMessage) {
+        if (!isPreview && !persistedMessage) {
           logInfo("widget.ai.response.suppressed", {
             workspaceId: widget.workspace.id,
             widgetId: widget.id,
-            conversationId: conversation.id,
+            conversationId,
             agentRunId: run?.id ?? null,
             reason: "conversation_inactive",
           });
@@ -480,7 +521,7 @@ export async function POST(
         logInfo("widget.ai.response.completed", {
           workspaceId: widget.workspace.id,
           widgetId: widget.id,
-          conversationId: conversation.id,
+          conversationId,
           agentRunId: run?.id ?? null,
           inputTokens,
           outputTokens,
@@ -500,18 +541,19 @@ export async function POST(
         logError("widget.ai.response.failed", {
           workspaceId: widget.workspace.id,
           widgetId: widget.id,
-          conversationId: conversation.id,
+          conversationId,
           agentRunId: run?.id ?? null,
           error: error instanceof Error ? error.message : "Unknown model error",
         });
       },
     });
 
-    let monitoring = true;
+    let monitoring = !isPreview;
     let checkInProgress = false;
+    let pauseMonitor: ReturnType<typeof setInterval> | null = null;
     const stopMonitoring = () => {
       monitoring = false;
-      clearInterval(pauseMonitor);
+      if (pauseMonitor) clearInterval(pauseMonitor);
     };
     const checkForHumanTakeover = async () => {
       if (!monitoring || checkInProgress) return;
@@ -519,7 +561,7 @@ export async function POST(
       try {
         const latest = await db.query.conversation.findFirst({
           where: (fields, { eq, and }) =>
-            and(eq(fields.id, conversation.id), eq(fields.workspaceId, widget.workspace.id)),
+            and(eq(fields.id, conversationId), eq(fields.workspaceId, widget.workspace.id)),
           columns: { aiPaused: true, status: true },
         });
         if (monitoring && (!latest || latest.aiPaused || latest.status === "ESCALATED")) {
@@ -531,8 +573,10 @@ export async function POST(
         checkInProgress = false;
       }
     };
-    const pauseMonitor = setInterval(() => void checkForHumanTakeover(), 1_000);
-    void checkForHumanTakeover();
+    if (!isPreview) {
+      pauseMonitor = setInterval(() => void checkForHumanTakeover(), 1_000);
+      void checkForHumanTakeover();
+    }
 
     return withWidgetCors(
       new Response(
@@ -545,7 +589,7 @@ export async function POST(
           },
         ),
         {
-          headers: streamHeaders(visitorSession),
+          headers: streamHeaders(visitorSession ?? undefined),
         },
       ),
       origin,
@@ -563,7 +607,7 @@ export async function POST(
     logError("widget.chat.failed", {
       workspaceId: widget.workspace.id,
       widgetId: widget.id,
-      conversationId: conversation.id,
+      conversationId,
       error: error instanceof Error ? error.message : "Unknown error",
     });
     return Response.json({ error: "The assistant is unavailable right now." }, { status: 503 });

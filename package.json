@@ -16,6 +16,7 @@
     "format:check": "pnpm fmt:check",
     "typecheck": "tsc --noEmit",
     "test:widget-stream": "node --test scripts/test-widget-stream.mjs",
+    "test:widget-preview-isolation": "node --test scripts/test-widget-preview-isolation.mjs",
     "test:widget-settings": "node --test scripts/test-widget-settings.mjs",
     "test:conversation-append": "node --test scripts/test-conversation-append.mjs",
     "test:rate-limit": "node --test scripts/test-rate-limit.mjs",

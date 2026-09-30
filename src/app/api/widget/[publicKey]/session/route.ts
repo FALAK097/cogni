@@ -61,47 +61,26 @@ export async function POST(
 
       const browserSessionId = parsed.data.sessionId ?? randomUUID();
       const visitorId = parsed.data.visitorId ?? randomUUID();
-      const nowIso = new Date().toISOString();
-      const visitorSession = await db.query.visitorSession.findFirst({
-        where: (fields, { eq, and, gt }) =>
-          and(
-            eq(fields.widgetId, widget.id),
-            eq(fields.browserSessionId, browserSessionId),
-            eq(fields.hostname, PREVIEW_HOSTNAME),
-            gt(fields.messageCount, 0),
-            gt(fields.expiresAt, nowIso),
-            getHasWidgetConversationCond(fields),
-          ),
-      });
-
-      const messages = visitorSession
-        ? await getVisitorConversationMessages({
-            db,
-            visitorSessionId: visitorSession.id,
-          })
-        : [];
 
       return Response.json({
-        sessionId: visitorSession?.id ?? null,
+        sessionId: null,
         browserSessionId,
-        token:
-          visitorSession?.token ??
-          createWidgetBootstrapToken({
-            widgetId: widget.id,
-            publicKey: widget.publicKey,
-            browserSessionId,
-            visitorId,
-            hostname: PREVIEW_HOSTNAME,
-          }),
+        token: createWidgetBootstrapToken({
+          widgetId: widget.id,
+          publicKey: widget.publicKey,
+          browserSessionId,
+          visitorId,
+          hostname: PREVIEW_HOSTNAME,
+        }),
         workspaceId: widget.workspaceId,
         publicKey: widget.publicKey,
-        isNew: visitorSession === null,
+        isNew: true,
         preview: true,
         enableLeadCapture: false,
         leadCaptureKeywords: [],
         enableBrochure: widget.enableBrochure,
         brochureSuggestionText: widget.brochureSuggestionText,
-        messages: toWidgetHistoryMessages(messages),
+        messages: [],
       });
     } catch {
       return Response.json({ error: "Preview access denied." }, { status: 403 });

@@ -32,11 +32,15 @@ export function getEngagedVisitorSessionCond(
   );
 }
 
-/** Dashboard inbox lists every engaged session, including dashboard preview chats. */
+/** Dashboard inbox hides dashboard preview chats. */
 export function getDashboardEngagedVisitorSessionCond(
-  s: Pick<typeof visitorSessionTable, "id" | "messageCount">,
+  s: Pick<typeof visitorSessionTable, "id" | "messageCount" | "hostname">,
 ) {
-  return and(gt(s.messageCount, 0), getHasWidgetConversationCond(s));
+  return and(
+    ne(s.hostname, "dashboard-preview"),
+    gt(s.messageCount, 0),
+    getHasWidgetConversationCond(s),
+  );
 }
 
 export function getWidgetConversationCond(

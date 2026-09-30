@@ -17,6 +17,7 @@ type WidgetAgentConfig = {
   workspaceId: string;
   latestUserMessage: string;
   memoryContext?: string;
+  allowActions: boolean;
   documentIds?: string[] | null;
   runTimeoutMs?: number;
   db: Db;
@@ -71,8 +72,12 @@ export async function streamWidgetAgent({
       config.instructions,
       "Use retrieved knowledge when it is relevant. Cite sources inline like [Source: Title].",
       "If knowledge is insufficient, say you do not know and offer human help.",
-      "You may check calendar availability when asked. Never invent availability.",
-      "Creating a calendar event requires the visitor's explicit confirmation and workspace approval. Clearly say when a request is pending approval.",
+      config.allowActions
+        ? "You may check calendar availability when asked. Never invent availability."
+        : "This is a dashboard preview. Do not use external tools or claim you performed external actions. Explain that actions are disabled in preview.",
+      config.allowActions
+        ? "Creating a calendar event requires the visitor's explicit confirmation and workspace approval. Clearly say when a request is pending approval."
+        : "Do not claim an action is pending approval because preview actions are disabled.",
       "Never claim an external action succeeded unless its tool result says it completed.",
       "Be concise and helpful.",
       config.memoryContext ? `\nConversation memory:\n${config.memoryContext}` : "",
@@ -81,12 +86,14 @@ export async function streamWidgetAgent({
       .filter(Boolean)
       .join("\n"),
     messages: await convertToModelMessages(messages),
-    tools: createWidgetAgentTools({
-      db: config.db,
-      workspaceId: config.workspaceId,
-      conversationId: config.conversationId,
-      agentRunId: config.agentRunId,
-    }),
+    tools: config.allowActions
+      ? createWidgetAgentTools({
+          db: config.db,
+          workspaceId: config.workspaceId,
+          conversationId: config.conversationId,
+          agentRunId: config.agentRunId,
+        })
+      : undefined,
     stopWhen: stepCountIs(4),
     onEnd: async ({ text, usage, finishReason }) => {
       clearTimeout(timeout);
