@@ -1194,6 +1194,7 @@ export function DashboardPage() {
               empty={convChartData.length > 0 && convChartData.every((point) => point.value === 0)}
               emptyMessage="No conversations in this period"
               labelFormatter={formatChartDate}
+              seriesLabel="Conversations"
               ariaLabel="Conversations over time"
             />
           )}
@@ -1352,6 +1353,8 @@ export function DashboardPage() {
               data={satChartData}
               labelFormatter={formatChartDate}
               valueFormatter={(v) => v.toFixed(1)}
+              seriesLabel="Satisfaction score"
+              yAxisDomain={[0, 5]}
               ariaLabel="Satisfaction score over time"
             />
           )}

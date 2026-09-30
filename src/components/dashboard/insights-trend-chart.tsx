@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useSyncExternalStore } from "react";
+import { useId, useSyncExternalStore, type ComponentProps } from "react";
 import {
   Area,
   AreaChart,
@@ -15,6 +15,7 @@ import {
 import { cn } from "@/lib/utils";
 
 type TrendPoint = { label: string; value: number };
+type YAxisDomain = ComponentProps<typeof YAxis>["domain"];
 
 const formatDefaultValue = (value: number) => value.toLocaleString();
 const formatDefaultLabel = (label: string) => label;
@@ -47,6 +48,8 @@ export function InsightsTrendChart({
   valueFormatter = formatDefaultValue,
   labelFormatter = formatDefaultLabel,
   ariaLabel,
+  seriesLabel = ariaLabel,
+  yAxisDomain = [0, "auto"],
 }: {
   data: TrendPoint[];
   className?: string;
@@ -56,6 +59,8 @@ export function InsightsTrendChart({
   emptyMessage?: string;
   valueFormatter?: (value: number) => string;
   labelFormatter?: (label: string) => string;
+  seriesLabel?: string;
+  yAxisDomain?: YAxisDomain;
   ariaLabel: string;
 }) {
   const gradientId = `trend-${useId().replace(/:/g, "")}`;
@@ -93,6 +98,7 @@ export function InsightsTrendChart({
         tickLine={false}
         width={42}
         tickMargin={8}
+        domain={yAxisDomain}
         tick={{ fill: "var(--muted-foreground)", fontSize: 12 }}
         tickFormatter={valueFormatter}
       />
@@ -106,7 +112,7 @@ export function InsightsTrendChart({
           fontSize: 12,
         }}
         labelFormatter={(label) => labelFormatter(String(label))}
-        formatter={(value) => [valueFormatter(Number(value)), ariaLabel]}
+        formatter={(value) => [valueFormatter(Number(value)), seriesLabel]}
       />
     </>
   );
