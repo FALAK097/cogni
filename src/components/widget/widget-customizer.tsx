@@ -446,14 +446,23 @@ export function WidgetCustomizer({
     return `<script src="${typeof window !== "undefined" ? window.location.origin : ""}/widget.bundle.js" data-widget-key="${publicKey}" async></script>`;
   };
 
-  const copyScript = () => {
-    navigator.clipboard.writeText(generateScript());
-    setCopied(true);
-    toast({
-      title: "Copied to clipboard",
-      description: "Embed code has been copied to your clipboard.",
-    });
-    setTimeout(() => setCopied(false), 2000);
+  const copyScript = async () => {
+    try {
+      await navigator.clipboard.writeText(generateScript());
+      setCopied(true);
+      toast({
+        title: "Copied to clipboard",
+        description: "Embed code has been copied to your clipboard.",
+      });
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+      toast({
+        title: "Couldn't copy embed code",
+        description: "Select and copy the code manually if clipboard access is blocked.",
+        variant: "destructive",
+      });
+    }
   };
 
   const appearanceConfig: AppearanceConfig = {

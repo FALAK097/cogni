@@ -920,12 +920,16 @@ export function WidgetInstallationPanel({
               <code className="rounded bg-muted px-1 py-0.5 text-xs">acme.com</code>).
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-end gap-2">
             <div className="relative flex-1">
+              <Label htmlFor="authorized-domain" className="sr-only">
+                Website domain
+              </Label>
               <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground">
                 https://
               </span>
               <Input
+                id="authorized-domain"
                 value={domainInput}
                 onChange={(event) => onDomainInputChange(event.target.value)}
                 onKeyDown={(event) => {
@@ -991,7 +995,7 @@ export function WidgetInstallationPanel({
               variant="outline"
               onClick={onCopyScript}
               className="absolute top-2 right-2 size-8 rounded-lg border-border bg-card"
-              aria-label="Copy embed code"
+              aria-label={copied ? "Embed code copied" : "Copy embed code"}
             >
               {copied ? <Check className="size-4 text-primary" /> : <Copy className="size-4" />}
             </Button>

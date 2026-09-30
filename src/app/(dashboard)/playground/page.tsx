@@ -5,7 +5,7 @@ import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 
 export const metadata = {
   title: `Agent | ${SITE_NAME}`,
-  description: "Configure and test your AI customer agent",
+  description: "Build, customize, preview and deploy your AI customer agent.",
 };
 
 export default async function PlaygroundPage({
