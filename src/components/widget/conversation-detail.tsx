@@ -11,6 +11,7 @@ import {
   Clock,
   Download,
   FileText,
+  Loader2,
   MoreVertical,
   Pencil,
   Pause,
@@ -200,7 +201,13 @@ export function ConversationDetail({
   const composerText = composerMode === "reply" ? replyText : noteText;
   const setComposerText = composerMode === "reply" ? setReplyText : setNoteText;
 
-  const { data: session, isLoading, isError, error } = useConversation(conversationId);
+  const {
+    data: session,
+    isLoading,
+    isFetching,
+    isError,
+    refetch,
+  } = useConversation(conversationId);
   const deleteConversationMutation = useDeleteConversation();
   const takeOverMutation = useTakeOverConversation();
   const aiPausedMutation = useSetConversationAiPaused();
@@ -333,10 +340,42 @@ export function ConversationDetail({
   }
 
   if (isError) {
-    const message = error instanceof Error ? error.message : "Failed to load conversation";
     return (
-      <div className="flex h-full items-center justify-center p-6 text-center">
-        <p className="text-sm text-destructive">{message}</p>
+      <div className="flex h-full min-w-0 flex-col overflow-hidden">
+        {part === "chat" ? (
+          <header className="shrink-0 px-3 py-2 sm:px-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onBack}
+              className="h-11 w-11 lg:hidden sm:h-9 sm:w-9"
+              aria-label="Back to conversations"
+            >
+              <ArrowLeft className="size-4" aria-hidden="true" />
+            </Button>
+          </header>
+        ) : null}
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
+          <div role="alert" className="space-y-1">
+            <p className="text-sm font-medium text-foreground">
+              {part === "details" ? "Details are unavailable" : "This conversation couldn’t load"}
+            </p>
+            <p className="text-sm text-muted-foreground">Check your connection and try again.</p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="min-h-9 gap-2"
+            disabled={isFetching}
+            onClick={() => void refetch()}
+          >
+            {isFetching ? (
+              <Loader2 className="size-4 motion-safe:animate-spin motion-reduce:animate-none" />
+            ) : null}
+            {isFetching ? "Retrying…" : "Try again"}
+          </Button>
+        </div>
       </div>
     );
   }
