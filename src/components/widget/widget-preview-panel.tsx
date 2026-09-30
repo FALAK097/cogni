@@ -27,7 +27,7 @@ export function WidgetPreviewPanel({ liveConfig }: WidgetPreviewPanelProps) {
             onClick={() => setPreviewMode("widget")}
             aria-pressed={previewMode === "widget"}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[13px] font-medium transition-colors",
+              "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100",
               previewMode === "widget"
                 ? "border-[var(--widget-accent-border)] bg-[var(--widget-accent-muted)] text-[var(--widget-accent)]"
                 : "border-transparent text-foreground hover:bg-muted",
@@ -41,7 +41,7 @@ export function WidgetPreviewPanel({ liveConfig }: WidgetPreviewPanelProps) {
             onClick={() => setPreviewMode("full-chat")}
             aria-pressed={previewMode === "full-chat"}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[13px] font-medium transition-colors",
+              "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100",
               previewMode === "full-chat"
                 ? "border-[var(--widget-accent-border)] bg-[var(--widget-accent-muted)] text-[var(--widget-accent)]"
                 : "border-transparent text-foreground hover:bg-muted",
