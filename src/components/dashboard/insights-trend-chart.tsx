@@ -1,48 +1,22 @@
 "use client";
 
-import { useId, useSyncExternalStore, type ComponentProps } from "react";
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { useMemo } from "react";
+import { EvilAreaChart } from "@/components/evilcharts/charts/recharts-area-chart";
+import type { ChartConfig } from "@/components/evilcharts/ui/recharts-chart";
 import { cn } from "@/lib/utils";
 
 type TrendPoint = { label: string; value: number };
-type YAxisDomain = ComponentProps<typeof YAxis>["domain"];
+type YAxisDomain = readonly [number, number | "auto"];
 
 const formatDefaultValue = (value: number) => value.toLocaleString();
 const formatDefaultLabel = (label: string) => label;
-const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 
-function subscribeToMotionPreference(onChange: () => void) {
-  const mediaQuery = window.matchMedia(REDUCED_MOTION_QUERY);
-  mediaQuery.addEventListener("change", onChange);
-  return () => mediaQuery.removeEventListener("change", onChange);
-}
-
-function getMotionPreference() {
-  return window.matchMedia(REDUCED_MOTION_QUERY).matches;
-}
-
-function getServerMotionPreference() {
-  return true;
-}
-
-// Gradient areas, sparse axes and restrained active dots follow EvilCharts' area
-// chart design: https://evilcharts.com/docs/recharts/area-chart/static
-// Keep this adapter typed and use workspace analytics rather than sample data.
+// Cogni's analytics data and View data table stay local; the rendered trend uses
+// the MIT-licensed EvilCharts Recharts area component.
 export function InsightsTrendChart({
   data,
   className,
   height = 240,
-  showArea = false,
   empty = false,
   emptyMessage = "No data for this period",
   valueFormatter = formatDefaultValue,
@@ -54,7 +28,6 @@ export function InsightsTrendChart({
   data: TrendPoint[];
   className?: string;
   height?: number;
-  showArea?: boolean;
   empty?: boolean;
   emptyMessage?: string;
   valueFormatter?: (value: number) => string;
@@ -63,12 +36,24 @@ export function InsightsTrendChart({
   yAxisDomain?: YAxisDomain;
   ariaLabel: string;
 }) {
-  const gradientId = `trend-${useId().replace(/:/g, "")}`;
-  const prefersReducedMotion = useSyncExternalStore(
-    subscribeToMotionPreference,
-    getMotionPreference,
-    getServerMotionPreference,
+  const chartConfig = useMemo(
+    () =>
+      ({
+        value: {
+          label: seriesLabel,
+          colors: {
+            light: ["var(--primary)"],
+            dark: ["var(--primary)"],
+          },
+        },
+      }) satisfies ChartConfig,
+    [seriesLabel],
   );
+  const chartData = useMemo(
+    () => data.map((point) => ({ ...point, label: labelFormatter(point.label) })),
+    [data, labelFormatter],
+  );
+
   if (data.length === 0) {
     return (
       <div
@@ -81,111 +66,60 @@ export function InsightsTrendChart({
       </div>
     );
   }
-  const axes = (
-    <>
-      <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="3 5" />
-      <XAxis
-        dataKey="label"
-        axisLine={false}
-        tickLine={false}
-        tickMargin={12}
-        minTickGap={40}
-        tick={{ fill: "var(--muted-foreground)", fontSize: 12 }}
-        tickFormatter={labelFormatter}
-      />
-      <YAxis
-        axisLine={false}
-        tickLine={false}
-        width={42}
-        tickMargin={8}
-        domain={yAxisDomain}
-        tick={{ fill: "var(--muted-foreground)", fontSize: 12 }}
-        tickFormatter={valueFormatter}
-      />
-      <Tooltip
-        cursor={{ stroke: "var(--border)", strokeDasharray: "3 3" }}
-        contentStyle={{
-          background: "var(--popover)",
-          border: "1px solid var(--border)",
-          borderRadius: 10,
-          color: "var(--popover-foreground)",
-          fontSize: 12,
-        }}
-        labelFormatter={(label) => labelFormatter(String(label))}
-        formatter={(value) => [valueFormatter(Number(value)), seriesLabel]}
-      />
-    </>
-  );
+
   return (
     <figure className={cn("min-w-0 w-full", className)} aria-label={ariaLabel}>
       {empty ? (
-        <div className="flex h-60 items-center justify-center text-sm text-muted-foreground">
+        <div
+          style={{ height }}
+          className="flex items-center justify-center text-sm text-muted-foreground"
+        >
           {emptyMessage}
         </div>
       ) : (
         <div style={{ height }}>
-          <ResponsiveContainer
-            width="100%"
-            height="100%"
-            minWidth={0}
-            initialDimension={{ width: 640, height }}
+          <EvilAreaChart
+            data={chartData}
+            config={chartConfig}
+            curveType="monotone"
+            animationType="left-to-right"
+            className="aspect-auto h-full w-full flex-none"
+            chartProps={{ margin: { top: 12, right: 12, bottom: 8, left: 0 } }}
           >
-            {showArea ? (
-              <AreaChart
-                data={data}
-                margin={{ top: 12, right: 12, bottom: 8, left: 0 }}
-                accessibilityLayer
-              >
-                <defs>
-                  <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.22} />
-                    <stop offset="100%" stopColor="var(--primary)" stopOpacity={0.01} />
-                  </linearGradient>
-                </defs>
-                {axes}
-                <Area
-                  type="monotone"
-                  dataKey="value"
-                  stroke="var(--primary)"
-                  strokeWidth={2}
-                  fill={`url(#${gradientId})`}
-                  isAnimationActive={!prefersReducedMotion}
-                  animationDuration={700}
-                  animationEasing="ease-out"
-                  dot={
-                    data.length === 1
-                      ? {
-                          r: 4,
-                          fill: "var(--primary)",
-                          stroke: "var(--background)",
-                          strokeWidth: 2,
-                        }
-                      : false
-                  }
-                  activeDot={{ r: 4, stroke: "var(--background)", strokeWidth: 2 }}
-                />
-              </AreaChart>
-            ) : (
-              <LineChart
-                data={data}
-                margin={{ top: 12, right: 12, bottom: 8, left: 0 }}
-                accessibilityLayer
-              >
-                {axes}
-                <Line
-                  type="monotone"
-                  dataKey="value"
-                  stroke="var(--primary)"
-                  strokeWidth={2}
-                  dot={data.length === 1}
-                  activeDot={{ r: 4, stroke: "var(--background)", strokeWidth: 2 }}
-                  isAnimationActive={!prefersReducedMotion}
-                  animationDuration={700}
-                  animationEasing="ease-out"
-                />
-              </LineChart>
-            )}
-          </ResponsiveContainer>
+            <EvilAreaChart.Grid vertical={false} stroke="var(--border)" strokeDasharray="3 5" />
+            <EvilAreaChart.XAxis
+              dataKey="label"
+              axisLine={false}
+              tickLine={false}
+              tickMargin={12}
+              minTickGap={40}
+              tick={{ fill: "var(--muted-foreground)", fontSize: 12 }}
+            />
+            <EvilAreaChart.YAxis
+              axisLine={false}
+              tickLine={false}
+              width={42}
+              tickMargin={8}
+              domain={yAxisDomain}
+              tick={{ fill: "var(--muted-foreground)", fontSize: 12 }}
+              tickFormatter={valueFormatter}
+            />
+            <EvilAreaChart.Tooltip
+              formatter={(value: number | string | readonly (number | string)[] | undefined) =>
+                valueFormatter(Number(value))
+              }
+            />
+            <EvilAreaChart.Area
+              dataKey="value"
+              variant="gradient"
+              strokeVariant="solid"
+              strokeWidth={2}
+              curveType="monotone"
+            >
+              {data.length === 1 ? <EvilAreaChart.Dot variant="border" /> : null}
+              <EvilAreaChart.ActiveDot variant="colored-border" />
+            </EvilAreaChart.Area>
+          </EvilAreaChart>
         </div>
       )}
       <details className="mt-2 text-xs text-muted-foreground">

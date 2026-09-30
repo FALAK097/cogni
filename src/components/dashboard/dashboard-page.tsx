@@ -1190,7 +1190,6 @@ export function DashboardPage() {
           ) : (
             <InsightsTrendChart
               data={convChartData}
-              showArea
               empty={convChartData.length > 0 && convChartData.every((point) => point.value === 0)}
               emptyMessage="No conversations in this period"
               labelFormatter={formatChartDate}
