@@ -1,8 +1,9 @@
 "use client";
 
 import { format, isToday, isYesterday } from "date-fns";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Bot, Pause, Search, User } from "@/components/icons";
+import { Bot, MessageSquare, Pause, Search, User } from "@/components/icons";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ interface ConversationsListProps {
   filter: ConversationFilter;
   selectedConversationId: string | null;
   onSelectConversation: (conversationId: string) => void;
+  onClearFilter: () => void;
 }
 
 const PAGE_SIZE = 20;
@@ -56,6 +58,7 @@ export function ConversationsList({
   filter,
   selectedConversationId,
   onSelectConversation,
+  onClearFilter,
 }: ConversationsListProps) {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -133,6 +136,18 @@ export function ConversationsList({
     setPage((current) => current + 1);
   };
   const firstConversationId = conversations[0]?.id ?? null;
+  const searchTerm = debouncedSearch.trim();
+  const emptyTitle = searchTerm
+    ? `No matches for “${searchTerm}”`
+    : filter === "all"
+      ? "No conversations yet"
+      : filter === "unassigned"
+        ? "No unassigned conversations"
+        : filter === "mine"
+          ? "No conversations assigned to you"
+          : filter === "open"
+            ? "No open conversations"
+            : "No closed conversations";
 
   useEffect(() => {
     if (selectedConversationId || !firstConversationId) return;
@@ -190,8 +205,45 @@ export function ConversationsList({
             ))}
           </div>
         ) : conversations.length === 0 ? (
-          <div className="flex h-full items-center justify-center p-6 text-center">
-            <p className="text-sm text-muted-foreground">No conversations found</p>
+          <div className="flex h-full min-h-[240px] flex-col items-center justify-center gap-3 px-5 py-8 text-center">
+            <span className="flex size-10 items-center justify-center rounded-xl border border-border/60 bg-card text-muted-foreground">
+              {searchTerm ? (
+                <Search className="size-[18px]" aria-hidden="true" />
+              ) : (
+                <MessageSquare className="size-[18px]" aria-hidden="true" />
+              )}
+            </span>
+            <div>
+              <p className="text-sm font-medium text-foreground">{emptyTitle}</p>
+              <p className="mt-1 max-w-[240px] text-xs leading-relaxed text-muted-foreground">
+                {searchTerm
+                  ? "Try another search or clear this one."
+                  : filter === "all"
+                    ? "New website chats will appear here. Set up your agent to start receiving conversations."
+                    : "Try another inbox view to find a conversation."}
+              </p>
+            </div>
+            {searchTerm ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSearch("");
+                  setDebouncedSearch("");
+                }}
+              >
+                Clear search
+              </Button>
+            ) : filter === "all" ? (
+              <Button render={<Link href="/playground" />} variant="outline" size="sm">
+                Set up your agent
+              </Button>
+            ) : (
+              <Button type="button" variant="outline" size="sm" onClick={onClearFilter}>
+                View all conversations
+              </Button>
+            )}
           </div>
         ) : (
           <div className="px-2 pb-2">

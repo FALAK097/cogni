@@ -161,6 +161,7 @@ export function WidgetConversations({ initialConversationId = null }: WidgetConv
             filter={filter}
             selectedConversationId={selectedConversationId}
             onSelectConversation={setSelectedConversationId}
+            onClearFilter={() => setFilter("all")}
           />
         </div>
 
