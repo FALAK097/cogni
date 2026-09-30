@@ -43,6 +43,9 @@ separate measured migration; a value looking plausible does not prove contrast.
 | Counts/time/cost   | Tabular numbers; stable width; zero is distinct from unavailable                 |
 | Focus              | Visible 2px+ perimeter; forced-colors support; never remove without replacement  |
 
+Keep native scrollbar cues on app panes so scrollable content is discoverable. Hide them only on
+specific horizontal controls where the project already provides another clear overflow cue.
+
 Contrast: measure foreground against its actual composite background. Normal text >=4.5:1,
 large text >=3:1; relevant non-text/focus boundaries >=3:1. Test light/dark, selected/hover/error/
 disabled states separately. No contrast numbers are asserted in this spec without a computation.
