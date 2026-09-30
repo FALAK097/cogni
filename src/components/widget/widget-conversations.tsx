@@ -139,6 +139,7 @@ export function WidgetConversations({ initialConversationId = null }: WidgetConv
                         )}
                       >
                         {count}
+                        <span className="sr-only"> conversations</span>
                       </span>
                     ) : null}
                   </TabsTrigger>

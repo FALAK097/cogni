@@ -3,7 +3,7 @@
 import { format, isToday, isYesterday } from "date-fns";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Bot, MessageSquare, Pause, Search, User } from "@/components/icons";
+import { Bot, MessageSquare, Pause, Search, User, X } from "@/components/icons";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -68,6 +68,10 @@ export function ConversationsList({
   const [pagesCache, setPagesCache] = useState<Record<number, ConversationSummary[]>>({});
   const { mutate: markConversationRead } = useMarkConversationRead();
   const markedReadRef = useRef<string | null>(null);
+  const clearSearch = () => {
+    setSearch("");
+    setDebouncedSearch("");
+  };
 
   if (listKey !== trackedListKey) {
     setTrackedListKey(listKey);
@@ -166,10 +170,21 @@ export function ConversationsList({
             <Input
               aria-label="Search conversations"
               placeholder="Search conversations…"
-              className="h-9 rounded-lg border-border/50 bg-white pl-9 text-sm shadow-none dark:bg-zinc-950"
+              className="h-9 rounded-lg border-border/50 bg-white pl-9 pr-9 text-sm shadow-none dark:bg-zinc-950"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
+            {search ? (
+              <button
+                type="button"
+                aria-label="Clear search"
+                title="Clear search"
+                onClick={clearSearch}
+                className="absolute top-1/2 right-1.5 flex size-8 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-transform duration-150 active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring motion-reduce:transition-none motion-reduce:active:scale-100"
+              >
+                <X className="size-4" aria-hidden="true" />
+              </button>
+            ) : null}
           </div>
         </div>
       </div>
@@ -224,15 +239,7 @@ export function ConversationsList({
               </p>
             </div>
             {searchTerm ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setSearch("");
-                  setDebouncedSearch("");
-                }}
-              >
+              <Button type="button" variant="outline" size="sm" onClick={clearSearch}>
                 Clear search
               </Button>
             ) : filter === "all" ? (
