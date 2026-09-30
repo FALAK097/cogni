@@ -4,7 +4,7 @@ const STEPS = [
   {
     num: "01",
     title: "Connect your website",
-    description: "Paste a single script tag. The widget appears live on your site in seconds.",
+    description: "Add the widget script to your site, then verify the installation in Agent.",
     color: "#6366f1",
     bg: "#eef0fe",
   },
@@ -19,14 +19,14 @@ const STEPS = [
   {
     num: "03",
     title: "Customize the widget",
-    description: "Match your brand exactly: colors, fonts, avatar, and conversation starters.",
+    description: "Set the widget's appearance and conversation starters to fit your site.",
     color: "#f59e0b",
     bg: "#fffbeb",
   },
   {
     num: "04",
     title: "Test and go live",
-    description: "Your AI agent handles questions 24/7. Your team steps in only when it matters.",
+    description: "Try real questions, review the answers, and publish when your setup is ready.",
     color: "#8b5cf6",
     bg: "#f5f3ff",
   },

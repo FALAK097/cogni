@@ -3,28 +3,23 @@ import Image from "next/image";
 import {
   ArrowRight,
   BarChart3,
-  BookOpen,
+  Bot,
   CheckCircle,
   Download,
-  Globe,
-  Home,
+  Inbox,
   MessageSquare,
-  Plug,
   Settings,
   Sparkles,
-  TrendingUp,
+  User,
 } from "@/components/icons";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { ThemeLogo } from "@/components/theme-logo";
 import { cn } from "@/lib/utils";
 
 const SIDEBAR_NAV = [
-  { label: "Dashboard", icon: Home, active: true },
-  { label: "Conversations", icon: MessageSquare, badge: "128" },
-  { label: "Knowledge Base", icon: BookOpen },
-  { label: "Sources", icon: Globe },
-  { label: "Integrations", icon: Plug },
-  { label: "Analytics", icon: BarChart3 },
+  { label: "Inbox", icon: Inbox },
+  { label: "Agent", icon: Bot },
+  { label: "Insights", icon: BarChart3, active: true },
   { label: "Settings", icon: Settings },
 ];
 
@@ -33,34 +28,34 @@ const METRICS = [
     label: "Total Conversations",
     value: "1,248",
     change: "↑ 18.6%",
-    note: "vs May 7 – May 13",
+    note: "vs previous 7 days",
     up: true,
     icon: MessageSquare,
     iconColor: "text-blue-500 bg-blue-50",
   },
   {
-    label: "Resolved Conversations",
+    label: "Closed Conversations",
     value: "846",
     change: "↑ 16.7%",
-    note: "vs May 7 – May 13",
+    note: "vs previous 7 days",
     up: true,
     icon: CheckCircle,
     iconColor: "text-emerald-500 bg-emerald-50",
   },
   {
-    label: "Resolution Rate",
-    value: "67.8%",
+    label: "Unique Users",
+    value: "984",
     change: "↑ 8.3%",
-    note: "vs May 7 – May 13",
+    note: "vs previous 7 days",
     up: true,
-    icon: TrendingUp,
+    icon: User,
     iconColor: "text-violet-500 bg-violet-50",
   },
   {
     label: "Avg. Response Time",
     value: "2.6s",
     change: "↓ 8.3%",
-    note: "vs May 7 – May 13",
+    note: "vs previous 7 days",
     up: false,
     icon: BarChart3,
     iconColor: "text-amber-500 bg-amber-50",
@@ -69,7 +64,7 @@ const METRICS = [
     label: "Satisfaction Score",
     value: "4.7 / 5",
     change: "↑ 0.3",
-    note: "vs May 7 – May 13",
+    note: "vs previous 7 days",
     up: true,
     icon: Sparkles,
     iconColor: "text-pink-500 bg-pink-50",
@@ -85,7 +80,7 @@ const SOURCE_DATA = [
 ];
 
 const STATUS_DATA = [
-  { label: "Resolved", pct: "67.8%", count: "846", color: "#10b981" },
+  { label: "Closed", pct: "67.8%", count: "846", color: "#10b981" },
   { label: "In Progress", pct: "24.2%", count: "302", color: "#6366f1" },
   { label: "Unresolved", pct: "8.0%", count: "100", color: "#ef4444" },
 ];
@@ -152,7 +147,7 @@ function DashboardMockup() {
 
           {/* Nav items */}
           <nav className="flex flex-col gap-0.5">
-            {SIDEBAR_NAV.map(({ label, icon: Icon, active, badge }) => (
+            {SIDEBAR_NAV.map(({ label, icon: Icon, active }) => (
               <div
                 key={label}
                 className={cn(
@@ -164,11 +159,6 @@ function DashboardMockup() {
                   className={cn("size-[15px] shrink-0", active ? "text-primary" : "text-gray-400")}
                 />
                 <span className="truncate">{label}</span>
-                {badge && (
-                  <span className="ml-auto rounded-full bg-primary px-1.5 py-px text-[9px] font-bold text-white">
-                    {badge}
-                  </span>
-                )}
               </div>
             ))}
           </nav>
@@ -179,7 +169,7 @@ function DashboardMockup() {
               A
             </div>
             <div className="min-w-0">
-              <p className="truncate text-[11px] font-semibold text-gray-700">Acme Inc.</p>
+              <p className="truncate text-[11px] font-semibold text-gray-700">Example workspace</p>
               <p className="text-[10px] text-gray-400">Team workspace</p>
             </div>
             <svg viewBox="0 0 12 12" className="ml-auto size-3 shrink-0 text-gray-400 fill-current">
@@ -213,7 +203,7 @@ function DashboardMockup() {
                   <rect x="1" y="2" width="12" height="11" rx="2" strokeWidth="1.4" />
                   <path d="M1 6h12M5 1v2M9 1v2" strokeWidth="1.4" strokeLinecap="round" />
                 </svg>
-                May 14 – May 20, 2024
+                Last 7 days
                 <svg
                   viewBox="0 0 10 10"
                   className="size-2.5 text-gray-400 stroke-current"

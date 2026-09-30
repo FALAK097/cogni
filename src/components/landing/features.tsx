@@ -96,7 +96,7 @@ function AiAgentVisual() {
         <div className="flex items-center gap-1.5 pl-9 pt-0.5 transition-transform duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] group-hover:scale-105 origin-left">
           <div className="size-2 rounded-full bg-emerald-500 animate-pulse" />
           <span className="text-[10px] font-bold text-emerald-700 bg-white border border-emerald-150 px-2.5 py-0.5 rounded-full shadow-2xs">
-            Resolved · 1.8s
+            Example AI reply
           </span>
         </div>
       </div>
@@ -127,10 +127,7 @@ function HandoffVisual() {
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-[11.5px] font-bold text-slate-800">Sarah K. assigned</p>
-          <p className="text-[10px] text-slate-400">Full context transferred · just now</p>
-        </div>
-        <div className="rounded-full bg-emerald-50 border border-emerald-100 px-2 py-0.5 text-[9px] font-bold text-emerald-700">
-          Online
+          <p className="text-[10px] text-slate-400">Conversation context included</p>
         </div>
       </div>
     </div>
@@ -231,9 +228,12 @@ function KnowledgeVisual() {
 function AnalyticsVisual() {
   return (
     <div className="mt-4">
+      <p className="mb-2 text-[9px] font-semibold uppercase tracking-wide text-gray-400">
+        Illustrative sample data
+      </p>
       <div className="mb-3 grid grid-cols-3 gap-2">
         {[
-          { label: "Resolution", value: "67.8%", up: true, change: "+4.2%" },
+          { label: "Closed", value: "846", up: true, change: "+4.2%" },
           { label: "Response", value: "2.6s", up: false, change: "-0.8s" },
           { label: "Satisfaction", value: "4.7/5", up: true, change: "+0.3" },
         ].map((m) => (
@@ -259,7 +259,7 @@ function AnalyticsVisual() {
             Volume Trends
           </span>
           <span className="text-[9px] font-bold text-[#064E2A] bg-emerald-50 px-1.5 py-0.5 rounded-full">
-            +12.4%
+            Sample
           </span>
         </div>
         <div className="flex items-end gap-1.5 h-16 pt-2">
@@ -362,7 +362,7 @@ const FEATURES = [
       </>
     ),
     description:
-      "When the AI can't help, it routes to your team instantly, handing over the full conversation so nobody starts from scratch.",
+      "When a conversation needs a person, your team can take over with the full conversation context.",
     bg: "#F0F9FF",
     color: "#0085D1",
     Visual: HandoffVisual,
