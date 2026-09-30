@@ -355,6 +355,11 @@
 
 /* Reduced motion: keep fades, remove movement */
 @media (prefers-reduced-motion: reduce) {
+  html,
+  body {
+    scroll-behavior: auto;
+  }
+
   .reveal-up,
   .reveal-scale,
   .reveal-left {
