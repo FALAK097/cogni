@@ -377,7 +377,7 @@ export function ConversationDetail({
               variant="ghost"
               size="icon"
               onClick={onBack}
-              className="h-7 w-7 shrink-0 lg:hidden"
+              className="h-11 w-11 shrink-0 lg:hidden sm:h-9 sm:w-9"
               aria-label="Back to conversations"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
@@ -404,11 +404,11 @@ export function ConversationDetail({
               <Button
                 variant="outline"
                 size="sm"
-                className="hidden h-7 rounded-md border-border/60 px-2.5 text-[11px] shadow-none sm:inline-flex"
+                className="hidden h-9 rounded-md border-border/60 px-2.5 text-xs shadow-none sm:inline-flex"
                 onClick={handleAssign}
                 disabled={takeOverMutation.isPending}
               >
-                <UserPlus className="mr-1 h-3 w-3" />
+                <UserPlus className="mr-1 h-3.5 w-3.5" />
                 Take over
               </Button>
             ) : null}
@@ -419,7 +419,7 @@ export function ConversationDetail({
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-7 rounded-md border-border/60 px-2.5 text-[11px] shadow-none xl:hidden"
+                    className="h-11 rounded-md border-border/60 px-3 text-xs shadow-none sm:h-9 sm:px-2.5 sm:text-[11px] xl:hidden"
                   >
                     Details
                   </Button>
@@ -445,7 +445,12 @@ export function ConversationDetail({
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={
-                  <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="More actions">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-11 w-11 sm:h-9 sm:w-9"
+                    aria-label="More actions"
+                  >
                     <MoreVertical className="h-4 w-4" />
                   </Button>
                 }
