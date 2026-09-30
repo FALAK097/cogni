@@ -4,7 +4,10 @@ import { Composio } from "@composio/core";
 import { and, eq } from "drizzle-orm";
 import { Resend } from "resend";
 
-import type { MessageJson } from "@/features/conversations/server/conversation-service";
+import {
+  appendConversationMessage,
+  type MessageJson,
+} from "@/features/conversations/server/conversation-service";
 import {
   getIntegrationTool,
   parseToolInput,
@@ -66,7 +69,6 @@ async function executeInternalTool({
 
   if (actionType === "conversation.note") {
     const message = requiredString(input, "message");
-    const messages = JSON.parse(currentConversation.messages) as MessageJson[];
     const note: MessageJson = {
       id: crypto.randomUUID(),
       body: message,
@@ -74,10 +76,13 @@ async function executeInternalTool({
       visibility: "INTERNAL",
       createdAt: new Date().toISOString(),
     };
-    await db
-      .update(conversation)
-      .set({ messages: JSON.stringify([...messages, note]), updatedAt: note.createdAt })
-      .where(and(eq(conversation.id, conversationId), eq(conversation.workspaceId, workspaceId)));
+    await appendConversationMessage({
+      db,
+      workspaceId,
+      conversationId,
+      message: note,
+      updateLastMessageAt: false,
+    });
     return { conversationId, noteId: note.id };
   }
 

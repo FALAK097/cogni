@@ -15,7 +15,7 @@ import {
   type widget,
   type workspaceMember,
 } from "@/lib/db/schema";
-import type { MessageJson } from "./conversation-service";
+import { appendConversationMessage, type MessageJson } from "./conversation-service";
 import { broadcastConversationEvent } from "@/lib/realtime/broadcast";
 
 function getInboxConversationBaseCond(c: typeof conversationTable) {
@@ -250,44 +250,21 @@ export async function appendTeamConversationMessage(
     createdAt: nowIso,
   };
 
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const conversation = await db.query.conversation.findFirst({
-      where: (fields, { eq, and }) =>
-        and(eq(fields.id, conversationId), eq(fields.workspaceId, workspaceId)),
-      columns: { messages: true, updatedAt: true },
-    });
+  const appended = await appendConversationMessage({
+    db,
+    workspaceId,
+    conversationId,
+    message: newMessage,
+    updateLastMessageAt: options.updateLastMessageAt,
+  });
+  if (!appended) return false;
 
-    if (!conversation) return false;
-
-    const messagesList = parseMessages(conversation.messages);
-    const updatedMessages = [...messagesList, newMessage];
-
-    const result = await db
-      .update(conversationTable)
-      .set({
-        messages: JSON.stringify(updatedMessages),
-        updatedAt: nowIso,
-        ...(options.updateLastMessageAt ? { lastMessageAt: nowIso } : {}),
-      })
-      .where(
-        and(
-          eq(conversationTable.id, conversationId),
-          eq(conversationTable.updatedAt, conversation.updatedAt),
-        ),
-      )
-      .returning({ id: conversationTable.id });
-
-    if (result.length > 0) {
-      await broadcastConversationEvent({
-        type: "message",
-        conversationId,
-        messageId: newMessage.id,
-      });
-      return true;
-    }
-  }
-
-  return false;
+  await broadcastConversationEvent({
+    type: "message",
+    conversationId,
+    messageId: appended.message.id,
+  });
+  return appended.inserted;
 }
 
 export async function broadcastConversationChanged(

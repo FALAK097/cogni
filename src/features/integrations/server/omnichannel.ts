@@ -1,9 +1,11 @@
 import "server-only";
 
 import { generateText } from "ai";
-import { and, eq } from "drizzle-orm";
 
-import type { MessageJson } from "@/features/conversations/server/conversation-service";
+import {
+  appendConversationMessage,
+  type MessageJson,
+} from "@/features/conversations/server/conversation-service";
 import { retrieveKnowledgeContext } from "@/features/knowledge/server/retrieval";
 import { getWidgetModel } from "@/lib/ai/providers";
 import type { Db } from "@/lib/db/client";
@@ -86,6 +88,7 @@ export async function ingestOmnichannelMessage({
     visibility: "PUBLIC",
     createdAt: now,
   };
+  let ingestedMessageId = incoming.id;
   if (!current) {
     const [created] = await db
       .insert(conversation)
@@ -103,39 +106,63 @@ export async function ingestOmnichannelMessage({
       .returning();
     current = created;
   } else {
-    const messages = JSON.parse(current.messages) as MessageJson[];
-    if (!messages.some((message) => message.clientId === externalMessageId)) {
-      const [updated] = await db
-        .update(conversation)
-        .set({
-          messages: JSON.stringify([...messages, incoming]),
-          updatedAt: now,
-          lastMessageAt: now,
-        })
-        .where(and(eq(conversation.id, current.id), eq(conversation.workspaceId, workspaceId)))
-        .returning();
-      current = updated;
+    const appended = await appendConversationMessage({
+      db,
+      workspaceId,
+      conversationId: current.id,
+      message: incoming,
+    });
+    if (!appended) throw new Error("Conversation not found.");
+    current = appended.conversation;
+    ingestedMessageId = appended.message.id;
+    if (appended.inserted) {
+      await broadcastConversationEvent({
+        type: "message",
+        conversationId: current.id,
+        messageId: incoming.id,
+      });
     }
+    return {
+      connection,
+      contact: channelContact,
+      conversation: current,
+      messageId: ingestedMessageId,
+    };
   }
   await broadcastConversationEvent({
     type: "message",
     conversationId: current.id,
     messageId: incoming.id,
   });
-  return { connection, contact: channelContact, conversation: current };
+  return {
+    connection,
+    contact: channelContact,
+    conversation: current,
+    messageId: ingestedMessageId,
+  };
 }
 
 export async function answerOmnichannelMessage({
   db,
   workspaceId,
   conversationId,
+  replyToMessageId,
   text,
 }: {
   db: Db;
   workspaceId: string;
   conversationId: string;
+  replyToMessageId: string;
   text: string;
 }) {
+  const activeConversation = await db.query.conversation.findFirst({
+    where: (fields, { eq, and }) =>
+      and(eq(fields.id, conversationId), eq(fields.workspaceId, workspaceId)),
+    columns: { aiPaused: true, status: true },
+  });
+  if (!activeConversation) throw new Error("Conversation not found.");
+  if (activeConversation.aiPaused || activeConversation.status === "CLOSED") return null;
+
   const widget = await db.query.widget.findFirst({
     where: (fields, { eq }) => eq(fields.workspaceId, workspaceId),
     with: { workspace: true },
@@ -160,26 +187,29 @@ export async function answerOmnichannelMessage({
       and(eq(fields.id, conversationId), eq(fields.workspaceId, workspaceId)),
   });
   if (!current) throw new Error("Conversation not found.");
-  const messages = JSON.parse(current.messages) as MessageJson[];
+  if (current.aiPaused || current.status === "CLOSED") return null;
   const response: MessageJson = {
     id: crypto.randomUUID(),
     body: result.text,
     authorType: "AI",
     visibility: "PUBLIC",
+    replyToMessageId,
     createdAt: new Date().toISOString(),
   };
-  await db
-    .update(conversation)
-    .set({
-      messages: JSON.stringify([...messages, response]),
-      updatedAt: response.createdAt,
-      lastMessageAt: response.createdAt,
-    })
-    .where(and(eq(conversation.id, conversationId), eq(conversation.workspaceId, workspaceId)));
-  await broadcastConversationEvent({
-    type: "message",
+  const appended = await appendConversationMessage({
+    db,
+    workspaceId,
     conversationId,
-    messageId: response.id,
+    message: response,
+    requireAiActive: true,
   });
-  return result.text;
+  if (!appended) return null;
+  if (appended.inserted) {
+    await broadcastConversationEvent({
+      type: "message",
+      conversationId,
+      messageId: appended.message.id,
+    });
+  }
+  return appended.message.body;
 }

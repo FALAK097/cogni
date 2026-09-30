@@ -437,7 +437,7 @@ export async function POST(
           }
           return;
         }
-        await recordAiMessage({
+        const persistedMessage = await recordAiMessage({
           db,
           conversationId: conversation.id,
           text,
@@ -452,6 +452,16 @@ export async function POST(
             finishReason,
             sources,
           });
+        }
+        if (!persistedMessage) {
+          logInfo("widget.ai.response.suppressed", {
+            workspaceId: widget.workspace.id,
+            widgetId: widget.id,
+            conversationId: conversation.id,
+            agentRunId: run?.id ?? null,
+            reason: "conversation_inactive",
+          });
+          return;
         }
         logInfo("widget.ai.response.completed", {
           workspaceId: widget.workspace.id,

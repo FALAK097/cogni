@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { runDbWriteOperation, type Db } from "@/lib/db/client";
 import { conversation, visitorSession as visitorSessionTable, contact } from "@/lib/db/schema";
 import type { widget as widgetTable } from "@/lib/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 
 const visitorSessionDurationMs = 1000 * 60 * 60 * 24 * 90;
 
@@ -61,6 +61,79 @@ export type MessageJson = {
   feedbackAt?: string | null;
 };
 
+/**
+ * Append against the current JSON array in one PostgreSQL UPDATE. The row lock
+ * acquired by UPDATE serializes concurrent writers, so no message is lost when
+ * a visitor, teammate, agent, or channel webhook writes at the same time.
+ */
+export async function appendConversationMessage({
+  db,
+  workspaceId,
+  conversationId,
+  message,
+  updateLastMessageAt = true,
+  requireAiActive = false,
+}: {
+  db: Db;
+  workspaceId: string;
+  conversationId: string;
+  message: MessageJson;
+  updateLastMessageAt?: boolean;
+  requireAiActive?: boolean;
+}) {
+  const messages = sql`COALESCE(NULLIF(${conversation.messages}, '')::jsonb, '[]'::jsonb)`;
+  const duplicate = message.clientId
+    ? sql`EXISTS (
+        SELECT 1
+        FROM jsonb_array_elements(${messages}) AS existing(item)
+        WHERE existing.item ->> 'clientId' = ${message.clientId}
+      )`
+    : message.replyToMessageId
+      ? sql`EXISTS (
+          SELECT 1
+          FROM jsonb_array_elements(${messages}) AS existing(item)
+          WHERE existing.item ->> 'replyToMessageId' = ${message.replyToMessageId}
+        )`
+      : null;
+  const appendedMessages = sql`(${messages} || ${JSON.stringify([message])}::jsonb)::text`;
+
+  const conditions = [
+    eq(conversation.id, conversationId),
+    eq(conversation.workspaceId, workspaceId),
+  ];
+  if (requireAiActive) {
+    conditions.push(eq(conversation.aiPaused, false), ne(conversation.status, "CLOSED"));
+  }
+
+  const [updatedConversation] = await db
+    .update(conversation)
+    .set({
+      messages: duplicate
+        ? sql`CASE WHEN ${duplicate} THEN ${conversation.messages} ELSE ${appendedMessages} END`
+        : appendedMessages,
+      updatedAt: message.createdAt,
+      ...(updateLastMessageAt ? { lastMessageAt: message.createdAt } : {}),
+    })
+    .where(and(...conditions))
+    .returning();
+
+  if (!updatedConversation) return null;
+
+  const persistedMessages = JSON.parse(updatedConversation.messages || "[]") as MessageJson[];
+  const persistedMessage = persistedMessages.find(
+    (candidate) =>
+      candidate.id === message.id ||
+      (message.clientId && candidate.clientId === message.clientId) ||
+      (message.replyToMessageId && candidate.replyToMessageId === message.replyToMessageId),
+  );
+
+  return {
+    conversation: updatedConversation,
+    message: persistedMessage ?? message,
+    inserted: persistedMessage?.id === message.id,
+  };
+}
+
 async function appendVisitorMessage(
   db: Db,
   visitorSession: VisitorSessionContext,
@@ -81,16 +154,6 @@ async function appendVisitorMessage(
   });
 
   if (existingConversation) {
-    const messagesList = JSON.parse(existingConversation.messages || "[]") as MessageJson[];
-    const replayed = messagesList.find((m) => m.clientId === clientMessageId);
-    if (replayed) {
-      return {
-        conversation: existingConversation,
-        visitorMessageId: replayed.id,
-        replayed: true,
-      };
-    }
-
     const newMessage: MessageJson = {
       id: randomUUID(),
       body: text,
@@ -100,32 +163,29 @@ async function appendVisitorMessage(
       createdAt: nowIso,
     };
 
-    const updatedMessages = [...messagesList, newMessage];
-    const results = await db
-      .update(conversation)
-      .set({
-        lastMessageAt: nowIso,
-        messages: JSON.stringify(updatedMessages),
-        updatedAt: nowIso,
-      })
-      .where(eq(conversation.id, existingConversation.id))
-      .returning();
+    const appended = await appendConversationMessage({
+      db,
+      workspaceId: visitorSession.widget.workspace.id,
+      conversationId: existingConversation.id,
+      message: newMessage,
+    });
+    if (!appended) throw new Error("Conversation not found.");
 
-    const updatedConvo = results[0];
-
-    await db
-      .update(visitorSessionTable)
-      .set({
-        lastSeenAt: nowIso,
-        expiresAt: new Date(now.getTime() + visitorSessionDurationMs).toISOString(),
-        messageCount: sql`${visitorSessionTable.messageCount} + 1`,
-      })
-      .where(eq(visitorSessionTable.id, visitorSession.id));
+    if (appended.inserted) {
+      await db
+        .update(visitorSessionTable)
+        .set({
+          lastSeenAt: nowIso,
+          expiresAt: new Date(now.getTime() + visitorSessionDurationMs).toISOString(),
+          messageCount: sql`${visitorSessionTable.messageCount} + 1`,
+        })
+        .where(eq(visitorSessionTable.id, visitorSession.id));
+    }
 
     return {
-      conversation: updatedConvo,
-      visitorMessageId: newMessage.id,
-      replayed: false,
+      conversation: appended.conversation,
+      visitorMessageId: appended.message.id,
+      replayed: !appended.inserted,
     };
   }
 
@@ -381,12 +441,6 @@ export async function recordAiMessage({
     }
 
     const now = new Date();
-    const list = JSON.parse(conversationData.messages || "[]") as MessageJson[];
-    const existing = list.find((m) => m.replyToMessageId === replyToMessageId);
-    if (existing) {
-      return existing;
-    }
-
     const aiMessage: MessageJson = {
       id: randomUUID(),
       body: text,
@@ -396,16 +450,15 @@ export async function recordAiMessage({
       createdAt: now.toISOString(),
     };
 
-    const updatedMessages = [...list, aiMessage];
-    await tx
-      .update(conversation)
-      .set({
-        lastMessageAt: now.toISOString(),
-        messages: JSON.stringify(updatedMessages),
-        updatedAt: now.toISOString(),
-      })
-      .where(eq(conversation.id, conversationId));
+    const appended = await appendConversationMessage({
+      db: tx,
+      workspaceId: conversationData.workspaceId,
+      conversationId,
+      message: aiMessage,
+      requireAiActive: true,
+    });
 
-    return aiMessage;
+    if (!appended) return null;
+    return appended.message;
   });
 }

@@ -65,7 +65,6 @@ export function createChannelBot({
 
   async function handleMessage(thread: Thread, message: Message, subscribe: boolean) {
     if (subscribe) await thread.subscribe();
-    await thread.startTyping("Thinking…");
     const ingested = await ingestOmnichannelMessage({
       db,
       workspaceId,
@@ -77,12 +76,41 @@ export function createChannelBot({
       userName: message.author.fullName || message.author.userName,
       text: message.text,
     });
+    const activeConversation = await db.query.conversation.findFirst({
+      where: (fields, { eq, and }) =>
+        and(
+          eq(fields.id, ingested.conversation.id),
+          eq(fields.workspaceId, ingested.connection.workspaceId),
+        ),
+      columns: { aiPaused: true, status: true },
+    });
+    if (
+      !activeConversation ||
+      activeConversation.aiPaused ||
+      activeConversation.status === "CLOSED"
+    ) {
+      return;
+    }
+
+    await thread.startTyping("Thinking…");
     const answer = await answerOmnichannelMessage({
       db,
       workspaceId: ingested.connection.workspaceId,
       conversationId: ingested.conversation.id,
+      replyToMessageId: ingested.messageId,
       text: message.text,
     });
+    if (answer === null) return;
+
+    const beforeSend = await db.query.conversation.findFirst({
+      where: (fields, { eq, and }) =>
+        and(
+          eq(fields.id, ingested.conversation.id),
+          eq(fields.workspaceId, ingested.connection.workspaceId),
+        ),
+      columns: { aiPaused: true, status: true },
+    });
+    if (!beforeSend || beforeSend.aiPaused || beforeSend.status === "CLOSED") return;
     await thread.post(answer);
   }
 
