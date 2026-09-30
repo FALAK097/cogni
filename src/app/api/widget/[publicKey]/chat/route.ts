@@ -40,7 +40,7 @@ import { conversation as conversationTable } from "@/lib/db/schema";
 import { emitDomainEvent } from "@/lib/events/domain-events";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { notifyWorkspaceMembers } from "@/lib/notifications/create-notification";
-import { checkRateLimit } from "@/lib/rate-limit/memory";
+import { checkRateLimits, getTrustedClientIp } from "@/lib/rate-limit/shared";
 import { env } from "@/lib/env/server";
 
 export const maxDuration = 60;
@@ -187,15 +187,29 @@ export async function POST(
   }
 
   if (!isPreview) {
-    const rateLimit = checkRateLimit({
-      key: `widget-chat:${token}`,
-      limit: 20,
-      windowMs: 60_000,
-    });
+    const rateLimit = await checkRateLimits([
+      {
+        key: `widget-public:ip:${getTrustedClientIp(request.headers)}`,
+        limit: 240,
+        windowMs: 60_000,
+      },
+      {
+        key: `widget-public:workspace:${access.widget.workspaceId}`,
+        limit: 1000,
+        windowMs: 60_000,
+      },
+      { key: `widget-chat:visitor:${token}`, limit: 20, windowMs: 60_000 },
+    ]);
     if (!rateLimit.allowed) {
+      if (rateLimit.unavailable) {
+        return Response.json({ error: "Service temporarily unavailable." }, { status: 503 });
+      }
       return Response.json(
         { error: "Too many messages. Wait a moment before trying again." },
-        { status: 429 },
+        {
+          status: 429,
+          headers: { "Retry-After": String(Math.ceil(rateLimit.retryAfterMs / 1000)) },
+        },
       );
     }
   }

@@ -10,8 +10,23 @@ jobs:
   quality:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: cogni_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cogni_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       SKIP_ENV_VALIDATION: "true"
+      DATABASE_URL: postgres://postgres@127.0.0.1:5432/cogni_test
 
     steps:
       - uses: actions/checkout@v4
@@ -26,9 +41,12 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+      - run: pnpm db:migrate
       - run: pnpm lint:github
       - run: pnpm typecheck
       - run: pnpm test:widget-stream
       - run: pnpm test:widget-settings
+      - run: pnpm test:conversation-append
+      - run: pnpm test:rate-limit
       - run: pnpm test:safe-fetch
       - run: pnpm fmt:check

@@ -20,7 +20,7 @@ import {
 import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
 import { getDb } from "@/lib/db/client";
 import { attachment as attachmentTable } from "@/lib/db/schema";
-import { checkRateLimit } from "@/lib/rate-limit/memory";
+import { checkRateLimits, getTrustedClientIp } from "@/lib/rate-limit/shared";
 import { deleteObject, isAllowedUpload, saveObject, uploadPublicPath } from "@/lib/storage/index";
 
 const metadataSchema = z.object({
@@ -85,15 +85,29 @@ export async function POST(
   if (!token) {
     return Response.json({ error: "Widget session is required." }, { status: 401 });
   }
-  const rateLimit = checkRateLimit({
-    key: `widget-upload:${token}`,
-    limit: 10,
-    windowMs: 60_000,
-  });
+  const rateLimit = await checkRateLimits([
+    {
+      key: `widget-public:ip:${getTrustedClientIp(request.headers)}`,
+      limit: 240,
+      windowMs: 60_000,
+    },
+    {
+      key: `widget-public:workspace:${access.widget.workspaceId}`,
+      limit: 1000,
+      windowMs: 60_000,
+    },
+    { key: `widget-upload:visitor:${token}`, limit: 10, windowMs: 60_000 },
+  ]);
   if (!rateLimit.allowed) {
+    if (rateLimit.unavailable) {
+      return Response.json({ error: "Service temporarily unavailable." }, { status: 503 });
+    }
     return Response.json(
       { error: "Too many uploads. Wait a moment before trying again." },
-      { status: 429 },
+      {
+        status: 429,
+        headers: { "Retry-After": String(Math.ceil(rateLimit.retryAfterMs / 1000)) },
+      },
     );
   }
 

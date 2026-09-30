@@ -721,3 +721,13 @@ export const approvalRequest = pgTable(
     ),
   ],
 );
+
+export const rateLimitBucket = pgTable(
+  "rate_limit_bucket",
+  {
+    keyHash: text().primaryKey().notNull(),
+    count: integer().notNull(),
+    resetAt: timestampString().notNull(),
+  },
+  (table) => [index("rate_limit_bucket_resetAt_idx").on(table.resetAt)],
+);

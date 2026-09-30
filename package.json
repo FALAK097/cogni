@@ -17,6 +17,8 @@
     "typecheck": "tsc --noEmit",
     "test:widget-stream": "node --test scripts/test-widget-stream.mjs",
     "test:widget-settings": "node --test scripts/test-widget-settings.mjs",
+    "test:conversation-append": "node --test scripts/test-conversation-append.mjs",
+    "test:rate-limit": "node --test scripts/test-rate-limit.mjs",
     "test:safe-fetch": "node --test scripts/test-safe-fetch.mjs",
     "check": "pnpm lint && pnpm typecheck && pnpm fmt:check",
     "db:generate": "drizzle-kit generate",

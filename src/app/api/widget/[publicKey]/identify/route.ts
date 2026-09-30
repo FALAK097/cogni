@@ -2,7 +2,7 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { widgetPreflightResponse } from "@/features/widget/server/widget-utils";
 import { getDb } from "@/lib/db/client";
-import { checkRateLimit } from "@/lib/rate-limit/memory";
+import { checkRateLimits, getTrustedClientIp } from "@/lib/rate-limit/shared";
 import { visitorSession as visitorSessionTable } from "@/lib/db/schema";
 
 const identifySchema = z.object({
@@ -52,14 +52,31 @@ export async function POST(
     return Response.json({ error: "Widget session is invalid or expired." }, { status: 401 });
   }
 
-  const rateLimit = checkRateLimit({
-    key: `widget-identify:${token}`,
-    limit: 10,
-    windowMs: 60_000,
-  });
+  const rateLimit = await checkRateLimits([
+    {
+      key: `widget-public:ip:${getTrustedClientIp(request.headers)}`,
+      limit: 240,
+      windowMs: 60_000,
+    },
+    {
+      key: `widget-public:workspace:${visitorSession.widget.workspaceId}`,
+      limit: 1000,
+      windowMs: 60_000,
+    },
+    { key: `widget-identify:visitor:${token}`, limit: 10, windowMs: 60_000 },
+  ]);
 
   if (!rateLimit.allowed) {
-    return Response.json({ error: "Too many requests. Try again shortly." }, { status: 429 });
+    if (rateLimit.unavailable) {
+      return Response.json({ error: "Service temporarily unavailable." }, { status: 503 });
+    }
+    return Response.json(
+      { error: "Too many requests. Try again shortly." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(Math.ceil(rateLimit.retryAfterMs / 1000)) },
+      },
+    );
   }
 
   const updates: Record<string, string> = { updatedAt: nowIso };
