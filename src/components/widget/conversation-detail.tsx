@@ -59,6 +59,7 @@ import type { ConversationDetail as ConversationDetailData, WidgetMessage } from
 import { generateAvatarUrl } from "@/lib/avatar-generator";
 import { cn } from "@/lib/utils";
 import { resolveTranscriptScroll } from "@/features/conversations/transcript-scroll";
+import { clearSubmittedDraft } from "@/features/conversations/draft-state";
 
 import {
   hideScrollbarClassName,
@@ -313,14 +314,15 @@ export function ConversationDetail({
   };
 
   const handleSend = () => {
-    const text = composerText.trim();
+    const submittedDraft = composerText;
+    const text = submittedDraft.trim();
     if (!text || sendMessageMutation.isPending) return;
 
     sendMessageMutation.mutate(
       { conversationId, message: text, action: composerMode },
       {
         onSuccess: () => {
-          setComposerText("");
+          setComposerText((currentDraft) => clearSubmittedDraft(currentDraft, submittedDraft));
           toast({ title: composerMode === "reply" ? "Reply sent" : "Internal note added" });
         },
         onError: () => {
