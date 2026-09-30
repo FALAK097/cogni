@@ -121,6 +121,11 @@ export function WidgetConversations({ initialConversationId = null }: WidgetConv
                   <TabsTrigger
                     key={tab.value}
                     value={tab.value}
+                    aria-label={
+                      count > 0
+                        ? `${tab.label}, ${count} unread conversation${count === 1 ? "" : "s"}`
+                        : tab.label
+                    }
                     className={cn(
                       "h-9 shrink-0 flex-none gap-2 rounded-none bg-transparent px-0 pb-2 text-sm font-medium shadow-none",
                       "after:-bottom-px after:h-[2px] after:rounded-full after:bg-primary",
@@ -131,6 +136,7 @@ export function WidgetConversations({ initialConversationId = null }: WidgetConv
                     {tab.label}
                     {count > 0 ? (
                       <span
+                        title={`${count} unread conversation${count === 1 ? "" : "s"}`}
                         className={cn(
                           "inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-medium",
                           active
@@ -139,7 +145,6 @@ export function WidgetConversations({ initialConversationId = null }: WidgetConv
                         )}
                       >
                         {count}
-                        <span className="sr-only"> conversations</span>
                       </span>
                     ) : null}
                   </TabsTrigger>
