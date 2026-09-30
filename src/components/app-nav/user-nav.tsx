@@ -59,14 +59,18 @@ export function UserNav({ userData, trigger, isSidebarOpen }: UserNavProps) {
           <DropdownMenuLabel className="py-3 font-normal">
             <div className="flex gap-2 justify-between items-center">
               <div className="flex gap-3 items-center min-w-0">
-                <Avatar
-                  className="size-10 flex-shrink-0 cursor-pointer transition-transform duration-200 hover:scale-105 active:scale-[0.96]"
+                <button
+                  type="button"
+                  aria-label="Change profile photo"
+                  title="Change profile photo"
                   onClick={() => setIsAvatarDialogOpen(true)}
-                  title="Edit Avatar"
+                  className="flex-shrink-0 rounded-full transition-transform duration-150 active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 >
-                  <AvatarImage src={currentAvatar} alt={userData.name} />
-                  <AvatarFallback>{userData.name.substring(0, 2).toUpperCase()}</AvatarFallback>
-                </Avatar>
+                  <Avatar className="size-10">
+                    <AvatarImage src={currentAvatar} alt="" />
+                    <AvatarFallback>{userData.name.substring(0, 2).toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                </button>
                 <div className="flex flex-col space-y-1.5 min-w-0">
                   <p className="text-sm font-medium leading-none truncate">{userData.name}</p>
                   <p className="text-xs leading-relaxed truncate text-muted-foreground">
