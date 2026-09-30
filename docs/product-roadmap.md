@@ -213,9 +213,10 @@ first-time user before expanding the shell.
 ## Status of this assessment
 
 The roadmap was rechecked on 2026-09-30. Live check and preview status belongs to PR #48 because
-each pushed head starts a new run. The current pass improves the responsive Insights chart row;
-`pnpm check` and `pnpm build` passed locally. Browser acceptance and remote checks remain separate
-gates. Provider setup remains a release dependency described in the PR.
+each pushed head starts a new run. The current pass improves the responsive Insights charts,
+labels closed conversations accurately, and gives Inbox empty views a clear next step. Local
+`pnpm check`, `pnpm build`, and React Doctor (100/100) passed. Browser acceptance and remote
+checks remain separate gates. Provider setup remains a release dependency described in the PR.
 
 This pass updates the roadmap/design/evidence docs and begins public-flow/inbox UX corrections.
 Synthetic local testing exposed blank preview completion. Widget SSE framing, empty/aborted
