@@ -85,6 +85,9 @@ Conversation list:
 Transcript:
 
 - Header: customer identity, channel, assignment, status, AI paused state and close/snooze action.
+- Initial load lands on the latest reply. While an agent reads older messages, background updates
+  preserve their position and offer a clear jump to new messages; repeated polling does not clear
+  that cue before the agent catches up.
 - Messages show author, public/internal treatment, time, delivery/failed/retrying state and source
   links where available. Render untrusted markdown safely; long URLs and code do not break panes.
 - Composer: Reply / Internal note, explicit recipient/channel, attachments, editable copilot draft,

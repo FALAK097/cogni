@@ -58,6 +58,7 @@ import {
 import type { ConversationDetail as ConversationDetailData, WidgetMessage } from "@/hooks/query";
 import { generateAvatarUrl } from "@/lib/avatar-generator";
 import { cn } from "@/lib/utils";
+import { resolveTranscriptScroll } from "@/features/conversations/transcript-scroll";
 
 import {
   hideScrollbarClassName,
@@ -197,6 +198,9 @@ export function ConversationDetail({
   const [replyText, setReplyText] = useState("");
   const [noteText, setNoteText] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const stickToBottomRef = useRef(true);
+  const previousMessageCountRef = useRef<number | null>(null);
+  const [hasNewMessages, setHasNewMessages] = useState(false);
 
   const composerText = composerMode === "reply" ? replyText : noteText;
   const setComposerText = composerMode === "reply" ? setReplyText : setNoteText;
@@ -226,9 +230,23 @@ export function ConversationDetail({
   const messages = session?.messages;
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    const container = scrollRef.current;
+    if (!container) return;
+
+    const messageCount = messages?.length ?? 0;
+    const previousMessageCount = previousMessageCountRef.current;
+    const scrollUpdate = resolveTranscriptScroll({
+      stickToBottom: stickToBottomRef.current,
+      previousMessageCount,
+      messageCount,
+    });
+    if (scrollUpdate.scrollToBottom) {
+      container.scrollTop = container.scrollHeight;
+      setHasNewMessages(false);
+    } else if (scrollUpdate.announceNewMessages) {
+      setHasNewMessages(true);
     }
+    previousMessageCountRef.current = messageCount;
   }, [messages]);
 
   const displayName = session ? getDisplayName(session) : "";
@@ -533,27 +551,58 @@ export function ConversationDetail({
           </div>
         </div>
 
-        <div ref={scrollRef} className={cn("min-h-0 flex-1", hideScrollbarClassName)}>
-          <div className="mx-auto max-w-3xl space-y-5 px-3 py-3 sm:px-4">
-            {groupedMessages.map((group) => (
-              <div key={group.date} className="space-y-4">
-                <div className="flex items-center justify-center px-1">
-                  <span className="shrink-0 text-[11px] font-medium text-muted-foreground">
-                    {formatDateSeparator(group.date)}
-                  </span>
-                </div>
+        <div className="relative min-h-0 flex-1">
+          <div
+            ref={scrollRef}
+            onScroll={(event) => {
+              const container = event.currentTarget;
+              stickToBottomRef.current =
+                container.scrollHeight - container.scrollTop - container.clientHeight < 64;
+              if (stickToBottomRef.current) setHasNewMessages(false);
+            }}
+            className={cn("h-full", hideScrollbarClassName)}
+          >
+            <div className="mx-auto max-w-3xl space-y-5 px-3 py-3 sm:px-4">
+              {groupedMessages.map((group) => (
+                <div key={group.date} className="space-y-4">
+                  <div className="flex items-center justify-center px-1">
+                    <span className="shrink-0 text-[11px] font-medium text-muted-foreground">
+                      {formatDateSeparator(group.date)}
+                    </span>
+                  </div>
 
-                {group.messages.map((message) => (
-                  <MessageBubble
-                    key={message.id}
-                    message={message}
-                    session={session}
-                    displayName={displayName}
-                  />
-                ))}
-              </div>
-            ))}
+                  {group.messages.map((message) => (
+                    <MessageBubble
+                      key={message.id}
+                      message={message}
+                      session={session}
+                      displayName={displayName}
+                    />
+                  ))}
+                </div>
+              ))}
+            </div>
           </div>
+          {hasNewMessages ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full shadow-md"
+              onClick={() => {
+                const container = scrollRef.current;
+                if (!container) return;
+                container.scrollTop = container.scrollHeight;
+                stickToBottomRef.current = true;
+                setHasNewMessages(false);
+              }}
+            >
+              New messages
+            </Button>
+          ) : null}
+          <output aria-live="polite" className="sr-only">
+            {hasNewMessages ? "New messages have arrived" : ""}
+          </output>
         </div>
 
         <div className="shrink-0 px-3 pb-3 sm:px-4">

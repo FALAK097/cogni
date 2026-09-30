@@ -19,6 +19,7 @@
     "test:widget-preview-isolation": "node --test scripts/test-widget-preview-isolation.mjs",
     "test:widget-settings": "node --test scripts/test-widget-settings.mjs",
     "test:conversation-append": "node --test scripts/test-conversation-append.mjs",
+    "test:conversation-scroll": "node --test scripts/test-conversation-scroll.mjs",
     "test:rate-limit": "node --test scripts/test-rate-limit.mjs",
     "test:safe-fetch": "node --test scripts/test-safe-fetch.mjs",
     "check": "pnpm lint && pnpm typecheck && pnpm fmt:check",
