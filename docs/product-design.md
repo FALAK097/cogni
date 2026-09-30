@@ -151,13 +151,13 @@ workflows/channels. Provider secrets remain server-only and never appear in brow
 ## Support operations and reporting
 
 Insights trend implementation uses the [EvilCharts area-chart reference](https://evilcharts.com/docs/recharts/area-chart/static)
-with Recharts, semantic theme colors, dashed horizontal grid, restrained active points and
-gradient fill. Preserve exact dates/counts with linear interpolation and provide View data
-tables. Operational chart updates render immediately without reveal animations. On desktop, give
-the primary trend half the chart row and let source/status breakdowns keep their 180px chart above
-the full-width legend; do not compress legends beside the donut. Keep the local adapter limited to
-the chart features this screen uses rather than importing unused brush, selection, and reveal
-systems. Other chart styling and exact palette matching await the owner's additional visual
+with Recharts, semantic theme colors, a dashed horizontal grid, restrained active points and a
+gradient fill. Keep each plotted value exact, use a restrained 700ms reveal that turns off for
+reduced-motion preferences, and provide an interactive tooltip plus a View data table. On desktop,
+give the primary trend half the chart row and let source/status breakdowns keep their 180px chart
+above the full-width legend; do not compress legends beside the donut. Keep the local adapter
+limited to the chart features this screen uses rather than adding unused brush or series-selection
+controls. Other chart styling and exact palette matching await the owner's additional visual
 references; do not claim pixel fidelity to screenshots that have not been provided.
 
 Tickets use an Inbox queue and contextual detail view with linked conversation/contact, number/title, assignee/team,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useId } from "react";
+import { useId, useSyncExternalStore } from "react";
 import {
   Area,
   AreaChart,
@@ -18,6 +18,21 @@ type TrendPoint = { label: string; value: number };
 
 const formatDefaultValue = (value: number) => value.toLocaleString();
 const formatDefaultLabel = (label: string) => label;
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+
+function subscribeToMotionPreference(onChange: () => void) {
+  const mediaQuery = window.matchMedia(REDUCED_MOTION_QUERY);
+  mediaQuery.addEventListener("change", onChange);
+  return () => mediaQuery.removeEventListener("change", onChange);
+}
+
+function getMotionPreference() {
+  return window.matchMedia(REDUCED_MOTION_QUERY).matches;
+}
+
+function getServerMotionPreference() {
+  return true;
+}
 
 // Gradient areas, sparse axes and restrained active dots follow EvilCharts' area
 // chart design: https://evilcharts.com/docs/recharts/area-chart/static
@@ -44,6 +59,11 @@ export function InsightsTrendChart({
   ariaLabel: string;
 }) {
   const gradientId = `trend-${useId().replace(/:/g, "")}`;
+  const prefersReducedMotion = useSyncExternalStore(
+    subscribeToMotionPreference,
+    getMotionPreference,
+    getServerMotionPreference,
+  );
   if (data.length === 0) {
     return (
       <div
@@ -118,13 +138,24 @@ export function InsightsTrendChart({
                 </defs>
                 {axes}
                 <Area
-                  type="linear"
+                  type="monotone"
                   dataKey="value"
                   stroke="var(--primary)"
                   strokeWidth={2}
                   fill={`url(#${gradientId})`}
-                  isAnimationActive={false}
-                  dot={data.length === 1}
+                  isAnimationActive={!prefersReducedMotion}
+                  animationDuration={700}
+                  animationEasing="ease-out"
+                  dot={
+                    data.length === 1
+                      ? {
+                          r: 4,
+                          fill: "var(--primary)",
+                          stroke: "var(--background)",
+                          strokeWidth: 2,
+                        }
+                      : false
+                  }
                   activeDot={{ r: 4, stroke: "var(--background)", strokeWidth: 2 }}
                 />
               </AreaChart>
@@ -136,13 +167,15 @@ export function InsightsTrendChart({
               >
                 {axes}
                 <Line
-                  type="linear"
+                  type="monotone"
                   dataKey="value"
                   stroke="var(--primary)"
                   strokeWidth={2}
                   dot={data.length === 1}
                   activeDot={{ r: 4, stroke: "var(--background)", strokeWidth: 2 }}
-                  isAnimationActive={false}
+                  isAnimationActive={!prefersReducedMotion}
+                  animationDuration={700}
+                  animationEasing="ease-out"
                 />
               </LineChart>
             )}
