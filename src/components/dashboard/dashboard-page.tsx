@@ -121,6 +121,14 @@ type ExportFormat = "csv" | "excel";
 type DateRangeValue = { start: Date; end: Date };
 type Granularity = "daily" | "weekly";
 type ExportSection = { title: string; headers: string[]; rows: string[][] };
+type DateRangePreset = "last-7-days" | "last-30-days" | "this-month" | "previous-month";
+
+const DATE_RANGE_PRESETS: { id: DateRangePreset; label: string }[] = [
+  { id: "last-7-days", label: "Last 7 days" },
+  { id: "last-30-days", label: "Last 30 days" },
+  { id: "this-month", label: "This month" },
+  { id: "previous-month", label: "Previous month" },
+];
 
 const DEFAULT_EXPORT_SELECTION = Object.fromEntries(
   EXPORT_SECTIONS.map((section) => [section.id, true]),
@@ -129,6 +137,24 @@ const DEFAULT_EXPORT_SELECTION = Object.fromEntries(
 function getDefaultDateRange(): DateRangeValue {
   const end = endOfDay(new Date());
   return { start: startOfDay(subDays(end, 6)), end };
+}
+
+function getPresetDateRange(preset: DateRangePreset): DateRangeValue {
+  const today = new Date();
+  const end = endOfDay(today);
+
+  switch (preset) {
+    case "last-7-days":
+      return { start: startOfDay(subDays(today, 6)), end };
+    case "last-30-days":
+      return { start: startOfDay(subDays(today, 29)), end };
+    case "this-month":
+      return { start: startOfMonth(today), end };
+    case "previous-month": {
+      const previousMonth = subMonths(startOfMonth(today), 1);
+      return { start: previousMonth, end: endOfDay(endOfMonth(previousMonth)) };
+    }
+  }
 }
 
 function formatNumber(value: number): string {
@@ -578,7 +604,9 @@ function CalendarMonth({
             <button
               key={day.toISOString()}
               type="button"
-              disabled={!inMonth}
+              disabled={!inMonth || isAfter(day, new Date())}
+              aria-pressed={isStart || isEnd}
+              aria-current={isToday ? "date" : undefined}
               onClick={() => onDayClick(day)}
               className={cn(
                 "flex h-8 w-full items-center justify-center rounded-md text-sm transition-colors",
@@ -643,6 +671,18 @@ function DateRangePicker({
     setDraftEnd(null);
   };
 
+  const handlePresetClick = (preset: DateRangePreset) => {
+    onChange(getPresetDateRange(preset));
+    setOpen(false);
+    setDraftStart(null);
+    setDraftEnd(null);
+  };
+
+  const isPresetSelected = (preset: DateRangePreset) => {
+    const range = getPresetDateRange(preset);
+    return isSameDay(value.start, range.start) && isSameDay(value.end, range.end);
+  };
+
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger
@@ -663,35 +703,55 @@ function DateRangePicker({
         <span>{label}</span>
       </PopoverTrigger>
       <PopoverContent align="end" side="bottom" sideOffset={6} className={POPOVER_PANEL_CLASS}>
-        <div className="flex items-center justify-between gap-3 pb-3">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            className="size-8"
-            onClick={() => setViewMonth((month) => subMonths(month, 1))}
-            aria-label="Previous month"
-          >
-            <HugeiconsIcon icon={ArrowLeft01Icon} strokeWidth={2} className="size-4" />
-          </Button>
-          <p className="text-sm font-medium">{format(viewMonth, "MMMM yyyy")}</p>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            className="size-8"
-            onClick={() => setViewMonth((month) => addMonths(month, 1))}
-            aria-label="Next month"
-          >
-            <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-4" />
-          </Button>
+        <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
+          <div className="grid grid-cols-2 gap-1 sm:w-28 sm:shrink-0 sm:grid-cols-1 sm:content-start sm:border-r sm:border-border/50 sm:pr-3">
+            {DATE_RANGE_PRESETS.map(({ id, label: presetLabel }) => (
+              <Button
+                key={id}
+                type="button"
+                variant={isPresetSelected(id) ? "secondary" : "ghost"}
+                size="sm"
+                className="h-8 justify-start px-2 text-left font-normal"
+                aria-pressed={isPresetSelected(id)}
+                onClick={() => handlePresetClick(id)}
+              >
+                {presetLabel}
+              </Button>
+            ))}
+          </div>
+          <div className="w-[252px]">
+            <div className="flex items-center justify-between gap-3 pb-3">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="size-8"
+                onClick={() => setViewMonth((month) => subMonths(month, 1))}
+                aria-label="Previous month"
+              >
+                <HugeiconsIcon icon={ArrowLeft01Icon} strokeWidth={2} className="size-4" />
+              </Button>
+              <p className="text-sm font-medium">{format(viewMonth, "MMMM yyyy")}</p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="size-8"
+                onClick={() => setViewMonth((month) => addMonths(month, 1))}
+                aria-label="Next month"
+                disabled={!isBefore(startOfMonth(viewMonth), startOfMonth(new Date()))}
+              >
+                <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-4" />
+              </Button>
+            </div>
+            <CalendarMonth
+              month={viewMonth}
+              rangeStart={displayStart}
+              rangeEnd={displayEnd}
+              onDayClick={handleDayClick}
+            />
+          </div>
         </div>
-        <CalendarMonth
-          month={viewMonth}
-          rangeStart={displayStart}
-          rangeEnd={displayEnd}
-          onDayClick={handleDayClick}
-        />
       </PopoverContent>
     </Popover>
   );
