@@ -3,7 +3,7 @@
 import { format, isToday, isYesterday } from "date-fns";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Bot, MessageSquare, Pause, Search, User, X } from "@/components/icons";
+import { Bot, Loader2, MessageSquare, Pause, Search, User, X } from "@/components/icons";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -90,7 +90,7 @@ export function ConversationsList({
   }, [selectedConversationId, markConversationRead]);
 
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 400);
+    const timer = setTimeout(() => setDebouncedSearch(search), 200);
     return () => clearTimeout(timer);
   }, [search]);
 
@@ -107,6 +107,8 @@ export function ConversationsList({
     search: debouncedSearch,
     filter,
   });
+  const isSearchPending =
+    search.trim() !== debouncedSearch.trim() || (isFetching && Boolean(search.trim()));
 
   const effectivePagesCache = useMemo(() => {
     if (!conversationsData || isPlaceholderData) return pagesCache;
@@ -166,7 +168,11 @@ export function ConversationsList({
       <div className="shrink-0 p-4">
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            {isSearchPending ? (
+              <Loader2 className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground motion-safe:animate-spin motion-reduce:animate-none" />
+            ) : (
+              <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            )}
             <Input
               aria-label="Search conversations"
               placeholder="Search conversations…"
@@ -185,6 +191,9 @@ export function ConversationsList({
                 <X className="size-4" aria-hidden="true" />
               </button>
             ) : null}
+            <output aria-live="polite" className="sr-only">
+              {isSearchPending ? "Searching conversations" : ""}
+            </output>
           </div>
         </div>
       </div>
@@ -197,7 +206,7 @@ export function ConversationsList({
           </Button>
         </div>
       ) : null}
-      <div className={cn("min-h-0 flex-1", hideScrollbarClassName)}>
+      <div aria-busy={isSearchPending} className={cn("min-h-0 flex-1", hideScrollbarClassName)}>
         {isError && conversations.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
             <p role="alert" className="text-sm text-muted-foreground">
