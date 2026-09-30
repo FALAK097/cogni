@@ -1,11 +1,11 @@
 # Cogni product roadmap
 
-Updated: 2026-09-29. Target: **AI agent + shared support inbox**, confirmed by the owner.
+Updated: 2026-09-30. Target: **AI agent + shared support inbox**, confirmed by the owner.
 
 This replaces the July architecture/status snapshot. Implementation evidence is the local branch
-`agent/omnichannel-agent-platform`, commit `92089bff194a76970c5d3abc8e053792fcb61f75`, and
-[PR #48](https://github.com/FALAK097/cogni/pull/48). Code present is not evidence that provider
-setup, deployed behavior, concurrency safety, or customer acceptance is complete.
+`agent/omnichannel-agent-platform` and [PR #48](https://github.com/FALAK097/cogni/pull/48). Code
+present is not evidence that provider setup, deployed behavior, concurrency safety, or customer
+acceptance is complete.
 
 ## Product promise
 
@@ -212,11 +212,10 @@ first-time user before expanding the shell.
 
 ## Status of this assessment
 
-PR #48 checks reported success for quality, React Doctor, GitGuardian and Vercel at the inspected
-head. The CI quality job runs lint/types/format; those checks do not certify runtime behavior.
-Prior review comments were read. Several older booking/webhook findings have been reworked in
-the current source; do not repeat outdated comments as current defects. Provider setup remains a
-release dependency described in the PR.
+The roadmap was rechecked on 2026-09-30. Live check and preview status belongs to PR #48 because
+each pushed head starts a new run. The current pass improves the responsive Insights chart row;
+`pnpm check` and `pnpm build` passed locally. Browser acceptance and remote checks remain separate
+gates. Provider setup remains a release dependency described in the PR.
 
 This pass updates the roadmap/design/evidence docs and begins public-flow/inbox UX corrections.
 Synthetic local testing exposed blank preview completion. Widget SSE framing, empty/aborted

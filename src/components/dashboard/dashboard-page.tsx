@@ -1119,8 +1119,8 @@ export function DashboardPage() {
         )}
       </section>
 
-      <section className="grid grid-cols-1 items-stretch gap-4 xl:grid-cols-5">
-        <DashboardCard className="flex min-h-[320px] flex-1 flex-col p-6 xl:col-span-3">
+      <section className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <DashboardCard className="flex min-h-[320px] flex-1 flex-col p-6 md:col-span-2 xl:col-span-2">
           <div className="mb-5 flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold tracking-tight">Conversations Over Time</h3>
             <GranularitySelect value={convGranularity} onChange={setConvGranularity} />
@@ -1144,13 +1144,13 @@ export function DashboardPage() {
           {isLoading ? (
             <Skeleton className="mx-auto size-[180px] rounded-full border border-border/50 bg-transparent" />
           ) : (
-            <div className="flex flex-1 flex-col items-center gap-5 sm:flex-row sm:items-center">
+            <div className="flex flex-1 flex-col items-center gap-4">
               <DonutChart
                 data={sourceChart.segments}
                 centerValue={sourceChart.total.toLocaleString()}
                 ariaLabel="Conversations by source"
               />
-              <DonutLegend items={sourceChart.legend} className="w-full flex-1" />
+              <DonutLegend items={sourceChart.legend} className="w-full" />
             </div>
           )}
         </DashboardCard>
@@ -1160,13 +1160,13 @@ export function DashboardPage() {
           {isLoading ? (
             <Skeleton className="mx-auto size-[180px] rounded-full border border-border/50 bg-transparent" />
           ) : (
-            <div className="flex flex-1 flex-col items-center gap-5 sm:flex-row sm:items-center">
+            <div className="flex flex-1 flex-col items-center gap-4">
               <DonutChart
                 data={statusChart.segments}
                 centerValue={statusChart.total.toLocaleString()}
                 ariaLabel="Conversations by status"
               />
-              <DonutLegend items={statusChart.legend} className="w-full flex-1" />
+              <DonutLegend items={statusChart.legend} className="w-full" />
             </div>
           )}
         </DashboardCard>
