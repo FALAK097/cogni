@@ -102,7 +102,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const POPOVER_PANEL_CLASS =
-  "w-auto rounded-xl border border-border/50 bg-zinc-50 p-4 text-foreground shadow-none ring-0 dark:bg-zinc-900";
+  "w-auto rounded-xl border border-border/50 bg-popover p-4 text-popover-foreground shadow-md ring-1 ring-foreground/10";
 
 const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"] as const;
 
