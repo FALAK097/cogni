@@ -772,7 +772,7 @@ function MessageBubble({
           className={cn(
             "rounded-xl px-4 py-3 text-sm leading-relaxed",
             isUser
-              ? "border border-border/50 bg-white text-foreground dark:bg-zinc-950"
+              ? "border border-border/50 bg-card text-foreground"
               : isTeam
                 ? "border border-primary/15 bg-primary/8 text-foreground"
                 : "border border-primary/10 bg-primary/5 text-foreground",

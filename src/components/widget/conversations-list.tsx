@@ -176,7 +176,7 @@ export function ConversationsList({
             <Input
               aria-label="Search conversations"
               placeholder="Search conversations…"
-              className="h-9 rounded-lg border-border/50 bg-white pl-9 pr-9 text-sm shadow-none dark:bg-zinc-950"
+              className="h-9 rounded-lg border-border/50 bg-input/50 pl-9 pr-9 text-sm shadow-none"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />

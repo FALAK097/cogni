@@ -204,7 +204,7 @@ export function WidgetConversations({ initialConversationId = null }: WidgetConv
               part="details"
             />
           ) : (
-            <div className="flex h-full items-center justify-center rounded-xl border border-border/60 bg-white p-4 dark:bg-zinc-950">
+            <div className="flex h-full items-center justify-center rounded-xl border border-border/60 bg-card p-4">
               <p className="text-center text-xs text-muted-foreground">
                 Contact and conversation details will appear here
               </p>
