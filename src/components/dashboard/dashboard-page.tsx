@@ -90,13 +90,13 @@ const CHART_COLORS = [
 ] as const;
 
 const STATUS_COLOR_CLASSES: Record<string, string> = {
-  Resolved: "bg-primary",
+  Closed: "bg-primary",
   "In Progress": "bg-chart-2",
   Unresolved: "bg-chart-4",
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  Resolved: "var(--primary)",
+  Closed: "var(--primary)",
   "In Progress": "var(--chart-2)",
   Unresolved: "var(--chart-4)",
 };
@@ -200,10 +200,10 @@ function buildExportSections(
           pct(analytics.kpis.uniqueUsers.changePercent),
         ],
         [
-          "Resolved Conversations",
-          String(analytics.kpis.resolvedConversations.value),
-          String(analytics.kpis.resolvedConversations.previousValue),
-          pct(analytics.kpis.resolvedConversations.changePercent),
+          "Closed Conversations",
+          String(analytics.kpis.closedConversations.value),
+          String(analytics.kpis.closedConversations.previousValue),
+          pct(analytics.kpis.closedConversations.changePercent),
         ],
         [
           "Avg. Response Time",
@@ -1064,9 +1064,9 @@ export function DashboardPage() {
               }
             />
             <MetricCard
-              label="Resolved Conversations"
-              value={analytics.kpis.resolvedConversations.value.toLocaleString()}
-              metric={analytics.kpis.resolvedConversations}
+              label="Closed Conversations"
+              value={analytics.kpis.closedConversations.value.toLocaleString()}
+              metric={analytics.kpis.closedConversations}
               previousRange={analytics.previousDateRange}
               icon={<HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="size-[18px]" />}
             />
@@ -1221,7 +1221,7 @@ export function DashboardPage() {
               href="/conversations"
               className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
             >
-              View all questions
+              Open inbox
               <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-4" />
             </Link>
           </div>

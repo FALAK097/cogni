@@ -142,7 +142,7 @@ function computeAvgResponseTimeMs(messages: MessageJson[]): number | null {
 
 function aggregatePeriod(conversations: ConversationRow[]) {
   const uniqueUsers = new Set<string>();
-  let resolvedConversations = 0;
+  let closedConversations = 0;
   let messagesSent = 0;
   let messagesReceived = 0;
   let engagedConversations = 0;
@@ -169,7 +169,7 @@ function aggregatePeriod(conversations: ConversationRow[]) {
       uniqueUsers.add(conversation.visitorSessionId);
     }
 
-    if (conversation.status === "CLOSED") resolvedConversations++;
+    if (conversation.status === "CLOSED") closedConversations++;
 
     const source = categorizeSource(
       conversation.visitorSession?.referrer ?? null,
@@ -179,7 +179,7 @@ function aggregatePeriod(conversations: ConversationRow[]) {
 
     const statusLabel =
       conversation.status === "CLOSED"
-        ? "Resolved"
+        ? "Closed"
         : conversation.status === "OPEN" || conversation.status === "ASSIGNED"
           ? "In Progress"
           : "Unresolved";
@@ -235,7 +235,7 @@ function aggregatePeriod(conversations: ConversationRow[]) {
   return {
     totalConversations,
     uniqueUserCount,
-    resolvedConversations,
+    closedConversations,
     avgResponseTimeMs,
     responseTimeSamples: responseTimes.length,
     satisfactionScore,
@@ -372,10 +372,7 @@ export async function getDashboardAnalytics(
     kpis: {
       totalConversations: toMetric(current.totalConversations, previous.totalConversations),
       uniqueUsers: toMetric(current.uniqueUserCount, previous.uniqueUserCount),
-      resolvedConversations: toMetric(
-        current.resolvedConversations,
-        previous.resolvedConversations,
-      ),
+      closedConversations: toMetric(current.closedConversations, previous.closedConversations),
       avgResponseTime: {
         ...toMetric(current.avgResponseTimeMs, previous.avgResponseTimeMs),
         formatted:

@@ -41,7 +41,7 @@ export type DashboardAnalytics = {
   kpis: {
     totalConversations: MetricComparison;
     uniqueUsers: MetricComparison;
-    resolvedConversations: MetricComparison;
+    closedConversations: MetricComparison;
     avgResponseTime: FormattedMetricComparison;
     satisfactionScore: FormattedMetricComparison & { max: number };
   };
