@@ -174,6 +174,7 @@ export function WidgetConversations({ initialConversationId = null }: WidgetConv
         >
           {selectedConversationId ? (
             <ConversationDetail
+              key={selectedConversationId}
               conversationId={selectedConversationId}
               onBack={() => setSelectedConversationId(null)}
               part="chat"
@@ -190,6 +191,7 @@ export function WidgetConversations({ initialConversationId = null }: WidgetConv
         <div className={cn(detailsColumnClassName, "hidden w-[292px] shrink-0 xl:flex")}>
           {selectedConversationId ? (
             <ConversationDetail
+              key={selectedConversationId}
               conversationId={selectedConversationId}
               onBack={() => {}}
               part="details"

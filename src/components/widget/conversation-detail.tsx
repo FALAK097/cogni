@@ -15,6 +15,7 @@ import {
   Pencil,
   Pause,
   Play,
+  MessageSquare,
   ThumbsDown,
   ThumbsUp,
   Trash2,
@@ -191,8 +192,13 @@ export function ConversationDetail({
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showDetailsSheet, setShowDetailsSheet] = useState(false);
-  const [composerText, setComposerText] = useState("");
+  const [composerMode, setComposerMode] = useState<"reply" | "note">("reply");
+  const [replyText, setReplyText] = useState("");
+  const [noteText, setNoteText] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const composerText = composerMode === "reply" ? replyText : noteText;
+  const setComposerText = composerMode === "reply" ? setReplyText : setNoteText;
 
   const { data: session, isLoading, isError, error } = useConversation(conversationId);
   const deleteConversationMutation = useDeleteConversation();
@@ -286,14 +292,17 @@ export function ConversationDetail({
     if (!text || sendMessageMutation.isPending) return;
 
     sendMessageMutation.mutate(
-      { conversationId, message: text, action: "reply" },
+      { conversationId, message: text, action: composerMode },
       {
         onSuccess: () => {
           setComposerText("");
-          toast({ title: "Reply sent" });
+          toast({ title: composerMode === "reply" ? "Reply sent" : "Internal note added" });
         },
         onError: () => {
-          toast({ title: "Failed to send message", variant: "destructive" });
+          toast({
+            title: composerMode === "reply" ? "Failed to send reply" : "Failed to add note",
+            variant: "destructive",
+          });
         },
       },
     );
@@ -339,11 +348,7 @@ export function ConversationDetail({
   if (part === "details") {
     return (
       <div className={cn("flex h-full flex-col gap-2.5", hideScrollbarClassName)}>
-        <SessionDetailsContent
-          conversationId={conversationId}
-          session={session}
-          displayName={displayName}
-        />
+        <SessionDetailsContent session={session} displayName={displayName} />
       </div>
     );
   }
@@ -433,11 +438,7 @@ export function ConversationDetail({
                   <SheetTitle>Conversation details</SheetTitle>
                 </SheetHeader>
                 <div className="p-4">
-                  <SessionDetailsContent
-                    conversationId={conversationId}
-                    session={session}
-                    displayName={displayName}
-                  />
+                  <SessionDetailsContent session={session} displayName={displayName} />
                 </div>
               </SheetContent>
             </Sheet>
@@ -517,7 +518,7 @@ export function ConversationDetail({
         </div>
 
         <div className="shrink-0 px-3 pb-3 sm:px-4">
-          {copilotMutation.data ? (
+          {copilotMutation.data && composerMode === "reply" ? (
             <div className="mb-2 space-y-2 rounded-xl border border-primary/20 bg-primary/[0.03] p-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="flex items-center gap-1.5 text-xs font-semibold">
@@ -540,7 +541,10 @@ export function ConversationDetail({
                   type="button"
                   size="sm"
                   className="h-7 text-xs"
-                  onClick={() => setComposerText(copilotMutation.data.draftReply)}
+                  onClick={() => {
+                    setComposerMode("reply");
+                    setReplyText(copilotMutation.data.draftReply);
+                  }}
                 >
                   Use editable draft
                 </Button>
@@ -552,13 +556,56 @@ export function ConversationDetail({
               </div>
             </div>
           ) : null}
-          <div className={composerBoxClassName}>
+          <div
+            className={cn(
+              composerBoxClassName,
+              composerMode === "note" &&
+                "border-amber-300/70 bg-amber-50/40 dark:border-amber-800/70 dark:bg-amber-950/10",
+            )}
+          >
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <fieldset className="inline-flex min-w-0 items-center gap-0.5 rounded-lg border border-border/50 bg-muted/30 p-0.5">
+                <legend className="sr-only">Message type</legend>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={composerMode === "reply" ? "secondary" : "ghost"}
+                  className="h-11 gap-1.5 px-3 text-xs sm:h-9 sm:px-2.5"
+                  aria-pressed={composerMode === "reply"}
+                  disabled={sendMessageMutation.isPending}
+                  onClick={() => setComposerMode("reply")}
+                >
+                  <MessageSquare className="size-3.5" aria-hidden="true" />
+                  Reply
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={composerMode === "note" ? "secondary" : "ghost"}
+                  className="h-11 gap-1.5 px-3 text-xs sm:h-9 sm:px-2.5"
+                  aria-pressed={composerMode === "note"}
+                  disabled={sendMessageMutation.isPending}
+                  onClick={() => setComposerMode("note")}
+                >
+                  <FileText className="size-3.5" aria-hidden="true" />
+                  Note
+                </Button>
+              </fieldset>
+              {composerMode === "note" ? (
+                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-800 dark:text-amber-300">
+                  <FileText className="size-3" aria-hidden="true" />
+                  Team only
+                </span>
+              ) : null}
+            </div>
             <Textarea
               value={composerText}
               onChange={(event) => setComposerText(event.target.value)}
-              aria-label="Reply to customer"
-              placeholder="Type your reply..."
-              className="min-h-[64px] resize-none rounded-lg border-border/50 bg-[#fafafa] px-3 py-2 text-sm leading-relaxed shadow-none dark:bg-zinc-900/50"
+              aria-label={composerMode === "reply" ? "Reply to customer" : "Internal note"}
+              placeholder={
+                composerMode === "reply" ? "Type your reply..." : "Write a note for your team..."
+              }
+              className="min-h-[64px] resize-none rounded-lg border-border/50 bg-muted/20 px-3 py-2 text-base leading-relaxed shadow-none sm:text-sm dark:bg-muted/10"
               onKeyDown={(event) => {
                 if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
                   event.preventDefault();
@@ -569,17 +616,19 @@ export function ConversationDetail({
 
             <div className="mt-2 flex items-center justify-between gap-2">
               <div className="flex items-center gap-0.5">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-9 gap-1.5 px-2 text-sm text-muted-foreground"
-                  disabled={copilotMutation.isPending}
-                  onClick={() => copilotMutation.mutate()}
-                >
-                  <Bot className="h-3 w-3" />
-                  {copilotMutation.isPending ? "Thinking…" : "Copilot"}
-                </Button>
+                {composerMode === "reply" ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-9 gap-1.5 px-2 text-sm text-muted-foreground"
+                    disabled={copilotMutation.isPending}
+                    onClick={() => copilotMutation.mutate()}
+                  >
+                    <Bot className="h-3 w-3" />
+                    {copilotMutation.isPending ? "Thinking…" : "Copilot"}
+                  </Button>
+                ) : null}
               </div>
 
               <div className="flex items-center">
@@ -589,7 +638,7 @@ export function ConversationDetail({
                   onClick={handleSend}
                   disabled={!composerText.trim() || sendMessageMutation.isPending}
                 >
-                  Send
+                  {composerMode === "reply" ? "Send" : "Add note"}
                 </Button>
               </div>
             </div>
@@ -723,18 +772,12 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
 }
 
 function SessionDetailsContent({
-  conversationId,
   session,
   displayName,
 }: {
-  conversationId: string;
   session: ConversationDetailData;
   displayName: string;
 }) {
-  const { toast } = useToast();
-  const [isAddingNote, setIsAddingNote] = useState(false);
-  const [noteText, setNoteText] = useState("");
-  const sendMessageMutation = useSendConversationMessage();
   const locationLabel = [session.city, session.country].filter(Boolean).join(", ");
   const localTime = session.timezone
     ? new Intl.DateTimeFormat("en-US", {
@@ -767,25 +810,6 @@ function SessionDetailsContent({
   ]
     .filter(Boolean)
     .join(" • ");
-
-  const handleSaveNote = () => {
-    const text = noteText.trim();
-    if (!text || sendMessageMutation.isPending) return;
-
-    sendMessageMutation.mutate(
-      { conversationId, message: text, action: "note" },
-      {
-        onSuccess: () => {
-          setNoteText("");
-          setIsAddingNote(false);
-          toast({ title: "Note added" });
-        },
-        onError: () => {
-          toast({ title: "Failed to add note", variant: "destructive" });
-        },
-      },
-    );
-  };
 
   return (
     <>
@@ -1006,70 +1030,27 @@ function SessionDetailsContent({
       ) : null}
 
       <Card className={cn(detailCardClassName, "shrink-0")}>
-        <CardHeader
-          className={cn("flex flex-row items-center justify-between", detailCardHeaderClassName())}
-        >
+        <CardHeader className={detailCardHeaderClassName()}>
           <CardTitle className="text-xs font-semibold">Notes</CardTitle>
-          <button
-            type="button"
-            onClick={() => setIsAddingNote((current) => !current)}
-            className="text-[11px] font-medium text-primary hover:underline"
-          >
-            + Add note
-          </button>
         </CardHeader>
         <CardContent className={cn("pb-3", detailCardContentClassName())}>
-          {isAddingNote ? (
-            <div className="mb-3 space-y-2">
-              <Textarea
-                value={noteText}
-                onChange={(event) => setNoteText(event.target.value)}
-                aria-label="Internal note"
-                placeholder="Add an internal note..."
-                className="min-h-[72px] resize-none text-xs leading-relaxed"
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-                    event.preventDefault();
-                    handleSaveNote();
-                  }
-                }}
-              />
-              <div className="flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={() => {
-                    setIsAddingNote(false);
-                    setNoteText("");
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={handleSaveNote}
-                  disabled={!noteText.trim() || sendMessageMutation.isPending}
-                >
-                  Save note
-                </Button>
-              </div>
-            </div>
-          ) : null}
-
-          {allNotes.length === 0 && !isAddingNote ? (
-            <p className="text-xs text-muted-foreground">No notes yet</p>
+          {allNotes.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              No notes yet. Choose Note in the composer to add one for your team.
+            </p>
           ) : (
             <div className="space-y-3">
               {allNotes.map((note) => (
                 <div key={note.id} className="rounded-lg border border-border/50 bg-muted/20 p-3">
                   <p className="text-xs leading-relaxed text-foreground">{note.body}</p>
-                  <p className="mt-2 text-[11px] text-muted-foreground">
-                    {format(new Date(note.createdAt), "MMM d, yyyy")} · {note.authorName}
-                  </p>
+                  <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <Badge variant="outline" className="px-1.5 py-0 text-[10px] font-normal">
+                      {note.type === "internal" ? "Internal" : "Contact"}
+                    </Badge>
+                    <span>
+                      {format(new Date(note.createdAt), "MMM d, yyyy")} · {note.authorName}
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
