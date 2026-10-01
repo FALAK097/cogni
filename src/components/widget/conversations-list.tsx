@@ -23,6 +23,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useConversations, useMarkConversationRead } from "@/hooks/query";
 import type { ConversationFilter, ConversationSummary } from "@/hooks/query";
 import { generateAvatarUrl } from "@/lib/avatar-generator";
+import { getConversationChannelLabel } from "@/features/conversations/channel-label";
 import { cn } from "@/lib/utils";
 
 import { scrollPaneClassName } from "./conversation-layout";
@@ -334,7 +335,7 @@ export function ConversationsList({
                     </div>
                     <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                       <span className="inline-flex rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
-                        {conversation.channel === "WIDGET" ? "Widget" : conversation.channel}
+                        {getConversationChannelLabel(conversation.channel)}
                       </span>
                       {conversation.status === "CLOSED" ? (
                         <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">

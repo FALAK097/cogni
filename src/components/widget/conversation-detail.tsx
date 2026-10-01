@@ -66,6 +66,7 @@ import { generateAvatarUrl } from "@/lib/avatar-generator";
 import { cn } from "@/lib/utils";
 import { resolveTranscriptScroll } from "@/features/conversations/transcript-scroll";
 import { clearSubmittedDraft } from "@/features/conversations/draft-state";
+import { getConversationChannelLabel } from "@/features/conversations/channel-label";
 
 import {
   scrollPaneClassName,
@@ -123,18 +124,6 @@ function getInitials(name: string) {
     return `${parts[0]?.[0] ?? ""}${parts[1]?.[0] ?? ""}`.toUpperCase();
   }
   return name.slice(0, 2).toUpperCase();
-}
-
-function getConversationChannelLabel(channel?: string) {
-  if (!channel || channel === "WIDGET") return "Website widget";
-  const labels: Record<string, string> = {
-    DISCORD: "Discord",
-    GCHAT: "Google Chat",
-    SLACK: "Slack",
-    TEAMS: "Microsoft Teams",
-    WHATSAPP: "WhatsApp",
-  };
-  return labels[channel] ?? formatStatusLabel(channel);
 }
 
 function splitMessageSources(content: string) {
