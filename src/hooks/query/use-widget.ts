@@ -21,7 +21,7 @@ export interface IpData {
   timezone?: string;
 }
 
-export type ConversationFilter = "all" | "unassigned" | "mine" | "open" | "closed";
+export type ConversationFilter = "all" | "unread" | "unassigned" | "mine" | "open" | "closed";
 
 export interface WidgetSessionSummary {
   id: string;

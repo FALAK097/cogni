@@ -40,6 +40,10 @@ test("list params use bounded defaults and normalize search", () => {
 
 test("list params reject unsupported filters, oversized pages, and long searches", () => {
   assert.equal(parseInboxListParams(new URLSearchParams("filter=deleted")).ok, false);
+  assert.deepEqual(
+    parseInboxListParams(new URLSearchParams("filter=unread")).data.filter,
+    "unread",
+  );
   assert.equal(parseInboxListParams(new URLSearchParams("limit=101")).ok, false);
   assert.equal(parseInboxListParams(new URLSearchParams(`search=${"x".repeat(201)}`)).ok, false);
 });

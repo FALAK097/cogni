@@ -35,6 +35,8 @@ function conversationFilterCond(
   const base = getInboxConversationBaseCond(c);
 
   switch (filter) {
+    case "unread":
+      return and(base, hasUnreadVisitorMessagesSql(c));
     case "unassigned":
       return and(base, isNull(c.assignedMemberId), ne(c.status, "CLOSED"));
     case "mine":

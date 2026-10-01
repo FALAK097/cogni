@@ -161,13 +161,15 @@ export function ConversationsList({
     ? `No matches for “${searchTerm}”`
     : filter === "all"
       ? "No conversations yet"
-      : filter === "unassigned"
-        ? "No unassigned conversations"
-        : filter === "mine"
-          ? "No conversations assigned to you"
-          : filter === "open"
-            ? "No open conversations"
-            : "No closed conversations";
+      : filter === "unread"
+        ? "You’re all caught up"
+        : filter === "unassigned"
+          ? "No unassigned conversations"
+          : filter === "mine"
+            ? "No conversations assigned to you"
+            : filter === "open"
+              ? "No open conversations"
+              : "No closed conversations";
 
   useEffect(() => {
     if (selectedConversationId || !firstConversationId) return;
@@ -258,7 +260,9 @@ export function ConversationsList({
                   ? "Try another search or clear this one."
                   : filter === "all"
                     ? "New website chats will appear here. Set up your agent to start receiving conversations."
-                    : "Try another inbox view to find a conversation."}
+                    : filter === "unread"
+                      ? "Unread visitor messages will show up here."
+                      : "Try another inbox view to find a conversation."}
               </p>
             </div>
             {searchTerm ? (

@@ -90,6 +90,7 @@ before(async () => {
         body: `cursor sample ${index + 1}`,
         authorType: "VISITOR",
         visibility: "PUBLIC",
+        ...(index === 1 ? { readAt: now } : {}),
         createdAt: now,
       },
     ]);
@@ -142,8 +143,11 @@ test("inbox cursors return complete, stable pages and correct unread view counts
   );
   assert.equal(firstPage.pagination.hasMore, true);
   assert.ok(firstPage.pagination.nextCursor);
-  assert.deepEqual(firstPage.counts, { all: 3, unassigned: 1, mine: 1, open: 2, closed: 1 });
-  assert.ok(firstItems.every((item) => item.unreadCount === 1));
+  assert.deepEqual(firstPage.counts, { all: 2, unassigned: 0, mine: 1, open: 1, closed: 1 });
+  assert.deepEqual(
+    firstItems.map((item) => item.unreadCount),
+    [1, 0],
+  );
 
   const secondPage = await getInboxPage(workspaceId, {
     membershipId: memberId,
@@ -193,5 +197,24 @@ test("open view includes assigned conversations and mine excludes closed convers
   assert.deepEqual(
     mine.conversations.map((conversation) => conversation.id),
     [conversationIds[2]],
+  );
+});
+
+test("unread view only includes conversations with an unread visitor message", async () => {
+  const result = await getInboxPage(workspaceId, {
+    membershipId: memberId,
+    filter: "unread",
+    limit: 20,
+    cursor: null,
+  });
+
+  assert.deepEqual(
+    result.conversations.map((conversation) => conversation.id),
+    [conversationIds[2], conversationIds[0]],
+  );
+  assert.ok(
+    result.conversations.every((conversation) =>
+      conversation.messages.some((message) => message.authorType === "VISITOR" && !message.readAt),
+    ),
   );
 });

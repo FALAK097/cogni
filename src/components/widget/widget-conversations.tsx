@@ -15,12 +15,17 @@ interface WidgetConversationsProps {
   initialConversationId?: string | null;
 }
 
-const FILTER_TABS: Array<{ value: ConversationFilter; label: string }> = [
-  { value: "all", label: "All" },
-  { value: "unassigned", label: "Unassigned" },
-  { value: "mine", label: "Mine" },
-  { value: "open", label: "Open" },
-  { value: "closed", label: "Closed" },
+const FILTER_TABS: Array<{
+  value: ConversationFilter;
+  label: string;
+  countKey: keyof typeof EMPTY_COUNTS;
+}> = [
+  { value: "all", label: "All", countKey: "all" },
+  { value: "unread", label: "Unread", countKey: "all" },
+  { value: "unassigned", label: "Unassigned", countKey: "unassigned" },
+  { value: "mine", label: "My inbox", countKey: "mine" },
+  { value: "open", label: "All open", countKey: "open" },
+  { value: "closed", label: "Closed", countKey: "closed" },
 ];
 
 const EMPTY_COUNTS = {
@@ -115,7 +120,7 @@ export function WidgetConversations({ initialConversationId = null }: WidgetConv
             >
               {FILTER_TABS.map((tab) => {
                 const active = filter === tab.value;
-                const count = counts[tab.value];
+                const count = counts[tab.countKey];
 
                 return (
                   <TabsTrigger

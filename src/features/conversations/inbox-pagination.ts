@@ -9,7 +9,7 @@ export type InboxCursor = z.infer<typeof inboxCursorSchema>;
 
 export type InboxListParams = {
   search?: string;
-  filter: "all" | "unassigned" | "mine" | "open" | "closed";
+  filter: "all" | "unread" | "unassigned" | "mine" | "open" | "closed";
   limit: number;
   cursor: InboxCursor | null;
 };
@@ -43,7 +43,7 @@ export function parseInboxListParams(
   };
 }
 
-const inboxListFilterSchema = z.enum(["all", "unassigned", "mine", "open", "closed"]);
+const inboxListFilterSchema = z.enum(["all", "unread", "unassigned", "mine", "open", "closed"]);
 
 export function encodeInboxCursor(cursor: InboxCursor) {
   return Buffer.from(JSON.stringify(cursor)).toString("base64url");
