@@ -37,7 +37,7 @@ async function loadIntegration(slug: string) {
   return integrationDetailResponseSchema.parse(body);
 }
 
-export function IntegrationDetail({ slug }: { slug: string }) {
+export function IntegrationDetail({ slug, canManage }: { slug: string; canManage: boolean }) {
   const router = useRouter();
   const { toast } = useToast();
   const disconnect = useDisconnectIntegration();
@@ -207,8 +207,11 @@ export function IntegrationDetail({ slug }: { slug: string }) {
           <p className="text-sm text-muted-foreground">
             Stops future actions. Existing audit history is retained.
           </p>
+          {!canManage ? (
+            <p className="text-sm text-muted-foreground">Only workspace owners can disconnect.</p>
+          ) : null}
           <AlertDialog>
-            <AlertDialogTrigger render={<Button variant="destructive" />}>
+            <AlertDialogTrigger render={<Button variant="destructive" disabled={!canManage} />}>
               Disconnect
             </AlertDialogTrigger>
             <AlertDialogContent>

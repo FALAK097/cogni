@@ -9,7 +9,7 @@ export const metadata = {
 };
 
 export default async function IntegrationsPage() {
-  await requireDashboardContext();
+  const { membership } = await requireDashboardContext();
 
   return (
     <ContentLayout>
@@ -21,7 +21,7 @@ export default async function IntegrationsPage() {
             Connect message channels and business tools for your agent.
           </p>
         </header>
-        <WidgetIntegrationsPage />
+        <WidgetIntegrationsPage canManage={membership.role === "OWNER"} />
       </div>
     </ContentLayout>
   );

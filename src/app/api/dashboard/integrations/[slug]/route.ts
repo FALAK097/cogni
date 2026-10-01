@@ -11,11 +11,12 @@ import {
   getActionStatusForDisplay,
 } from "@/features/integrations/action-recovery";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
+import { canManageWorkspace } from "@/lib/auth/permissions";
 
 type RouteContext = { params: Promise<{ slug: string }> };
 
 export async function GET(request: Request, context: RouteContext) {
-  const { db, workspace } = await requireDashboardContext();
+  const { db, workspace, membership } = await requireDashboardContext();
   const { slug } = await context.params;
   const provider = getComposioProviderBySlug(slug);
   if (!provider) return NextResponse.json({ error: "Integration not found." }, { status: 404 });
@@ -106,7 +107,7 @@ export async function GET(request: Request, context: RouteContext) {
       connectedAt: integration.updatedAt,
       lastHealthCheckAt: checkedAt,
       lastError: healthError,
-      inboundWebhookUrl,
+      inboundWebhookUrl: canManageWorkspace(membership.role) ? inboundWebhookUrl : null,
       capabilities: integrationTools
         .filter((tool) => tool.provider === provider)
         .map((tool) => ({

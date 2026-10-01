@@ -11,6 +11,8 @@ type IntegrationCategorySectionProps = {
   category: CategoryDefinition;
   integrations: IntegrationManifest[];
   isConnected: (slug: string) => boolean;
+  hasRecord: (slug: string) => boolean;
+  canManage: boolean;
   onSelect: (slug: string) => void;
   initialVisible?: number;
 };
@@ -19,6 +21,8 @@ export function IntegrationCategorySection({
   category,
   integrations,
   isConnected,
+  hasRecord,
+  canManage,
   onSelect,
   initialVisible = 4,
 }: IntegrationCategorySectionProps) {
@@ -65,6 +69,8 @@ export function IntegrationCategorySection({
             key={integration.slug}
             integration={integration}
             isConnected={isConnected(integration.slug)}
+            hasRecord={hasRecord(integration.slug)}
+            canManage={canManage}
             onClick={() => onSelect(integration.slug)}
           />
         ))}

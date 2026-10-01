@@ -6,6 +6,7 @@ import {
   createAvailableSlots,
 } from "@/features/integrations/server/booking";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
+import { canManageWorkspace } from "@/lib/auth/permissions";
 import { widget } from "@/lib/db/schema";
 
 const defaultSettings = bookingSettingsInputSchema.parse({
@@ -37,7 +38,13 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
-  const { db, workspace } = await requireDashboardContext();
+  const { db, workspace, membership } = await requireDashboardContext();
+  if (!canManageWorkspace(membership.role)) {
+    return NextResponse.json(
+      { error: "Only workspace owners can change booking settings." },
+      { status: 403 },
+    );
+  }
   const parsed = bookingSettingsInputSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 });

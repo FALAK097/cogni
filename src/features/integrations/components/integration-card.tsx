@@ -9,14 +9,23 @@ import { cn } from "@/lib/utils";
 type IntegrationCardProps = {
   integration: IntegrationManifest;
   isConnected: boolean;
+  hasRecord: boolean;
+  canManage: boolean;
   onClick: () => void;
 };
 
-export function IntegrationCard({ integration, isConnected, onClick }: IntegrationCardProps) {
+export function IntegrationCard({
+  integration,
+  isConnected,
+  hasRecord,
+  canManage,
+  onClick,
+}: IntegrationCardProps) {
   const isComingSoon = integration.isComingSoon;
+  const canOpen = hasRecord || canManage;
 
   const handleClick = () => {
-    if (!isComingSoon) {
+    if (!isComingSoon && canOpen) {
       onClick();
     }
   };
@@ -24,18 +33,20 @@ export function IntegrationCard({ integration, isConnected, onClick }: Integrati
   return (
     <button
       type="button"
-      disabled={isComingSoon}
+      disabled={isComingSoon || !canOpen}
       className={cn(
         "group relative flex h-full w-full flex-col rounded-xl border border-border/70 bg-card p-4 sm:p-5 text-left transition-[transform,background-color,border-color,box-shadow] duration-200",
-        isComingSoon
+        isComingSoon || !canOpen
           ? "opacity-75"
           : "cursor-pointer hover:border-primary/40 hover:shadow-[0_4px_20px_-8px_rgba(0,0,0,0.08)] hover:-translate-y-0.5",
       )}
       onClick={handleClick}
       aria-label={
         isComingSoon
-          ? `${integration.name} coming soon`
-          : `${isConnected ? "Manage" : "Connect"} ${integration.name}`
+          ? integration.name + " coming soon"
+          : !canOpen
+            ? integration.name + ". Only workspace owners can connect this integration."
+            : (isConnected ? "Manage " : hasRecord ? "Reconnect " : "Connect ") + integration.name
       }
     >
       {/* Status Indicator */}
@@ -82,6 +93,14 @@ export function IntegrationCard({ integration, isConnected, onClick }: Integrati
           >
             Coming Soon
           </span>
+        ) : !canManage && !hasRecord ? (
+          <span className="inline-flex w-full justify-center rounded-md border border-border/70 px-3 py-1.5 text-[13px] font-medium text-muted-foreground">
+            Owner access required
+          </span>
+        ) : !canManage ? (
+          <span className="inline-flex w-full justify-center rounded-md border border-border/70 px-3 py-1.5 text-[13px] font-medium text-muted-foreground">
+            View connection status
+          </span>
         ) : isConnected ? (
           <span
             className={cn(
@@ -94,11 +113,12 @@ export function IntegrationCard({ integration, isConnected, onClick }: Integrati
         ) : (
           <span
             className={cn(
-              buttonVariants({ size: "sm" }),
-              "w-full bg-primary text-primary-foreground hover:bg-primary/90 font-medium shadow-sm",
+              buttonVariants({ variant: hasRecord ? "outline" : "default", size: "sm" }),
+              "w-full font-medium",
+              !hasRecord && "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90",
             )}
           >
-            Connect
+            {hasRecord ? "Reconnect" : "Connect"}
           </span>
         )}
       </div>

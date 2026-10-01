@@ -7,14 +7,19 @@ import {
   getComposioProviderBySlug,
 } from "@/features/integrations/server/composio-connections";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
+import { canManageWorkspace } from "@/lib/auth/permissions";
 import { integration as integrationTable } from "@/lib/db/schema";
 
 export async function GET(request: Request) {
-  const { db, workspace } = await requireDashboardContext();
+  const { db, workspace, membership } = await requireDashboardContext();
   const url = new URL(request.url);
   const slug = url.searchParams.get("slug") ?? "";
-  const provider = getComposioProviderBySlug(slug);
   const destination = new URL("/integrations", url.origin);
+  if (!canManageWorkspace(membership.role)) {
+    destination.searchParams.set("integration", "owner-required");
+    return NextResponse.redirect(destination);
+  }
+  const provider = getComposioProviderBySlug(slug);
 
   if (!provider) {
     destination.searchParams.set("integration", "unsupported");

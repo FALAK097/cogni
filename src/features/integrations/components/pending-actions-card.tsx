@@ -18,7 +18,7 @@ type PendingApproval = {
   actionStatus: string | null;
   actionErrorMessage: string | null;
   expiresAt: string;
-  token: string;
+  token: string | null;
 };
 
 async function readResponse<T>(response: Response): Promise<T> {
@@ -27,7 +27,7 @@ async function readResponse<T>(response: Response): Promise<T> {
   return body;
 }
 
-export function PendingActionsCard() {
+export function PendingActionsCard({ canManage }: { canManage: boolean }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const query = useQuery<{ approvals: PendingApproval[] }>({
@@ -125,7 +125,11 @@ export function PendingActionsCard() {
                   </p>
                 ) : null}
               </div>
-              {outcomeUnknown ? null : (
+              {!canManage ? (
+                <p className="max-w-48 text-right text-xs text-muted-foreground">
+                  Owner approval required
+                </p>
+              ) : outcomeUnknown ? null : (
                 <div className="flex shrink-0 gap-2">
                   {approval.status === "PENDING" ? (
                     <Button

@@ -895,6 +895,7 @@ export function WidgetInstallationPanel({
   onAddDomain,
   onRemoveDomain,
   onCopyScript,
+  canManage,
 }: {
   allowedDomains: string[];
   domainInput: string;
@@ -904,6 +905,7 @@ export function WidgetInstallationPanel({
   onAddDomain: () => void;
   onRemoveDomain: (domain: string) => void;
   onCopyScript: () => void;
+  canManage: boolean;
 }) {
   return (
     <>
@@ -932,6 +934,7 @@ export function WidgetInstallationPanel({
                 id="authorized-domain"
                 value={domainInput}
                 onChange={(event) => onDomainInputChange(event.target.value)}
+                disabled={!canManage}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
                     event.preventDefault();
@@ -945,7 +948,7 @@ export function WidgetInstallationPanel({
             <Button
               type="button"
               onClick={onAddDomain}
-              disabled={!domainInput.trim()}
+              disabled={!canManage || !domainInput.trim()}
               className="h-10 rounded-lg bg-[var(--widget-accent)] px-4 text-sm font-medium text-primary-foreground hover:bg-[var(--widget-accent-hover)]"
             >
               Add
@@ -963,6 +966,7 @@ export function WidgetInstallationPanel({
                   variant="ghost"
                   size="icon-sm"
                   onClick={() => onRemoveDomain(domain)}
+                  disabled={!canManage}
                   className="size-8 text-muted-foreground hover:text-destructive"
                   aria-label={`Remove ${domain}`}
                 >

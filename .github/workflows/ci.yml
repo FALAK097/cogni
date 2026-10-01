@@ -48,6 +48,7 @@ jobs:
       - run: pnpm test:widget-settings
       - run: pnpm test:conversation-append
       - run: pnpm test:integration-action-recovery
+      - run: pnpm test:workspace-permissions
       - run: pnpm test:rate-limit
       - run: pnpm test:safe-fetch
       - run: pnpm fmt:check

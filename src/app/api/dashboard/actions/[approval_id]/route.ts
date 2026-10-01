@@ -4,6 +4,7 @@ import { z } from "zod";
 import { decideApprovalRequest } from "@/features/integrations/server/approval-service";
 import { executeApprovedTool } from "@/features/integrations/server/tool-executor";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
+import { canManageWorkspace } from "@/lib/auth/permissions";
 import { completeWorkflowRun, updateWorkflowStep } from "@/lib/workflows/runner";
 import { approvalRequest, workflowRun } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
@@ -16,7 +17,13 @@ const decisionSchema = z.object({
 });
 
 export async function PATCH(request: Request, context: RouteContext) {
-  const { db, session, workspace } = await requireDashboardContext();
+  const { db, session, workspace, membership } = await requireDashboardContext();
+  if (!canManageWorkspace(membership.role)) {
+    return NextResponse.json(
+      { error: "Only workspace owners can approve actions." },
+      { status: 403 },
+    );
+  }
   const { approval_id: approvalId } = await context.params;
   const parsed = decisionSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {

@@ -9,8 +9,9 @@ import { Button } from "@/components/ui/button";
 import { useConnectIntegration, useIntegrations } from "@/hooks/query";
 import { INTEGRATION_CATEGORIES } from "@/features/integrations/categories";
 import { getAllIntegrations, getIntegrationsByCategory } from "@/features/integrations/registry";
+import { Info } from "@/components/icons";
 
-export function WidgetIntegrationsPage() {
+export function WidgetIntegrationsPage({ canManage }: { canManage: boolean }) {
   const { toast } = useToast();
   const integrationsQuery = useIntegrations();
   const connectMutation = useConnectIntegration();
@@ -25,12 +26,24 @@ export function WidgetIntegrationsPage() {
     );
   }, [integrationsQuery.data?.workspaceIntegrations]);
 
+  const existingSlugs = useMemo(
+    () =>
+      new Set(
+        (integrationsQuery.data?.workspaceIntegrations ?? [])
+          .filter((entry) => entry.status !== "DISCONNECTED")
+          .map((entry) => entry.slug ?? entry.integrationSlug)
+          .filter(Boolean) as string[],
+      ),
+    [integrationsQuery.data?.workspaceIntegrations],
+  );
+
   async function handleSelect(slug: string) {
-    const connected = connectedSlugs.has(slug);
+    const connected = connectedSlugs.has(slug) || (!canManage && existingSlugs.has(slug));
     if (connected) {
       window.location.assign(`/integrations/${slug}`);
       return;
     }
+    if (!canManage) return;
     try {
       await connectMutation.mutateAsync({ slug });
       return;
@@ -63,7 +76,16 @@ export function WidgetIntegrationsPage() {
 
   return (
     <div className="space-y-10 pb-10">
-      <PendingActionsCard />
+      <PendingActionsCard canManage={canManage} />
+      {!canManage ? (
+        <output className="flex items-start gap-2 rounded-lg border border-border/70 bg-muted/30 px-3 py-2.5 text-sm text-muted-foreground">
+          <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          <p>
+            You can view connections and approvals. A workspace owner manages connections and makes
+            approval decisions.
+          </p>
+        </output>
+      ) : null}
       {INTEGRATION_CATEGORIES.map((category) => {
         const integrations = getIntegrationsByCategory(category.id);
         if (integrations.length === 0) return null;
@@ -73,7 +95,9 @@ export function WidgetIntegrationsPage() {
             key={category.id}
             category={category}
             integrations={integrations}
+            canManage={canManage}
             isConnected={(slug) => connectedSlugs.has(slug)}
+            hasRecord={(slug) => existingSlugs.has(slug)}
             onSelect={handleSelect}
             initialVisible={6}
           />

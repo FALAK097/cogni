@@ -22,6 +22,7 @@
     "test:conversation-draft": "node --test scripts/test-conversation-draft.mjs",
     "test:conversation-scroll": "node --test scripts/test-conversation-scroll.mjs",
     "test:integration-action-recovery": "node --test scripts/test-integration-action-recovery.mjs",
+    "test:workspace-permissions": "node --test scripts/test-workspace-permissions.mjs",
     "test:inbox-pagination": "node --test scripts/test-inbox-pagination.mjs",
     "test:inbox-pagination-db": "node --test scripts/test-inbox-pagination-db.mjs",
     "test:rate-limit": "node --test scripts/test-rate-limit.mjs",

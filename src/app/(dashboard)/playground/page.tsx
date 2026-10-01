@@ -13,12 +13,20 @@ export default async function PlaygroundPage({
 }: {
   searchParams: Promise<{ subtab?: string }>;
 }) {
-  const [{ workspace }, { subtab }] = await Promise.all([requireDashboardContext(), searchParams]);
+  const [{ workspace, membership }, { subtab }] = await Promise.all([
+    requireDashboardContext(),
+    searchParams,
+  ]);
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <Suspense>
-        <WidgetCustomizer workspaceId={workspace.id} initialSubtab={subtab} key={workspace.id} />
+        <WidgetCustomizer
+          workspaceId={workspace.id}
+          initialSubtab={subtab}
+          canManage={membership.role === "OWNER"}
+          key={workspace.id}
+        />
       </Suspense>
     </div>
   );

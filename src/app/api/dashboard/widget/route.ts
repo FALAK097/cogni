@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { canManageWorkspace } from "@/lib/auth/permissions";
 import { eq } from "drizzle-orm";
 
 import {
@@ -183,12 +184,26 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
+  const { membership } = await requireDashboardContext();
+  if (!canManageWorkspace(membership.role)) {
+    return NextResponse.json(
+      { error: "Only workspace owners can change agent settings." },
+      { status: 403 },
+    );
+  }
   const body = (await request.json()) as Record<string, unknown>;
   const settings = await saveWidgetConfig(body);
   return NextResponse.json(settings);
 }
 
 export async function POST(request: Request) {
+  const { membership } = await requireDashboardContext();
+  if (!canManageWorkspace(membership.role)) {
+    return NextResponse.json(
+      { error: "Only workspace owners can change agent settings." },
+      { status: 403 },
+    );
+  }
   const body = (await request.json()) as Record<string, unknown>;
   const settings = await saveWidgetConfig(body);
   return NextResponse.json(settings);

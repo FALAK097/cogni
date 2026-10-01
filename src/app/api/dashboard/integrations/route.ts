@@ -10,6 +10,7 @@ import {
   type ComposioProvider,
 } from "@/features/integrations/server/composio-connections";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
+import { canManageWorkspace } from "@/lib/auth/permissions";
 import { integration as integrationTable } from "@/lib/db/schema";
 import { env } from "@/lib/env/server";
 import { z } from "zod";
@@ -64,7 +65,13 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const { db, workspace } = await requireDashboardContext();
+  const { db, workspace, membership } = await requireDashboardContext();
+  if (!canManageWorkspace(membership.role)) {
+    return NextResponse.json(
+      { error: "Only workspace owners can manage connections." },
+      { status: 403 },
+    );
+  }
   const body = connectIntegrationSchema.safeParse(await request.json().catch(() => null));
   const slug = body.success ? body.data.slug.toLowerCase() : "";
   const provider = getComposioProviderBySlug(slug);
@@ -137,7 +144,13 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const { db, workspace } = await requireDashboardContext();
+  const { db, workspace, membership } = await requireDashboardContext();
+  if (!canManageWorkspace(membership.role)) {
+    return NextResponse.json(
+      { error: "Only workspace owners can manage connections." },
+      { status: 403 },
+    );
+  }
   const url = new URL(request.url);
   const slug = url.searchParams.get("slug");
 

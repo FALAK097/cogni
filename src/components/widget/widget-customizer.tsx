@@ -168,9 +168,11 @@ function WidgetCustomizerSkeleton() {
 export function WidgetCustomizer({
   workspaceId,
   initialSubtab,
+  canManage,
 }: {
   workspaceId?: string | null;
   initialSubtab?: string | null;
+  canManage: boolean;
 }) {
   const activeWorkspaceId = workspaceId || "";
   const { toast } = useToast();
@@ -209,18 +211,23 @@ export function WidgetCustomizer({
 
   const updateConfig = useCallback(
     <Key extends keyof WidgetCustomizerConfig>(key: Key, value: WidgetCustomizerConfig[Key]) => {
+      if (!canManage) return;
       const next = { ...configOverridesRef.current, [key]: value };
       configOverridesRef.current = next;
       setConfigOverrides(next);
     },
-    [],
+    [canManage],
   );
 
-  const updateConfigBatch = useCallback((updates: Partial<WidgetCustomizerConfig>) => {
-    const next = { ...configOverridesRef.current, ...updates };
-    configOverridesRef.current = next;
-    setConfigOverrides(next);
-  }, []);
+  const updateConfigBatch = useCallback(
+    (updates: Partial<WidgetCustomizerConfig>) => {
+      if (!canManage) return;
+      const next = { ...configOverridesRef.current, ...updates };
+      configOverridesRef.current = next;
+      setConfigOverrides(next);
+    },
+    [canManage],
+  );
 
   const handleSubTabChange = (value: string | number) => {
     if (typeof value !== "string" || !AGENT_SECTIONS.includes(value as AgentSection)) return;
@@ -263,6 +270,7 @@ export function WidgetCustomizer({
 
   const persistConfig = useCallback(
     (options?: { silent?: boolean }) => {
+      if (!canManage) return;
       if (!activeWorkspaceId || !widgetConfigData) {
         if (!activeWorkspaceId && !options?.silent) {
           toast({
@@ -327,7 +335,7 @@ export function WidgetCustomizer({
         },
       );
     },
-    [activeWorkspaceId, buildSavePayload, saveWidgetConfig, toast, widgetConfigData],
+    [activeWorkspaceId, buildSavePayload, canManage, saveWidgetConfig, toast, widgetConfigData],
   );
 
   useEffect(() => {
@@ -373,6 +381,7 @@ export function WidgetCustomizer({
   );
 
   const handleResetAppearance = () => {
+    if (!canManage) return;
     const defaults = getAppearanceDefaults();
     const next = {
       ...configOverridesRef.current,
@@ -588,6 +597,12 @@ export function WidgetCustomizer({
           )}
         </output>
       </div>
+      {!canManage ? (
+        <output className="shrink-0 rounded-lg border border-border/70 bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+          You can preview the agent. Only workspace owners can change settings or authorized
+          domains.
+        </output>
+      ) : null}
 
       <div className="flex min-h-0 flex-1 flex-col gap-2 lg:flex-row lg:gap-3">
         <div
@@ -616,48 +631,54 @@ export function WidgetCustomizer({
             </TabsList>
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
               <TabsContent value="build" keepMounted={false} className="space-y-8">
-                <WidgetAgentPanel
-                  agentName={config.agentName}
-                  instructions={config.instructions}
-                  escalationKeywords={config.escalationKeywords}
-                  modelProvider={config.modelProvider}
-                  modelName={config.modelName}
-                  onUpdate={(key, value) => updateConfig(key, value)}
-                />
-                <WidgetBehaviourPanel
-                  inputPlaceholder={config.inputPlaceholder}
-                  autoShowPreviewDelay={config.autoShowPreviewDelay}
-                  hideSuggestionsOnInteract={config.hideSuggestionsOnInteract}
-                  enableLeadCapture={config.enableLeadCapture}
-                  leadCaptureMinutesThreshold={config.leadCaptureMinutesThreshold}
-                  leadCaptureMessageThreshold={config.leadCaptureMessageThreshold}
-                  leadCaptureKeywords={config.leadCaptureKeywords}
-                  enableBrochure={config.enableBrochure}
-                  brochureSuggestionText={config.brochureSuggestionText}
-                  privacyPolicyUrl={config.privacyPolicyUrl}
-                  onUpdate={handleBehaviourUpdate}
-                  onKeywordsChange={(value) => handleArrayChange("leadCaptureKeywords", value)}
-                />
-                <BookingSettingsCard />
+                <fieldset disabled={!canManage} className="min-w-0 space-y-8 border-0 p-0">
+                  <legend className="sr-only">Agent behavior settings</legend>
+                  <WidgetAgentPanel
+                    agentName={config.agentName}
+                    instructions={config.instructions}
+                    escalationKeywords={config.escalationKeywords}
+                    modelProvider={config.modelProvider}
+                    modelName={config.modelName}
+                    onUpdate={(key, value) => updateConfig(key, value)}
+                  />
+                  <WidgetBehaviourPanel
+                    inputPlaceholder={config.inputPlaceholder}
+                    autoShowPreviewDelay={config.autoShowPreviewDelay}
+                    hideSuggestionsOnInteract={config.hideSuggestionsOnInteract}
+                    enableLeadCapture={config.enableLeadCapture}
+                    leadCaptureMinutesThreshold={config.leadCaptureMinutesThreshold}
+                    leadCaptureMessageThreshold={config.leadCaptureMessageThreshold}
+                    leadCaptureKeywords={config.leadCaptureKeywords}
+                    enableBrochure={config.enableBrochure}
+                    brochureSuggestionText={config.brochureSuggestionText}
+                    privacyPolicyUrl={config.privacyPolicyUrl}
+                    onUpdate={handleBehaviourUpdate}
+                    onKeywordsChange={(value) => handleArrayChange("leadCaptureKeywords", value)}
+                  />
+                  <BookingSettingsCard />
+                </fieldset>
               </TabsContent>
 
               <TabsContent value="customize" keepMounted={false} className="space-y-8">
-                <WidgetAppearancePanel
-                  config={appearanceConfig}
-                  onUpdate={handleAppearanceUpdate}
-                  onBatchUpdate={handleAppearanceBatchUpdate}
-                  onReset={handleResetAppearance}
-                />
-                <WidgetConversationStarterPanel
-                  welcomeMessage={config.welcomeMessage}
-                  previewMessages={config.previewMessages}
-                  onUpdateWelcome={(value) => updateConfig("welcomeMessage", value)}
-                  onPreviewMessagesChange={(value) => handleArrayChange("previewMessages", value)}
-                />
-                <WidgetSuggestedQuestionsPanel
-                  suggestions={config.suggestions}
-                  onChange={(value) => handleArrayChange("suggestions", value)}
-                />
+                <fieldset disabled={!canManage} className="min-w-0 space-y-8 border-0 p-0">
+                  <legend className="sr-only">Widget appearance settings</legend>
+                  <WidgetAppearancePanel
+                    config={appearanceConfig}
+                    onUpdate={handleAppearanceUpdate}
+                    onBatchUpdate={handleAppearanceBatchUpdate}
+                    onReset={handleResetAppearance}
+                  />
+                  <WidgetConversationStarterPanel
+                    welcomeMessage={config.welcomeMessage}
+                    previewMessages={config.previewMessages}
+                    onUpdateWelcome={(value) => updateConfig("welcomeMessage", value)}
+                    onPreviewMessagesChange={(value) => handleArrayChange("previewMessages", value)}
+                  />
+                  <WidgetSuggestedQuestionsPanel
+                    suggestions={config.suggestions}
+                    onChange={(value) => handleArrayChange("suggestions", value)}
+                  />
+                </fieldset>
               </TabsContent>
 
               <TabsContent value="deploy" keepMounted={false}>
@@ -670,6 +691,7 @@ export function WidgetCustomizer({
                   onAddDomain={handleAddDomain}
                   onRemoveDomain={handleRemoveDomain}
                   onCopyScript={copyScript}
+                  canManage={canManage}
                 />
               </TabsContent>
             </div>

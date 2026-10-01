@@ -12,6 +12,7 @@ import {
 import { executeApprovedTool } from "@/features/integrations/server/tool-executor";
 import { parseToolInput } from "@/features/integrations/server/tool-registry";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
+import { canManageWorkspace } from "@/lib/auth/permissions";
 
 const proposeActionSchema = z.object({
   actionType: z.string().min(1),
@@ -22,7 +23,8 @@ const proposeActionSchema = z.object({
 });
 
 export async function GET() {
-  const { db, workspace } = await requireDashboardContext();
+  const { db, workspace, membership } = await requireDashboardContext();
+  const canManage = canManageWorkspace(membership.role);
   const approvals = await db.query.approvalRequest.findMany({
     where: (fields, { and, eq, gt, or }) =>
       and(
@@ -67,7 +69,7 @@ export async function GET() {
         ...approval,
         actionStatus,
         actionErrorMessage,
-        token: getApprovalToken(approval),
+        token: canManage ? getApprovalToken(approval) : null,
         tokenHash: undefined,
       })),
   });

@@ -65,6 +65,13 @@ Keep future capabilities hidden until functional and avoid a separate page for e
 Search/command palette uses immediate keyboard feedback; no staged entry delay.
 Persist layout preferences per user/workspace. Tenant change discards selected foreign records.
 
+### Workspace permissions
+
+Keep the current two-role model. Owners manage agent settings and connections, and approve or
+reject external actions. Members can work conversations and view setup, connection health and
+approval status; mutation controls explain when an owner is needed. Enforce these boundaries in
+server routes as well as the interface. Add finer roles only when customer workflows require them.
+
 ## Inbox
 
 Desktop at widths where content fits: navigation → conversation list (300–340px) → flexible
