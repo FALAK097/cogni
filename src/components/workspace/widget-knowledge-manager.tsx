@@ -205,7 +205,7 @@ function formatSortValue(state: SortingState): SortValue {
   return `${first.id}.${first.desc ? "desc" : "asc"}` as SortValue;
 }
 
-export function WidgetKnowledgeManager() {
+export function WidgetKnowledgeManager({ canManage }: { canManage: boolean }) {
   const sourcesQuery = useKnowledgeBaseSources("default");
   const deleteMutation = useDeleteKnowledgeBaseSource();
   const retryMutation = useRetryKnowledgeBaseSource();
@@ -223,6 +223,7 @@ export function WidgetKnowledgeManager() {
   const sorting = parseSortValue(sortBy);
 
   async function handleDeleteConfirm() {
+    if (!canManage) return;
     if (!deleteTarget) return;
     setDeleteError(null);
     try {
@@ -243,6 +244,7 @@ export function WidgetKnowledgeManager() {
   }
 
   async function handleRetrySource(source: KnowledgeBaseSource) {
+    if (!canManage) return;
     setAddError(null);
     try {
       await retryMutation.mutateAsync(source.id);
@@ -253,6 +255,7 @@ export function WidgetKnowledgeManager() {
   }
 
   function startAddDialog(value: Exclude<AddDialog, null>) {
+    if (!canManage) return;
     setAddDialog(value);
     setAddMenuOpen(false);
     setAddError(null);
@@ -266,6 +269,7 @@ export function WidgetKnowledgeManager() {
   return (
     <div className="space-y-6 pb-10">
       <KnowledgeToolbar
+        canManage={canManage}
         addMenuOpen={addMenuOpen}
         isRefetching={isRefetching}
         showRetry={sourcesQuery.isError && !isInitialLoading}
@@ -275,8 +279,14 @@ export function WidgetKnowledgeManager() {
       />
 
       {addError ? <ErrorBanner message={addError} onDismiss={() => setAddError(null)} /> : null}
+      {!canManage ? (
+        <output className="block rounded-lg border border-border/70 bg-muted/30 px-3 py-2.5 text-sm text-muted-foreground">
+          You can review source health. Only workspace owners can add, retry, or delete sources.
+        </output>
+      ) : null}
 
       <KnowledgeSourcesPanel
+        canManage={canManage}
         isInitialLoading={isInitialLoading}
         isError={sourcesQuery.isError}
         isRefetching={isRefetching}
@@ -311,6 +321,7 @@ export function WidgetKnowledgeManager() {
 }
 
 function KnowledgeToolbar({
+  canManage,
   addMenuOpen,
   isRefetching,
   showRetry,
@@ -318,6 +329,7 @@ function KnowledgeToolbar({
   onRetry,
   onSelectAddDialog,
 }: {
+  canManage: boolean;
   addMenuOpen: boolean;
   isRefetching: boolean;
   showRetry: boolean;
@@ -333,33 +345,40 @@ function KnowledgeToolbar({
           Retry
         </Button>
       ) : null}
-      <DropdownMenu open={addMenuOpen} onOpenChange={onAddMenuOpenChange}>
-        <DropdownMenuTrigger
-          render={
-            <Button
-              className="h-9 rounded-full px-3 shadow-none sm:px-4"
-              size="default"
-              aria-label="Add knowledge source"
-            >
-              {isRefetching ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Plus className="h-4 w-4" />
-              )}
-              Add Source
-              <ChevronDown className="hidden h-4 w-4 opacity-70 sm:inline" />
-            </Button>
-          }
-        />
-        <DropdownMenuContent align="end" sideOffset={10} className="w-80 p-2">
-          <AddSourceMenu onSelect={onSelectAddDialog} />
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {canManage ? (
+        <DropdownMenu open={addMenuOpen} onOpenChange={onAddMenuOpenChange}>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                className="h-9 rounded-full px-3 shadow-none sm:px-4"
+                size="default"
+                aria-label="Add knowledge source"
+              >
+                {isRefetching ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Plus className="h-4 w-4" />
+                )}
+                Add Source
+                <ChevronDown className="hidden h-4 w-4 opacity-70 sm:inline" />
+              </Button>
+            }
+          />
+          <DropdownMenuContent align="end" sideOffset={10} className="w-80 p-2">
+            <AddSourceMenu onSelect={onSelectAddDialog} />
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : (
+        <span className="rounded-full border border-border/70 px-3 py-2 text-xs text-muted-foreground">
+          Owner access required
+        </span>
+      )}
     </div>
   );
 }
 
 function KnowledgeSourcesPanel({
+  canManage,
   isInitialLoading,
   isError,
   isRefetching,
@@ -372,6 +391,7 @@ function KnowledgeSourcesPanel({
   onRetrySource,
   retryingSourceId,
 }: {
+  canManage: boolean;
   isInitialLoading: boolean;
   isError: boolean;
   isRefetching: boolean;
@@ -391,16 +411,18 @@ function KnowledgeSourcesPanel({
       ) : isError ? (
         <QueryErrorState onRetry={onRetry} />
       ) : sources.length === 0 ? (
-        <KnowledgeEmptyState onAddFirstSource={onAddFirstSource} />
+        <KnowledgeEmptyState canManage={canManage} onAddFirstSource={onAddFirstSource} />
       ) : (
         <>
           <KnowledgeSourcesMobileList
+            canManage={canManage}
             sources={sources}
             onDeleteSource={onDeleteSource}
             onRetrySource={onRetrySource}
             retryingSourceId={retryingSourceId}
           />
           <KnowledgeSourcesTable
+            canManage={canManage}
             sources={sources}
             sorting={sorting}
             onSortChange={onSortChange}
@@ -419,7 +441,13 @@ function KnowledgeSourcesPanel({
   );
 }
 
-function KnowledgeEmptyState({ onAddFirstSource }: { onAddFirstSource: () => void }) {
+function KnowledgeEmptyState({
+  canManage,
+  onAddFirstSource,
+}: {
+  canManage: boolean;
+  onAddFirstSource: () => void;
+}) {
   return (
     <div className="p-6">
       <EmptyState
@@ -427,21 +455,27 @@ function KnowledgeEmptyState({ onAddFirstSource }: { onAddFirstSource: () => voi
         title="No knowledge sources yet"
         description="Add a website URL, upload documents, or paste text to teach your AI assistant how to answer questions."
       >
-        <Button size="sm" className="h-9 rounded-xl shadow-none" onClick={onAddFirstSource}>
-          <Plus className="mr-1.5 h-4 w-4" />
-          Add Source
-        </Button>
+        {canManage ? (
+          <Button size="sm" className="h-9 rounded-xl shadow-none" onClick={onAddFirstSource}>
+            <Plus className="mr-1.5 h-4 w-4" />
+            Add Source
+          </Button>
+        ) : (
+          <p className="text-sm text-muted-foreground">Ask a workspace owner to add a source.</p>
+        )}
       </EmptyState>
     </div>
   );
 }
 
 function KnowledgeSourcesMobileList({
+  canManage,
   sources,
   onDeleteSource,
   onRetrySource,
   retryingSourceId,
 }: {
+  canManage: boolean;
   sources: KnowledgeBaseSource[];
   onDeleteSource: (source: KnowledgeBaseSource) => void;
   onRetrySource: (source: KnowledgeBaseSource) => void;
@@ -479,12 +513,14 @@ function KnowledgeSourcesMobileList({
                   <span>{formatUpdatedAt(source.updatedAt)}</span>
                 </div>
               </div>
-              <SourceActions
-                source={source}
-                onDeleteSource={onDeleteSource}
-                onRetrySource={onRetrySource}
-                isRetrying={retryingSourceId === source.id}
-              />
+              {canManage ? (
+                <SourceActions
+                  source={source}
+                  onDeleteSource={onDeleteSource}
+                  onRetrySource={onRetrySource}
+                  isRetrying={retryingSourceId === source.id}
+                />
+              ) : null}
             </div>
           </div>
         );
@@ -518,6 +554,7 @@ function KnowledgeSourcesFooter({
 }
 
 function KnowledgeSourcesTable({
+  canManage,
   sources,
   sorting,
   onSortChange,
@@ -525,6 +562,7 @@ function KnowledgeSourcesTable({
   onRetrySource,
   retryingSourceId,
 }: {
+  canManage: boolean;
   sources: KnowledgeBaseSource[];
   sorting: SortingState;
   onSortChange: (updater: SortingState | ((old: SortingState) => SortingState)) => void;
@@ -573,7 +611,9 @@ function KnowledgeSourcesTable({
         </span>
       ),
     },
-    {
+  ];
+  if (canManage) {
+    columns.push({
       id: "actions",
       header: "Actions",
       enableSorting: false,
@@ -585,8 +625,8 @@ function KnowledgeSourcesTable({
           isRetrying={retryingSourceId === row.original.id}
         />
       ),
-    },
-  ];
+    });
+  }
 
   // react-doctor-disable-next-line react-hooks-js/incompatible-library -- TanStack Table owns row/header model functions here by design.
   const table = useReactTable({

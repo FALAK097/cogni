@@ -8,6 +8,7 @@ import { eq, and } from "drizzle-orm";
 import { document as documentTable } from "@/lib/db/schema";
 import { enqueueDocumentProcessing } from "@/lib/jobs/ingestion";
 import { requireAuth, requireDashboardContext } from "@/lib/auth/dashboard-context";
+import { canManageWorkspace } from "@/lib/auth/permissions";
 import { deleteObject, isAllowedKnowledgeUpload, saveObject } from "@/lib/storage/index";
 import {
   inferKnowledgeMimeType,
@@ -39,7 +40,10 @@ export async function addUrlSourceAction(
   formData: FormData,
 ): Promise<KnowledgeActionState> {
   await requireAuth();
-  const { db, workspace } = await requireDashboardContext();
+  const { db, workspace, membership } = await requireDashboardContext();
+  if (!canManageWorkspace(membership.role)) {
+    return { error: "Only workspace owners can change knowledge sources." };
+  }
 
   const parsed = urlSchema.safeParse({
     title: formData.get("title"),
@@ -80,7 +84,10 @@ export async function addUrlSourceAction(
 
 export async function uploadDocumentAction(formData: FormData) {
   await requireAuth();
-  const { db, workspace } = await requireDashboardContext();
+  const { db, workspace, membership } = await requireDashboardContext();
+  if (!canManageWorkspace(membership.role)) {
+    return { error: "Only workspace owners can change knowledge sources." };
+  }
 
   const rawTitle = formData.get("title");
   const file = formData.get("file");
@@ -143,7 +150,10 @@ export async function addManualTextSourceAction(
   formData: FormData,
 ): Promise<KnowledgeActionState> {
   await requireAuth();
-  const { db, workspace } = await requireDashboardContext();
+  const { db, workspace, membership } = await requireDashboardContext();
+  if (!canManageWorkspace(membership.role)) {
+    return { error: "Only workspace owners can change knowledge sources." };
+  }
 
   const parsed = manualTextSchema.safeParse({
     title: formData.get("title"),
@@ -196,7 +206,10 @@ export async function importSitemapSourceAction(
   formData: FormData,
 ): Promise<KnowledgeActionState> {
   await requireAuth();
-  const { db, workspace } = await requireDashboardContext();
+  const { db, workspace, membership } = await requireDashboardContext();
+  if (!canManageWorkspace(membership.role)) {
+    return { error: "Only workspace owners can change knowledge sources." };
+  }
 
   const parsed = sitemapSchema.safeParse({
     title: formData.get("title"),
@@ -237,7 +250,10 @@ export async function importSitemapSourceAction(
 
 export async function deleteDocumentAction(formData: FormData) {
   await requireAuth();
-  const { db, workspace } = await requireDashboardContext();
+  const { db, workspace, membership } = await requireDashboardContext();
+  if (!canManageWorkspace(membership.role)) {
+    return { error: "Only workspace owners can change knowledge sources." };
+  }
 
   const documentId = formData.get("documentId");
   if (typeof documentId !== "string") return;

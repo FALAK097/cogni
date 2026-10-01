@@ -5,6 +5,7 @@ import { document as documentTable, workflowRun } from "@/lib/db/schema";
 import { enqueueDocumentProcessing } from "@/lib/jobs/ingestion";
 import { deleteObject } from "@/lib/storage";
 import { z } from "zod";
+import { canManageWorkspace } from "@/lib/auth/permissions";
 
 type RouteContext = { params: Promise<{ source_id: string }> };
 
@@ -13,7 +14,13 @@ const updateSourceSchema = z.object({
 });
 
 export async function PATCH(request: Request, context: RouteContext) {
-  const { db, workspace } = await requireDashboardContext();
+  const { db, workspace, membership } = await requireDashboardContext();
+  if (!canManageWorkspace(membership.role)) {
+    return NextResponse.json(
+      { error: "Only workspace owners can retry source indexing." },
+      { status: 403 },
+    );
+  }
   const { source_id: sourceId } = await context.params;
   const parsed = updateSourceSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
@@ -45,7 +52,13 @@ export async function PATCH(request: Request, context: RouteContext) {
 }
 
 export async function DELETE(_request: Request, context: RouteContext) {
-  const { db, workspace } = await requireDashboardContext();
+  const { db, workspace, membership } = await requireDashboardContext();
+  if (!canManageWorkspace(membership.role)) {
+    return NextResponse.json(
+      { error: "Only workspace owners can delete knowledge sources." },
+      { status: 403 },
+    );
+  }
   const { source_id: sourceId } = await context.params;
 
   const source = await db.query.document.findFirst({

@@ -8,9 +8,16 @@ import {
 } from "@/features/knowledge/server/mime";
 import { isAllowedKnowledgeUpload, saveObject } from "@/lib/storage/index";
 import { document as documentTable } from "@/lib/db/schema";
+import { canManageWorkspace } from "@/lib/auth/permissions";
 
 export async function POST(request: Request) {
-  const { db, workspace } = await requireDashboardContext();
+  const { db, workspace, membership } = await requireDashboardContext();
+  if (!canManageWorkspace(membership.role)) {
+    return NextResponse.json(
+      { error: "Only workspace owners can change knowledge sources." },
+      { status: 403 },
+    );
+  }
   const formData = await request.formData();
   const rawTitle = formData.get("title");
   const file = formData.get("file");

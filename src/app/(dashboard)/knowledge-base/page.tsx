@@ -9,12 +9,12 @@ export const metadata = {
 };
 
 export default async function KnowledgeBasePage() {
-  await requireDashboardContext();
+  const { membership } = await requireDashboardContext();
 
   return (
     <ContentLayout>
       <div className="container mx-auto">
-        <WidgetKnowledgeManager />
+        <WidgetKnowledgeManager canManage={membership.role === "OWNER"} />
       </div>
     </ContentLayout>
   );
