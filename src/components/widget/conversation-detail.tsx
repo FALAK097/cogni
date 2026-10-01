@@ -485,7 +485,7 @@ export function ConversationDetail({
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-11 rounded-md border-border/60 px-3 text-xs shadow-none sm:h-9 sm:px-2.5 sm:text-[11px] xl:hidden"
+                    className="h-11 rounded-md border-border/60 px-3 text-xs shadow-none sm:h-9 sm:px-2.5 sm:text-xs xl:hidden"
                   >
                     Details
                   </Button>
@@ -570,7 +570,7 @@ export function ConversationDetail({
               {groupedMessages.map((group) => (
                 <div key={group.date} className="space-y-4">
                   <div className="flex items-center justify-center px-1">
-                    <span className="shrink-0 text-[11px] font-medium text-muted-foreground">
+                    <span className="shrink-0 text-xs font-medium text-muted-foreground">
                       {formatDateSeparator(group.date)}
                     </span>
                   </div>
@@ -616,13 +616,13 @@ export function ConversationDetail({
                 <p className="flex items-center gap-1.5 text-xs font-semibold">
                   <Bot className="h-3.5 w-3.5" /> Copilot draft
                 </p>
-                <span className="text-[10px] text-muted-foreground">Never sent automatically</span>
+                <span className="text-xs text-muted-foreground">Never sent automatically</span>
               </div>
               <p className="text-xs leading-relaxed text-muted-foreground">
                 {copilotMutation.data.summary}
               </p>
               {copilotMutation.data.nextActions.length > 0 ? (
-                <ul className="list-inside list-disc text-[11px] text-muted-foreground">
+                <ul className="list-inside list-disc text-xs text-muted-foreground">
                   {copilotMutation.data.nextActions.map((action) => (
                     <li key={action}>{action}</li>
                   ))}
@@ -641,7 +641,7 @@ export function ConversationDetail({
                   Use editable draft
                 </Button>
                 {copilotMutation.data.sources.length > 0 ? (
-                  <span className="text-[10px] text-muted-foreground">
+                  <span className="text-xs text-muted-foreground">
                     Sources: {copilotMutation.data.sources.map((source) => source.title).join(", ")}
                   </span>
                 ) : null}
@@ -684,7 +684,7 @@ export function ConversationDetail({
                 </Button>
               </fieldset>
               {composerMode === "note" ? (
-                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-800 dark:text-amber-300">
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-800 dark:text-amber-300">
                   <FileText className="size-3" aria-hidden="true" />
                   Team only
                 </span>
@@ -729,7 +729,7 @@ export function ConversationDetail({
                 </span>
                 <span
                   aria-hidden="true"
-                  className="mr-3 hidden text-[11px] text-muted-foreground sm:inline"
+                  className="mr-3 hidden text-xs text-muted-foreground sm:inline"
                 >
                   ⌘/Ctrl + Enter
                 </span>
@@ -817,14 +817,14 @@ function MessageBubble({
               className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border/50 pt-2.5"
               aria-label="Sources"
             >
-              <span className="mr-0.5 inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
+              <span className="mr-0.5 inline-flex items-center gap-1 text-xs font-medium text-muted-foreground">
                 <FileText className="h-3 w-3" aria-hidden="true" />
                 Sources
               </span>
               {parsedMessage.sources.map((source) => (
                 <span
                   key={source}
-                  className="inline-flex max-w-full items-center rounded-md bg-background/80 px-2 py-1 text-[11px] leading-none text-foreground ring-1 ring-border/60"
+                  className="inline-flex max-w-full items-center rounded-md bg-background/80 px-2 py-1 text-xs leading-none text-foreground ring-1 ring-border/60"
                 >
                   <span className="truncate">{source}</span>
                 </span>
@@ -845,9 +845,7 @@ function MessageBubble({
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-xs font-medium">{doc.fileName}</p>
                     {doc.description ? (
-                      <p className="truncate text-[10px] text-muted-foreground">
-                        {doc.description}
-                      </p>
+                      <p className="truncate text-xs text-muted-foreground">{doc.description}</p>
                     ) : null}
                   </div>
                 </div>
@@ -883,8 +881,8 @@ function MessageBubble({
 function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-start justify-between gap-3 py-1.5">
-      <span className="text-[11px] text-muted-foreground">{label}</span>
-      <div className="text-right text-[11px] font-medium text-foreground">{children}</div>
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <div className="text-right text-xs font-medium text-foreground">{children}</div>
     </div>
   );
 }
@@ -959,7 +957,7 @@ function SessionDetailsContent({
           </div>
 
           {locationTimeLabel ? (
-            <div className="mt-3 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <div className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
               <Clock className="h-3 w-3 shrink-0" />
               {locationLabel ? (
                 <CountryFlag countryCode={session.ipData?.countryCode ?? ""} size="sm" />
@@ -977,7 +975,7 @@ function SessionDetailsContent({
         <CardContent className={cn("space-y-0 pb-3", detailCardContentClassName())}>
           <DetailRow label="User ID">
             <span className="inline-flex items-center gap-1">
-              <span className="font-mono text-[11px]">{userId.slice(0, 12)}</span>
+              <span className="font-mono text-xs">{userId.slice(0, 12)}</span>
               <Button
                 type="button"
                 variant="ghost"
@@ -1085,7 +1083,7 @@ function SessionDetailsContent({
                   <p className="truncate text-xs font-medium text-foreground">
                     {conversation.subject}
                   </p>
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     {format(new Date(conversation.lastMessageAt), "MMM d, yyyy")}
                   </p>
                 </div>
@@ -1125,16 +1123,16 @@ function SessionDetailsContent({
                           ? "Appointment booking"
                           : workflow.name}
                       </p>
-                      <p className="text-[10px] text-muted-foreground">
+                      <p className="text-xs text-muted-foreground">
                         {format(new Date(workflow.startedAt), "MMM d, h:mm a")}
                       </p>
                     </div>
-                    <Badge variant={workflowStatusVariant(workflow.status)} className="text-[9px]">
+                    <Badge variant={workflowStatusVariant(workflow.status)} className="text-[11px]">
                       {formatStatusLabel(workflow.status.replaceAll("_", " "))}
                     </Badge>
                   </div>
                   {startAt || attendeeEmail ? (
-                    <p className="mt-2 text-[11px] text-muted-foreground">
+                    <p className="mt-2 text-xs text-muted-foreground">
                       {startAt ? format(new Date(startAt), "MMM d, yyyy h:mm a") : null}
                       {startAt && attendeeEmail ? " · " : null}
                       {attendeeEmail}
@@ -1143,20 +1141,20 @@ function SessionDetailsContent({
                   <div className="mt-3 space-y-2 border-l pl-3">
                     {workflow.steps.map((step) => (
                       <div key={step.id}>
-                        <div className="flex items-center justify-between gap-2 text-[11px]">
+                        <div className="flex items-center justify-between gap-2 text-xs">
                           <span className="truncate">{step.name}</span>
-                          <span className="shrink-0 text-[10px] text-muted-foreground">
+                          <span className="shrink-0 text-xs text-muted-foreground">
                             {formatStatusLabel(step.status.replaceAll("_", " "))}
                           </span>
                         </div>
                         {step.errorMessage ? (
-                          <p className="mt-0.5 text-[10px] text-destructive">{step.errorMessage}</p>
+                          <p className="mt-0.5 text-xs text-destructive">{step.errorMessage}</p>
                         ) : null}
                       </div>
                     ))}
                   </div>
                   {workflow.errorMessage ? (
-                    <p className="mt-2 rounded bg-destructive/10 p-2 text-[10px] text-destructive">
+                    <p className="mt-2 rounded bg-destructive/10 p-2 text-xs text-destructive">
                       {workflow.errorMessage}
                     </p>
                   ) : null}
@@ -1181,7 +1179,7 @@ function SessionDetailsContent({
               {allNotes.map((note) => (
                 <div key={note.id} className="rounded-lg border border-border/50 bg-muted/20 p-3">
                   <p className="text-xs leading-relaxed text-foreground">{note.body}</p>
-                  <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                  <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
                     <Badge variant="outline" className="px-1.5 py-0 text-[10px] font-normal">
                       {note.type === "internal" ? "Internal" : "Contact"}
                     </Badge>
