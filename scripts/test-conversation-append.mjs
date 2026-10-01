@@ -24,6 +24,7 @@ await build({
     contents: `
       export {
         appendConversationMessage,
+        markVisitorMessagesAsRead,
         recordVisitorMessage,
         setAiMessageFeedback,
       } from "@/features/conversations/server/conversation-service";
@@ -58,8 +59,13 @@ await build({
   ],
 });
 
-const { appendConversationMessage, recordVisitorMessage, setAiMessageFeedback, createTestDb } =
-  await import(`${pathToFileURL(outputFile).href}?build=${randomUUID()}`);
+const {
+  appendConversationMessage,
+  markVisitorMessagesAsRead,
+  recordVisitorMessage,
+  setAiMessageFeedback,
+  createTestDb,
+} = await import(`${pathToFileURL(outputFile).href}?build=${randomUUID()}`);
 const raw = postgres(databaseUrl, { max: 2 });
 const appClients = Array.from({ length: 3 }, () => postgres(databaseUrl, { max: 1 }));
 const appDatabases = appClients.map((client) => createTestDb(client));
@@ -262,4 +268,50 @@ test("feedback updates preserve concurrent transcript appends and stay tenant sc
     feedbackAt: new Date().toISOString(),
   });
   assert.equal(foreignWorkspaceUpdate, false);
+});
+
+test("marking visitor messages read preserves concurrent transcript appends", async () => {
+  await raw`UPDATE "conversation" SET "messages" = ${JSON.stringify([
+    { id: "visitor-unread", body: "Question", authorType: "VISITOR", createdAt: now },
+    { id: "ai-response", body: "Hello", authorType: "AI", createdAt: now },
+  ])} WHERE "id" = ${conversationId} AND "workspaceId" = ${workspaceId}`;
+  const readAt = new Date().toISOString();
+  const readWrite = markVisitorMessagesAsRead({
+    db: appDatabases[0],
+    workspaceId,
+    conversationId,
+    readAt,
+  });
+  const appendWrites = Array.from({ length: 20 }, (_, index) =>
+    appendConversationMessage({
+      db: appDatabases[(index + 1) % appDatabases.length],
+      workspaceId,
+      conversationId,
+      message: {
+        id: randomUUID(),
+        body: `read-race-${index}`,
+        authorType: "TEAM",
+        visibility: "INTERNAL",
+        createdAt: new Date().toISOString(),
+      },
+    }),
+  );
+
+  assert.equal(await readWrite, true);
+  await Promise.all(appendWrites);
+
+  const [row] =
+    await raw`SELECT "messages" FROM "conversation" WHERE "id" = ${conversationId} AND "workspaceId" = ${workspaceId}`;
+  const messages = JSON.parse(row.messages);
+  assert.equal(messages.length, 22);
+  assert.equal(messages[0].readAt, readAt);
+  assert.equal(messages[1].readAt, undefined);
+
+  const foreignWorkspaceRead = await markVisitorMessagesAsRead({
+    db: appDatabases[0],
+    workspaceId: randomUUID(),
+    conversationId,
+    readAt,
+  });
+  assert.equal(foreignWorkspaceRead, false);
 });

@@ -15,7 +15,11 @@ import {
   type widget,
   type workspaceMember,
 } from "@/lib/db/schema";
-import { appendConversationMessage, type MessageJson } from "./conversation-service";
+import {
+  appendConversationMessage,
+  markVisitorMessagesAsRead,
+  type MessageJson,
+} from "./conversation-service";
 import { encodeInboxCursor, type InboxCursor } from "../inbox-pagination";
 import { broadcastConversationEvent } from "@/lib/realtime/broadcast";
 
@@ -149,53 +153,29 @@ function hasUnreadVisitorMessagesSql(c: typeof conversationTable) {
 export async function markConversationAsRead(workspaceId: string, conversationId: string) {
   const db = getDb();
   const now = new Date().toISOString();
+  const updated = await markVisitorMessagesAsRead({
+    db,
+    workspaceId,
+    conversationId,
+    readAt: now,
+  });
 
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const conversation = await db.query.conversation.findFirst({
-      where: (fields, { eq, and }) =>
-        and(eq(fields.id, conversationId), eq(fields.workspaceId, workspaceId)),
-      columns: { messages: true, updatedAt: true },
+  if (updated) {
+    await broadcastConversationEvent({
+      type: "read",
+      conversationId,
+      actor: "TEAM",
     });
-
-    if (!conversation) return false;
-
-    const messages = parseMessages(conversation.messages);
-    let changed = false;
-    const updatedMessages = messages.map((message) => {
-      if (message.authorType === "VISITOR" && !message.readAt) {
-        changed = true;
-        return { ...message, readAt: now };
-      }
-      return message;
-    });
-
-    if (!changed) return true;
-
-    const result = await db
-      .update(conversationTable)
-      .set({
-        messages: JSON.stringify(updatedMessages),
-        updatedAt: now,
-      })
-      .where(
-        and(
-          eq(conversationTable.id, conversationId),
-          eq(conversationTable.updatedAt, conversation.updatedAt),
-        ),
-      )
-      .returning({ id: conversationTable.id });
-
-    if (result.length > 0) {
-      await broadcastConversationEvent({
-        type: "read",
-        conversationId,
-        actor: "TEAM",
-      });
-      return true;
-    }
+    return true;
   }
 
-  return false;
+  return Boolean(
+    await db.query.conversation.findFirst({
+      where: (fields, { eq, and }) =>
+        and(eq(fields.id, conversationId), eq(fields.workspaceId, workspaceId)),
+      columns: { id: true },
+    }),
+  );
 }
 
 export async function appendTeamConversationMessage(

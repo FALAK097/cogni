@@ -364,6 +364,55 @@ export async function setAiMessageFeedback({
   return updated.length > 0;
 }
 
+export async function markVisitorMessagesAsRead({
+  db,
+  workspaceId,
+  conversationId,
+  readAt,
+}: {
+  db: Db;
+  workspaceId: string;
+  conversationId: string;
+  readAt: string;
+}) {
+  const messages = sql`COALESCE(NULLIF(${conversation.messages}, '')::jsonb, '[]'::jsonb)`;
+  const hasUnreadVisitorMessage = sql`EXISTS (
+    SELECT 1
+    FROM jsonb_array_elements(${messages}) AS candidate(item)
+    WHERE candidate.item ->> 'authorType' = 'VISITOR'
+      AND candidate.item ->> 'readAt' IS NULL
+  )`;
+  const updatedMessages = sql`(
+    SELECT COALESCE(
+      jsonb_agg(
+        CASE
+          WHEN entry.item ->> 'authorType' = 'VISITOR'
+            AND entry.item ->> 'readAt' IS NULL
+          THEN jsonb_set(entry.item, '{readAt}', to_jsonb(${readAt}::text), true)
+          ELSE entry.item
+        END
+        ORDER BY entry.ordinality
+      ),
+      '[]'::jsonb
+    )::text
+    FROM jsonb_array_elements(${messages}) WITH ORDINALITY AS entry(item, ordinality)
+  )`;
+
+  const updated = await db
+    .update(conversation)
+    .set({ messages: updatedMessages, updatedAt: readAt })
+    .where(
+      and(
+        eq(conversation.id, conversationId),
+        eq(conversation.workspaceId, workspaceId),
+        hasUnreadVisitorMessage,
+      ),
+    )
+    .returning({ id: conversation.id });
+
+  return updated.length > 0;
+}
+
 export async function startVisitorConversation({
   db,
   widget: widgetContext,
