@@ -7,8 +7,13 @@ export const metadata = {
   description: "View widget conversations",
 };
 
-export default async function ConversationsPage() {
+export default async function ConversationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ conversationId?: string }>;
+}) {
   await requireDashboardContext();
+  const { conversationId } = await searchParams;
 
-  return <WidgetConversations />;
+  return <WidgetConversations initialConversationId={conversationId ?? null} />;
 }

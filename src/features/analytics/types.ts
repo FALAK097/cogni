@@ -27,6 +27,7 @@ export type BreakdownItem = {
 export type TopQuestion = {
   question: string;
   count: number;
+  conversationId: string;
 };
 
 export type SatisfactionPoint = {

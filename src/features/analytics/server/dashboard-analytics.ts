@@ -8,6 +8,7 @@ import {
   startOfDay,
   subDays,
 } from "date-fns";
+import { desc } from "drizzle-orm";
 
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
 import { collectAiResponseTimeSamplesMs } from "@/features/analytics/response-time";
@@ -127,7 +128,7 @@ function aggregatePeriod(conversations: ConversationRow[]) {
   let feedbackNegative = 0;
   const sourceCounts = new Map<string, number>();
   const statusCounts = new Map<string, number>();
-  const questionCounts = new Map<string, number>();
+  const questionCounts = new Map<string, { count: number; conversationId: string }>();
   const dailyCounts = new Map<string, number>();
   const dailySatisfaction = new Map<string, { positive: number; negative: number }>();
 
@@ -168,7 +169,11 @@ function aggregatePeriod(conversations: ConversationRow[]) {
     if (firstVisitorMessage?.body) {
       const question = normalizeQuestion(firstVisitorMessage.body);
       if (question.length > 0) {
-        questionCounts.set(question, (questionCounts.get(question) ?? 0) + 1);
+        const current = questionCounts.get(question);
+        questionCounts.set(question, {
+          count: (current?.count ?? 0) + 1,
+          conversationId: current?.conversationId ?? conversation.id,
+        });
       }
     }
 
@@ -202,9 +207,9 @@ function aggregatePeriod(conversations: ConversationRow[]) {
   const conversationsPerUser = uniqueUserCount > 0 ? totalConversations / uniqueUserCount : 0;
 
   const topQuestions: TopQuestion[] = [...questionCounts.entries()]
-    .sort((a, b) => b[1] - a[1])
+    .sort((a, b) => b[1].count - a[1].count)
     .slice(0, 5)
-    .map(([question, count]) => ({ question, count }));
+    .map(([question, value]) => ({ question, ...value }));
 
   return {
     totalConversations,
@@ -293,6 +298,7 @@ async function fetchWidgetConversations(
       visitorSessionId: true,
       messages: true,
     },
+    orderBy: [desc(conversation.createdAt), desc(conversation.id)],
     with: {
       visitorSession: {
         columns: {

@@ -1441,9 +1441,27 @@ export function DashboardPage({ canManage = false }: { canManage?: boolean }) {
                 </TableHeader>
                 <TableBody>
                   {(analytics?.topQuestions ?? []).map((item: TopQuestion) => (
-                    <TableRow key={item.question} className="border-border/50 hover:bg-transparent">
+                    <TableRow
+                      key={item.question}
+                      className="group border-border/50 hover:bg-transparent"
+                    >
                       <TableCell className="whitespace-normal break-words px-0 py-2.5 text-sm">
-                        {item.question}
+                        <Link
+                          href={{
+                            pathname: "/conversations",
+                            query: { conversationId: item.conversationId },
+                          }}
+                          aria-label={`Open a conversation about: ${item.question}`}
+                          className="inline-flex min-h-11 items-center gap-1.5 rounded-sm pr-1 text-left outline-none transition-colors hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                        >
+                          <span>{item.question}</span>
+                          <HugeiconsIcon
+                            icon={ArrowRight01Icon}
+                            strokeWidth={1.75}
+                            className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                            aria-hidden="true"
+                          />
+                        </Link>
                       </TableCell>
                       <TableCell className="px-0 py-2.5 text-right text-sm font-medium tabular-nums">
                         {formatNumber(item.count)}
