@@ -6,6 +6,7 @@ import { createApprovalRequest } from "@/features/integrations/server/approval-s
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { workflowRun } from "@/lib/db/schema";
 import { completeWorkflowRun, updateWorkflowStep } from "@/lib/workflows/runner";
+import { getWorkflowProgression } from "@/lib/workflows/progression";
 
 type RouteContext = { params: Promise<{ workflow_id: string }> };
 
@@ -28,19 +29,33 @@ export async function POST(request: Request, context: RouteContext) {
   if (["COMPLETED", "CANCELLED", "DEAD"].includes(run.status)) {
     return NextResponse.json({ error: "Workflow is already terminal." }, { status: 409 });
   }
+  if (run.status !== "RUNNING") {
+    return NextResponse.json({ error: "Workflow is waiting for another step." }, { status: 409 });
+  }
 
   const steps = await db.query.workflowStep.findMany({
     where: (fields, { eq, and }) =>
       and(eq(fields.workflowRunId, run.id), eq(fields.workspaceId, workspace.id)),
     orderBy: (fields, { asc }) => [asc(fields.position)],
   });
-  const step = parsed.data.stepId
-    ? steps.find((candidate) => candidate.id === parsed.data.stepId)
-    : steps.find((candidate) => candidate.status === "PENDING");
-  if (!step) {
+  const progression = getWorkflowProgression(steps, parsed.data.stepId);
+  if (progression.kind === "blocked") {
+    return NextResponse.json(
+      { error: "Complete or resolve the current workflow step before continuing." },
+      { status: 409 },
+    );
+  }
+  if (progression.kind === "out-of-order") {
+    return NextResponse.json(
+      { error: "Workflow steps must be completed in order." },
+      { status: 409 },
+    );
+  }
+  if (progression.kind === "complete") {
     await completeWorkflowRun({ db, workspaceId: workspace.id, runId: run.id });
     return NextResponse.json({ status: "COMPLETED" });
   }
+  const step = progression.step;
   if (step.status !== "PENDING") {
     return NextResponse.json({ error: "Step is not pending." }, { status: 409 });
   }

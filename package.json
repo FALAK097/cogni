@@ -27,6 +27,7 @@
     "test:inbox-pagination-db": "node --test scripts/test-inbox-pagination-db.mjs",
     "test:analytics-response-time": "node --test scripts/test-analytics-response-time.mjs",
     "test:analytics-aggregation": "node --test scripts/test-analytics-aggregation.mjs",
+    "test:workflow-progression": "node --test scripts/test-workflow-progression.mjs",
     "test:rate-limit": "node --test scripts/test-rate-limit.mjs",
     "test:safe-fetch": "node --test scripts/test-safe-fetch.mjs",
     "check": "pnpm lint && pnpm typecheck && pnpm fmt:check",

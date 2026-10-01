@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { createWorkflowWithSteps } from "@/lib/workflows/runner";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
+import { canManageWorkspace } from "@/lib/auth/permissions";
 
 const stepSchema = z.object({
   name: z.string().trim().min(1).max(120),
@@ -45,7 +46,13 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const { db, workspace } = await requireDashboardContext();
+  const { db, workspace, membership } = await requireDashboardContext();
+  if (!canManageWorkspace(membership.role)) {
+    return NextResponse.json(
+      { error: "Only workspace owners can create workflows." },
+      { status: 403 },
+    );
+  }
   const parsed = createWorkflowSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 });
