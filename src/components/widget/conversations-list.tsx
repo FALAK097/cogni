@@ -291,7 +291,7 @@ export function ConversationsList({
             {conversations.map((conversation) => {
               const displayName = getDisplayName(conversation);
               const selected = selectedConversationId === conversation.id;
-              const unreadCount = selected ? 0 : conversation.unreadCount;
+              const unreadCount = conversation.unreadCount;
 
               return (
                 <button

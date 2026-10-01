@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, requireData } from "@/lib/api/client";
 import { queryKeys } from "@/lib/query-keys";
 import type { WidgetWidgetConfig, WidgetBorderRadiusStyle } from "@/features/widget/domain";
+import { toast } from "@/components/ui/use-toast";
 
 export type DashboardWidgetConfig = Omit<WidgetWidgetConfig, "borderRadius"> & {
   agentName: string;
@@ -554,6 +555,14 @@ export function useMarkConversationRead() {
       void queryClient.invalidateQueries({
         queryKey: queryKeys.conversations.detail(conversationId),
       });
+    },
+    onError: () => {
+      toast({
+        title: "Couldn’t confirm the conversation was marked as read",
+        description: "It remains unread. Reopen the conversation to try again.",
+        variant: "destructive",
+      });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all });
     },
   });
 }

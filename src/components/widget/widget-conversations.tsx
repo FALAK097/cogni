@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useConversations } from "@/hooks/query";
-import type { ConversationFilter, ConversationSummary } from "@/hooks/query";
+import type { ConversationFilter } from "@/hooks/query";
 import { cn } from "@/lib/utils";
 
 import { ConversationDetail } from "./conversation-detail";
@@ -36,34 +36,6 @@ const EMPTY_COUNTS = {
   closed: 0,
 };
 
-function adjustUnreadTabCounts(
-  counts: typeof EMPTY_COUNTS,
-  selectedConversation: ConversationSummary | undefined,
-  currentMembershipId: string | null,
-) {
-  if (!selectedConversation || selectedConversation.unreadCount === 0) {
-    return counts;
-  }
-
-  const decrement = (value: number) => Math.max(0, value - 1);
-
-  return {
-    all: decrement(counts.all),
-    unassigned:
-      selectedConversation.status !== "CLOSED" && !selectedConversation.assigneeId
-        ? decrement(counts.unassigned)
-        : counts.unassigned,
-    mine:
-      currentMembershipId &&
-      selectedConversation.status !== "CLOSED" &&
-      selectedConversation.assigneeId === currentMembershipId
-        ? decrement(counts.mine)
-        : counts.mine,
-    open: selectedConversation.status !== "CLOSED" ? decrement(counts.open) : counts.open,
-    closed: selectedConversation.status === "CLOSED" ? decrement(counts.closed) : counts.closed,
-  };
-}
-
 export function WidgetConversations({ initialConversationId = null }: WidgetConversationsProps) {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(
     initialConversationId,
@@ -86,20 +58,7 @@ export function WidgetConversations({ initialConversationId = null }: WidgetConv
 
   const { data: conversationsData } = useConversations({ limit: 20, filter });
 
-  const counts = useMemo(() => {
-    const baseCounts = conversationsData?.counts ?? EMPTY_COUNTS;
-    if (!selectedConversationId) return baseCounts;
-
-    const selectedConversation = conversationsData?.conversations.find(
-      (conversation) => conversation.id === selectedConversationId,
-    );
-
-    return adjustUnreadTabCounts(
-      baseCounts,
-      selectedConversation,
-      conversationsData?.currentMembershipId ?? null,
-    );
-  }, [conversationsData, selectedConversationId]);
+  const counts = conversationsData?.counts ?? EMPTY_COUNTS;
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-sidebar">
