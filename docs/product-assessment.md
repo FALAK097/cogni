@@ -13,14 +13,14 @@ are local changes. This is a product/screen assessment, not a formal change-scop
 
 ## Coverage
 
-| Domain        | Evidence inspected                                                                                 | Result                                                                                                     |
-| ------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Accessibility | Landing FAQ markup, signed-in settings accessibility tree, inbox search and error branches         | Native disclosure and names fixed; broader field associations/keyboard testing remain                      |
-| Layout        | Public/reference screenshots, sign-in viewport constraints, settings screenshot, inbox pane source | Sign-in can scroll; navigation and pane redesign specified; full responsive acceptance remains             |
-| Writing       | Metadata, hero, features, FAQ, sign-in, integration registry, CTA, inbox errors                    | Unsupported outcomes/customer claims removed from active pages; retry and setup expectations made explicit |
-| Typography    | Geist tokens, rendered settings/reference hierarchy, inbox sizes                                   | Inbox previews/channel labels enlarged; remaining small detail metadata still needs a density pass         |
-| Colors        | Existing OKLCH ramps, hard-coded purple landing/widget colors, theme rules                         | Blue app/purple widget ownership documented; rendered contrast measurements remain required                |
-| UI            | FAQ interaction source, settings controls, inbox affordances/presence, public sample cards         | Fake actions/presence removed; sample data labeled; delivery/reconnect states remain                       |
+| Domain        | Evidence inspected                                                                                 | Result                                                                                                                                                      |
+| ------------- | -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Accessibility | Landing FAQ markup, signed-in settings accessibility tree, inbox search and error branches         | Native disclosure and names fixed; broader field associations/keyboard testing remain                                                                       |
+| Layout        | Public/reference screenshots, sign-in viewport constraints, settings screenshot, inbox pane source | Sign-in can scroll; navigation and pane redesign specified; full responsive acceptance remains                                                              |
+| Writing       | Metadata, hero, features, FAQ, sign-in, integration registry, CTA, inbox errors                    | Unsupported outcomes/customer claims removed from active pages; retry and setup expectations made explicit                                                  |
+| Typography    | Geist tokens, rendered settings/reference hierarchy, inbox sizes                                   | Inbox previews and channel, timestamp, ownership and assignee metadata use a readable 12px hierarchy; transcript detail metadata still needs a density pass |
+| Colors        | Existing OKLCH ramps, hard-coded purple landing/widget colors, theme rules                         | Blue app/purple widget ownership documented; rendered contrast measurements remain required                                                                 |
+| UI            | FAQ interaction source, settings controls, inbox affordances/presence, public sample cards         | Fake actions/presence removed; sample data labeled; delivery/reconnect states remain                                                                        |
 
 ## Findings and first corrections
 
@@ -37,7 +37,7 @@ are local changes. This is a product/screen assessment, not a formal change-scop
 | MEDIUM   | Writing       | `src/components/landing/integrations.tsx:7`, `hero.tsx`, `features.tsx`                                                                | Unbacked integration logos and illustrative metrics resembled live capabilities/data                                   | **Fixed locally:** use integration registry, qualify channel setup, visibly label sample illustrations, remove inert illustration button                                                 | Marketing must distinguish registered tools, configured channels and sample data                                |
 | MEDIUM   | Accessibility | `src/components/widget/conversations-list.tsx:152`                                                                                     | Search depended on placeholder for identification                                                                      | **Fixed locally:** persistent accessible name                                                                                                                                            | A placeholder disappears as the user types                                                                      |
 | MEDIUM   | Colors        | `src/app/globals.css`, `src/components/landing/features.tsx`                                                                           | App blue and hard-coded purple/alpha marketing colors have separate systems                                            | **Planned:** semantic ownership, measured rendered contrast in each theme and state                                                                                                      | Source color values alone do not establish readable contrast                                                    |
-| MEDIUM   | Typography    | `src/components/widget/conversations-list.tsx`                                                                                         | Channel metadata is 9px                                                                                                | **Planned:** readable metadata sizes in density contract                                                                                                                                 | Support agents need to scan channels without magnifying the interface                                           |
+| MEDIUM   | Typography    | `src/components/widget/conversations-list.tsx`                                                                                         | Channel metadata was 9px                                                                                               | **Fixed in PR #48:** channel labels, timestamps, AI ownership and assignee metadata use 12px text; unread counts use tabular numerals                                                    | Support agents need to scan conversation ownership and timing quickly                                           |
 
 ## Verification record
 
@@ -140,6 +140,11 @@ temporary viewport override was reset after capturing the final Agent view.
 - Additional UI designs mentioned in the implementation request were not attached or linked
   in the available message. Exact matching against those designs requires the references;
   the current changes do not establish pixel-perfect fidelity to unseen designs.
+- Inbox list polish in PR #48 raises secondary timestamps and ownership metadata to the 12px
+  density contract, aligns supporting icons, and replaces the unmarked load-more text with the
+  shared plus/loading icons and an exposed busy state. Formatting, lint, typecheck, cursor tests,
+  conversation draft/scroll tests and React Doctor 100/100 passed. Browser verification of these
+  latest changes is not verified because local-app navigation was blocked by the browser policy.
 - Final production-build browser check confirmed all three sidebar destinations, Agent →
   Knowledge navigation with the indexed QA source, Settings → Connections and explicit
   Connect names. Insights displayed No data for missing response/feedback samples and

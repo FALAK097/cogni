@@ -10,6 +10,7 @@ import {
   Loader2,
   MessageSquare,
   Pause,
+  Plus,
   Search,
   User,
   X,
@@ -304,7 +305,7 @@ export function ConversationsList({
                       <span className="truncate text-sm font-semibold text-foreground">
                         {displayName}
                       </span>
-                      <span className="shrink-0 text-[11px] text-muted-foreground">
+                      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
                         {formatListTime(conversation.lastMessageAt)}
                       </span>
                     </div>
@@ -313,7 +314,7 @@ export function ConversationsList({
                         {conversation.preview}
                       </p>
                       {unreadCount > 0 ? (
-                        <span className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">
+                        <span className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-semibold tabular-nums text-primary-foreground">
                           {unreadCount}
                         </span>
                       ) : null}
@@ -335,21 +336,21 @@ export function ConversationsList({
                       ) : null}
                       <span
                         className={cn(
-                          "inline-flex items-center gap-1 text-[11px] font-medium",
+                          "inline-flex items-center gap-1 text-xs font-medium",
                           conversation.aiPaused
                             ? "text-amber-700 dark:text-amber-400"
                             : "text-muted-foreground",
                         )}
                       >
                         {conversation.aiPaused ? (
-                          <Pause className="size-3 shrink-0" aria-hidden="true" />
+                          <Pause className="size-3.5 shrink-0" aria-hidden="true" />
                         ) : (
-                          <Bot className="size-3 shrink-0" aria-hidden="true" />
+                          <Bot className="size-3.5 shrink-0" aria-hidden="true" />
                         )}
                         {conversation.aiPaused ? "AI paused" : "AI enabled"}
                       </span>
-                      <span className="inline-flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground">
-                        <User className="size-3 shrink-0" aria-hidden="true" />
+                      <span className="inline-flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                        <User className="size-3.5 shrink-0" aria-hidden="true" />
                         <span className="truncate">
                           {conversation.assigneeName ?? "Unassigned"}
                         </span>
@@ -367,11 +368,25 @@ export function ConversationsList({
         <div className="shrink-0 p-3 pt-0">
           <Button
             variant="ghost"
-            className="h-8 w-full text-sm text-muted-foreground hover:text-foreground"
+            className="h-9 w-full gap-1.5 text-sm text-muted-foreground hover:text-foreground"
             onClick={handleLoadMore}
             disabled={isFetching || isPlaceholderData}
+            aria-busy={isFetching}
           >
-            {isFetching ? "Loading..." : "+ Load more conversations"}
+            {isFetching ? (
+              <>
+                <Loader2
+                  className="size-4 motion-safe:animate-spin motion-reduce:animate-none"
+                  aria-hidden="true"
+                />
+                Loading conversations…
+              </>
+            ) : (
+              <>
+                <Plus className="size-4" aria-hidden="true" />
+                Load more conversations
+              </>
+            )}
           </Button>
         </div>
       ) : null}
