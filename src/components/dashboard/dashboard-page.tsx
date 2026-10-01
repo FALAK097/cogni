@@ -1118,9 +1118,9 @@ export function DashboardPage() {
               aria-hidden="true"
             />
             <div>
-              <h2 className="text-sm font-semibold">Insights couldn’t load</h2>
+              <h2 className="text-sm font-semibold">Unable to load Insights</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Your selected date range is still selected. Try again in a moment.
+                The selected date range is unchanged.
               </p>
             </div>
           </div>
@@ -1413,7 +1413,7 @@ export function DashboardPage() {
       {analyticsQuery.isError ? (
         <output className="flex flex-col gap-3 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
           <span className="text-muted-foreground">
-            Couldn’t refresh Insights. Showing the data from your last successful load.
+            Unable to refresh. Showing the last loaded data.
           </span>
           <Button
             type="button"
