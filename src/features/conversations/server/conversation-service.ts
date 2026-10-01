@@ -413,6 +413,34 @@ export async function markVisitorMessagesAsRead({
   return updated.length > 0;
 }
 
+export async function setConversationStatus({
+  db,
+  workspaceId,
+  conversationId,
+  status: targetStatus,
+}: {
+  db: Db;
+  workspaceId: string;
+  conversationId: string;
+  status: "CLOSED" | "OPEN";
+}) {
+  const status =
+    targetStatus === "CLOSED"
+      ? "CLOSED"
+      : sql<string>`case when ${conversation.assignedMemberId} is null then 'OPEN' else 'ASSIGNED' end`;
+  const [updated] = await db
+    .update(conversation)
+    .set({ status, updatedAt: new Date().toISOString() })
+    .where(and(eq(conversation.id, conversationId), eq(conversation.workspaceId, workspaceId)))
+    .returning({
+      id: conversation.id,
+      status: conversation.status,
+      assignedMemberId: conversation.assignedMemberId,
+    });
+
+  return updated ?? null;
+}
+
 export async function startVisitorConversation({
   db,
   widget: widgetContext,

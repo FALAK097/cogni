@@ -8,6 +8,7 @@ import { Streamdown } from "streamdown";
 import {
   ArrowLeft,
   Bot,
+  CheckCircle2,
   Clock,
   Copy,
   Download,
@@ -19,6 +20,7 @@ import {
   Play,
   MessageSquare,
   Send,
+  RotateCcw,
   ThumbsDown,
   ThumbsUp,
   Trash2,
@@ -54,6 +56,7 @@ import {
   useConversation,
   useDeleteConversation,
   useSetConversationAiPaused,
+  useSetConversationStatus,
   useSendConversationMessage,
   useTakeOverConversation,
 } from "@/hooks/query";
@@ -218,6 +221,7 @@ export function ConversationDetail({
   const deleteConversationMutation = useDeleteConversation();
   const takeOverMutation = useTakeOverConversation();
   const aiPausedMutation = useSetConversationAiPaused();
+  const statusMutation = useSetConversationStatus();
   const sendMessageMutation = useSendConversationMessage();
   const copilotMutation = useMutation({
     mutationFn: () => generateCopilotDraft(conversationId),
@@ -311,6 +315,27 @@ export function ConversationDetail({
       {
         onSuccess: () => toast({ title: isPaused ? "AI replies resumed" : "AI replies paused" }),
         onError: () => toast({ title: "Could not update AI replies", variant: "destructive" }),
+      },
+    );
+  };
+
+  const handleToggleStatus = () => {
+    const isClosed = session?.conversationStatus === "CLOSED";
+    statusMutation.mutate(
+      { conversationId, status: isClosed ? "OPEN" : "CLOSED" },
+      {
+        onSuccess: () =>
+          toast({
+            title: isClosed ? "Conversation reopened" : "Conversation resolved",
+            description: isClosed
+              ? "It’s back in the active inbox."
+              : "You can reopen it at any time.",
+          }),
+        onError: () =>
+          toast({
+            title: isClosed ? "Could not reopen conversation" : "Could not resolve conversation",
+            variant: "destructive",
+          }),
       },
     );
   };
@@ -479,6 +504,29 @@ export function ConversationDetail({
               </Button>
             ) : null}
 
+            <Button
+              type="button"
+              variant={session.conversationStatus === "CLOSED" ? "outline" : "secondary"}
+              size="sm"
+              className="hidden h-9 gap-1.5 rounded-md px-2.5 text-xs shadow-none lg:inline-flex"
+              onClick={handleToggleStatus}
+              disabled={statusMutation.isPending}
+              aria-label={
+                session.conversationStatus === "CLOSED"
+                  ? `Reopen conversation with ${displayName}`
+                  : `Resolve conversation with ${displayName}`
+              }
+            >
+              {statusMutation.isPending ? (
+                <Loader2 className="size-3.5 motion-safe:animate-spin motion-reduce:animate-none" />
+              ) : session.conversationStatus === "CLOSED" ? (
+                <RotateCcw className="size-3.5" />
+              ) : (
+                <CheckCircle2 className="size-3.5" />
+              )}
+              {session.conversationStatus === "CLOSED" ? "Reopen" : "Resolve"}
+            </Button>
+
             <Sheet open={showDetailsSheet} onOpenChange={setShowDetailsSheet}>
               <SheetTrigger
                 render={
@@ -518,6 +566,20 @@ export function ConversationDetail({
                 }
               />
               <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={handleToggleStatus}
+                  disabled={statusMutation.isPending}
+                  className="lg:hidden"
+                >
+                  {session.conversationStatus === "CLOSED" ? (
+                    <RotateCcw className="mr-2 h-4 w-4" />
+                  ) : (
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                  )}
+                  {session.conversationStatus === "CLOSED"
+                    ? "Reopen conversation"
+                    : "Resolve conversation"}
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleExport}>
                   <Download className="mr-2 h-4 w-4" />
                   Export JSON

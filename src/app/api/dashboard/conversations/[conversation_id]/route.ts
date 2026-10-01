@@ -8,6 +8,7 @@ import {
   getConversation,
   markConversationAsRead,
 } from "@/features/conversations/server/queries";
+import { setConversationStatus } from "@/features/conversations/server/conversation-service";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { isChatSdkChannel, postChannelReply } from "@/features/integrations/server/chat-sdk";
 import {
@@ -247,6 +248,21 @@ export async function PATCH(request: Request, context: RouteContext) {
       conversation.status,
       conversation.assignedMemberId,
     );
+    return NextResponse.json({ ok: true });
+  }
+
+  if (body.action === "close" || body.action === "reopen") {
+    const updated = await setConversationStatus({
+      db,
+      workspaceId: workspace.id,
+      conversationId: conversation.id,
+      status: body.action === "close" ? "CLOSED" : "OPEN",
+    });
+    if (!updated) {
+      return NextResponse.json({ error: "Conversation not found." }, { status: 404 });
+    }
+
+    await broadcastConversationChanged(updated.id, updated.status, updated.assignedMemberId);
     return NextResponse.json({ ok: true });
   }
 

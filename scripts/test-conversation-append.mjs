@@ -26,6 +26,7 @@ await build({
         appendConversationMessage,
         markVisitorMessagesAsRead,
         recordVisitorMessage,
+        setConversationStatus,
         setAiMessageFeedback,
       } from "@/features/conversations/server/conversation-service";
       import { drizzle } from "drizzle-orm/postgres-js";
@@ -63,6 +64,7 @@ const {
   appendConversationMessage,
   markVisitorMessagesAsRead,
   recordVisitorMessage,
+  setConversationStatus,
   setAiMessageFeedback,
   createTestDb,
 } = await import(`${pathToFileURL(outputFile).href}?build=${randomUUID()}`);
@@ -75,10 +77,14 @@ const widgetId = randomUUID();
 const visitorSessionId = randomUUID();
 const firstMessageSessionId = randomUUID();
 const conversationId = randomUUID();
+const userId = randomUUID();
+const memberId = randomUUID();
 const now = new Date().toISOString();
 
 before(async () => {
   await raw`INSERT INTO "workspace" ("id", "name", "slug", "updatedAt") VALUES (${workspaceId}, 'Rate test', ${`test-${workspaceId}`}, ${now})`;
+  await raw`INSERT INTO "user" ("id", "name", "email", "updatedAt") VALUES (${userId}, 'Test member', ${`${userId}@example.test`}, ${now})`;
+  await raw`INSERT INTO "workspace_member" ("id", "userId", "workspaceId", "updatedAt") VALUES (${memberId}, ${userId}, ${workspaceId}, ${now})`;
   await raw`INSERT INTO "contact" ("id", "name", "updatedAt", "workspaceId") VALUES (${contactId}, 'Test visitor', ${now}, ${workspaceId})`;
   await raw`INSERT INTO "widget" ("id", "publicKey", "updatedAt", "workspaceId") VALUES (${widgetId}, ${`test-${widgetId}`}, ${now}, ${workspaceId})`;
   await raw`INSERT INTO "visitor_session" ("id", "token", "hostname", "expiresAt", "updatedAt", "widgetId", "contactId") VALUES (${visitorSessionId}, ${randomUUID()}, 'localhost', ${new Date(Date.now() + 86_400_000).toISOString()}, ${now}, ${widgetId}, ${contactId}), (${firstMessageSessionId}, ${randomUUID()}, 'localhost', ${new Date(Date.now() + 86_400_000).toISOString()}, ${now}, ${widgetId}, NULL)`;
@@ -87,6 +93,7 @@ before(async () => {
 
 after(async () => {
   await raw`DELETE FROM "workspace" WHERE "id" = ${workspaceId}`;
+  await raw`DELETE FROM "user" WHERE "id" = ${userId}`;
   await Promise.all(appClients.map((client) => client.end({ timeout: 5 })));
   await raw.end({ timeout: 5 });
 });
@@ -314,4 +321,34 @@ test("marking visitor messages read preserves concurrent transcript appends", as
     readAt,
   });
   assert.equal(foreignWorkspaceRead, false);
+});
+
+test("conversation status is tenant scoped and reopening preserves assignment", async () => {
+  await raw`UPDATE "conversation" SET "assignedMemberId" = ${memberId}, "status" = 'ASSIGNED' WHERE "id" = ${conversationId} AND "workspaceId" = ${workspaceId}`;
+
+  const closed = await setConversationStatus({
+    db: appDatabases[0],
+    workspaceId,
+    conversationId,
+    status: "CLOSED",
+  });
+  assert.equal(closed?.status, "CLOSED");
+  assert.equal(closed?.assignedMemberId, memberId);
+
+  const reopened = await setConversationStatus({
+    db: appDatabases[1],
+    workspaceId,
+    conversationId,
+    status: "OPEN",
+  });
+  assert.equal(reopened?.status, "ASSIGNED");
+  assert.equal(reopened?.assignedMemberId, memberId);
+
+  const foreignWorkspaceUpdate = await setConversationStatus({
+    db: appDatabases[0],
+    workspaceId: randomUUID(),
+    conversationId,
+    status: "CLOSED",
+  });
+  assert.equal(foreignWorkspaceUpdate, null);
 });

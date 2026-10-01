@@ -469,6 +469,31 @@ export function useSetConversationAiPaused() {
   });
 }
 
+export function useSetConversationStatus() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      conversationId,
+      status,
+    }: {
+      conversationId: string;
+      status: "CLOSED" | "OPEN";
+    }) => {
+      const { data, error } = await api.PATCH<{ ok: boolean }>(
+        "/api/conversations/{conversation_id}",
+        {
+          params: { path: { conversation_id: conversationId } },
+          body: { action: status === "CLOSED" ? "close" : "reopen" },
+        },
+      );
+      return requireData(data, error, "Failed to update conversation status");
+    },
+    onSuccess: (_data, variables) =>
+      invalidateConversationQueries(queryClient, variables.conversationId),
+  });
+}
+
 function invalidateConversationQueries(
   queryClient: ReturnType<typeof useQueryClient>,
   conversationId: string,
