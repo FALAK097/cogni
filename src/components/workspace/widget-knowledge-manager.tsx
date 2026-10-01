@@ -242,6 +242,16 @@ export function WidgetKnowledgeManager() {
     setAddError(message);
   }
 
+  async function handleRetrySource(source: KnowledgeBaseSource) {
+    setAddError(null);
+    try {
+      await retryMutation.mutateAsync(source.id);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to retry indexing";
+      setAddError(`Couldn’t retry “${source.displayName}”: ${message}`);
+    }
+  }
+
   function startAddDialog(value: Exclude<AddDialog, null>) {
     setAddDialog(value);
     setAddMenuOpen(false);
@@ -276,7 +286,8 @@ export function WidgetKnowledgeManager() {
         onAddFirstSource={() => setAddDialog("url")}
         onSortChange={handleSortChange}
         onDeleteSource={setDeleteTarget}
-        onRetrySource={(source) => retryMutation.mutate(source.id)}
+        retryingSourceId={retryMutation.isPending ? retryMutation.variables : null}
+        onRetrySource={(source) => void handleRetrySource(source)}
       />
 
       <KnowledgeDialogs
@@ -359,6 +370,7 @@ function KnowledgeSourcesPanel({
   onSortChange,
   onDeleteSource,
   onRetrySource,
+  retryingSourceId,
 }: {
   isInitialLoading: boolean;
   isError: boolean;
@@ -370,6 +382,7 @@ function KnowledgeSourcesPanel({
   onSortChange: (updater: SortingState | ((old: SortingState) => SortingState)) => void;
   onDeleteSource: (source: KnowledgeBaseSource) => void;
   onRetrySource: (source: KnowledgeBaseSource) => void;
+  retryingSourceId: string | null;
 }) {
   return (
     <div className="overflow-hidden rounded-[20px] border border-border/60 bg-transparent shadow-none [--card-spacing:0rem]">
@@ -385,6 +398,7 @@ function KnowledgeSourcesPanel({
             sources={sources}
             onDeleteSource={onDeleteSource}
             onRetrySource={onRetrySource}
+            retryingSourceId={retryingSourceId}
           />
           <KnowledgeSourcesTable
             sources={sources}
@@ -392,6 +406,7 @@ function KnowledgeSourcesPanel({
             onSortChange={onSortChange}
             onDeleteSource={onDeleteSource}
             onRetrySource={onRetrySource}
+            retryingSourceId={retryingSourceId}
           />
           <KnowledgeSourcesFooter
             visibleCount={sources.length}
@@ -425,10 +440,12 @@ function KnowledgeSourcesMobileList({
   sources,
   onDeleteSource,
   onRetrySource,
+  retryingSourceId,
 }: {
   sources: KnowledgeBaseSource[];
   onDeleteSource: (source: KnowledgeBaseSource) => void;
   onRetrySource: (source: KnowledgeBaseSource) => void;
+  retryingSourceId: string | null;
 }) {
   return (
     <div className="space-y-3 p-4 md:hidden">
@@ -466,6 +483,7 @@ function KnowledgeSourcesMobileList({
                 source={source}
                 onDeleteSource={onDeleteSource}
                 onRetrySource={onRetrySource}
+                isRetrying={retryingSourceId === source.id}
               />
             </div>
           </div>
@@ -505,12 +523,14 @@ function KnowledgeSourcesTable({
   onSortChange,
   onDeleteSource,
   onRetrySource,
+  retryingSourceId,
 }: {
   sources: KnowledgeBaseSource[];
   sorting: SortingState;
   onSortChange: (updater: SortingState | ((old: SortingState) => SortingState)) => void;
   onDeleteSource: (source: KnowledgeBaseSource) => void;
   onRetrySource: (source: KnowledgeBaseSource) => void;
+  retryingSourceId: string | null;
 }) {
   "use no memo";
 
@@ -562,6 +582,7 @@ function KnowledgeSourcesTable({
           source={row.original}
           onDeleteSource={onDeleteSource}
           onRetrySource={onRetrySource}
+          isRetrying={retryingSourceId === row.original.id}
         />
       ),
     },
@@ -700,10 +721,12 @@ function SourceActions({
   source,
   onDeleteSource,
   onRetrySource,
+  isRetrying,
 }: {
   source: KnowledgeBaseSource;
   onDeleteSource: (source: KnowledgeBaseSource) => void;
   onRetrySource: (source: KnowledgeBaseSource) => void;
+  isRetrying: boolean;
 }) {
   return (
     <DropdownMenu>
@@ -721,9 +744,17 @@ function SourceActions({
       />
       <DropdownMenuContent align="end" sideOffset={8} className="w-44">
         {source.status === "failed" ? (
-          <DropdownMenuItem className="cursor-pointer gap-2" onClick={() => onRetrySource(source)}>
-            <RefreshCw className="h-4 w-4" />
-            Retry indexing
+          <DropdownMenuItem
+            className="cursor-pointer gap-2"
+            disabled={isRetrying}
+            onClick={() => onRetrySource(source)}
+          >
+            {isRetrying ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+            {isRetrying ? "Retrying…" : "Retry indexing"}
           </DropdownMenuItem>
         ) : null}
         <DropdownMenuItem
