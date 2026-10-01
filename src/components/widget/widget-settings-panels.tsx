@@ -4,7 +4,7 @@ import Image from "next/image";
 import type { ReactNode } from "react";
 import { useRef } from "react";
 
-import { Check, Copy, Moon, RotateCcw, Sun, Trash2 } from "@/components/icons";
+import { Check, Copy, Moon, RotateCcw, Shield, ShieldCheck, Sun, Trash2 } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -914,6 +914,25 @@ export function WidgetInstallationPanel({
         description="Authorize domains and copy the embed code to your website."
       />
       <div className="space-y-8">
+        <output className="flex items-start gap-3 rounded-lg border border-border/70 bg-muted/30 p-3">
+          {allowedDomains.length > 0 ? (
+            <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+          ) : (
+            <Shield className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          )}
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-foreground">
+              {allowedDomains.length > 0
+                ? "Domain access is restricted"
+                : "Add your website domain first"}
+            </p>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {allowedDomains.length > 0
+                ? "Only authorized domains can load the widget."
+                : "Production widget requests are rejected until you authorize a domain."}
+            </p>
+          </div>
+        </output>
         <section className="space-y-4">
           <div>
             <h3 className="text-sm font-semibold text-foreground">Authorized domains</h3>
