@@ -199,7 +199,7 @@ export function ConversationsList({
             <Input
               aria-label="Search conversations"
               placeholder="Search conversations…"
-              className="h-9 rounded-lg border-border/50 bg-input/50 pl-9 pr-9 text-sm shadow-none"
+              className="h-11 rounded-lg border-border/50 bg-input/50 pl-9 pr-12 text-base shadow-none sm:h-9 sm:pr-10 sm:text-sm"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
@@ -209,7 +209,7 @@ export function ConversationsList({
                 aria-label="Clear search"
                 title="Clear search"
                 onClick={clearSearch}
-                className="absolute top-1/2 right-1.5 flex size-8 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-transform duration-150 active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring motion-reduce:transition-none motion-reduce:active:scale-100"
+                className="absolute top-1/2 right-1.5 flex size-11 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-transform duration-150 active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring motion-reduce:transition-none motion-reduce:active:scale-100 sm:size-8"
               >
                 <X className="size-4" aria-hidden="true" />
               </button>
