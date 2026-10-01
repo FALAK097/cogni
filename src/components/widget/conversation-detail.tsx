@@ -122,6 +122,18 @@ function getInitials(name: string) {
   return name.slice(0, 2).toUpperCase();
 }
 
+function getConversationChannelLabel(channel?: string) {
+  if (!channel || channel === "WIDGET") return "Website widget";
+  const labels: Record<string, string> = {
+    DISCORD: "Discord",
+    GCHAT: "Google Chat",
+    SLACK: "Slack",
+    TEAMS: "Microsoft Teams",
+    WHATSAPP: "WhatsApp",
+  };
+  return labels[channel] ?? formatStatusLabel(channel);
+}
+
 function splitMessageSources(content: string) {
   const lines = content.trimEnd().split("\n");
 
@@ -449,6 +461,7 @@ export function ConversationDetail({
   if (!session) return null;
 
   const isAssignedToMe = session.assigneeId === session.currentMembershipId;
+  const replyTargetLabel = `Replying to ${displayName} via ${getConversationChannelLabel(session.conversationChannel)}`;
 
   if (part === "details") {
     return (
@@ -787,7 +800,17 @@ export function ConversationDetail({
                   <FileText className="size-3" aria-hidden="true" />
                   Team only
                 </span>
-              ) : null}
+              ) : (
+                <span
+                  className="inline-flex max-w-[52%] min-w-0 items-center gap-1.5 text-xs text-muted-foreground sm:max-w-[60%]"
+                  title={replyTargetLabel}
+                >
+                  <MessageSquare className="size-3 shrink-0" aria-hidden="true" />
+                  <span className="truncate">
+                    To {displayName} · {getConversationChannelLabel(session.conversationChannel)}
+                  </span>
+                </span>
+              )}
             </div>
             <Textarea
               value={composerText}
