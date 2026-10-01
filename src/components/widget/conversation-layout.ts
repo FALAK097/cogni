@@ -6,7 +6,6 @@ export const detailsColumnClassName = "flex h-full min-h-0 flex-col gap-2.5 over
 export const detailCardClassName =
   "gap-0 rounded-xl border border-border/60 bg-card py-0 shadow-none ring-0";
 
-export const hideScrollbarClassName =
-  "overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden";
+export const scrollPaneClassName = "overflow-y-auto";
 
 export const composerBoxClassName = "rounded-xl border border-border/60 bg-card p-3";

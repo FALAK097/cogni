@@ -25,7 +25,7 @@ import type { ConversationFilter, ConversationSummary } from "@/hooks/query";
 import { generateAvatarUrl } from "@/lib/avatar-generator";
 import { cn } from "@/lib/utils";
 
-import { hideScrollbarClassName } from "./conversation-layout";
+import { scrollPaneClassName } from "./conversation-layout";
 
 interface ConversationsListProps {
   filter: ConversationFilter;
@@ -229,7 +229,7 @@ export function ConversationsList({
           </Button>
         </div>
       ) : null}
-      <div aria-busy={isSearchPending} className={cn("min-h-0 flex-1", hideScrollbarClassName)}>
+      <div aria-busy={isSearchPending} className={cn("min-h-0 flex-1", scrollPaneClassName)}>
         {isError && conversations.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
             <p role="alert" className="text-sm text-muted-foreground">

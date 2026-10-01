@@ -68,7 +68,7 @@ import { resolveTranscriptScroll } from "@/features/conversations/transcript-scr
 import { clearSubmittedDraft } from "@/features/conversations/draft-state";
 
 import {
-  hideScrollbarClassName,
+  scrollPaneClassName,
   detailCardClassName,
   composerBoxClassName,
 } from "./conversation-layout";
@@ -399,7 +399,7 @@ export function ConversationDetail({
   if (isLoading && !session) {
     if (part === "details") {
       return (
-        <div className={cn("flex h-full flex-col gap-2.5", hideScrollbarClassName)}>
+        <div className={cn("flex h-full flex-col gap-2.5", scrollPaneClassName)}>
           <Skeleton className="h-28 w-full shrink-0 rounded-xl" />
           <Skeleton className="h-36 w-full shrink-0 rounded-xl" />
           <Skeleton className="h-36 w-full shrink-0 rounded-xl" />
@@ -468,7 +468,7 @@ export function ConversationDetail({
 
   if (part === "details") {
     return (
-      <div className={cn("flex h-full flex-col gap-2.5", hideScrollbarClassName)}>
+      <div className={cn("flex h-full flex-col gap-2.5", scrollPaneClassName)}>
         <SessionDetailsContent
           session={session}
           displayName={displayName}
@@ -617,10 +617,7 @@ export function ConversationDetail({
                   </Button>
                 }
               />
-              <SheetContent
-                side="right"
-                className={cn("w-full max-w-sm p-0", hideScrollbarClassName)}
-              >
+              <SheetContent side="right" className={cn("w-full max-w-sm p-0", scrollPaneClassName)}>
                 <SheetHeader className="border-b border-border/60 px-4 py-4">
                   <SheetTitle>Conversation details</SheetTitle>
                 </SheetHeader>
@@ -708,7 +705,7 @@ export function ConversationDetail({
                 container.scrollHeight - container.scrollTop - container.clientHeight < 64;
               if (stickToBottomRef.current) setHasNewMessages(false);
             }}
-            className={cn("h-full", hideScrollbarClassName)}
+            className={cn("h-full", scrollPaneClassName)}
           >
             <div className="mx-auto max-w-3xl space-y-5 px-3 py-3 sm:px-4">
               {groupedMessages.map((group) => (
