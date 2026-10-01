@@ -86,6 +86,8 @@ const copilotResultSchema = z.object({
   sources: z.array(z.object({ documentId: z.string().min(1), title: z.string().min(1) })),
 });
 
+const uncertainDeliveryMessage = "The channel may have received this reply";
+
 async function generateCopilotDraft(conversationId: string) {
   const response = await fetch(`/api/dashboard/conversations/${conversationId}/copilot`, {
     method: "POST",
@@ -199,6 +201,8 @@ export function ConversationDetail({
 }: ConversationDetailProps) {
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showDuplicateReplyDialog, setShowDuplicateReplyDialog] = useState(false);
+  const [channelReplyDeliveryUncertain, setChannelReplyDeliveryUncertain] = useState(false);
   const [showDetailsSheet, setShowDetailsSheet] = useState(false);
   const [composerMode, setComposerMode] = useState<"reply" | "note">("reply");
   const [replyText, setReplyText] = useState("");
@@ -340,19 +344,34 @@ export function ConversationDetail({
     );
   };
 
-  const handleSend = () => {
+  const handleSend = (confirmedPossibleDuplicate = false) => {
     const submittedDraft = composerText;
     const text = submittedDraft.trim();
     if (!text || sendMessageMutation.isPending) return;
+    if (composerMode === "reply" && channelReplyDeliveryUncertain && !confirmedPossibleDuplicate) {
+      setShowDuplicateReplyDialog(true);
+      return;
+    }
 
     sendMessageMutation.mutate(
       { conversationId, message: text, action: composerMode },
       {
         onSuccess: () => {
           setComposerText((currentDraft) => clearSubmittedDraft(currentDraft, submittedDraft));
+          if (composerMode === "reply") setChannelReplyDeliveryUncertain(false);
           toast({ title: composerMode === "reply" ? "Reply sent" : "Internal note added" });
         },
-        onError: () => {
+        onError: (error) => {
+          if (error instanceof Error && error.message.includes(uncertainDeliveryMessage)) {
+            setChannelReplyDeliveryUncertain(true);
+            toast({
+              title: "Check channel delivery",
+              description:
+                "The reply may have reached the customer. Check the channel before sending again.",
+              variant: "destructive",
+            });
+            return;
+          }
           toast({
             title: composerMode === "reply" ? "Failed to send reply" : "Failed to add note",
             variant: "destructive",
@@ -456,6 +475,24 @@ export function ConversationDetail({
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={showDuplicateReplyDialog} onOpenChange={setShowDuplicateReplyDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Check channel delivery before retrying</AlertDialogTitle>
+            <AlertDialogDescription>
+              The channel may already have delivered your last reply, but Cogni could not confirm
+              it. Check the channel before sending this message again; resending can create a
+              duplicate.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep draft</AlertDialogCancel>
+            <AlertDialogAction onClick={() => handleSend(true)}>
+              Send again anyway
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -798,7 +835,7 @@ export function ConversationDetail({
                 <Button
                   size="sm"
                   className="h-11 min-w-[76px] gap-1.5 rounded-md px-3.5 text-sm sm:h-9"
-                  onClick={handleSend}
+                  onClick={() => handleSend()}
                   disabled={!composerText.trim() || sendMessageMutation.isPending}
                   aria-keyshortcuts="Meta+Enter Control+Enter"
                   aria-describedby="composer-shortcut-hint"

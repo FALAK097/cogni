@@ -18,6 +18,13 @@ import {
 
 type RouteContext = { params: Promise<{ conversation_id: string }> };
 
+const uncertainChannelReplyMessage =
+  "The channel may have received this reply, but Cogni could not confirm or save it. Check the channel before sending again.";
+
+function uncertainChannelReplyResponse() {
+  return NextResponse.json({ error: uncertainChannelReplyMessage }, { status: 502 });
+}
+
 function mapMessageToClient(message: MessageJson, agentName: string) {
   const isTeam = message.authorType === "TEAM";
   const isVisitor = message.authorType === "VISITOR";
@@ -308,28 +315,43 @@ export async function PATCH(request: Request, context: RouteContext) {
       if (!isChatSdkChannel(channel)) {
         return NextResponse.json({ error: "Unsupported channel." }, { status: 409 });
       }
-      await postChannelReply({
-        channel,
-        db,
-        workspaceId: workspace.id,
-        integrationId: integration.id,
-        externalThreadId: conversation.externalThreadId,
-        text: message,
-      });
+      try {
+        await postChannelReply({
+          channel,
+          db,
+          workspaceId: workspace.id,
+          integrationId: integration.id,
+          externalThreadId: conversation.externalThreadId,
+          text: message,
+        });
+      } catch {
+        return uncertainChannelReplyResponse();
+      }
     }
 
-    const saved = await appendTeamConversationMessage(
-      workspace.id,
-      conversation.id,
-      {
-        body: message,
-        authorType: "TEAM",
-        visibility: body.action === "note" ? "INTERNAL" : "PUBLIC",
-      },
-      { updateLastMessageAt: body.action === "reply" },
-    );
+    let saved: boolean;
+    try {
+      saved = await appendTeamConversationMessage(
+        workspace.id,
+        conversation.id,
+        {
+          body: message,
+          authorType: "TEAM",
+          visibility: body.action === "note" ? "INTERNAL" : "PUBLIC",
+        },
+        { updateLastMessageAt: body.action === "reply" },
+      );
+    } catch (error) {
+      if (body.action === "reply" && conversation.channel !== "WIDGET") {
+        return uncertainChannelReplyResponse();
+      }
+      throw error;
+    }
 
     if (!saved) {
+      if (body.action === "reply" && conversation.channel !== "WIDGET") {
+        return uncertainChannelReplyResponse();
+      }
       return NextResponse.json(
         { error: "Failed to save message. Please try again." },
         { status: 409 },
