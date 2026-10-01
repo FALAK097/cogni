@@ -289,8 +289,10 @@ export function ConversationsList({
                   aria-pressed={selected}
                   onClick={() => onSelectConversation(conversation.id)}
                   className={cn(
-                    "flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
-                    selected ? "bg-primary/5" : "hover:bg-muted/40",
+                    "relative flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
+                    selected
+                      ? "bg-primary/5 before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full before:bg-primary"
+                      : "hover:bg-muted/40",
                   )}
                 >
                   <Avatar className="h-10 w-10">
