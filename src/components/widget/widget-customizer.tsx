@@ -185,6 +185,7 @@ export function WidgetCustomizer({
   const pendingSaveRef = useRef(false);
   const savedOverridesRef = useRef<Partial<WidgetCustomizerConfig>>({});
   const configOverridesRef = useRef(configOverrides);
+  const widgetConfigRef = useRef<DashboardWidgetConfig | undefined>(undefined);
 
   useEffect(() => {
     configOverridesRef.current = configOverrides;
@@ -193,7 +194,11 @@ export function WidgetCustomizer({
   const widgetConfigQuery = useWidgetConfig(activeWorkspaceId);
   const { data: widgetConfigData, isLoading } = widgetConfigQuery;
   const saveWidgetConfigMutation = useSaveWidgetConfig();
-  const saveWidgetConfig = saveWidgetConfigMutation.mutate;
+  const saveWidgetConfig = saveWidgetConfigMutation.mutateAsync;
+
+  useEffect(() => {
+    widgetConfigRef.current = widgetConfigData;
+  }, [widgetConfigData]);
 
   const isReady = Boolean(activeWorkspaceId) && Boolean(widgetConfigData) && !isLoading;
 
@@ -204,13 +209,17 @@ export function WidgetCustomizer({
 
   const updateConfig = useCallback(
     <Key extends keyof WidgetCustomizerConfig>(key: Key, value: WidgetCustomizerConfig[Key]) => {
-      setConfigOverrides((current) => ({ ...current, [key]: value }));
+      const next = { ...configOverridesRef.current, [key]: value };
+      configOverridesRef.current = next;
+      setConfigOverrides(next);
     },
     [],
   );
 
   const updateConfigBatch = useCallback((updates: Partial<WidgetCustomizerConfig>) => {
-    setConfigOverrides((current) => ({ ...current, ...updates }));
+    const next = { ...configOverridesRef.current, ...updates };
+    configOverridesRef.current = next;
+    setConfigOverrides(next);
   }, []);
 
   const handleSubTabChange = (value: string | number) => {
@@ -244,10 +253,11 @@ export function WidgetCustomizer({
   };
 
   const buildSavePayload = useCallback(() => {
-    if (!widgetConfigData) return {};
-    const merged = mergeWidgetConfig(widgetConfigData, configOverrides, activeWorkspaceId);
+    const savedConfig = widgetConfigRef.current;
+    if (!savedConfig) return {};
+    const merged = mergeWidgetConfig(savedConfig, configOverridesRef.current, activeWorkspaceId);
     return toSavePayload(merged);
-  }, [activeWorkspaceId, configOverrides, widgetConfigData]);
+  }, [activeWorkspaceId]);
 
   const persistConfigRef = useRef<(options?: { silent?: boolean }) => void>(() => {});
 
@@ -269,42 +279,51 @@ export function WidgetCustomizer({
         return;
       }
 
-      savedOverridesRef.current = { ...configOverridesRef.current };
+      const submittedOverrides = { ...configOverridesRef.current };
+      savedOverridesRef.current = submittedOverrides;
       isSavingRef.current = true;
 
-      saveWidgetConfig(
-        {
-          workspaceId: activeWorkspaceId,
-          body: buildSavePayload(),
-        },
-        {
-          onSuccess: () => {
-            isSavingRef.current = false;
-            setConfigOverrides((current) =>
-              getPendingConfigOverrides(current, savedOverridesRef.current),
-            );
-            if (pendingSaveRef.current) {
-              pendingSaveRef.current = false;
-              persistConfigRef.current({ silent: true });
-            }
-            if (!options?.silent) {
-              toast({
-                title: "Configuration saved",
-                description: "Your widget configuration has been published.",
-              });
-            }
-          },
-          onError: (error) => {
-            isSavingRef.current = false;
+      void saveWidgetConfig({
+        workspaceId: activeWorkspaceId,
+        body: buildSavePayload(),
+      }).then(
+        (savedConfig) => {
+          widgetConfigRef.current = savedConfig;
+          isSavingRef.current = false;
+          const pendingOverrides = getPendingConfigOverrides(
+            configOverridesRef.current,
+            submittedOverrides,
+          );
+          configOverridesRef.current = pendingOverrides;
+          if (Object.keys(pendingOverrides).length === 0) {
+            savedOverridesRef.current = {};
+          }
+          setConfigOverrides(pendingOverrides);
+          if (pendingSaveRef.current) {
             pendingSaveRef.current = false;
-            if (!options?.silent) {
-              toast({
-                title: "Error saving configuration",
-                description: error.message || "Failed to save configuration. Please try again.",
-                variant: "destructive",
-              });
-            }
-          },
+            persistConfigRef.current({ silent: true });
+          }
+          if (!options?.silent) {
+            toast({
+              title: "Configuration saved",
+              description: "Your widget configuration has been saved.",
+            });
+          }
+        },
+        (error: unknown) => {
+          isSavingRef.current = false;
+          pendingSaveRef.current = false;
+          savedOverridesRef.current = {};
+          if (!options?.silent) {
+            toast({
+              title: "Error saving configuration",
+              description:
+                error instanceof Error
+                  ? error.message
+                  : "Failed to save configuration. Please try again.",
+              variant: "destructive",
+            });
+          }
         },
       );
     },
@@ -324,24 +343,45 @@ export function WidgetCustomizer({
     }
 
     saveTimerRef.current = setTimeout(() => {
+      saveTimerRef.current = null;
       persistConfig({ silent: true });
     }, 800);
 
     return () => {
       if (saveTimerRef.current) {
         clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
       }
     };
   }, [configOverrides, isReady, persistConfig]);
 
+  useEffect(
+    () => () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+
+      if (valuesEqual(configOverridesRef.current, savedOverridesRef.current)) return;
+      if (isSavingRef.current) {
+        pendingSaveRef.current = true;
+        return;
+      }
+      persistConfigRef.current({ silent: true });
+    },
+    [],
+  );
+
   const handleResetAppearance = () => {
     const defaults = getAppearanceDefaults();
-    setConfigOverrides((current) => ({
-      ...current,
+    const next = {
+      ...configOverridesRef.current,
       ...defaults,
       userBubbleTextColor: APPEARANCE_DEFAULTS.userBubbleTextColor,
       headerGradientTo: defaults.headerGradientFrom,
-    }));
+    };
+    configOverridesRef.current = next;
+    setConfigOverrides(next);
   };
 
   const liveConfig = useMemo(() => {
