@@ -75,7 +75,7 @@ export function WidgetConversations({ initialConversationId = null }: WidgetConv
           >
             <TabsList
               variant="line"
-              className="h-auto w-full justify-start gap-6 overflow-x-auto rounded-none bg-transparent p-0 pb-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              className="h-auto w-full justify-start gap-6 overflow-x-auto rounded-none bg-transparent p-0 pb-0"
             >
               {FILTER_TABS.map((tab) => {
                 const active = filter === tab.value;
@@ -91,7 +91,7 @@ export function WidgetConversations({ initialConversationId = null }: WidgetConv
                         : tab.label
                     }
                     className={cn(
-                      "h-9 shrink-0 flex-none gap-2 rounded-none bg-transparent px-0 pb-2 text-sm font-medium shadow-none",
+                      "h-11 shrink-0 flex-none gap-2 rounded-none bg-transparent px-0 pb-2 text-sm font-medium shadow-none sm:h-9",
                       "after:-bottom-px after:h-[2px] after:rounded-full after:bg-primary",
                       "data-active:bg-transparent data-active:shadow-none",
                       active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
