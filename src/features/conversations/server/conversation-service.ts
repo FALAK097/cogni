@@ -368,19 +368,28 @@ export async function markVisitorMessagesAsRead({
   db,
   workspaceId,
   conversationId,
+  throughMessageId,
   readAt,
 }: {
   db: Db;
   workspaceId: string;
   conversationId: string;
+  throughMessageId: string;
   readAt: string;
 }) {
   const messages = sql`COALESCE(NULLIF(${conversation.messages}, '')::jsonb, '[]'::jsonb)`;
+  const throughMessageOrdinality = sql`(
+    SELECT max(entry.ordinality)
+    FROM jsonb_array_elements(${messages}) WITH ORDINALITY AS entry(item, ordinality)
+    WHERE entry.item ->> 'id' = ${throughMessageId}
+      AND entry.item ->> 'authorType' = 'VISITOR'
+  )`;
   const hasUnreadVisitorMessage = sql`EXISTS (
     SELECT 1
-    FROM jsonb_array_elements(${messages}) AS candidate(item)
+    FROM jsonb_array_elements(${messages}) WITH ORDINALITY AS candidate(item, ordinality)
     WHERE candidate.item ->> 'authorType' = 'VISITOR'
       AND candidate.item ->> 'readAt' IS NULL
+      AND candidate.ordinality <= ${throughMessageOrdinality}
   )`;
   const updatedMessages = sql`(
     SELECT COALESCE(
@@ -388,6 +397,7 @@ export async function markVisitorMessagesAsRead({
         CASE
           WHEN entry.item ->> 'authorType' = 'VISITOR'
             AND entry.item ->> 'readAt' IS NULL
+            AND entry.ordinality <= ${throughMessageOrdinality}
           THEN jsonb_set(entry.item, '{readAt}', to_jsonb(${readAt}::text), true)
           ELSE entry.item
         END

@@ -93,16 +93,6 @@ export function ConversationsList({
   }
 
   useEffect(() => {
-    if (!selectedConversationId) {
-      markedReadRef.current = null;
-      return;
-    }
-    if (markedReadRef.current === selectedConversationId) return;
-    markedReadRef.current = selectedConversationId;
-    markConversationRead(selectedConversationId);
-  }, [selectedConversationId, markConversationRead]);
-
-  useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 200);
     return () => clearTimeout(timer);
   }, [search]);
@@ -146,6 +136,23 @@ export function ConversationsList({
     }
     return result;
   }, [effectivePagesCache, page, conversationsData?.conversations]);
+
+  useEffect(() => {
+    if (!selectedConversationId) {
+      markedReadRef.current = null;
+      return;
+    }
+    if (markedReadRef.current === selectedConversationId) return;
+    const selectedConversation = conversations.find(
+      (conversation) => conversation.id === selectedConversationId,
+    );
+    if (!selectedConversation?.lastUnreadVisitorMessageId) return;
+    markedReadRef.current = selectedConversationId;
+    markConversationRead({
+      conversationId: selectedConversationId,
+      throughMessageId: selectedConversation.lastUnreadVisitorMessageId,
+    });
+  }, [conversations, selectedConversationId, markConversationRead]);
 
   const handleLoadMore = () => {
     const nextCursor = conversationsData?.pagination.nextCursor;

@@ -344,6 +344,7 @@ export interface ConversationSummary {
   assigneeName: string | null;
   assigneeId: string | null;
   unreadCount: number;
+  lastUnreadVisitorMessageId: string | null;
   preview: string;
   lastMessageAt: string;
   country: string | null;
@@ -532,17 +533,23 @@ export function useMarkConversationRead() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (conversationId: string) => {
+    mutationFn: async ({
+      conversationId,
+      throughMessageId,
+    }: {
+      conversationId: string;
+      throughMessageId: string;
+    }) => {
       const { data, error } = await api.PATCH<{ ok: boolean }>(
         "/api/conversations/{conversation_id}",
         {
           params: { path: { conversation_id: conversationId } },
-          body: { action: "read" },
+          body: { action: "read", readThroughMessageId: throughMessageId },
         },
       );
       return requireData(data, error, "Failed to mark conversation as read");
     },
-    onSuccess: (_data, conversationId) => {
+    onSuccess: (_data, { conversationId }) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all });
       void queryClient.invalidateQueries({
         queryKey: queryKeys.conversations.detail(conversationId),

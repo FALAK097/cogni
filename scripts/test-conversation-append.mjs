@@ -281,12 +281,19 @@ test("marking visitor messages read preserves concurrent transcript appends", as
   await raw`UPDATE "conversation" SET "messages" = ${JSON.stringify([
     { id: "visitor-unread", body: "Question", authorType: "VISITOR", createdAt: now },
     { id: "ai-response", body: "Hello", authorType: "AI", createdAt: now },
+    {
+      id: "visitor-arrived-after-open",
+      body: "One more question",
+      authorType: "VISITOR",
+      createdAt: now,
+    },
   ])} WHERE "id" = ${conversationId} AND "workspaceId" = ${workspaceId}`;
   const readAt = new Date().toISOString();
   const readWrite = markVisitorMessagesAsRead({
     db: appDatabases[0],
     workspaceId,
     conversationId,
+    throughMessageId: "visitor-unread",
     readAt,
   });
   const appendWrites = Array.from({ length: 20 }, (_, index) =>
@@ -297,8 +304,8 @@ test("marking visitor messages read preserves concurrent transcript appends", as
       message: {
         id: randomUUID(),
         body: `read-race-${index}`,
-        authorType: "TEAM",
-        visibility: "INTERNAL",
+        authorType: index === 0 ? "VISITOR" : "TEAM",
+        visibility: index === 0 ? "PUBLIC" : "INTERNAL",
         createdAt: new Date().toISOString(),
       },
     }),
@@ -310,14 +317,16 @@ test("marking visitor messages read preserves concurrent transcript appends", as
   const [row] =
     await raw`SELECT "messages" FROM "conversation" WHERE "id" = ${conversationId} AND "workspaceId" = ${workspaceId}`;
   const messages = JSON.parse(row.messages);
-  assert.equal(messages.length, 22);
+  assert.equal(messages.length, 23);
   assert.equal(messages[0].readAt, readAt);
   assert.equal(messages[1].readAt, undefined);
+  assert.equal(messages[2].readAt, undefined);
 
   const foreignWorkspaceRead = await markVisitorMessagesAsRead({
     db: appDatabases[0],
     workspaceId: randomUUID(),
     conversationId,
+    throughMessageId: "visitor-unread",
     readAt,
   });
   assert.equal(foreignWorkspaceRead, false);

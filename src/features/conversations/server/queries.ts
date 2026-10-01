@@ -154,13 +154,18 @@ function hasUnreadVisitorMessagesSql(c: typeof conversationTable) {
   )`;
 }
 
-export async function markConversationAsRead(workspaceId: string, conversationId: string) {
+export async function markConversationAsRead(
+  workspaceId: string,
+  conversationId: string,
+  throughMessageId: string,
+) {
   const db = getDb();
   const now = new Date().toISOString();
   const updated = await markVisitorMessagesAsRead({
     db,
     workspaceId,
     conversationId,
+    throughMessageId,
     readAt: now,
   });
 
@@ -378,6 +383,9 @@ export async function getConversation(
 
 export function mapConversationToListItem(conversation: ParsedConversation) {
   const lastMessage = getLastPublicMessage(conversation.messages);
+  const lastUnreadVisitorMessage = conversation.messages.findLast(
+    (message) => message.authorType === "VISITOR" && !message.readAt,
+  );
 
   return {
     id: conversation.id,
@@ -390,6 +398,7 @@ export function mapConversationToListItem(conversation: ParsedConversation) {
     assigneeName: conversation.assignedMember?.user.name ?? null,
     assigneeId: conversation.assignedMemberId,
     unreadCount: countUnreadMessages(conversation.messages),
+    lastUnreadVisitorMessageId: lastUnreadVisitorMessage?.id ?? null,
     preview: lastMessage?.body ?? conversation.subject,
     lastMessageAt: conversation.lastMessageAt
       ? new Date(conversation.lastMessageAt).toISOString()

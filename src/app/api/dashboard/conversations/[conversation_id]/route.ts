@@ -195,9 +195,14 @@ export async function PATCH(request: Request, context: RouteContext) {
   const { db, workspace, membership } = await requireDashboardContext();
   const { conversation_id: conversationId } = await context.params;
 
-  let body: { action?: string; message?: string; paused?: boolean };
+  let body: { action?: string; message?: string; paused?: boolean; readThroughMessageId?: string };
   try {
-    body = (await request.json()) as { action?: string; message?: string; paused?: boolean };
+    body = (await request.json()) as {
+      action?: string;
+      message?: string;
+      paused?: boolean;
+      readThroughMessageId?: string;
+    };
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
@@ -267,7 +272,10 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   if (body.action === "read") {
-    await markConversationAsRead(workspace.id, conversation.id);
+    if (!body.readThroughMessageId || body.readThroughMessageId.length > 128) {
+      return NextResponse.json({ error: "A valid read boundary is required." }, { status: 400 });
+    }
+    await markConversationAsRead(workspace.id, conversation.id, body.readThroughMessageId);
     return NextResponse.json({ ok: true });
   }
 

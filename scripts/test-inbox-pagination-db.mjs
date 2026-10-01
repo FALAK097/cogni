@@ -64,6 +64,7 @@ const now = new Date("2026-09-30T08:15:00.000Z").toISOString();
 const conversationIds = [1, 2, 3].map(
   (number) => `00000000-0000-4000-8000-${String(number).padStart(12, "0")}`,
 );
+const visitorMessageIds = conversationIds.map(() => randomUUID());
 
 before(async () => {
   await raw`
@@ -86,7 +87,7 @@ before(async () => {
     const assignee = index === 2 ? memberId : null;
     const messages = JSON.stringify([
       {
-        id: randomUUID(),
+        id: visitorMessageIds[index],
         body: `cursor sample ${index + 1}`,
         authorType: "VISITOR",
         visibility: "PUBLIC",
@@ -147,6 +148,10 @@ test("inbox cursors return complete, stable pages and correct unread view counts
   assert.deepEqual(
     firstItems.map((item) => item.unreadCount),
     [1, 0],
+  );
+  assert.deepEqual(
+    firstItems.map((item) => item.lastUnreadVisitorMessageId),
+    [visitorMessageIds[2], null],
   );
 
   const secondPage = await getInboxPage(workspaceId, {
