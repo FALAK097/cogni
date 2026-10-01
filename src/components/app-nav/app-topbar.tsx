@@ -24,7 +24,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useKnowledgeBases } from "@/hooks/query";
 import { useIsMobileSidebar, useSidebar } from "@/hooks/use-sidebar";
 import { cn } from "@/lib/utils";
 
@@ -77,22 +76,6 @@ function getFallbackLabel(segment: string, index: number, routeSegments: string[
   return formatSegment(segment);
 }
 
-function useBreadcrumbLabels(segments: string[]) {
-  const knowledgeBaseIndex = segments.indexOf("knowledge-base");
-  const knowledgeBaseId = knowledgeBaseIndex >= 0 ? (segments[knowledgeBaseIndex + 1] ?? "") : "";
-
-  const knowledgeBasesQuery = useKnowledgeBases();
-
-  const labels = new Map<string, string>();
-  const knowledgeBase = knowledgeBasesQuery.data?.knowledgeBases?.find(
-    (item) => item.id === knowledgeBaseId,
-  );
-
-  if (knowledgeBaseId) labels.set(knowledgeBaseId, knowledgeBase?.name ?? "Knowledge Base");
-
-  return labels;
-}
-
 function getVisibleCrumbs(crumbs: Crumb[]) {
   if (crumbs.length <= 4) return { visible: crumbs, hidden: [] };
   return {
@@ -108,7 +91,6 @@ function getBreadcrumbHref(routeSegments: string[], index: number) {
 function Breadcrumbs() {
   const pathname = usePathname();
   const segments = pathname.split("/").filter(Boolean);
-  const labels = useBreadcrumbLabels(segments);
 
   const routeSegments = segments.length > 0 ? segments : ["dashboard"];
   const routeCrumbs = routeSegments.map((segment, index) => {
@@ -116,7 +98,7 @@ function Breadcrumbs() {
 
     return {
       href: getBreadcrumbHref(routeSegments, index),
-      label: labels.get(segment) ?? getFallbackLabel(segment, index, routeSegments),
+      label: getFallbackLabel(segment, index, routeSegments),
       current: isCurrent,
     };
   });

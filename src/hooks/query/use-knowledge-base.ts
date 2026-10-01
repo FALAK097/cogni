@@ -43,41 +43,15 @@ export type KnowledgeBase = {
   id: string;
   workspaceId: string;
   name: string;
-  status?: string | null;
   sourceCount?: number;
   createdAt: string;
   updatedAt: string;
 };
 
-export type KnowledgeBaseEnvelope = {
-  knowledgeBase?: KnowledgeBase | null;
-  operation?: { status?: string; message?: string } | null;
-};
-
-export interface KnowledgeBasesResponse {
-  knowledgeBases: KnowledgeBase[];
-  count: number;
-}
-
 export interface KnowledgeBaseSourcesResponse {
   knowledgeBase: KnowledgeBase;
   sources: KnowledgeBaseSource[];
   count: number;
-}
-
-export function useKnowledgeBases() {
-  const workspaceId = useActiveWorkspaceId() ?? "";
-
-  return useQuery<KnowledgeBasesResponse>({
-    queryKey: queryKeys.knowledgeBase.list(workspaceId),
-    queryFn: async () => {
-      const { data, error } = await api.GET<KnowledgeBasesResponse>("/api/knowledge-base", {
-        params: { query: { workspaceId } },
-      });
-      return requireData(data, error, "Failed to fetch knowledge bases");
-    },
-    enabled: Boolean(workspaceId),
-  });
 }
 
 export function useKnowledgeBaseSources(

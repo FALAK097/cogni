@@ -19,14 +19,6 @@ export const queryKeys = {
   },
   knowledgeBase: {
     all: ["knowledge-base"] as const,
-    list: (workspaceId: string) => [...queryKeys.knowledgeBase.all, "list", workspaceId] as const,
-    detail: (workspaceId: string, knowledgeBaseId?: string | null) =>
-      [
-        ...queryKeys.knowledgeBase.all,
-        "detail",
-        workspaceId,
-        knowledgeBaseId ?? "default",
-      ] as const,
     sources: (workspaceId: string, knowledgeBaseId?: string | null) =>
       [
         ...queryKeys.knowledgeBase.all,
