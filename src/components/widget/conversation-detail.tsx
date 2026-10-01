@@ -775,11 +775,11 @@ export function ConversationDetail({
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="h-9 gap-1.5 px-2 text-sm text-muted-foreground"
+                    className="h-11 gap-1.5 px-2 text-sm text-muted-foreground sm:h-9"
                     disabled={copilotMutation.isPending}
                     onClick={() => copilotMutation.mutate()}
                   >
-                    <Bot className="h-3 w-3" />
+                    <Bot className="size-4" aria-hidden="true" />
                     {copilotMutation.isPending ? "Thinking…" : "Copilot"}
                   </Button>
                 ) : null}
@@ -797,7 +797,7 @@ export function ConversationDetail({
                 </span>
                 <Button
                   size="sm"
-                  className="h-9 min-w-[76px] gap-1.5 rounded-md px-3.5 text-sm"
+                  className="h-11 min-w-[76px] gap-1.5 rounded-md px-3.5 text-sm sm:h-9"
                   onClick={handleSend}
                   disabled={!composerText.trim() || sendMessageMutation.isPending}
                   aria-keyshortcuts="Meta+Enter Control+Enter"
