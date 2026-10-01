@@ -13,6 +13,7 @@ import { detailsColumnClassName, panelBoxClassName } from "./conversation-layout
 
 interface WidgetConversationsProps {
   initialConversationId?: string | null;
+  canManage: boolean;
 }
 
 const FILTER_TABS: Array<{
@@ -36,7 +37,10 @@ const EMPTY_COUNTS = {
   closed: 0,
 };
 
-export function WidgetConversations({ initialConversationId = null }: WidgetConversationsProps) {
+export function WidgetConversations({
+  initialConversationId = null,
+  canManage,
+}: WidgetConversationsProps) {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(
     initialConversationId,
   );
@@ -147,6 +151,7 @@ export function WidgetConversations({ initialConversationId = null }: WidgetConv
             <ConversationDetail
               key={selectedConversationId}
               conversationId={selectedConversationId}
+              canManage={canManage}
               onBack={() => setSelectedConversationId(null)}
               onSelectConversation={setSelectedConversationId}
               part="chat"
@@ -165,6 +170,7 @@ export function WidgetConversations({ initialConversationId = null }: WidgetConv
             <ConversationDetail
               key={selectedConversationId}
               conversationId={selectedConversationId}
+              canManage={canManage}
               onBack={() => {}}
               onSelectConversation={setSelectedConversationId}
               part="details"

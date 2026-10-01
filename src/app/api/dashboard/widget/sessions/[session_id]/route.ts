@@ -5,6 +5,7 @@ import { and, eq } from "drizzle-orm";
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
 import { getDashboardEngagedVisitorSessionCond } from "@/features/widget/server/widget-data-filters";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
+import { canManageWorkspace } from "@/lib/auth/permissions";
 import {
   conversation as conversationTable,
   contact as contactTable,
@@ -303,7 +304,13 @@ export async function PATCH(request: Request, context: RouteContext) {
 }
 
 export async function DELETE(_request: Request, context: RouteContext) {
-  const { db, workspace } = await requireDashboardContext();
+  const { db, workspace, membership } = await requireDashboardContext();
+  if (!canManageWorkspace(membership.role)) {
+    return NextResponse.json(
+      { error: "Only workspace owners can delete visitor sessions." },
+      { status: 403 },
+    );
+  }
   const { session_id: sessionId } = await context.params;
   const widget = await db.query.widget.findFirst({
     where: (fields, { eq }) => eq(fields.workspaceId, workspace.id),

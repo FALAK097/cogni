@@ -75,6 +75,7 @@ import {
 
 interface ConversationDetailProps {
   conversationId: string;
+  canManage: boolean;
   onBack: () => void;
   onSelectConversation: (conversationId: string) => void;
   part?: "chat" | "details";
@@ -210,6 +211,7 @@ function detailCardContentClassName() {
 
 export function ConversationDetail({
   conversationId,
+  canManage,
   onBack,
   onSelectConversation,
   part = "chat",
@@ -685,11 +687,16 @@ export function ConversationDetail({
                   </DropdownMenuItem>
                 ) : null}
                 <DropdownMenuItem
-                  className="text-destructive"
-                  onClick={() => setShowDeleteDialog(true)}
+                  className={cn(canManage && "text-destructive")}
+                  disabled={!canManage}
+                  onClick={canManage ? () => setShowDeleteDialog(true) : undefined}
+                  title={canManage ? undefined : "Only workspace owners can delete conversations."}
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
                   Delete conversation
+                  {!canManage ? (
+                    <span className="ml-auto pl-4 text-xs text-muted-foreground">Owner only</span>
+                  ) : null}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

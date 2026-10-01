@@ -10,6 +10,7 @@ import {
 } from "@/features/conversations/server/queries";
 import { setConversationStatus } from "@/features/conversations/server/conversation-service";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
+import { canManageWorkspace } from "@/lib/auth/permissions";
 import { isChatSdkChannel, postChannelReply } from "@/features/integrations/server/chat-sdk";
 import {
   conversation as conversationTable,
@@ -365,7 +366,13 @@ export async function PATCH(request: Request, context: RouteContext) {
 }
 
 export async function DELETE(_request: Request, context: RouteContext) {
-  const { db, workspace } = await requireDashboardContext();
+  const { db, workspace, membership } = await requireDashboardContext();
+  if (!canManageWorkspace(membership.role)) {
+    return NextResponse.json(
+      { error: "Only workspace owners can delete conversations." },
+      { status: 403 },
+    );
+  }
   const { conversation_id: conversationId } = await context.params;
 
   const conversation = await db.query.conversation.findFirst({

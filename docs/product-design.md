@@ -70,6 +70,8 @@ Persist layout preferences per user/workspace. Tenant change discards selected f
 Keep the current two-role model. Owners manage agent settings, knowledge sources and connections,
 and approve or reject external actions. Members can work conversations and inspect agent and source
 health, connection health and approval status; mutation controls explain when an owner is needed.
+Deleting conversations or visitor sessions is owner-only because it permanently removes customer
+history.
 Enforce these boundaries in server routes and server actions as well as the interface. Add finer
 roles only when customer workflows require them.
 
