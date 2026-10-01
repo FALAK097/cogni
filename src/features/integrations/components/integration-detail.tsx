@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { z } from "zod";
 
 import { Badge } from "@/components/ui/badge";
+import { AlertCircle, Info } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -167,11 +168,30 @@ export function IntegrationDetail({ slug }: { slug: string }) {
                     {new Date(action.createdAt).toLocaleString()}
                   </p>
                   {action.errorMessage ? (
-                    <p className="mt-1 text-xs text-destructive">{action.errorMessage}</p>
+                    <p
+                      className={
+                        action.status === "UNKNOWN" || action.status === "NOT_SENT"
+                          ? "mt-1 text-xs text-muted-foreground"
+                          : "mt-1 text-xs text-destructive"
+                      }
+                    >
+                      {action.errorMessage}
+                    </p>
                   ) : null}
                 </div>
-                <Badge variant={action.status === "FAILED" ? "destructive" : "outline"}>
-                  {action.status.toLowerCase()}
+                <Badge
+                  variant={action.status === "FAILED" ? "destructive" : "outline"}
+                  className={
+                    action.status === "UNKNOWN"
+                      ? "border-amber-500/25 bg-amber-500/10 text-amber-800 dark:text-amber-300"
+                      : action.status === "NOT_SENT"
+                        ? "text-muted-foreground"
+                        : undefined
+                  }
+                >
+                  {action.status === "UNKNOWN" ? <AlertCircle aria-hidden="true" /> : null}
+                  {action.status === "NOT_SENT" ? <Info aria-hidden="true" /> : null}
+                  {action.status === "NOT_SENT" ? "Not sent" : action.status.toLowerCase()}
                 </Badge>
               </div>
             ))

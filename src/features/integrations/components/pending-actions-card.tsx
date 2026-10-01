@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AlertCircle, Info } from "@/components/icons";
 import { useToast } from "@/components/ui/use-toast";
 import { queryKeys } from "@/lib/query-keys";
 
@@ -14,6 +15,8 @@ type PendingApproval = {
   riskLevel: string;
   summary: string;
   status: string;
+  actionStatus: string | null;
+  actionErrorMessage: string | null;
   expiresAt: string;
   token: string;
 };
@@ -76,6 +79,8 @@ export function PendingActionsCard() {
       <CardContent className="space-y-3">
         {query.data.approvals.map((approval) => {
           const isPending = decision.isPending && decision.variables.approval.id === approval.id;
+          const outcomeUnknown = approval.actionStatus === "UNKNOWN";
+          const notSent = approval.actionStatus === "NOT_SENT";
           return (
             <div
               key={approval.id}
@@ -87,34 +92,66 @@ export function PendingActionsCard() {
                   <Badge variant={approval.riskLevel === "HIGH" ? "destructive" : "secondary"}>
                     {approval.riskLevel.toLowerCase()} risk
                   </Badge>
+                  {outcomeUnknown ? (
+                    <Badge
+                      variant="outline"
+                      className="border-amber-500/25 bg-amber-500/10 text-amber-800 dark:text-amber-300"
+                    >
+                      <AlertCircle aria-hidden="true" />
+                      Outcome unknown
+                    </Badge>
+                  ) : null}
+                  {notSent ? (
+                    <Badge variant="outline">
+                      <Info aria-hidden="true" />
+                      Not sent
+                    </Badge>
+                  ) : null}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {approval.actionType} · expires {new Date(approval.expiresAt).toLocaleString()}
                 </p>
+                {outcomeUnknown || notSent ? (
+                  <p
+                    className={
+                      outcomeUnknown
+                        ? "max-w-2xl text-sm text-amber-900 dark:text-amber-200"
+                        : "max-w-2xl text-sm text-muted-foreground"
+                    }
+                  >
+                    {outcomeUnknown
+                      ? (approval.actionErrorMessage ?? "Check the provider before trying again.")
+                      : `This action was not sent. ${approval.actionErrorMessage ?? "You can safely retry it."}`}
+                  </p>
+                ) : null}
               </div>
-              <div className="flex shrink-0 gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isPending || approval.status === "APPROVED"}
-                  onClick={() => decision.mutate({ approval, value: "REJECTED" })}
-                >
-                  Reject
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={isPending}
-                  onClick={() => decision.mutate({ approval, value: "APPROVED" })}
-                >
-                  {isPending
-                    ? "Running…"
-                    : approval.status === "APPROVED"
-                      ? "Retry action"
-                      : "Approve and run"}
-                </Button>
-              </div>
+              {outcomeUnknown ? null : (
+                <div className="flex shrink-0 gap-2">
+                  {approval.status === "PENDING" ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={isPending}
+                      onClick={() => decision.mutate({ approval, value: "REJECTED" })}
+                    >
+                      Reject
+                    </Button>
+                  ) : null}
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={isPending}
+                    onClick={() => decision.mutate({ approval, value: "APPROVED" })}
+                  >
+                    {isPending
+                      ? "Running…"
+                      : approval.status === "APPROVED"
+                        ? "Retry action"
+                        : "Approve and run"}
+                  </Button>
+                </div>
+              )}
             </div>
           );
         })}

@@ -6,6 +6,10 @@ import {
   getComposioProviderBySlug,
 } from "@/features/integrations/server/composio-connections";
 import { integrationTools } from "@/features/integrations/server/tool-registry";
+import {
+  ACTION_OUTCOME_UNKNOWN_MESSAGE,
+  getActionStatusForDisplay,
+} from "@/features/integrations/action-recovery";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 
 type RouteContext = { params: Promise<{ slug: string }> };
@@ -54,11 +58,20 @@ export async function GET(request: Request, context: RouteContext) {
     columns: {
       id: true,
       actionType: true,
+      provider: true,
       status: true,
       errorMessage: true,
       createdAt: true,
       updatedAt: true,
     },
+  });
+  const visibleActions = actions.map(({ provider: actionProvider, ...action }) => {
+    const status = getActionStatusForDisplay(action.status, actionProvider, action.actionType);
+    return {
+      ...action,
+      status,
+      errorMessage: status === "UNKNOWN" ? ACTION_OUTCOME_UNKNOWN_MESSAGE : action.errorMessage,
+    };
   });
   const config = (() => {
     try {
@@ -103,6 +116,6 @@ export async function GET(request: Request, context: RouteContext) {
           requiresApproval: tool.requiresApproval,
         })),
     },
-    actions,
+    actions: visibleActions,
   });
 }

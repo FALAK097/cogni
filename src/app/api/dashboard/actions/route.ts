@@ -5,6 +5,10 @@ import {
   createApprovalRequest,
   getApprovalToken,
 } from "@/features/integrations/server/approval-service";
+import {
+  ACTION_OUTCOME_UNKNOWN_MESSAGE,
+  getActionStatusForDisplay,
+} from "@/features/integrations/action-recovery";
 import { executeApprovedTool } from "@/features/integrations/server/tool-executor";
 import { parseToolInput } from "@/features/integrations/server/tool-registry";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
@@ -29,28 +33,43 @@ export async function GET() {
     orderBy: (fields, { desc }) => [desc(fields.createdAt)],
     limit: 100,
   });
-  const actionable = (
-    await Promise.all(
-      approvals.map(async (approval) => {
-        if (approval.status === "PENDING") return approval;
-        const action = await db.query.integrationAction.findFirst({
-          where: (fields, { and, eq }) =>
-            and(
-              eq(fields.workspaceId, workspace.id),
-              eq(fields.idempotencyKey, `approval:${approval.id}`),
-            ),
-          columns: { status: true },
-        });
-        return action?.status === "COMPLETED" || action?.status === "RUNNING" ? null : approval;
-      }),
-    )
-  ).filter((approval): approval is (typeof approvals)[number] => approval !== null);
+  const actionable = await Promise.all(
+    approvals.map(async (approval) => {
+      if (approval.status === "PENDING") {
+        return { approval, actionStatus: null, actionErrorMessage: null };
+      }
+      const action = await db.query.integrationAction.findFirst({
+        where: (fields, { and, eq }) =>
+          and(
+            eq(fields.workspaceId, workspace.id),
+            eq(fields.idempotencyKey, `approval:${approval.id}`),
+          ),
+        columns: { status: true, provider: true, actionType: true, errorMessage: true },
+      });
+      const actionStatus = action
+        ? getActionStatusForDisplay(action.status, action.provider, action.actionType)
+        : null;
+      if (actionStatus === "COMPLETED" || actionStatus === "RUNNING") return null;
+      return {
+        approval,
+        actionStatus,
+        actionErrorMessage:
+          actionStatus === "UNKNOWN"
+            ? ACTION_OUTCOME_UNKNOWN_MESSAGE
+            : (action?.errorMessage ?? null),
+      };
+    }),
+  );
   return NextResponse.json({
-    approvals: actionable.map((approval) => ({
-      ...approval,
-      token: getApprovalToken(approval),
-      tokenHash: undefined,
-    })),
+    approvals: actionable
+      .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
+      .map(({ approval, actionStatus, actionErrorMessage }) => ({
+        ...approval,
+        actionStatus,
+        actionErrorMessage,
+        token: getApprovalToken(approval),
+        tokenHash: undefined,
+      })),
   });
 }
 

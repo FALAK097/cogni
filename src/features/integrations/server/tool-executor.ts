@@ -14,9 +14,27 @@ import {
   toComposioArguments,
   type ToolActionType,
 } from "@/features/integrations/server/tool-registry";
+import {
+  ACTION_OUTCOME_UNKNOWN_MESSAGE,
+  getActionExecutionDecision,
+} from "@/features/integrations/action-recovery";
 import type { Db } from "@/lib/db/client";
 import { contact, conversation, integrationAction } from "@/lib/db/schema";
 import { env } from "@/lib/env/server";
+
+export class ActionOutcomeUnknownError extends Error {
+  constructor() {
+    super(ACTION_OUTCOME_UNKNOWN_MESSAGE);
+    this.name = "ActionOutcomeUnknownError";
+  }
+}
+
+class ActionNotSentError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ActionNotSentError";
+  }
+}
 
 function requiredString(input: Record<string, unknown>, key: string) {
   const value = input[key];
@@ -179,30 +197,34 @@ async function executeComposioTool({
   actionType: ToolActionType;
   input: Record<string, unknown>;
 }) {
-  if (!env.COMPOSIO_API_KEY) throw new Error("Composio is not configured.");
+  if (!env.COMPOSIO_API_KEY) throw new ActionNotSentError("Composio is not configured.");
   const tool = getIntegrationTool(actionType);
   if (!tool?.composioToolSlug || tool.provider !== provider) {
-    throw new Error(`Unsupported ${provider} action.`);
+    throw new ActionNotSentError(`Unsupported ${provider} action.`);
   }
   const connection = await db.query.integration.findFirst({
     where: (fields, { eq, and }) =>
       and(eq(fields.workspaceId, workspaceId), eq(fields.provider, provider)),
   });
   if (!connection?.connectedAccountId || connection.status !== "CONNECTED") {
-    throw new Error(`${provider} is not connected.`);
+    throw new ActionNotSentError(`${provider} is not connected.`);
   }
   const composio = new Composio({ apiKey: env.COMPOSIO_API_KEY });
-  return composio.tools.execute(
-    tool.composioToolSlug,
-    {
-      userId: workspaceId,
-      connectedAccountId: connection.connectedAccountId,
-      version: connection.toolkitVersion ?? "latest",
-      dangerouslySkipVersionCheck: connection.toolkitVersion === null,
-      arguments: toComposioArguments(actionType, input),
-    },
-    { signal: AbortSignal.timeout(20_000) },
-  );
+  try {
+    return await composio.tools.execute(
+      tool.composioToolSlug,
+      {
+        userId: workspaceId,
+        connectedAccountId: connection.connectedAccountId,
+        version: connection.toolkitVersion ?? "latest",
+        dangerouslySkipVersionCheck: connection.toolkitVersion === null,
+        arguments: toComposioArguments(actionType, input),
+      },
+      { signal: AbortSignal.timeout(20_000) },
+    );
+  } catch {
+    throw new ActionOutcomeUnknownError();
+  }
 }
 
 export async function executeApprovedTool({
@@ -225,8 +247,32 @@ export async function executeApprovedTool({
     where: (fields, { eq, and }) =>
       and(eq(fields.workspaceId, workspaceId), eq(fields.idempotencyKey, idempotencyKey)),
   });
-  if (existing?.status === "COMPLETED") return existing;
-  if (existing?.status === "RUNNING") throw new Error("This action is already running.");
+  const recovery = getActionExecutionDecision(
+    existing?.status,
+    existing?.provider ?? parsed.tool.provider,
+    existing?.actionType ?? parsed.tool.actionType,
+  );
+  if (recovery === "RETURN_COMPLETED" && existing) return existing;
+  if (recovery === "BLOCK_RUNNING") throw new Error("This action is already running.");
+  if (recovery === "RECONCILE_UNKNOWN") {
+    if (existing?.status === "FAILED") {
+      await db
+        .update(integrationAction)
+        .set({
+          status: "UNKNOWN",
+          errorMessage: ACTION_OUTCOME_UNKNOWN_MESSAGE,
+          updatedAt: new Date().toISOString(),
+        })
+        .where(
+          and(
+            eq(integrationAction.id, existing.id),
+            eq(integrationAction.workspaceId, workspaceId),
+            eq(integrationAction.status, existing.status),
+          ),
+        );
+    }
+    throw new ActionOutcomeUnknownError();
+  }
 
   const now = new Date().toISOString();
   const [action] = existing
@@ -237,7 +283,7 @@ export async function executeApprovedTool({
           and(
             eq(integrationAction.id, existing.id),
             eq(integrationAction.workspaceId, workspaceId),
-            eq(integrationAction.status, "FAILED"),
+            eq(integrationAction.status, existing.status),
           ),
         )
         .returning()
@@ -284,10 +330,20 @@ export async function executeApprovedTool({
       .returning();
     return completed;
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Tool execution failed.";
+    const outcomeUnknown = error instanceof ActionOutcomeUnknownError;
+    const notSent = error instanceof ActionNotSentError;
+    const message = outcomeUnknown
+      ? ACTION_OUTCOME_UNKNOWN_MESSAGE
+      : error instanceof Error
+        ? error.message
+        : "Tool execution failed.";
     await db
       .update(integrationAction)
-      .set({ status: "FAILED", errorMessage: message, updatedAt: new Date().toISOString() })
+      .set({
+        status: outcomeUnknown ? "UNKNOWN" : notSent ? "NOT_SENT" : "FAILED",
+        errorMessage: message,
+        updatedAt: new Date().toISOString(),
+      })
       .where(
         and(eq(integrationAction.id, action.id), eq(integrationAction.workspaceId, workspaceId)),
       );
