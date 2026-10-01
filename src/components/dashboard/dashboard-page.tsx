@@ -23,13 +23,11 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 
-import type {
-  DashboardAnalytics,
-  MetricComparison,
-  SatisfactionPoint,
-  TimeSeriesPoint,
-  TopQuestion,
-} from "@/features/analytics/types";
+import type { DashboardAnalytics, MetricComparison, TopQuestion } from "@/features/analytics/types";
+import {
+  aggregateWeeklyCounts,
+  aggregateWeeklySatisfaction,
+} from "@/features/analytics/aggregation";
 import { InsightsTrendChart } from "@/components/dashboard/insights-trend-chart";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -526,39 +524,6 @@ function runDashboardExport(
   }
 
   return true;
-}
-
-function aggregateWeeklyCounts(data: TimeSeriesPoint[]): TimeSeriesPoint[] {
-  if (data.length === 0) return [];
-  const buckets = new Map<string, number>();
-  for (const point of data) {
-    const weekStart = format(parseISO(point.date), "yyyy-'W'II");
-    buckets.set(weekStart, (buckets.get(weekStart) ?? 0) + point.count);
-  }
-  return [...buckets.entries()].map(([date, count]) => ({ date, count }));
-}
-
-function aggregateWeeklySatisfaction(data: SatisfactionPoint[]): SatisfactionPoint[] {
-  if (data.length === 0) return [];
-  const buckets = new Map<string, { positive: number; negative: number }>();
-  for (const point of data) {
-    const weekKey = point.date.slice(0, 7);
-    const bucket = buckets.get(weekKey) ?? { positive: 0, negative: 0 };
-    if (point.score !== null && point.responses > 0) {
-      const positive = (point.score / 5) * point.responses;
-      bucket.positive += positive;
-      bucket.negative += point.responses - positive;
-    }
-    buckets.set(weekKey, bucket);
-  }
-  return [...buckets.entries()].map(([date, bucket]) => {
-    const responses = bucket.positive + bucket.negative;
-    return {
-      date,
-      responses,
-      score: responses > 0 ? (bucket.positive / responses) * 5 : null,
-    };
-  });
 }
 
 // --- primitives ---
