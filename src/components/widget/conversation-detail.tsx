@@ -18,6 +18,7 @@ import {
   Pause,
   Play,
   MessageSquare,
+  Send,
   ThumbsDown,
   ThumbsUp,
   Trash2,
@@ -723,13 +724,39 @@ export function ConversationDetail({
               </div>
 
               <div className="flex items-center">
+                <span id="composer-shortcut-hint" className="sr-only">
+                  Press Command or Control and Enter to send.
+                </span>
+                <span
+                  aria-hidden="true"
+                  className="mr-3 hidden text-[11px] text-muted-foreground sm:inline"
+                >
+                  ⌘/Ctrl + Enter
+                </span>
                 <Button
                   size="sm"
-                  className="h-9 rounded-md px-4 text-sm"
+                  className="h-9 min-w-[76px] gap-1.5 rounded-md px-3.5 text-sm"
                   onClick={handleSend}
                   disabled={!composerText.trim() || sendMessageMutation.isPending}
+                  aria-keyshortcuts="Meta+Enter Control+Enter"
+                  aria-describedby="composer-shortcut-hint"
                 >
-                  {composerMode === "reply" ? "Send" : "Add note"}
+                  {sendMessageMutation.isPending ? (
+                    <>
+                      <Loader2
+                        className="size-3.5 motion-safe:animate-spin motion-reduce:animate-none"
+                        aria-hidden="true"
+                      />
+                      {composerMode === "reply" ? "Sending" : "Adding"}
+                    </>
+                  ) : (
+                    <>
+                      {composerMode === "reply" ? (
+                        <Send className="size-3.5" aria-hidden="true" />
+                      ) : null}
+                      {composerMode === "reply" ? "Send" : "Add note"}
+                    </>
+                  )}
                 </Button>
               </div>
             </div>
