@@ -1442,7 +1442,7 @@ export function DashboardPage({ canManage = false }: { canManage?: boolean }) {
                 <TableBody>
                   {(analytics?.topQuestions ?? []).map((item: TopQuestion) => (
                     <TableRow key={item.question} className="border-border/50 hover:bg-transparent">
-                      <TableCell className="max-w-0 truncate px-0 py-2.5 text-sm">
+                      <TableCell className="whitespace-normal break-words px-0 py-2.5 text-sm">
                         {item.question}
                       </TableCell>
                       <TableCell className="px-0 py-2.5 text-right text-sm font-medium tabular-nums">
