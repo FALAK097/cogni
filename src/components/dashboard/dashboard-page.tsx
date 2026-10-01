@@ -135,7 +135,7 @@ const DATE_RANGE_PRESETS: { id: DateRangePreset; label: string }[] = [
   { id: "previous-month", label: "Previous month" },
 ];
 
-function AgentSetupChecklist() {
+function AgentSetupChecklist({ canManage }: { canManage: boolean }) {
   const workspaceId = useActiveWorkspaceId() ?? "";
   const configQuery = useWidgetConfig(workspaceId);
   const sourcesQuery = useKnowledgeBaseSources();
@@ -248,13 +248,19 @@ function AgentSetupChecklist() {
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                 {step.description}
               </p>
-              <Link
-                href={step.href}
-                className="mt-2 inline-flex min-h-8 items-center gap-1 rounded-sm text-xs font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-              >
-                {step.action}
-                <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-3.5" />
-              </Link>
+              {step.complete || canManage ? (
+                <Link
+                  href={step.href}
+                  className="mt-2 inline-flex min-h-8 items-center gap-1 rounded-sm text-xs font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                >
+                  {step.action}
+                  <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-3.5" />
+                </Link>
+              ) : (
+                <p className="mt-2 min-h-8 content-center text-xs text-muted-foreground">
+                  A workspace owner needs to complete this step.
+                </p>
+              )}
             </div>
           </li>
         ))}
@@ -1102,7 +1108,7 @@ function GranularitySelect({
 
 // --- page ---
 
-export function DashboardPage() {
+export function DashboardPage({ canManage = false }: { canManage?: boolean }) {
   const [dateRange, setDateRange] = useState<DateRangeValue>(getDefaultDateRange);
   const [convGranularity, setConvGranularity] = useState<Granularity>("daily");
   const [satGranularity, setSatGranularity] = useState<Granularity>("daily");
@@ -1274,7 +1280,7 @@ export function DashboardPage() {
         </div>
       ) : null}
 
-      {!hasInitialError ? <AgentSetupChecklist /> : null}
+      {!hasInitialError ? <AgentSetupChecklist canManage={canManage} /> : null}
 
       <section
         hidden={hasInitialError}
