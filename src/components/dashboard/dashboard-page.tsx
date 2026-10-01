@@ -1280,7 +1280,7 @@ export function DashboardPage({ canManage = false }: { canManage?: boolean }) {
         </div>
       ) : null}
 
-      {!hasInitialError ? <AgentSetupChecklist canManage={canManage} /> : null}
+      <AgentSetupChecklist canManage={canManage} />
 
       <section
         hidden={hasInitialError}
