@@ -365,36 +365,38 @@ export interface ConversationsResponse {
   };
   currentMembershipId: string;
   pagination: {
-    page: number;
     limit: number;
-    total: number;
-    pages: number;
+    hasMore: boolean;
+    nextCursor: string | null;
   };
 }
 
 export function useConversations(
   options: {
-    page?: number;
     limit?: number;
+    cursor?: string | null;
     search?: string;
     filter?: ConversationFilter;
   } = {},
 ) {
+  const search = options.search?.trim() || null;
+  const cursor = options.cursor ?? null;
+
   return useQuery<ConversationsResponse>({
     queryKey: [
       ...queryKeys.conversations.list(),
-      options.page ?? 1,
       options.limit ?? 20,
-      options.search ?? null,
+      cursor,
+      search,
       options.filter ?? "all",
     ],
     queryFn: async () => {
       const { data, error } = await api.GET<ConversationsResponse>("/api/conversations", {
         params: {
           query: {
-            page: options.page ?? 1,
             limit: options.limit ?? 20,
-            ...(options.search ? { search: options.search } : {}),
+            ...(cursor ? { cursor } : {}),
+            ...(search ? { search } : {}),
             ...(options.filter && options.filter !== "all" ? { filter: options.filter } : {}),
           },
         },

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, isNull, like, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, like, lt, ne, or, sql } from "drizzle-orm";
 
 import { getDb } from "@/lib/db/client";
 import {
@@ -16,6 +16,7 @@ import {
   type workspaceMember,
 } from "@/lib/db/schema";
 import { appendConversationMessage, type MessageJson } from "./conversation-service";
+import { encodeInboxCursor, type InboxCursor } from "../inbox-pagination";
 import { broadcastConversationEvent } from "@/lib/realtime/broadcast";
 
 function getInboxConversationBaseCond(c: typeof conversationTable) {
@@ -145,43 +146,6 @@ function hasUnreadVisitorMessagesSql(c: typeof conversationTable) {
   )`;
 }
 
-function computeUnreadTabCounts(
-  conversations: Array<{
-    assignedMemberId: string | null;
-    status: string;
-    hasUnread: boolean;
-  }>,
-  membershipId?: string,
-) {
-  const withUnread = conversations.map((conversation) => ({
-    assignedMemberId: conversation.assignedMemberId,
-    status: conversation.status,
-    hasUnread: conversation.hasUnread,
-  }));
-
-  return {
-    all: withUnread.filter((conversation) => conversation.hasUnread).length,
-    unassigned: withUnread.filter(
-      (conversation) =>
-        conversation.hasUnread &&
-        !conversation.assignedMemberId &&
-        conversation.status !== "CLOSED",
-    ).length,
-    mine: membershipId
-      ? withUnread.filter(
-          (conversation) =>
-            conversation.hasUnread && conversation.assignedMemberId === membershipId,
-        ).length
-      : 0,
-    open: withUnread.filter(
-      (conversation) => conversation.hasUnread && conversation.status === "OPEN",
-    ).length,
-    closed: withUnread.filter(
-      (conversation) => conversation.hasUnread && conversation.status === "CLOSED",
-    ).length,
-  };
-}
-
 export async function markConversationAsRead(workspaceId: string, conversationId: string) {
   const db = getDb();
   const now = new Date().toISOString();
@@ -287,38 +251,69 @@ function getLastPublicMessage(messages: MessageJson[]) {
   return publicMessages[publicMessages.length - 1] ?? null;
 }
 
-export async function getInboxSummary(
+export async function getInboxPage(
   workspaceId: string,
-  query?: string,
-  filter?: string,
-  membershipId?: string,
+  options: {
+    query?: string;
+    filter?: string;
+    membershipId: string;
+    limit: number;
+    cursor: InboxCursor | null;
+  },
 ) {
   const db = getDb();
+  const unread = hasUnreadVisitorMessagesSql(conversationTable);
+  const baseWhere = and(
+    eq(conversationTable.workspaceId, workspaceId),
+    getInboxConversationBaseCond(conversationTable),
+  );
+  const cursorWhere = options.cursor
+    ? or(
+        lt(conversationTable.lastMessageAt, options.cursor.lastMessageAt),
+        and(
+          eq(conversationTable.lastMessageAt, options.cursor.lastMessageAt),
+          lt(conversationTable.id, options.cursor.id),
+        ),
+      )
+    : undefined;
 
-  const [countConversations, rawConversations] = await Promise.all([
+  const [countRows, fetchedConversations] = await Promise.all([
     db
       .select({
-        assignedMemberId: conversationTable.assignedMemberId,
-        status: conversationTable.status,
-        hasUnread: hasUnreadVisitorMessagesSql(conversationTable).mapWith(Boolean),
+        all: sql<number>`count(*) filter (where ${unread})`.mapWith(Number),
+        unassigned: sql<number>`count(*) filter (
+          where ${unread}
+            and ${conversationTable.assignedMemberId} is null
+            and ${conversationTable.status} <> 'CLOSED'
+        )`.mapWith(Number),
+        mine: options.membershipId
+          ? sql<number>`count(*) filter (
+              where ${unread} and ${conversationTable.assignedMemberId} = ${options.membershipId}
+            )`.mapWith(Number)
+          : sql<number>`0`.mapWith(Number),
+        open: sql<number>`count(*) filter (
+          where ${unread} and ${conversationTable.status} = 'OPEN'
+        )`.mapWith(Number),
+        closed: sql<number>`count(*) filter (
+          where ${unread} and ${conversationTable.status} = 'CLOSED'
+        )`.mapWith(Number),
       })
       .from(conversationTable)
-      .where(
-        and(
-          eq(conversationTable.workspaceId, workspaceId),
-          getInboxConversationBaseCond(conversationTable),
-        ),
-      ),
+      .where(baseWhere),
     db.query.conversation.findMany({
       where: (fields) =>
-        conversationWhereCond(
-          fields as typeof conversationTable,
-          workspaceId,
-          query,
-          filter,
-          membershipId,
+        and(
+          conversationWhereCond(
+            fields as typeof conversationTable,
+            workspaceId,
+            options.query,
+            options.filter,
+            options.membershipId,
+          ),
+          cursorWhere,
         ),
-      orderBy: (fields, { desc }) => [desc(fields.lastMessageAt)],
+      orderBy: [desc(conversationTable.lastMessageAt), desc(conversationTable.id)],
+      limit: options.limit + 1,
       with: {
         contact: true,
         workspaceMember: {
@@ -329,16 +324,30 @@ export async function getInboxSummary(
     }),
   ]);
 
+  const hasMore = fetchedConversations.length > options.limit;
+  const rawConversations = hasMore
+    ? fetchedConversations.slice(0, options.limit)
+    : fetchedConversations;
   const conversations = rawConversations.map((conversation) =>
     mapConversationRow({
       ...conversation,
       contact: { ...conversation.contact, contactNotes: undefined },
     }),
   );
+  const lastConversation = rawConversations.at(-1);
+  const nextCursor =
+    hasMore && lastConversation
+      ? encodeInboxCursor({
+          lastMessageAt: new Date(lastConversation.lastMessageAt).toISOString(),
+          id: lastConversation.id,
+        })
+      : null;
+  const countRow = countRows[0] ?? { all: 0, unassigned: 0, mine: 0, open: 0, closed: 0 };
 
   return {
-    counts: computeUnreadTabCounts(countConversations, membershipId),
+    counts: countRow,
     conversations,
+    pagination: { limit: options.limit, hasMore, nextCursor },
   };
 }
 

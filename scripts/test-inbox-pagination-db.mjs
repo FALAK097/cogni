@@ -1,0 +1,160 @@
+import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import { mkdir } from "node:fs/promises";
+import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+import { after, before, test } from "node:test";
+import "dotenv/config";
+import { build } from "esbuild";
+import postgres from "postgres";
+
+process.env.SKIP_ENV_VALIDATION ??= "true";
+
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl || !["localhost", "127.0.0.1", "::1"].includes(new URL(databaseUrl).hostname)) {
+  throw new Error("Inbox pagination integration tests require a local DATABASE_URL.");
+}
+
+const outputDirectory = join(process.cwd(), "node_modules", ".cache", "cogni-inbox-test");
+const outputFile = join(outputDirectory, "queries.mjs");
+await mkdir(outputDirectory, { recursive: true });
+
+await build({
+  stdin: {
+    contents: `
+      export { getInboxPage, mapConversationToListItem } from "@/features/conversations/server/queries";
+      export { decodeInboxCursor } from "@/features/conversations/inbox-pagination";
+      export { getDb } from "@/lib/db/client";
+    `,
+    resolveDir: process.cwd(),
+    sourcefile: "inbox-pagination-test-entry.ts",
+  },
+  outfile: outputFile,
+  bundle: true,
+  platform: "node",
+  format: "esm",
+  packages: "external",
+  alias: { "@": resolve("src") },
+  plugins: [
+    {
+      name: "server-only-test-stub",
+      setup(buildContext) {
+        buildContext.onResolve({ filter: /^server-only$/ }, () => ({
+          path: "server-only",
+          namespace: "server-only-test-stub",
+        }));
+        buildContext.onLoad({ filter: /.*/, namespace: "server-only-test-stub" }, () => ({
+          contents: "export {};",
+          loader: "js",
+        }));
+      },
+    },
+  ],
+});
+
+const { decodeInboxCursor, getDb, getInboxPage, mapConversationToListItem } = await import(
+  `${pathToFileURL(outputFile).href}?build=${randomUUID()}`
+);
+const raw = postgres(databaseUrl, { max: 1 });
+const workspaceId = randomUUID();
+const otherWorkspaceId = randomUUID();
+const now = new Date("2026-09-30T08:15:00.000Z").toISOString();
+const conversationIds = [1, 2, 3].map(
+  (number) => `00000000-0000-4000-8000-${String(number).padStart(12, "0")}`,
+);
+
+before(async () => {
+  await raw`
+    INSERT INTO "workspace" ("id", "name", "slug", "updatedAt") VALUES
+      (${workspaceId}, 'Inbox cursor test', ${`test-${workspaceId}`}, ${now}),
+      (${otherWorkspaceId}, 'Other workspace', ${`test-${otherWorkspaceId}`}, ${now})
+  `;
+
+  for (const [index, conversationId] of conversationIds.entries()) {
+    const contactId = randomUUID();
+    const status = index === 0 ? "CLOSED" : "OPEN";
+    const messages = JSON.stringify([
+      {
+        id: randomUUID(),
+        body: `cursor sample ${index + 1}`,
+        authorType: "VISITOR",
+        visibility: "PUBLIC",
+        createdAt: now,
+      },
+    ]);
+
+    await raw`
+      INSERT INTO "contact" ("id", "name", "updatedAt", "workspaceId")
+      VALUES (${contactId}, ${`Visitor ${index + 1}`}, ${now}, ${workspaceId})
+    `;
+    await raw`
+      INSERT INTO "conversation" (
+        "id", "subject", "status", "updatedAt", "lastMessageAt", "messages", "workspaceId", "contactId"
+      ) VALUES (
+        ${conversationId}, ${`Cursor sample ${index + 1}`}, ${status}, ${now}, ${now}, ${messages}, ${workspaceId}, ${contactId}
+      )
+    `;
+  }
+
+  const otherContactId = randomUUID();
+  await raw`
+    INSERT INTO "contact" ("id", "name", "updatedAt", "workspaceId")
+    VALUES (${otherContactId}, 'Other visitor', ${now}, ${otherWorkspaceId})
+  `;
+  await raw`
+    INSERT INTO "conversation" (
+      "id", "subject", "updatedAt", "lastMessageAt", "messages", "workspaceId", "contactId"
+    ) VALUES (
+      ${"ffffffff-ffff-4fff-8fff-ffffffffffff"}, 'Other workspace conversation', ${now}, ${now}, ${JSON.stringify([{ id: randomUUID(), body: "private", authorType: "VISITOR", createdAt: now }])}, ${otherWorkspaceId}, ${otherContactId}
+    )
+  `;
+});
+
+after(async () => {
+  await raw`DELETE FROM "workspace" WHERE "id" IN (${workspaceId}, ${otherWorkspaceId})`;
+  await getDb().$client.end({ timeout: 5 });
+  await raw.end({ timeout: 5 });
+});
+
+test("inbox cursors return complete, stable pages and workspace-scoped unread counts", async () => {
+  const firstPage = await getInboxPage(workspaceId, {
+    membershipId: "test-membership",
+    limit: 2,
+    cursor: null,
+  });
+  const firstItems = firstPage.conversations.map(mapConversationToListItem);
+
+  assert.deepEqual(
+    firstPage.conversations.map((conversation) => conversation.id),
+    [conversationIds[2], conversationIds[1]],
+  );
+  assert.equal(firstPage.pagination.hasMore, true);
+  assert.ok(firstPage.pagination.nextCursor);
+  assert.deepEqual(firstPage.counts, { all: 3, unassigned: 2, mine: 0, open: 2, closed: 1 });
+  assert.ok(firstItems.every((item) => item.unreadCount === 1));
+
+  const secondPage = await getInboxPage(workspaceId, {
+    membershipId: "test-membership",
+    limit: 2,
+    cursor: decodeInboxCursor(firstPage.pagination.nextCursor),
+  });
+
+  assert.deepEqual(
+    secondPage.conversations.map((conversation) => conversation.id),
+    [conversationIds[0]],
+  );
+  assert.equal(secondPage.pagination.hasMore, false);
+  assert.equal(secondPage.pagination.nextCursor, null);
+});
+
+test("unassigned view excludes closed conversations", async () => {
+  const result = await getInboxPage(workspaceId, {
+    membershipId: "test-membership",
+    filter: "unassigned",
+    limit: 20,
+    cursor: null,
+  });
+
+  assert.equal(result.conversations.length, 2);
+  assert.ok(result.conversations.every((conversation) => conversation.status !== "CLOSED"));
+});

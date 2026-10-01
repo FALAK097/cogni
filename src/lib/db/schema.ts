@@ -228,6 +228,11 @@ export const conversation = pgTable(
       table.status,
       table.lastMessageAt,
     ),
+    index("conversation_workspaceId_lastMessageAt_id_idx").on(
+      table.workspaceId,
+      table.lastMessageAt,
+      table.id,
+    ),
   ],
 );
 

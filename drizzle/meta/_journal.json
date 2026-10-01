@@ -22,6 +22,13 @@
       "when": 1790749807202,
       "tag": "0002_shared_rate_limits",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790770349361,
+      "tag": "0003_inbox_cursor_pagination",
+      "breakpoints": true
     }
   ]
 }

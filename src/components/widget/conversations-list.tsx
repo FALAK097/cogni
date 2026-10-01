@@ -76,6 +76,7 @@ export function ConversationsList({
   const listKey = `${filter}:${debouncedSearch}`;
   const [trackedListKey, setTrackedListKey] = useState(listKey);
   const [pagesCache, setPagesCache] = useState<Record<number, ConversationSummary[]>>({});
+  const [cursorsByPage, setCursorsByPage] = useState<Record<number, string | null>>({ 1: null });
   const { mutate: markConversationRead } = useMarkConversationRead();
   const markedReadRef = useRef<string | null>(null);
   const clearSearch = () => {
@@ -87,6 +88,7 @@ export function ConversationsList({
     setTrackedListKey(listKey);
     setPage(1);
     setPagesCache({});
+    setCursorsByPage({ 1: null });
   }
 
   useEffect(() => {
@@ -112,8 +114,8 @@ export function ConversationsList({
     isError,
     refetch,
   } = useConversations({
-    page,
     limit: PAGE_SIZE,
+    cursor: cursorsByPage[page] ?? null,
     search: debouncedSearch,
     filter,
   });
@@ -125,8 +127,7 @@ export function ConversationsList({
     return { ...pagesCache, [page]: conversationsData.conversations };
   }, [pagesCache, conversationsData, page, isPlaceholderData]);
 
-  const totalPages = conversationsData?.pagination.pages ?? 1;
-  const hasMore = page < totalPages;
+  const hasMore = conversationsData?.pagination.hasMore ?? false;
   const conversations = useMemo(() => {
     if (page === 1) {
       return effectivePagesCache[1] ?? conversationsData?.conversations ?? [];
@@ -146,9 +147,11 @@ export function ConversationsList({
   }, [effectivePagesCache, page, conversationsData?.conversations]);
 
   const handleLoadMore = () => {
-    if (conversationsData && !isPlaceholderData) {
-      setPagesCache((current) => ({ ...current, [page]: conversationsData.conversations }));
-    }
+    const nextCursor = conversationsData?.pagination.nextCursor;
+    if (!conversationsData || !nextCursor || isPlaceholderData || isFetching) return;
+
+    setPagesCache((current) => ({ ...current, [page]: conversationsData.conversations }));
+    setCursorsByPage((current) => ({ ...current, [page + 1]: nextCursor }));
     setPage((current) => current + 1);
   };
   const firstConversationId = conversations[0]?.id ?? null;
@@ -366,7 +369,7 @@ export function ConversationsList({
             variant="ghost"
             className="h-8 w-full text-sm text-muted-foreground hover:text-foreground"
             onClick={handleLoadMore}
-            disabled={isFetching}
+            disabled={isFetching || isPlaceholderData}
           >
             {isFetching ? "Loading..." : "+ Load more conversations"}
           </Button>

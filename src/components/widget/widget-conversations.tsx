@@ -77,7 +77,7 @@ export function WidgetConversations({ initialConversationId = null }: WidgetConv
     setSelectedConversationId(null);
   }
 
-  const { data: conversationsData } = useConversations({ page: 1, limit: 20, filter });
+  const { data: conversationsData } = useConversations({ limit: 20, filter });
 
   const counts = useMemo(() => {
     const baseCounts = conversationsData?.counts ?? EMPTY_COUNTS;
