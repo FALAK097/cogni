@@ -716,12 +716,12 @@ function CalendarMonth({
   const days = getMonthDays(month);
 
   return (
-    <div className="w-[252px]">
+    <div className="w-[280px] sm:w-[252px]">
       <div className="grid grid-cols-7 gap-0.5">
         {WEEKDAY_LABELS.map((label) => (
           <span
             key={label}
-            className="flex h-8 items-center justify-center text-xs font-medium text-muted-foreground"
+            className="flex h-11 items-center justify-center text-xs font-medium text-muted-foreground"
           >
             {label}
           </span>
@@ -744,11 +744,12 @@ function CalendarMonth({
               key={day.toISOString()}
               type="button"
               disabled={!inMonth || isAfter(day, new Date())}
-              aria-pressed={isStart || isEnd}
+              aria-label={format(day, "EEEE, MMMM d, yyyy")}
+              aria-pressed={isStart || isEnd || Boolean(inRange)}
               aria-current={isToday ? "date" : undefined}
               onClick={() => onDayClick(day)}
               className={cn(
-                "flex h-8 w-full items-center justify-center rounded-md text-sm transition-colors",
+                "flex h-11 w-full items-center justify-center rounded-md text-sm transition-colors",
                 !inMonth && "invisible",
                 inMonth && !isStart && !isEnd && !inRange && "text-foreground hover:bg-muted",
                 inRange && !isStart && !isEnd && "bg-primary/10 text-foreground",
@@ -829,8 +830,8 @@ function DateRangePicker({
           <Button
             variant="outline"
             size="sm"
-            className="h-9 gap-2 rounded-lg border-border/50 bg-transparent px-3 font-normal shadow-none"
-            aria-label="Select date range"
+            className="h-11 gap-2 rounded-lg border-border/50 bg-transparent px-3 font-normal shadow-none sm:h-9"
+            aria-label={`Date range: ${label}`}
           />
         }
       >
@@ -850,7 +851,7 @@ function DateRangePicker({
                 type="button"
                 variant={isPresetSelected(id) ? "secondary" : "ghost"}
                 size="sm"
-                className="h-8 justify-start px-2 text-left font-normal"
+                className="h-11 justify-start px-2 text-left font-normal sm:h-8"
                 aria-pressed={isPresetSelected(id)}
                 onClick={() => handlePresetClick(id)}
               >
@@ -858,13 +859,13 @@ function DateRangePicker({
               </Button>
             ))}
           </div>
-          <div className="w-[252px]">
+          <div className="w-[280px] sm:w-[252px]">
             <div className="flex items-center justify-between gap-3 pb-3">
               <Button
                 type="button"
                 variant="ghost"
                 size="icon-sm"
-                className="size-8"
+                className="size-11 sm:size-8"
                 onClick={() => setViewMonth((month) => subMonths(month, 1))}
                 aria-label="Previous month"
               >
@@ -875,7 +876,7 @@ function DateRangePicker({
                 type="button"
                 variant="ghost"
                 size="icon-sm"
-                className="size-8"
+                className="size-11 sm:size-8"
                 onClick={() => setViewMonth((month) => addMonths(month, 1))}
                 aria-label="Next month"
                 disabled={!isBefore(startOfMonth(viewMonth), startOfMonth(new Date()))}
