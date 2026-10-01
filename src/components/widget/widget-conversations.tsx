@@ -49,10 +49,12 @@ function adjustUnreadTabCounts(
         ? decrement(counts.unassigned)
         : counts.unassigned,
     mine:
-      currentMembershipId && selectedConversation.assigneeId === currentMembershipId
+      currentMembershipId &&
+      selectedConversation.status !== "CLOSED" &&
+      selectedConversation.assigneeId === currentMembershipId
         ? decrement(counts.mine)
         : counts.mine,
-    open: selectedConversation.status === "OPEN" ? decrement(counts.open) : counts.open,
+    open: selectedConversation.status !== "CLOSED" ? decrement(counts.open) : counts.open,
     closed: selectedConversation.status === "CLOSED" ? decrement(counts.closed) : counts.closed,
   };
 }

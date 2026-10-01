@@ -38,9 +38,11 @@ function conversationFilterCond(
     case "unassigned":
       return and(base, isNull(c.assignedMemberId), ne(c.status, "CLOSED"));
     case "mine":
-      return membershipId ? and(base, eq(c.assignedMemberId, membershipId)) : sql`1 = 0`;
+      return membershipId
+        ? and(base, eq(c.assignedMemberId, membershipId), ne(c.status, "CLOSED"))
+        : sql`1 = 0`;
     case "open":
-      return and(base, eq(c.status, "OPEN"));
+      return and(base, ne(c.status, "CLOSED"));
     case "closed":
       return and(base, eq(c.status, "CLOSED"));
     default:
@@ -268,11 +270,13 @@ export async function getInboxPage(
         )`.mapWith(Number),
         mine: options.membershipId
           ? sql<number>`count(*) filter (
-              where ${unread} and ${conversationTable.assignedMemberId} = ${options.membershipId}
+              where ${unread}
+                and ${conversationTable.assignedMemberId} = ${options.membershipId}
+                and ${conversationTable.status} <> 'CLOSED'
             )`.mapWith(Number)
           : sql<number>`0`.mapWith(Number),
         open: sql<number>`count(*) filter (
-          where ${unread} and ${conversationTable.status} = 'OPEN'
+          where ${unread} and ${conversationTable.status} <> 'CLOSED'
         )`.mapWith(Number),
         closed: sql<number>`count(*) filter (
           where ${unread} and ${conversationTable.status} = 'CLOSED'
