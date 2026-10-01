@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { createApprovalRequest } from "@/features/integrations/server/approval-service";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
+import { canManageWorkspace } from "@/lib/auth/permissions";
 import { workflowRun } from "@/lib/db/schema";
 import { completeWorkflowRun, updateWorkflowStep } from "@/lib/workflows/runner";
 import { getWorkflowProgression } from "@/lib/workflows/progression";
@@ -15,7 +16,13 @@ const advanceSchema = z.object({
 });
 
 export async function POST(request: Request, context: RouteContext) {
-  const { db, workspace } = await requireDashboardContext();
+  const { db, workspace, membership } = await requireDashboardContext();
+  if (!canManageWorkspace(membership.role)) {
+    return NextResponse.json(
+      { error: "Only workspace owners can advance workflows." },
+      { status: 403 },
+    );
+  }
   const { workflow_id: workflowId } = await context.params;
   const parsed = advanceSchema.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success)

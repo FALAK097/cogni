@@ -76,7 +76,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const { db, session, workspace } = await requireDashboardContext();
+  const { db, session, workspace, membership } = await requireDashboardContext();
   const parsed = proposeActionSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 });
@@ -94,6 +94,12 @@ export async function POST(request: Request) {
   try {
     const parsedTool = parseToolInput(parsed.data.actionType, parsed.data.input);
     if (!parsedTool.tool.requiresApproval) {
+      if (!canManageWorkspace(membership.role)) {
+        return NextResponse.json(
+          { error: "Only workspace owners can run actions that do not require approval." },
+          { status: 403 },
+        );
+      }
       const action = await executeApprovedTool({
         db,
         workspaceId: workspace.id,
