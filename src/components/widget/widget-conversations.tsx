@@ -148,6 +148,7 @@ export function WidgetConversations({ initialConversationId = null }: WidgetConv
               key={selectedConversationId}
               conversationId={selectedConversationId}
               onBack={() => setSelectedConversationId(null)}
+              onSelectConversation={setSelectedConversationId}
               part="chat"
             />
           ) : (
@@ -165,6 +166,7 @@ export function WidgetConversations({ initialConversationId = null }: WidgetConv
               key={selectedConversationId}
               conversationId={selectedConversationId}
               onBack={() => {}}
+              onSelectConversation={setSelectedConversationId}
               part="details"
             />
           ) : (

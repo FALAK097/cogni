@@ -7,6 +7,7 @@ import { z } from "zod";
 import { Streamdown } from "streamdown";
 import {
   ArrowLeft,
+  ArrowRight,
   Bot,
   CheckCircle2,
   Clock,
@@ -75,6 +76,7 @@ import {
 interface ConversationDetailProps {
   conversationId: string;
   onBack: () => void;
+  onSelectConversation: (conversationId: string) => void;
   part?: "chat" | "details";
 }
 
@@ -209,6 +211,7 @@ function detailCardContentClassName() {
 export function ConversationDetail({
   conversationId,
   onBack,
+  onSelectConversation,
   part = "chat",
 }: ConversationDetailProps) {
   const { toast } = useToast();
@@ -466,7 +469,11 @@ export function ConversationDetail({
   if (part === "details") {
     return (
       <div className={cn("flex h-full flex-col gap-2.5", hideScrollbarClassName)}>
-        <SessionDetailsContent session={session} displayName={displayName} />
+        <SessionDetailsContent
+          session={session}
+          displayName={displayName}
+          onSelectConversation={onSelectConversation}
+        />
       </div>
     );
   }
@@ -618,7 +625,11 @@ export function ConversationDetail({
                   <SheetTitle>Conversation details</SheetTitle>
                 </SheetHeader>
                 <div className="p-4">
-                  <SessionDetailsContent session={session} displayName={displayName} />
+                  <SessionDetailsContent
+                    session={session}
+                    displayName={displayName}
+                    onSelectConversation={onSelectConversation}
+                  />
                 </div>
               </SheetContent>
             </Sheet>
@@ -1033,9 +1044,11 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
 function SessionDetailsContent({
   session,
   displayName,
+  onSelectConversation,
 }: {
   session: ConversationDetailData;
   displayName: string;
+  onSelectConversation: (conversationId: string) => void;
 }) {
   const { toast } = useToast();
   const userId = session.contactExternalId ?? session.visitorId;
@@ -1219,31 +1232,48 @@ function SessionDetailsContent({
           <CardHeader className={detailCardHeaderClassName()}>
             <CardTitle className="text-xs font-semibold">Previous conversations</CardTitle>
           </CardHeader>
-          <CardContent className={cn("space-y-2.5 pb-3", detailCardContentClassName())}>
-            {session.previousConversations?.map((conversation) => (
-              <div key={conversation.id} className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="truncate text-xs font-medium text-foreground">
-                    {conversation.subject}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {format(new Date(conversation.lastMessageAt), "MMM d, yyyy")}
-                  </p>
-                </div>
-                <Badge
-                  variant={conversation.status === "CLOSED" ? "secondary" : "outline"}
-                  className={cn(
-                    "shrink-0 text-[10px]",
-                    conversation.status === "CLOSED" &&
-                      "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400",
-                  )}
+          <CardContent className={cn("space-y-1 pb-3", detailCardContentClassName())}>
+            {session.previousConversations?.map((conversation) => {
+              const statusLabel =
+                conversation.status === "CLOSED"
+                  ? "Resolved"
+                  : formatStatusLabel(conversation.status);
+              const lastMessageLabel = format(new Date(conversation.lastMessageAt), "MMM d, yyyy");
+
+              return (
+                <button
+                  key={conversation.id}
+                  type="button"
+                  className="group flex min-h-11 w-full items-center justify-between gap-2 rounded-md px-2 py-2 text-left transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                  aria-label={`Open previous conversation: ${conversation.subject}, ${statusLabel}, ${lastMessageLabel}`}
+                  title={conversation.subject}
+                  onClick={() => onSelectConversation(conversation.id)}
                 >
-                  {conversation.status === "CLOSED"
-                    ? "Resolved"
-                    : formatStatusLabel(conversation.status)}
-                </Badge>
-              </div>
-            ))}
+                  <span className="min-w-0 flex-1">
+                    <span className="block break-words text-xs font-medium text-foreground group-hover:text-primary">
+                      {conversation.subject}
+                    </span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      {lastMessageLabel}
+                    </span>
+                  </span>
+                  <Badge
+                    variant={conversation.status === "CLOSED" ? "secondary" : "outline"}
+                    className={cn(
+                      "shrink-0 text-[10px]",
+                      conversation.status === "CLOSED" &&
+                        "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400",
+                    )}
+                  >
+                    {statusLabel}
+                  </Badge>
+                  <ArrowRight
+                    className="size-3.5 shrink-0 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                </button>
+              );
+            })}
           </CardContent>
         </Card>
       ) : null}
