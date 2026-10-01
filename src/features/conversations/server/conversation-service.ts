@@ -143,10 +143,22 @@ async function appendVisitorMessage(
   const now = new Date();
   const nowIso = now.toISOString();
 
+  // Serialize first-message creation per visitor session. Without locking the
+  // parent row, simultaneous requests can both observe no active conversation.
+  await db.execute(sql`
+    SELECT id
+    FROM ${visitorSessionTable}
+    WHERE ${visitorSessionTable.id} = ${visitorSession.id}
+      AND ${visitorSessionTable.widgetId} = ${visitorSession.widget.id}
+    FOR UPDATE
+  `);
+
   const existingConversation = await db.query.conversation.findFirst({
     where: (convo, { eq, and, ne }) =>
       and(
         eq(convo.visitorSessionId, visitorSession.id),
+        eq(convo.workspaceId, visitorSession.widget.workspace.id),
+        eq(convo.widgetId, visitorSession.widget.id),
         ne(convo.status, "CLOSED"),
         eq(convo.channel, "WIDGET"),
       ),
@@ -179,7 +191,12 @@ async function appendVisitorMessage(
           expiresAt: new Date(now.getTime() + visitorSessionDurationMs).toISOString(),
           messageCount: sql`${visitorSessionTable.messageCount} + 1`,
         })
-        .where(eq(visitorSessionTable.id, visitorSession.id));
+        .where(
+          and(
+            eq(visitorSessionTable.id, visitorSession.id),
+            eq(visitorSessionTable.widgetId, visitorSession.widget.id),
+          ),
+        );
     }
 
     return {
@@ -205,7 +222,12 @@ async function appendVisitorMessage(
     await db
       .update(visitorSessionTable)
       .set({ contactId })
-      .where(eq(visitorSessionTable.id, visitorSession.id));
+      .where(
+        and(
+          eq(visitorSessionTable.id, visitorSession.id),
+          eq(visitorSessionTable.widgetId, visitorSession.widget.id),
+        ),
+      );
   }
 
   const newMessage: MessageJson = {
@@ -240,7 +262,12 @@ async function appendVisitorMessage(
       expiresAt: new Date(now.getTime() + visitorSessionDurationMs).toISOString(),
       messageCount: sql`${visitorSessionTable.messageCount} + 1`,
     })
-    .where(eq(visitorSessionTable.id, visitorSession.id));
+    .where(
+      and(
+        eq(visitorSessionTable.id, visitorSession.id),
+        eq(visitorSessionTable.widgetId, visitorSession.widget.id),
+      ),
+    );
 
   console.info("conversation.created", {
     workspaceId: visitorSession.widget.workspace.id,
@@ -270,6 +297,71 @@ export async function recordVisitorMessage({
   return runDbWriteOperation(db, (executor) =>
     appendVisitorMessage(executor, visitorSession, text, clientMessageId),
   );
+}
+
+export async function setAiMessageFeedback({
+  db,
+  conversationId,
+  workspaceId,
+  visitorSessionId,
+  messageId,
+  feedback,
+  reason,
+  feedbackAt,
+}: {
+  db: Db;
+  conversationId: string;
+  workspaceId: string;
+  visitorSessionId: string;
+  messageId: string;
+  feedback: "positive" | "negative";
+  reason: string | null;
+  feedbackAt: string;
+}) {
+  const messages = sql`COALESCE(NULLIF(${conversation.messages}, '')::jsonb, '[]'::jsonb)`;
+  const matchingAiMessage = sql`EXISTS (
+    SELECT 1
+    FROM jsonb_array_elements(${messages}) AS candidate(item)
+    WHERE candidate.item ->> 'id' = ${messageId}
+      AND candidate.item ->> 'authorType' = 'AI'
+  )`;
+  const updatedMessages = sql`(
+    SELECT COALESCE(
+      jsonb_agg(
+        CASE
+          WHEN entry.item ->> 'id' = ${messageId}
+            AND entry.item ->> 'authorType' = 'AI'
+          THEN jsonb_set(
+            jsonb_set(
+              jsonb_set(entry.item, '{feedback}', to_jsonb(${feedback}::text), true),
+              '{feedbackReason}', COALESCE(to_jsonb(${reason}::text), 'null'::jsonb), true
+            ),
+            '{feedbackAt}', to_jsonb(${feedbackAt}::text), true
+          )
+          ELSE entry.item
+        END
+        ORDER BY entry.ordinality
+      ),
+      '[]'::jsonb
+    )::text
+    FROM jsonb_array_elements(${messages}) WITH ORDINALITY AS entry(item, ordinality)
+  )`;
+
+  const updated = await db
+    .update(conversation)
+    .set({ messages: updatedMessages, updatedAt: feedbackAt })
+    .where(
+      and(
+        eq(conversation.id, conversationId),
+        eq(conversation.workspaceId, workspaceId),
+        eq(conversation.visitorSessionId, visitorSessionId),
+        ne(conversation.status, "CLOSED"),
+        matchingAiMessage,
+      ),
+    )
+    .returning({ id: conversation.id });
+
+  return updated.length > 0;
 }
 
 export async function startVisitorConversation({
