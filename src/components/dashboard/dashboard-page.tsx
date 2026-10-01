@@ -234,10 +234,10 @@ function buildExportSections(
           pct(analytics.kpis.closedConversations.changePercent),
         ],
         [
-          "Avg. Response Time",
-          analytics.kpis.avgResponseTime.formatted,
-          String(analytics.kpis.avgResponseTime.previousValue),
-          pct(analytics.kpis.avgResponseTime.changePercent),
+          "Avg. AI Response Time",
+          analytics.kpis.avgAiResponseTime.formatted,
+          String(analytics.kpis.avgAiResponseTime.previousValue),
+          pct(analytics.kpis.avgAiResponseTime.changePercent),
         ],
         [
           "Satisfaction Score",
@@ -1175,15 +1175,38 @@ export function DashboardPage() {
               icon={<HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="size-[18px]" />}
             />
             <MetricCard
-              label="Avg. Response Time"
+              label="Avg. AI Response Time"
               value={
-                analytics.kpis.avgResponseTime.formatted === "—"
+                analytics.kpis.avgAiResponseTime.formatted === "—"
                   ? "No data"
-                  : analytics.kpis.avgResponseTime.formatted
+                  : analytics.kpis.avgAiResponseTime.formatted
               }
-              metric={analytics.kpis.avgResponseTime}
+              metric={analytics.kpis.avgAiResponseTime}
               previousRange={analytics.previousDateRange}
               icon={<HugeiconsIcon icon={Clock01Icon} strokeWidth={2} className="size-[18px]" />}
+              info={
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <button
+                        type="button"
+                        className="text-muted-foreground transition-colors hover:text-foreground"
+                        aria-label="Average AI response time information"
+                      />
+                    }
+                  >
+                    <HugeiconsIcon
+                      icon={InformationCircleIcon}
+                      strokeWidth={2}
+                      className="size-4"
+                    />
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs">
+                    Time from the first visitor message in a turn to the next public AI reply.
+                    Human-only replies and unanswered turns are excluded.
+                  </TooltipContent>
+                </Tooltip>
+              }
               invertTrend
             />
             <MetricCard

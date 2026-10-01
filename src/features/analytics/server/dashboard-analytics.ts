@@ -10,6 +10,7 @@ import {
 } from "date-fns";
 
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
+import { averageAiResponseTimeMs } from "@/features/analytics/response-time";
 import { getWidgetConversationCond } from "@/features/widget/server/widget-data-filters";
 import type { Db } from "@/lib/db/client";
 import { conversation } from "@/lib/db/schema";
@@ -114,32 +115,6 @@ function normalizeQuestion(text: string): string {
   return text.trim().replace(/\s+/g, " ");
 }
 
-function computeAvgResponseTimeMs(messages: MessageJson[]): number | null {
-  const deltas: number[] = [];
-
-  for (let index = 0; index < messages.length; index++) {
-    const message = messages[index];
-    if (message.authorType !== "VISITOR") continue;
-
-    const visitorTime = new Date(message.createdAt).getTime();
-    if (Number.isNaN(visitorTime)) continue;
-
-    for (let nextIndex = index + 1; nextIndex < messages.length; nextIndex++) {
-      const nextMessage = messages[nextIndex];
-      if (nextMessage.authorType !== "AI") continue;
-
-      const aiTime = new Date(nextMessage.createdAt).getTime();
-      if (Number.isNaN(aiTime) || aiTime < visitorTime) continue;
-
-      deltas.push(aiTime - visitorTime);
-      break;
-    }
-  }
-
-  if (deltas.length === 0) return null;
-  return deltas.reduce((sum, delta) => sum + delta, 0) / deltas.length;
-}
-
 function aggregatePeriod(conversations: ConversationRow[]) {
   const uniqueUsers = new Set<string>();
   let closedConversations = 0;
@@ -196,7 +171,7 @@ function aggregatePeriod(conversations: ConversationRow[]) {
       }
     }
 
-    const responseTime = computeAvgResponseTimeMs(messages);
+    const responseTime = averageAiResponseTimeMs(messages);
     if (responseTime !== null) responseTimes.push(responseTime);
 
     for (const message of messages) {
@@ -215,7 +190,7 @@ function aggregatePeriod(conversations: ConversationRow[]) {
 
   const totalConversations = conversations.length;
   const uniqueUserCount = uniqueUsers.size;
-  const avgResponseTimeMs =
+  const avgAiResponseTimeMs =
     responseTimes.length > 0
       ? responseTimes.reduce((sum, value) => sum + value, 0) / responseTimes.length
       : 0;
@@ -236,8 +211,8 @@ function aggregatePeriod(conversations: ConversationRow[]) {
     totalConversations,
     uniqueUserCount,
     closedConversations,
-    avgResponseTimeMs,
-    responseTimeSamples: responseTimes.length,
+    avgAiResponseTimeMs,
+    aiResponseSamples: responseTimes.length,
     satisfactionScore,
     feedbackTotal,
     messagesSent,
@@ -373,13 +348,13 @@ export async function getDashboardAnalytics(
       totalConversations: toMetric(current.totalConversations, previous.totalConversations),
       uniqueUsers: toMetric(current.uniqueUserCount, previous.uniqueUserCount),
       closedConversations: toMetric(current.closedConversations, previous.closedConversations),
-      avgResponseTime: {
-        ...toMetric(current.avgResponseTimeMs, previous.avgResponseTimeMs),
+      avgAiResponseTime: {
+        ...toMetric(current.avgAiResponseTimeMs, previous.avgAiResponseTimeMs),
         formatted:
-          current.responseTimeSamples > 0 ? formatDuration(current.avgResponseTimeMs) : "—",
+          current.aiResponseSamples > 0 ? formatDuration(current.avgAiResponseTimeMs) : "—",
         changePercent:
-          current.responseTimeSamples > 0 && previous.responseTimeSamples > 0
-            ? toMetric(current.avgResponseTimeMs, previous.avgResponseTimeMs).changePercent
+          current.aiResponseSamples > 0 && previous.aiResponseSamples > 0
+            ? toMetric(current.avgAiResponseTimeMs, previous.avgAiResponseTimeMs).changePercent
             : null,
       },
       satisfactionScore: {

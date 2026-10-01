@@ -42,7 +42,7 @@ export type DashboardAnalytics = {
     totalConversations: MetricComparison;
     uniqueUsers: MetricComparison;
     closedConversations: MetricComparison;
-    avgResponseTime: FormattedMetricComparison;
+    avgAiResponseTime: FormattedMetricComparison;
     satisfactionScore: FormattedMetricComparison & { max: number };
   };
   conversationsOverTime: TimeSeriesPoint[];
