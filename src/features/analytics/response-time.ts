@@ -1,6 +1,6 @@
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
 
-export function averageAiResponseTimeMs(messages: readonly MessageJson[]): number | null {
+export function collectAiResponseTimeSamplesMs(messages: readonly MessageJson[]): number[] {
   const responseTimes: number[] = [];
   let pendingVisitorMessageAt: number | null = null;
 
@@ -29,6 +29,10 @@ export function averageAiResponseTimeMs(messages: readonly MessageJson[]): numbe
     pendingVisitorMessageAt = null;
   }
 
+  return responseTimes;
+}
+
+export function averageAiResponseTimeMs(responseTimes: readonly number[]): number | null {
   if (responseTimes.length === 0) return null;
   return (
     responseTimes.reduce((total, responseTime) => total + responseTime, 0) / responseTimes.length

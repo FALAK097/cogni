@@ -10,7 +10,7 @@ import {
 } from "date-fns";
 
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
-import { averageAiResponseTimeMs } from "@/features/analytics/response-time";
+import { collectAiResponseTimeSamplesMs } from "@/features/analytics/response-time";
 import { getWidgetConversationCond } from "@/features/widget/server/widget-data-filters";
 import type { Db } from "@/lib/db/client";
 import { conversation } from "@/lib/db/schema";
@@ -121,7 +121,8 @@ function aggregatePeriod(conversations: ConversationRow[]) {
   let messagesSent = 0;
   let messagesReceived = 0;
   let engagedConversations = 0;
-  const responseTimes: number[] = [];
+  let responseTimeTotal = 0;
+  let aiResponseSamples = 0;
   let feedbackPositive = 0;
   let feedbackNegative = 0;
   const sourceCounts = new Map<string, number>();
@@ -171,8 +172,9 @@ function aggregatePeriod(conversations: ConversationRow[]) {
       }
     }
 
-    const responseTime = averageAiResponseTimeMs(messages);
-    if (responseTime !== null) responseTimes.push(responseTime);
+    const responseTimes = collectAiResponseTimeSamplesMs(messages);
+    responseTimeTotal += responseTimes.reduce((sum, responseTime) => sum + responseTime, 0);
+    aiResponseSamples += responseTimes.length;
 
     for (const message of messages) {
       if (message.feedback === "positive") feedbackPositive++;
@@ -190,10 +192,7 @@ function aggregatePeriod(conversations: ConversationRow[]) {
 
   const totalConversations = conversations.length;
   const uniqueUserCount = uniqueUsers.size;
-  const avgAiResponseTimeMs =
-    responseTimes.length > 0
-      ? responseTimes.reduce((sum, value) => sum + value, 0) / responseTimes.length
-      : 0;
+  const avgAiResponseTimeMs = aiResponseSamples > 0 ? responseTimeTotal / aiResponseSamples : 0;
 
   const feedbackTotal = feedbackPositive + feedbackNegative;
   const satisfactionScore = feedbackTotal > 0 ? (feedbackPositive / feedbackTotal) * 5 : 0;
@@ -212,7 +211,7 @@ function aggregatePeriod(conversations: ConversationRow[]) {
     uniqueUserCount,
     closedConversations,
     avgAiResponseTimeMs,
-    aiResponseSamples: responseTimes.length,
+    aiResponseSamples,
     satisfactionScore,
     feedbackTotal,
     messagesSent,
