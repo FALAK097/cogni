@@ -417,7 +417,7 @@ export function ConversationDetail({
     );
   }
 
-  if (isError) {
+  if (isError && !session) {
     return (
       <div className="flex h-full min-w-0 flex-col overflow-hidden">
         {part === "chat" ? (
@@ -510,6 +510,27 @@ export function ConversationDetail({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {isError ? (
+        <output
+          aria-live="polite"
+          className="mx-3 mt-2 flex shrink-0 items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/40 px-3 py-2 text-xs sm:mx-4"
+        >
+          <span className="min-w-0 truncate text-muted-foreground">
+            Couldn’t refresh. Showing the last loaded conversation.
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 shrink-0 px-2.5"
+            onClick={() => void refetch()}
+            disabled={isFetching}
+            aria-busy={isFetching}
+          >
+            {isFetching ? "Retrying…" : "Retry"}
+          </Button>
+        </output>
+      ) : null}
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <div className="flex shrink-0 items-center justify-between gap-2 px-3 py-2 sm:px-4">
