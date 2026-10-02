@@ -63,6 +63,15 @@ const WIDGET_CARD_CLASS = "rounded-xl border border-border";
 
 const WIDGET_SETTINGS_CARD_CLASS = `${WIDGET_CARD_CLASS} overflow-hidden`;
 
+async function waitForPreviewWidget(prompt: string): Promise<boolean> {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const sendPreviewMessage = window.Widget?.sendPreviewMessage;
+    if (sendPreviewMessage) return sendPreviewMessage(prompt);
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 100));
+  }
+  return false;
+}
+
 function resolveInitialSection(initialSubtab?: string | null): AgentSection {
   if (!initialSubtab) return "build";
   if (AGENT_SECTIONS.includes(initialSubtab as AgentSection)) return initialSubtab as AgentSection;
@@ -202,19 +211,10 @@ export function WidgetCustomizer({
   const saveWidgetConfigMutation = useSaveWidgetConfig();
   const saveWidgetConfig = saveWidgetConfigMutation.mutateAsync;
 
-  const tryPreviewPrompt = useCallback(async (prompt: string) => {
+  const tryPreviewPrompt = useCallback((prompt: string) => {
     setSendingTestPrompt(prompt);
     setShowMobilePreview(true);
-    try {
-      for (let attempt = 0; attempt < 50; attempt += 1) {
-        const sendPreviewMessage = window.Widget?.sendPreviewMessage;
-        if (sendPreviewMessage) return await sendPreviewMessage(prompt);
-        await new Promise<void>((resolve) => window.setTimeout(resolve, 100));
-      }
-      return false;
-    } finally {
-      setSendingTestPrompt(null);
-    }
+    return waitForPreviewWidget(prompt).finally(() => setSendingTestPrompt(null));
   }, []);
 
   useEffect(() => {
