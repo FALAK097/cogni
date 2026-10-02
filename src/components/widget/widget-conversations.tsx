@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useConversations } from "@/hooks/query";
 import type { ConversationFilter } from "@/hooks/query";
 import { useActiveWorkspaceId } from "@/hooks/use-auth";
@@ -93,56 +99,40 @@ export function WidgetConversations({
           Inbox
         </h1>
 
-        <div className="mt-0 lg:mt-3">
-          <Tabs
+        <div className="mt-2 lg:mt-3">
+          <Select
             value={filter}
-            onValueChange={(value) => setFilter(value as ConversationFilter)}
-            className="gap-0"
+            onValueChange={(value) => {
+              if (value) setFilter(value as ConversationFilter);
+            }}
           >
-            <TabsList
-              variant="line"
-              className="h-auto w-full justify-start gap-6 overflow-x-auto rounded-none bg-transparent p-0 pb-0"
+            <SelectTrigger
+              aria-label="Inbox view"
+              className="h-10 w-full justify-between rounded-xl border-border/60 bg-background px-3 shadow-none"
             >
+              <SelectValue placeholder="Choose an inbox view" />
+            </SelectTrigger>
+            <SelectContent align="start" alignItemWithTrigger={false} className="w-64 rounded-xl">
               {FILTER_TABS.map((tab) => {
-                const active = filter === tab.value;
                 const count = counts[tab.countKey];
                 const countKind = tab.value === "snoozed" ? "snoozed" : "unread";
 
                 return (
-                  <TabsTrigger
-                    key={tab.value}
-                    value={tab.value}
-                    aria-label={
-                      count > 0
-                        ? `${tab.label}, ${count} ${countKind} conversation${count === 1 ? "" : "s"}`
-                        : tab.label
-                    }
-                    className={cn(
-                      "h-11 shrink-0 flex-none gap-2 rounded-none bg-transparent px-0 pb-2 text-sm font-medium shadow-none sm:h-9",
-                      "after:-bottom-px after:h-[2px] after:rounded-full after:bg-primary",
-                      "data-active:bg-transparent data-active:shadow-none",
-                      active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    {tab.label}
+                  <SelectItem key={tab.value} value={tab.value} className="min-h-10 rounded-lg">
+                    <span>{tab.label}</span>
                     {count > 0 ? (
                       <span
-                        title={`${count} ${countKind} conversation${count === 1 ? "" : "s"}`}
-                        className={cn(
-                          "inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-medium",
-                          active
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground",
-                        )}
+                        aria-label={`${count} ${countKind} conversation${count === 1 ? "" : "s"}`}
+                        className="ml-auto rounded-full bg-muted px-2 py-0.5 text-xs tabular-nums text-muted-foreground"
                       >
                         {count}
                       </span>
                     ) : null}
-                  </TabsTrigger>
+                  </SelectItem>
                 );
               })}
-            </TabsList>
-          </Tabs>
+            </SelectContent>
+          </Select>
         </div>
       </header>
 
