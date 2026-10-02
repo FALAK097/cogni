@@ -35,7 +35,7 @@ function mapMessageToClient(message: MessageJson, agentName: string) {
     id: message.id,
     role: isVisitor ? ("user" as const) : ("assistant" as const),
     authorType: message.authorType,
-    authorName: isVisitor ? null : isTeam ? "You" : agentName,
+    authorName: isVisitor ? null : isTeam ? (message.authorName ?? "Team") : agentName,
     content: message.body,
     timestamp: message.createdAt,
     visibility: message.visibility ?? "PUBLIC",
@@ -203,7 +203,7 @@ export async function GET(_request: Request, context: RouteContext) {
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
-  const { db, workspace, membership } = await requireDashboardContext();
+  const { db, workspace, membership, session } = await requireDashboardContext();
   const { conversation_id: conversationId } = await context.params;
 
   let body: {
@@ -388,6 +388,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         {
           body: message,
           authorType: "TEAM",
+          authorName: session.user.name,
           visibility: body.action === "note" ? "INTERNAL" : "PUBLIC",
         },
         { updateLastMessageAt: body.action === "reply" },

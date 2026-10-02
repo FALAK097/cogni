@@ -156,6 +156,29 @@ test("duplicate webhook deliveries append only once", async () => {
   assert.ok(deliveries.every((delivery) => delivery?.message.id === matching[0].id));
 });
 
+test("team author names are preserved in transcript messages", async () => {
+  const messageId = randomUUID();
+  await appendConversationMessage({
+    db: appDatabases[0],
+    workspaceId,
+    conversationId,
+    message: {
+      id: messageId,
+      body: "I’ll check that for you.",
+      authorType: "TEAM",
+      authorName: "Mina Support",
+      visibility: "PUBLIC",
+      createdAt: new Date().toISOString(),
+    },
+  });
+
+  const [row] = await raw`SELECT "messages" FROM "conversation" WHERE "id" = ${conversationId}`;
+  const storedMessages = JSON.parse(row.messages);
+  const message = storedMessages.find((entry) => entry.id === messageId);
+
+  assert.equal(message.authorName, "Mina Support");
+});
+
 test("AI appends are denied after takeover and all appends stay workspace scoped", async () => {
   await raw`UPDATE "conversation" SET "aiPaused" = true WHERE "id" = ${conversationId}`;
   const paused = await appendConversationMessage({

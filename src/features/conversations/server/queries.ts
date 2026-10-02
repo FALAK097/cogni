@@ -203,7 +203,8 @@ export async function markConversationAsRead(
 export async function appendTeamConversationMessage(
   workspaceId: string,
   conversationId: string,
-  message: Pick<MessageJson, "body" | "authorType" | "visibility">,
+  message: Pick<MessageJson, "body" | "authorType" | "visibility"> &
+    Partial<Pick<MessageJson, "authorName">>,
   options: { updateLastMessageAt: boolean },
 ): Promise<boolean> {
   const db = getDb();
@@ -212,6 +213,7 @@ export async function appendTeamConversationMessage(
     id: randomUUID(),
     body: message.body,
     authorType: message.authorType,
+    ...(message.authorName ? { authorName: message.authorName } : {}),
     visibility: message.visibility,
     createdAt: nowIso,
   };

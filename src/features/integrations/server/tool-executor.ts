@@ -92,6 +92,7 @@ async function executeInternalTool({
       id: crypto.randomUUID(),
       body: message,
       authorType: "TEAM",
+      authorName: "AI agent",
       visibility: "INTERNAL",
       createdAt: new Date().toISOString(),
     };

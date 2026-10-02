@@ -1049,9 +1049,13 @@ function MessageBubble({
 }) {
   const isUser = message.role === "user";
   const isTeam = message.authorType === "TEAM";
+  const isInternal = message.isInternal || message.visibility === "INTERNAL";
   const hasDocuments =
     message.metadata?.type === "documents" && !!message.metadata?.documents?.length;
   const parsedMessage = splitMessageSources(message.content);
+  const authorName =
+    message.authorName?.trim() || (isUser ? displayName : isTeam ? "Team" : "AI agent");
+  const timestamp = new Date(message.timestamp);
 
   return (
     <div className="flex gap-3">
@@ -1069,14 +1073,32 @@ function MessageBubble({
       )}
 
       <div className="min-w-0 max-w-[85%] sm:max-w-[78%]">
+        <div className="mb-1 flex min-h-4 min-w-0 items-center gap-2 px-1 text-xs">
+          <span className="min-w-0 truncate font-medium text-foreground">{authorName}</span>
+          {isInternal ? (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 font-medium text-muted-foreground">
+              <FileText className="size-3" aria-hidden="true" />
+              Internal note
+            </span>
+          ) : null}
+          <time
+            dateTime={message.timestamp}
+            title={format(timestamp, "PPpp")}
+            className="ml-auto shrink-0 text-muted-foreground tabular-nums"
+          >
+            {format(timestamp, "p")}
+          </time>
+        </div>
         <div
           className={cn(
             "rounded-xl px-4 py-3 text-sm leading-relaxed",
-            isUser
-              ? "border border-border/50 bg-card text-foreground"
-              : isTeam
-                ? "border border-primary/15 bg-primary/8 text-foreground"
-                : "border border-primary/10 bg-primary/5 text-foreground",
+            isInternal
+              ? "border border-border bg-muted/60 text-foreground"
+              : isUser
+                ? "border border-border/50 bg-card text-foreground"
+                : isTeam
+                  ? "border border-primary/15 bg-primary/8 text-foreground"
+                  : "border border-primary/10 bg-primary/5 text-foreground",
           )}
         >
           <Streamdown className="break-words font-sans text-sm leading-relaxed">

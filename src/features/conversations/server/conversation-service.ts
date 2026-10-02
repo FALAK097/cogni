@@ -51,6 +51,7 @@ export type MessageJson = {
   id: string;
   body: string;
   authorType: "VISITOR" | "AI" | "TEAM";
+  authorName?: string | null;
   visibility?: "PUBLIC" | "INTERNAL";
   clientId?: string | null;
   replyToMessageId?: string | null;
