@@ -68,6 +68,7 @@ import {
   useSendConversationMessage,
   useTakeOverConversation,
 } from "@/hooks/query";
+import { useCurrentTimestamp } from "@/hooks/use-current-timestamp";
 import type { ConversationDetail as ConversationDetailData, WidgetMessage } from "@/hooks/query";
 import { generateAvatarUrl } from "@/lib/avatar-generator";
 import { cn } from "@/lib/utils";
@@ -278,7 +279,12 @@ export function ConversationDetail({
   });
 
   const messages = session?.messages;
-  const isSnoozed = Boolean(session?.snoozedUntil && Date.parse(session.snoozedUntil) > Date.now());
+  const currentTimestamp = useCurrentTimestamp();
+  const isSnoozed = Boolean(
+    currentTimestamp !== null &&
+    session?.snoozedUntil &&
+    Date.parse(session.snoozedUntil) > currentTimestamp,
+  );
 
   useEffect(() => {
     const container = scrollRef.current;

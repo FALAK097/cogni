@@ -39,6 +39,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useConversations, useMarkConversationRead, useWorkspaceMembers } from "@/hooks/query";
+import { useCurrentTimestamp } from "@/hooks/use-current-timestamp";
 import type { ConversationFilter, ConversationSummary } from "@/hooks/query";
 import { generateAvatarUrl } from "@/lib/avatar-generator";
 import {
@@ -98,6 +99,7 @@ export function ConversationsList({
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const currentTimestamp = useCurrentTimestamp();
   const [channelFilter, setChannelFilter] = useState<InboxChannel | null>(null);
   const [assigneeFilter, setAssigneeFilter] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -542,7 +544,8 @@ export function ConversationsList({
                         {getConversationChannelLabel(conversation.channel)}
                       </span>
                       {conversation.snoozedUntil &&
-                      Date.parse(conversation.snoozedUntil) > Date.now() ? (
+                      currentTimestamp !== null &&
+                      Date.parse(conversation.snoozedUntil) > currentTimestamp ? (
                         <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                           <Clock className="size-3.5 shrink-0" aria-hidden="true" />
                           Until{" "}
