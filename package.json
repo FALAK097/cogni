@@ -38,6 +38,7 @@
     "test:workflow-progression": "node --test scripts/test-workflow-progression.mjs",
     "test:rate-limit": "node --test scripts/test-rate-limit.mjs",
     "test:safe-fetch": "node --test scripts/test-safe-fetch.mjs",
+    "test:knowledge-retrieval": "node --test scripts/test-knowledge-retrieval.mjs",
     "check": "pnpm lint && pnpm typecheck && pnpm fmt:check",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
