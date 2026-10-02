@@ -18,6 +18,7 @@
     "test:widget-stream": "node --test scripts/test-widget-stream.mjs",
     "test:widget-preview-isolation": "node --test scripts/test-widget-preview-isolation.mjs",
     "test:widget-preview-evidence": "node --test scripts/test-widget-preview-evidence.mjs",
+    "test:widget-preview-message": "node --test scripts/test-widget-preview-message.mjs",
     "test:widget-settings": "node --test scripts/test-widget-settings.mjs",
     "test:conversation-append": "node --test scripts/test-conversation-append.mjs",
     "test:conversation-draft": "node --test scripts/test-conversation-draft.mjs",
