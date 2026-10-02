@@ -87,6 +87,7 @@ export interface WidgetMessage {
   feedback?: "positive" | "negative" | null;
   feedbackReason?: string | null;
   feedbackAt?: string | null;
+  citations?: Array<{ documentId: string; title: string; excerpt: string }>;
   isInternal: boolean;
   metadata?: {
     type?: string;

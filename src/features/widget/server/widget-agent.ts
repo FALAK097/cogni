@@ -41,6 +41,7 @@ export async function streamWidgetAgent({
     totalTokens: number | null;
     finishReason: string | null;
     sources: { documentId: string; title: string }[];
+    citations: { documentId: string; title: string; excerpt: string }[];
   }) => Promise<void>;
 }) {
   const sources = await retrieveKnowledgeContext(
@@ -70,7 +71,7 @@ export async function streamWidgetAgent({
     instructions: [
       `You are ${config.displayName}, the AI support assistant for ${config.workspaceName}.`,
       config.instructions,
-      "Use retrieved knowledge when it is relevant. Cite sources inline like [Source: Title].",
+      "Use retrieved knowledge when relevant. Do not add source labels or a Sources section to the answer text; the interface adds source references separately.",
       "If knowledge is insufficient, say you do not know and offer human help.",
       config.allowActions
         ? "You may check calendar availability when asked. Never invent availability."
@@ -121,6 +122,18 @@ export async function streamWidgetAgent({
             documentId: source.documentId,
             title: source.title,
           })),
+          citations: [
+            ...new Map(
+              sources.map((source) => [
+                source.documentId,
+                {
+                  documentId: source.documentId,
+                  title: source.title,
+                  excerpt: source.content,
+                },
+              ]),
+            ).values(),
+          ],
         });
         completion.succeed();
       } catch (error) {

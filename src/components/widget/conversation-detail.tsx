@@ -12,6 +12,7 @@ import {
   ArrowRight,
   Bot,
   CheckCircle2,
+  ChevronDown,
   Clock,
   Copy,
   Download,
@@ -1420,7 +1421,38 @@ function MessageBubble({
             {parsedMessage.content}
           </Streamdown>
 
-          {parsedMessage.sources.length > 0 ? (
+          {message.citations && message.citations.length > 0 ? (
+            <div className="mt-3 space-y-1.5 border-t border-border/50 pt-2.5" aria-label="Sources">
+              <span className="mb-1 inline-flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                <FileText className="h-3 w-3" aria-hidden="true" />
+                Sources used
+              </span>
+              {message.citations.map((citation) => (
+                <details
+                  key={citation.documentId}
+                  className="group rounded-md bg-background/75 ring-1 ring-border/60 open:bg-background"
+                >
+                  <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md px-2.5 py-2 text-xs font-medium text-foreground outline-none transition-colors hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+                    <FileText
+                      className="size-3.5 shrink-0 text-muted-foreground"
+                      aria-hidden="true"
+                    />
+                    <span className="min-w-0 flex-1 truncate">{citation.title}</span>
+                    <span className="shrink-0 text-[11px] font-normal text-muted-foreground group-open:hidden">
+                      Preview
+                    </span>
+                    <ChevronDown
+                      className="size-3.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none"
+                      aria-hidden="true"
+                    />
+                  </summary>
+                  <p className="border-t border-border/50 px-2.5 py-2 text-xs leading-relaxed text-muted-foreground">
+                    {citation.excerpt}
+                  </p>
+                </details>
+              ))}
+            </div>
+          ) : parsedMessage.sources.length > 0 ? (
             <div
               className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border/50 pt-2.5"
               aria-label="Sources"

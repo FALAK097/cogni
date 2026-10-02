@@ -60,6 +60,13 @@ export type MessageJson = {
   feedback?: "positive" | "negative" | null;
   feedbackReason?: string | null;
   feedbackAt?: string | null;
+  citations?: MessageCitation[];
+};
+
+export type MessageCitation = {
+  documentId: string;
+  title: string;
+  excerpt: string;
 };
 
 /**
@@ -610,11 +617,13 @@ export async function recordAiMessage({
   conversationId,
   text,
   replyToMessageId,
+  citations,
 }: {
   db: Db;
   conversationId: string;
   text: string;
   replyToMessageId: string;
+  citations?: MessageCitation[];
 }) {
   return runDbWriteOperation(db, async (tx) => {
     const conversationData = await tx.query.conversation.findFirst({
@@ -626,6 +635,13 @@ export async function recordAiMessage({
     }
 
     const now = new Date();
+    const seenCitationIds = new Set<string>();
+    const uniqueCitations =
+      citations?.filter((citation) => {
+        if (seenCitationIds.has(citation.documentId)) return false;
+        seenCitationIds.add(citation.documentId);
+        return true;
+      }) ?? [];
     const aiMessage: MessageJson = {
       id: randomUUID(),
       body: text,
@@ -633,6 +649,15 @@ export async function recordAiMessage({
       visibility: "PUBLIC",
       replyToMessageId,
       createdAt: now.toISOString(),
+      ...(uniqueCitations.length > 0
+        ? {
+            citations: uniqueCitations.slice(0, 4).map((citation) => ({
+              documentId: citation.documentId,
+              title: citation.title.slice(0, 160),
+              excerpt: citation.excerpt.trim().slice(0, 360),
+            })),
+          }
+        : {}),
     };
 
     const appended = await appendConversationMessage({

@@ -27,6 +27,7 @@ await build({
         getVisitorConversationMessages,
         markVisitorMessagesAsRead,
         recordVisitorMessage,
+        recordAiMessage,
         setConversationStatus,
         setAiMessageFeedback,
       } from "@/features/conversations/server/conversation-service";
@@ -66,6 +67,7 @@ const {
   getVisitorConversationMessages,
   markVisitorMessagesAsRead,
   recordVisitorMessage,
+  recordAiMessage,
   setConversationStatus,
   setAiMessageFeedback,
   createTestDb,
@@ -204,6 +206,46 @@ test("public conversation history never includes attributed internal notes", asy
 
   assert.ok(publicMessages.every((message) => message.visibility !== "INTERNAL"));
   assert.ok(publicMessages.every((message) => message.id !== messageId));
+});
+
+test("AI citation metadata is persisted with bounded, deduplicated source evidence", async () => {
+  const replyToMessageId = randomUUID();
+  const persisted = await recordAiMessage({
+    db: appDatabases[0],
+    conversationId,
+    text: "The return window is 30 days.\n\nSources:\n- Returns policy",
+    replyToMessageId,
+    citations: [
+      {
+        documentId: "returns-policy",
+        title: "Returns policy".repeat(20),
+        excerpt: ` ${"Customers may return an item within 30 days. ".repeat(12)} `,
+      },
+      {
+        documentId: "shipping-policy",
+        title: "Shipping policy",
+        excerpt: "Orders ship in 2 days.",
+      },
+      { documentId: "third-source", title: "Third source", excerpt: "Third excerpt." },
+      { documentId: "fourth-source", title: "Fourth source", excerpt: "Fourth excerpt." },
+      { documentId: "fifth-source", title: "Fifth source", excerpt: "Not stored." },
+      { documentId: "returns-policy", title: "Returns policy duplicate", excerpt: "Duplicate." },
+    ],
+  });
+
+  assert.ok(persisted);
+  assert.equal(persisted.citations?.length, 4);
+  assert.equal(persisted.citations?.[0]?.title.length, 160);
+  assert.equal(persisted.citations?.[0]?.excerpt.length, 360);
+  assert.equal(persisted.citations?.[0]?.excerpt.startsWith("Customers"), true);
+  assert.equal(
+    persisted.citations?.some((citation) => citation.documentId === "fifth-source"),
+    false,
+  );
+  assert.equal(
+    persisted.citations?.filter((citation) => citation.documentId === "returns-policy").length,
+    1,
+  );
 });
 
 test("AI appends are denied after takeover and all appends stay workspace scoped", async () => {

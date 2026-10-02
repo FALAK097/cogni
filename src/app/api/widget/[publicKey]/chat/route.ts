@@ -506,7 +506,15 @@ export async function POST(
         agentRunId: run?.id ?? null,
       },
       messages: historyMessages,
-      onFinish: async ({ text, inputTokens, outputTokens, totalTokens, finishReason, sources }) => {
+      onFinish: async ({
+        text,
+        inputTokens,
+        outputTokens,
+        totalTokens,
+        finishReason,
+        sources,
+        citations,
+      }) => {
         if (!text.trim()) {
           if (run) {
             await completeAgentRun({
@@ -527,6 +535,7 @@ export async function POST(
               conversationId,
               text,
               replyToMessageId: visitorMessageId,
+              citations,
             });
         if (run) {
           await completeAgentRun({
