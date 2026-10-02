@@ -148,6 +148,7 @@ export interface WidgetSessionDetail {
   contactCreatedAt?: string | null;
   contactLastSeenAt?: string | null;
   contactPhone?: string | null;
+  contactTags?: string[];
   contactSource?: string | null;
   contactCapturedAt?: string | null;
   contactCaptureContext?: Record<string, unknown> | null;
@@ -521,6 +522,38 @@ export function useDeleteInboxSavedView() {
       void queryClient.invalidateQueries({
         queryKey: queryKeys.conversations.savedViews(workspaceId),
       });
+    },
+  });
+}
+
+export function useUpdateContactTag() {
+  const queryClient = useQueryClient();
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useMutation({
+    mutationFn: async (input: {
+      conversationId: string;
+      action: "add" | "remove";
+      tag: string;
+    }) => {
+      const response = await fetch(
+        `/api/dashboard/conversations/${encodeURIComponent(input.conversationId)}/contact-tags`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: input.action, tag: input.tag }),
+        },
+      );
+      const result: { tags?: string[]; error?: string } = await response.json().catch(() => ({}));
+      if (!response.ok || !result.tags) {
+        throw new Error(result.error ?? "Could not update contact tags.");
+      }
+      return { conversationId: input.conversationId, tags: result.tags };
+    },
+    onSuccess: ({ conversationId, tags }) => {
+      queryClient.setQueryData<ConversationDetail>(
+        queryKeys.conversations.detail(workspaceId, conversationId),
+        (current) => (current ? { ...current, contactTags: tags } : current),
+      );
     },
   });
 }

@@ -53,7 +53,12 @@ const contactUpdateSchema = z
 
 const contactTagSchema = z.object({
   conversationId: conversationIdSchema,
-  tag: z.string().trim().min(1).max(50),
+  tag: z
+    .string()
+    .trim()
+    .min(1)
+    .max(50)
+    .regex(/^[\p{L}\p{N}][\p{L}\p{N} ._-]*$/u),
 });
 
 const emailSchema = z.object({

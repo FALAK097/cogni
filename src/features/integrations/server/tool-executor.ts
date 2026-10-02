@@ -8,6 +8,7 @@ import {
   appendConversationMessage,
   type MessageJson,
 } from "@/features/conversations/server/conversation-service";
+import { changeContactTag } from "@/features/contacts/server/contact-tags";
 import {
   getIntegrationTool,
   parseToolInput,
@@ -120,19 +121,17 @@ async function executeInternalTool({
   }
 
   if (actionType === "contact.add_tag") {
-    const tag = requiredString(input, "tag").toLowerCase();
-    const currentTags = JSON.parse(currentConversation.contact.tags) as unknown;
-    const tags = Array.isArray(currentTags)
-      ? currentTags.filter((value): value is string => typeof value === "string")
-      : [];
-    const nextTags = [...new Set([...tags, tag])].slice(0, 50);
-    await db
-      .update(contact)
-      .set({ tags: JSON.stringify(nextTags), updatedAt: new Date().toISOString() })
-      .where(
-        and(eq(contact.id, currentConversation.contactId), eq(contact.workspaceId, workspaceId)),
-      );
-    return { contactId: currentConversation.contactId, tags: nextTags };
+    const tag = requiredString(input, "tag");
+    const result = await changeContactTag({
+      db,
+      workspaceId,
+      contactId: currentConversation.contactId,
+      action: "add",
+      tag,
+    });
+    if (result.kind === "limit") throw new Error("This contact already has 50 tags.");
+    if (result.kind === "not-found") throw new Error("Contact not found in this workspace.");
+    return { contactId: currentConversation.contactId, tags: result.tags };
   }
 
   if (actionType === "conversation.set_status") {

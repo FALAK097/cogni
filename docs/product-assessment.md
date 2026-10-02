@@ -68,6 +68,13 @@ transition, Agent navigation closes it, and resizing to 1024px closes it. Cmd+B 
 reply field and delete confirmation unchanged; the confirmation was cancelled. The 320px
 document stayed 320px wide. Independent review approved the scoped source changes.
 
+Contact-tag follow-up keeps customer labels in the existing Contact card: agents can add or
+remove tags, and the same workspace-scoped update service is used by the AI tag action. The
+service normalizes case, tolerates malformed legacy JSON, serializes concurrent edits under a
+row lock and enforces the 50-tag limit. Local PostgreSQL tests cover concurrent writes,
+workspace isolation and limits. A localhost Inbox browser pass added a temporary tag, confirmed
+it appeared in the card, removed it and confirmed the empty state returned. No tag remained.
+
 Agent setup follow-up keeps all configuration in the existing page:
 
 | Before                                                                                    | After                                                                                 | Why                                                                 |

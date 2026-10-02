@@ -12,6 +12,7 @@ import {
 import { setConversationStatus } from "@/features/conversations/server/conversation-service";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { canManageWorkspace } from "@/lib/auth/permissions";
+import { parseContactTags } from "@/features/contacts/server/contact-tags";
 import { isChatSdkChannel, postChannelReply } from "@/features/integrations/server/chat-sdk";
 import {
   conversation as conversationTable,
@@ -152,6 +153,7 @@ export async function GET(_request: Request, context: RouteContext) {
       ? new Date(conversation.contact.lastSeenAt).toISOString()
       : null,
     contactPhone: conversation.contact.phone,
+    contactTags: parseContactTags(conversation.contact.tags),
     contactSource: conversation.contact.source,
     contactCapturedAt: conversation.contact.capturedAt
       ? new Date(conversation.contact.capturedAt).toISOString()

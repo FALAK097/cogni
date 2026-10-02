@@ -3,7 +3,7 @@
 import { format, formatDistanceToNow, isToday, isYesterday } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Dispatch, SetStateAction } from "react";
+import type { Dispatch, FormEvent, SetStateAction } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 import { Streamdown } from "streamdown";
@@ -21,6 +21,7 @@ import {
   Pencil,
   Pause,
   Play,
+  Plus,
   MessageSquare,
   Send,
   RotateCcw,
@@ -28,6 +29,7 @@ import {
   ThumbsUp,
   Trash2,
   UserPlus,
+  X,
 } from "@/components/icons";
 
 import {
@@ -45,6 +47,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CountryFlag } from "@/components/ui/country-flag";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -58,6 +61,14 @@ import {
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useToast } from "@/components/ui/use-toast";
 import {
   useConversation,
@@ -67,6 +78,7 @@ import {
   useSetConversationStatus,
   useSendConversationMessage,
   useTakeOverConversation,
+  useUpdateContactTag,
 } from "@/hooks/query";
 import { useCurrentTimestamp } from "@/hooks/use-current-timestamp";
 import type { ConversationDetail as ConversationDetailData, WidgetMessage } from "@/hooks/query";
@@ -1202,6 +1214,37 @@ function SessionDetailsContent({
   onSelectConversation: (conversationId: string) => void;
 }) {
   const { toast } = useToast();
+  const updateContactTag = useUpdateContactTag();
+  const [newTag, setNewTag] = useState("");
+  const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
+  const [showAllTags, setShowAllTags] = useState(false);
+  const [tagError, setTagError] = useState<string | null>(null);
+  const contactTags = session.contactTags ?? [];
+  const tagConversationId = session.conversationId ?? session.id;
+  const visibleTags = showAllTags ? contactTags : contactTags.slice(0, 8);
+  const addContactTag = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setTagError(null);
+    const tag = newTag.trim();
+    if (!tag) return;
+    updateContactTag.mutate(
+      { conversationId: tagConversationId, action: "add", tag },
+      {
+        onSuccess: () => {
+          setNewTag("");
+          setTagPopoverOpen(false);
+        },
+        onError: (error) => setTagError(error.message),
+      },
+    );
+  };
+  const removeContactTag = (tag: string) => {
+    setTagError(null);
+    updateContactTag.mutate(
+      { conversationId: tagConversationId, action: "remove", tag },
+      { onError: (error) => setTagError(error.message) },
+    );
+  };
   const userId = session.contactExternalId ?? session.visitorId;
   const locationLabel = [session.city, session.country].filter(Boolean).join(", ");
   const localTime = session.timezone
@@ -1272,6 +1315,110 @@ function SessionDetailsContent({
               <span className="truncate">{locationTimeLabel}</span>
             </div>
           ) : null}
+
+          <div className="mt-3 border-t border-border/60 pt-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-medium text-muted-foreground">Tags</p>
+              <Popover
+                open={tagPopoverOpen}
+                onOpenChange={(open) => {
+                  setTagPopoverOpen(open);
+                  if (open) setTagError(null);
+                }}
+              >
+                <PopoverTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="size-11 shrink-0 rounded-lg text-muted-foreground sm:size-8"
+                      aria-label="Add contact tag"
+                      title="Add contact tag"
+                      disabled={contactTags.length >= 50}
+                    />
+                  }
+                >
+                  <Plus className="size-4" aria-hidden="true" />
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-[min(18rem,calc(100vw-2rem))] rounded-xl">
+                  <PopoverHeader>
+                    <PopoverTitle>Add a contact tag</PopoverTitle>
+                    <PopoverDescription>
+                      Tags are shared across this customer’s conversations.
+                    </PopoverDescription>
+                  </PopoverHeader>
+                  <form onSubmit={addContactTag} className="mt-3 space-y-2">
+                    <Input
+                      aria-label="New contact tag"
+                      className="h-11 text-base sm:h-9 sm:text-sm"
+                      placeholder="e.g. billing"
+                      maxLength={32}
+                      value={newTag}
+                      onChange={(event) => setNewTag(event.target.value)}
+                    />
+                    {tagError ? (
+                      <p role="alert" className="text-xs text-destructive">
+                        {tagError}
+                      </p>
+                    ) : null}
+                    <div className="flex justify-end">
+                      <Button
+                        type="submit"
+                        size="sm"
+                        className="h-11 sm:h-8"
+                        disabled={!newTag.trim() || updateContactTag.isPending}
+                      >
+                        {updateContactTag.isPending ? "Adding…" : "Add tag"}
+                      </Button>
+                    </div>
+                  </form>
+                </PopoverContent>
+              </Popover>
+            </div>
+            {contactTags.length > 0 ? (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {visibleTags.map((tag) => (
+                  <Badge
+                    key={tag}
+                    variant="outline"
+                    className="max-w-full gap-1 rounded-md px-2 py-1 text-xs font-normal"
+                  >
+                    <span className="max-w-32 truncate" title={tag}>
+                      {tag}
+                    </span>
+                    <button
+                      type="button"
+                      className="-mr-1 inline-flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring sm:size-5"
+                      aria-label={`Remove ${tag} tag`}
+                      title={`Remove ${tag} tag`}
+                      disabled={updateContactTag.isPending}
+                      onClick={() => removeContactTag(tag)}
+                    >
+                      <X className="size-3" aria-hidden="true" />
+                    </button>
+                  </Badge>
+                ))}
+                {contactTags.length > 8 ? (
+                  <button
+                    type="button"
+                    className="min-h-7 rounded-md px-1.5 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+                    aria-expanded={showAllTags}
+                    onClick={() => setShowAllTags((visible) => !visible)}
+                  >
+                    {showAllTags ? "Show fewer" : `+${contactTags.length - 8} more`}
+                  </button>
+                ) : null}
+              </div>
+            ) : (
+              <p className="mt-1 text-xs text-muted-foreground">No tags yet</p>
+            )}
+            {tagError && !tagPopoverOpen ? (
+              <p role="alert" className="mt-2 text-xs text-destructive">
+                {tagError}
+              </p>
+            ) : null}
+          </div>
         </CardContent>
       </Card>
 
