@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import test from "node:test";
+import test, { after } from "node:test";
 import { build } from "esbuild";
 import { randomBytes, randomUUID } from "node:crypto";
 
@@ -20,7 +20,14 @@ const outputFile = join(outputDirectory, "shared.mjs");
 await mkdir(outputDirectory, { recursive: true });
 
 await build({
-  entryPoints: [resolve("src/lib/rate-limit/shared.ts")],
+  stdin: {
+    contents: `
+      export { checkRateLimits, pruneExpiredRateLimitBuckets } from "@/lib/rate-limit/shared";
+      export { getDb } from "@/lib/db/client";
+    `,
+    resolveDir: process.cwd(),
+    sourcefile: "rate-limit-test-entry.ts",
+  },
   outfile: outputFile,
   bundle: true,
   platform: "node",
@@ -44,9 +51,13 @@ await build({
   ],
 });
 
-const { checkRateLimits, pruneExpiredRateLimitBuckets } = await import(
+const { checkRateLimits, getDb, pruneExpiredRateLimitBuckets } = await import(
   `${pathToFileURL(outputFile).href}?build=${randomUUID()}`
 );
+
+after(async () => {
+  await getDb().$client.end({ timeout: 5 });
+});
 
 test("parallel requests cannot exceed a shared limit", async () => {
   const prefix = randomUUID();
