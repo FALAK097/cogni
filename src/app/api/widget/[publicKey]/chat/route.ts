@@ -105,7 +105,16 @@ const chatRequestSchema = z.object({
     }),
 });
 
-function streamHeaders(session?: { id: string; token: string }) {
+type WidgetPreviewEvidence = {
+  outcome: "answer" | "handoff";
+  grounded: boolean;
+  sources: { title: string }[];
+};
+
+function streamHeaders(
+  session?: { id: string; token: string },
+  previewEvidence?: WidgetPreviewEvidence,
+) {
   const headers = new Headers({
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache",
@@ -114,6 +123,19 @@ function streamHeaders(session?: { id: string; token: string }) {
   if (session) {
     headers.set("X-Widget-Session-Id", session.id);
     headers.set("X-Widget-Session-Token", session.token);
+  }
+  if (previewEvidence) {
+    headers.set(
+      "X-Widget-Preview-Evidence",
+      encodeURIComponent(
+        JSON.stringify({
+          ...previewEvidence,
+          sources: previewEvidence.sources.slice(0, 4).map(({ title }) => ({
+            title: title.slice(0, 160),
+          })),
+        }),
+      ),
+    );
   }
   return headers;
 }
@@ -378,7 +400,7 @@ export async function POST(
 
   const origin = getRequestOrigin(request);
   const corsAllowed = validateEmbedOrigin(origin, access.allowedDomains);
-  const respondWithText = (text: string) => {
+  const respondWithText = (text: string, previewEvidence?: WidgetPreviewEvidence) => {
     const stream = createWidgetSseStream(
       (async function* () {
         yield text;
@@ -398,7 +420,10 @@ export async function POST(
     );
     return withWidgetCors(
       new Response(stream, {
-        headers: streamHeaders(visitorSession ?? undefined),
+        headers: streamHeaders(
+          visitorSession ?? undefined,
+          isPreview ? previewEvidence : undefined,
+        ),
       }),
       origin,
       corsAllowed,
@@ -406,7 +431,12 @@ export async function POST(
   };
 
   if (activeConversation?.aiPaused || shouldEscalate) {
-    return respondWithText(handoffReply);
+    return respondWithText(
+      handoffReply,
+      isPreview && shouldEscalate
+        ? { outcome: "handoff", grounded: false, sources: [] }
+        : undefined,
+    );
   }
 
   let run: { id: string; startedAtMs: number } | null = null;
@@ -589,7 +619,16 @@ export async function POST(
           },
         ),
         {
-          headers: streamHeaders(visitorSession ?? undefined),
+          headers: streamHeaders(
+            visitorSession ?? undefined,
+            isPreview
+              ? {
+                  outcome: "answer",
+                  grounded: result.sources.length > 0,
+                  sources: result.sources,
+                }
+              : undefined,
+          ),
         },
       ),
       origin,

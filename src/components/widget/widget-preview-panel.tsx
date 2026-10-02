@@ -1,21 +1,73 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import { BotMessageSquare, MessageCircle } from "@/components/icons";
+import { BotMessageSquare, MessageCircle, RefreshCw } from "@/components/icons";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 import { WidgetLiveWidgetPreview, type WidgetLivePreviewConfig } from "./widget-live-preview";
+import type { WidgetPreviewEvidence } from "./widget-test-panel";
 
 type PreviewMode = "widget" | "full-chat";
+const PREVIEW_EVIDENCE_EVENT = "cogni:widget-preview-evidence";
+
+function isPreviewEvidence(value: unknown): value is WidgetPreviewEvidence {
+  if (typeof value !== "object" || value === null) return false;
+  const evidence = value as Record<string, unknown>;
+  return (
+    (evidence.outcome === "answer" || evidence.outcome === "handoff") &&
+    typeof evidence.grounded === "boolean" &&
+    Array.isArray(evidence.sources) &&
+    evidence.sources.every(
+      (source: unknown) =>
+        typeof source === "object" &&
+        source !== null &&
+        "title" in source &&
+        typeof source.title === "string",
+    )
+  );
+}
 
 type WidgetPreviewPanelProps = {
   liveConfig: WidgetLivePreviewConfig;
+  testMode?: boolean;
+  onEvidenceChange?: (evidence: WidgetPreviewEvidence | null) => void;
 };
 
-export function WidgetPreviewPanel({ liveConfig }: WidgetPreviewPanelProps) {
+export function WidgetPreviewPanel({
+  liveConfig,
+  testMode = false,
+  onEvidenceChange,
+}: WidgetPreviewPanelProps) {
   const [previewMode, setPreviewMode] = useState<PreviewMode>("widget");
+  const [resetting, setResetting] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
   const previewHostRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!testMode) return;
+    const handleEvidence = (event: Event) => {
+      const detail = (event as CustomEvent<unknown>).detail;
+      if (isPreviewEvidence(detail)) onEvidenceChange?.(detail);
+    };
+    window.addEventListener(PREVIEW_EVIDENCE_EVENT, handleEvidence);
+    return () => window.removeEventListener(PREVIEW_EVIDENCE_EVENT, handleEvidence);
+  }, [onEvidenceChange, testMode]);
+
+  const resetTest = async () => {
+    setResetting(true);
+    setResetError(null);
+    onEvidenceChange?.(null);
+    try {
+      const reset = await window.Widget?.resetPreview?.();
+      if (!reset) setResetError("The preview is still starting. Try again in a moment.");
+      setResetting(false);
+    } catch {
+      setResetError("Couldn't start a new test. Retry the preview and try again.");
+      setResetting(false);
+    }
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
@@ -57,7 +109,29 @@ export function WidgetPreviewPanel({ liveConfig }: WidgetPreviewPanelProps) {
         >
           Sandbox · messages not saved · actions off
         </output>
+        {testMode ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-8 shrink-0 gap-1.5"
+            onClick={() => void resetTest()}
+            disabled={resetting}
+          >
+            <RefreshCw
+              className={cn("size-3.5", resetting && "motion-safe:animate-spin")}
+              aria-hidden="true"
+            />
+            {resetting ? "Resetting…" : "Reset test"}
+          </Button>
+        ) : null}
       </div>
+
+      {testMode && resetError ? (
+        <p role="alert" className="border-b border-border/60 px-4 py-2 text-xs text-destructive">
+          {resetError}
+        </p>
+      ) : null}
 
       <div className="relative flex min-h-0 flex-1 overflow-hidden p-4">
         <div

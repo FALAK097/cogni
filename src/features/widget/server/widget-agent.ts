@@ -142,6 +142,10 @@ export async function streamWidgetAgent({
   });
   return {
     fullStream: result.fullStream,
+    sources: sources.map((source: { documentId: string; title: string }) => ({
+      documentId: source.documentId,
+      title: source.title,
+    })),
     waitForCompletion: completion.waitForCompletion,
     abortSignal: abortController.signal,
     interruptForTakeover: () => {

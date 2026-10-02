@@ -12,6 +12,7 @@ import {
   getOrCreateVisitorId,
 } from "./storage.js";
 import { generateUUID, getBrowserMetadata } from "./utils.js";
+import { parseWidgetPreviewEvidence, PREVIEW_EVIDENCE_EVENT } from "./preview-evidence.js";
 
 const buildPublicApiUrl = (path) => `${state.baseUrl}${path}`;
 
@@ -310,6 +311,13 @@ export async function callWidgetChatAPI(
       return callWidgetChatAPI(userMessage, historyToSend, leadInfo, interactionId, false);
     }
     throw new Error(`Chat API error: ${response.status}`);
+  }
+
+  if (state.preview) {
+    const evidence = parseWidgetPreviewEvidence(response.headers.get("X-Widget-Preview-Evidence"));
+    if (evidence) {
+      window.dispatchEvent(new CustomEvent(PREVIEW_EVIDENCE_EVENT, { detail: evidence }));
+    }
   }
 
   const sessionId = response.headers.get("X-Widget-Session-Id");

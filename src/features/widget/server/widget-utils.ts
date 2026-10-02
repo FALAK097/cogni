@@ -175,7 +175,10 @@ export function withWidgetCors(response: Response, origin: string | null, allowe
   headers.set("Access-Control-Allow-Origin", origin);
   headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  headers.set("Access-Control-Expose-Headers", "X-Widget-Session-Id, X-Widget-Session-Token");
+  headers.set(
+    "Access-Control-Expose-Headers",
+    "X-Widget-Session-Id, X-Widget-Session-Token, X-Widget-Preview-Evidence",
+  );
   headers.set("Vary", "Origin");
 
   return new Response(response.body, {
@@ -196,7 +199,7 @@ export function widgetPreflightResponse(request: Request) {
   response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
   response.headers.set(
     "Access-Control-Expose-Headers",
-    "X-Widget-Session-Id, X-Widget-Session-Token",
+    "X-Widget-Session-Id, X-Widget-Session-Token, X-Widget-Preview-Evidence",
   );
   response.headers.set("Access-Control-Max-Age", "86400");
   response.headers.set("Vary", "Origin");

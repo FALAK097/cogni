@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { Bot, Code, Eye, Sparkles } from "@/components/icons";
+import { Bot, Code, Eye, MessageCircle, Sparkles } from "@/components/icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/use-toast";
 import type { DashboardWidgetConfig } from "@/hooks/query";
@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { WidgetPreviewPanel } from "./widget-preview-panel";
+import { WidgetTestPanel, type WidgetPreviewEvidence } from "./widget-test-panel";
 import {
   APPEARANCE_DEFAULTS,
   getAppearanceDefaults,
@@ -31,7 +32,7 @@ import {
   type AppearanceConfig,
 } from "./widget-settings-panels";
 
-const AGENT_SECTIONS = ["build", "customize", "deploy"] as const;
+const AGENT_SECTIONS = ["build", "test", "customize", "deploy"] as const;
 type AgentSection = (typeof AGENT_SECTIONS)[number];
 
 const NAV_ITEMS: {
@@ -40,6 +41,7 @@ const NAV_ITEMS: {
   icon: typeof Sparkles;
 }[] = [
   { id: "build", label: "Build", icon: Bot },
+  { id: "test", label: "Test", icon: MessageCircle },
   { id: "customize", label: "Customize", icon: Sparkles },
   { id: "deploy", label: "Deploy", icon: Code },
 ];
@@ -179,6 +181,7 @@ export function WidgetCustomizer({
   const router = useRouter();
   const activeSection = resolveInitialSection(initialSubtab);
   const [showMobilePreview, setShowMobilePreview] = useState(false);
+  const [previewEvidence, setPreviewEvidence] = useState<WidgetPreviewEvidence | null>(null);
   const [copied, setCopied] = useState(false);
   const [domainInput, setDomainInput] = useState("");
   const [configOverrides, setConfigOverrides] = useState<Partial<WidgetCustomizerConfig>>({});
@@ -664,6 +667,13 @@ export function WidgetCustomizer({
                 </fieldset>
               </TabsContent>
 
+              <TabsContent value="test" keepMounted={false}>
+                <WidgetTestPanel
+                  escalationKeywords={config.escalationKeywords}
+                  evidence={previewEvidence}
+                />
+              </TabsContent>
+
               <TabsContent value="customize" keepMounted={false} className="space-y-8">
                 <fieldset disabled={!canManage} className="min-w-0 space-y-8 border-0 p-0">
                   <legend className="sr-only">Widget appearance settings</legend>
@@ -712,7 +722,11 @@ export function WidgetCustomizer({
               : "hidden lg:flex lg:h-full lg:w-[380px] xl:w-[420px]",
           )}
         >
-          <WidgetPreviewPanel liveConfig={liveConfig} />
+          <WidgetPreviewPanel
+            liveConfig={liveConfig}
+            testMode={activeSection === "test"}
+            onEvidenceChange={setPreviewEvidence}
+          />
         </div>
       </div>
     </div>

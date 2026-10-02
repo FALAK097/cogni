@@ -4,7 +4,14 @@
 
 import { closeLeadForm } from "./widget/lead-capture.js";
 import { state } from "./widget/state.js";
-import { destroyWidget, init, toggleChat, getScriptInfo, updateAppearance } from "./widget/ui.js";
+import {
+  destroyWidget,
+  init,
+  resetChat,
+  toggleChat,
+  getScriptInfo,
+  updateAppearance,
+} from "./widget/ui.js";
 
 const events = new EventTarget();
 
@@ -35,6 +42,12 @@ function toggle() {
   emit(wasOpen ? "close" : "open");
 }
 
+async function resetPreview() {
+  if (!state.preview || !state.isInitialized) return false;
+  await resetChat();
+  return true;
+}
+
 (function autoInit() {
   const { publicKey } = getScriptInfo();
   if (publicKey) {
@@ -55,6 +68,7 @@ window.Widget = {
   toggle,
   open: show,
   close: hide,
+  resetPreview,
   on: (name, listener) => events.addEventListener(name, listener),
   off: (name, listener) => events.removeEventListener(name, listener),
   identify: async (customer) => {
