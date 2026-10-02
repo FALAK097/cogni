@@ -22,7 +22,7 @@ export function AgentNavigation() {
             href={href}
             aria-current={pathname === href ? "page" : false}
             className={cn(
-              "inline-flex min-h-9 items-center gap-2 rounded-md px-3 text-sm transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+              "inline-flex min-h-11 items-center gap-2 rounded-md px-3 text-sm transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring lg:min-h-9",
               pathname === href
                 ? "bg-secondary font-medium text-secondary-foreground"
                 : "text-muted-foreground hover:bg-muted hover:text-foreground",

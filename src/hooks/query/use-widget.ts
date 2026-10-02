@@ -24,7 +24,14 @@ export interface IpData {
   timezone?: string;
 }
 
-export type ConversationFilter = "all" | "unread" | "unassigned" | "mine" | "open" | "closed";
+export type ConversationFilter =
+  | "all"
+  | "unread"
+  | "unassigned"
+  | "mine"
+  | "open"
+  | "closed"
+  | "snoozed";
 
 export interface WidgetSessionSummary {
   id: string;
@@ -141,6 +148,8 @@ export interface WidgetSessionDetail {
   conversationChannel?: string;
   conversationStartedAt?: string;
   conversationSubject?: string;
+  snoozedUntil?: string | null;
+  workspaceTimezone?: string;
   assigneeName?: string | null;
   assigneeId?: string | null;
   agentName?: string;
@@ -354,6 +363,7 @@ export interface ConversationSummary {
   city: string | null;
   channel: string;
   subject: string;
+  snoozedUntil: string | null;
 }
 
 export type ConversationDetail = WidgetSessionDetail;
@@ -366,8 +376,10 @@ export interface ConversationsResponse {
     mine: number;
     open: number;
     closed: number;
+    snoozed: number;
   };
   currentMembershipId: string;
+  workspaceTimezone: string;
   pagination: {
     limit: number;
     hasMore: boolean;
@@ -519,6 +531,34 @@ export function useSetConversationStatus() {
         },
       );
       return requireData(data, error, "Failed to update conversation status");
+    },
+    onSuccess: (_data, variables) =>
+      invalidateConversationQueries(queryClient, variables.conversationId),
+  });
+}
+
+export function useSetConversationSnooze() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      conversationId,
+      snoozedUntil,
+    }: {
+      conversationId: string;
+      snoozedUntil: string | null;
+    }) => {
+      const { data, error } = await api.PATCH<{ ok: boolean; snoozedUntil: string | null }>(
+        "/api/conversations/{conversation_id}",
+        {
+          params: { path: { conversation_id: conversationId } },
+          body: {
+            action: snoozedUntil ? "snooze" : "unsnooze",
+            ...(snoozedUntil ? { snoozedUntil } : {}),
+          },
+        },
+      );
+      return requireData(data, error, "Failed to update snooze");
     },
     onSuccess: (_data, variables) =>
       invalidateConversationQueries(queryClient, variables.conversationId),

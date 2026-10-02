@@ -112,6 +112,7 @@ export async function appendConversationMessage({
         ? sql`CASE WHEN ${duplicate} THEN ${conversation.messages} ELSE ${appendedMessages} END`
         : appendedMessages,
       updatedAt: message.createdAt,
+      ...(message.authorType === "VISITOR" ? { snoozedUntil: null } : {}),
       ...(updateLastMessageAt ? { lastMessageAt: message.createdAt } : {}),
     })
     .where(and(...conditions))
@@ -440,7 +441,11 @@ export async function setConversationStatus({
       : sql<string>`case when ${conversation.assignedMemberId} is null then 'OPEN' else 'ASSIGNED' end`;
   const [updated] = await db
     .update(conversation)
-    .set({ status, updatedAt: new Date().toISOString() })
+    .set({
+      status,
+      snoozedUntil: null,
+      updatedAt: new Date().toISOString(),
+    })
     .where(and(eq(conversation.id, conversationId), eq(conversation.workspaceId, workspaceId)))
     .returning({
       id: conversation.id,

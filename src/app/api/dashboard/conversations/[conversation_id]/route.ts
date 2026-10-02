@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { eq, and, inArray } from "drizzle-orm";
+import { z } from "zod";
+import { eq, and, inArray, ne } from "drizzle-orm";
 
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
 import {
@@ -162,6 +163,8 @@ export async function GET(_request: Request, context: RouteContext) {
     conversationChannel: conversation.channel,
     conversationStartedAt: new Date(conversation.createdAt).toISOString(),
     conversationSubject: conversation.subject,
+    snoozedUntil: conversation.snoozedUntil,
+    workspaceTimezone: workspace.timezone,
     assigneeName: conversation.assignedMember?.user.name ?? null,
     assigneeId: conversation.assignedMemberId,
     agentName,
@@ -203,13 +206,20 @@ export async function PATCH(request: Request, context: RouteContext) {
   const { db, workspace, membership } = await requireDashboardContext();
   const { conversation_id: conversationId } = await context.params;
 
-  let body: { action?: string; message?: string; paused?: boolean; readThroughMessageId?: string };
+  let body: {
+    action?: string;
+    message?: string;
+    paused?: boolean;
+    readThroughMessageId?: string;
+    snoozedUntil?: string;
+  };
   try {
     body = (await request.json()) as {
       action?: string;
       message?: string;
       paused?: boolean;
       readThroughMessageId?: string;
+      snoozedUntil?: string;
     };
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
@@ -231,6 +241,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       .set({
         assignedMemberId: membership.id,
         status: "ASSIGNED",
+        snoozedUntil: null,
         ...(takeOver ? { aiPaused: true } : {}),
       })
       .where(
@@ -241,6 +252,45 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     await broadcastConversationChanged(conversation.id, "ASSIGNED", membership.id);
     return NextResponse.json({ ok: true });
+  }
+
+  if (body.action === "snooze" || body.action === "unsnooze") {
+    if (body.action === "snooze" && conversation.status === "CLOSED") {
+      return NextResponse.json(
+        { error: "Resolved conversations cannot be snoozed." },
+        { status: 409 },
+      );
+    }
+
+    let snoozedUntil: string | null = null;
+    if (body.action === "snooze") {
+      const parsedUntil = z.string().datetime({ offset: true }).safeParse(body.snoozedUntil);
+      const timestamp = parsedUntil.success ? Date.parse(parsedUntil.data) : Number.NaN;
+      const maxSnoozeAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
+      if (!Number.isFinite(timestamp) || timestamp <= Date.now() || timestamp > maxSnoozeAt) {
+        return NextResponse.json(
+          { error: "Choose a valid snooze time within the next 30 days." },
+          { status: 400 },
+        );
+      }
+      snoozedUntil = new Date(timestamp).toISOString();
+    }
+
+    const updated = await db
+      .update(conversationTable)
+      .set({ snoozedUntil, updatedAt: new Date().toISOString() })
+      .where(
+        and(
+          eq(conversationTable.id, conversation.id),
+          eq(conversationTable.workspaceId, workspace.id),
+          ne(conversationTable.status, "CLOSED"),
+        ),
+      )
+      .returning({ id: conversationTable.id });
+    if (updated.length === 0) {
+      return NextResponse.json({ error: "Conversation is resolved." }, { status: 409 });
+    }
+    return NextResponse.json({ ok: true, snoozedUntil });
   }
 
   if (body.action === "set_ai_paused") {

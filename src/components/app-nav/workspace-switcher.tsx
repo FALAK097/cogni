@@ -67,7 +67,7 @@ export function WorkspaceSwitcher({ isOpen }: WorkspaceSwitcherProps) {
             variant="ghost"
             data-testid="workspace-switcher-trigger"
             className={cn(
-              "w-full justify-between mx-0 h-10 font-normal hover:bg-muted/50",
+              "w-full justify-between mx-0 h-11 lg:h-10 font-normal hover:bg-muted/50",
               isOpen ? "px-2.5" : "justify-center px-0",
             )}
             title={!isOpen ? activeWorkspaceName : undefined}

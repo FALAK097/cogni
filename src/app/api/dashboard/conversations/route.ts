@@ -24,6 +24,7 @@ export async function GET(request: Request) {
     conversations: result.conversations.map(mapConversationToListItem),
     counts: result.counts,
     currentMembershipId: membership.id,
+    workspaceTimezone: workspace.timezone,
     pagination: result.pagination,
   });
 }

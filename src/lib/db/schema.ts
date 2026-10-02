@@ -186,6 +186,7 @@ export const conversation = pgTable(
     id: text().primaryKey().notNull(),
     subject: text().notNull(),
     status: text().default("OPEN").notNull(),
+    snoozedUntil: timestampString(),
     channel: text().default("WIDGET").notNull(),
     externalThreadId: text(),
     aiPaused: boolean().default(false).notNull(),
@@ -228,6 +229,7 @@ export const conversation = pgTable(
       table.status,
       table.lastMessageAt,
     ),
+    index("conversation_workspaceId_snoozedUntil_idx").on(table.workspaceId, table.snoozedUntil),
     index("conversation_workspaceId_lastMessageAt_id_idx").on(
       table.workspaceId,
       table.lastMessageAt,

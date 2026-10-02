@@ -35,6 +35,7 @@ const FILTER_TABS: Array<{
   { value: "unassigned", label: "Unassigned", countKey: "unassigned" },
   { value: "mine", label: "My inbox", countKey: "mine" },
   { value: "open", label: "All open", countKey: "open" },
+  { value: "snoozed", label: "Snoozed", countKey: "snoozed" },
   { value: "closed", label: "Closed", countKey: "closed" },
 ];
 
@@ -44,6 +45,7 @@ const EMPTY_COUNTS = {
   mine: 0,
   open: 0,
   closed: 0,
+  snoozed: 0,
 };
 
 export function WidgetConversations({
@@ -104,6 +106,7 @@ export function WidgetConversations({
               {FILTER_TABS.map((tab) => {
                 const active = filter === tab.value;
                 const count = counts[tab.countKey];
+                const countKind = tab.value === "snoozed" ? "snoozed" : "unread";
 
                 return (
                   <TabsTrigger
@@ -111,7 +114,7 @@ export function WidgetConversations({
                     value={tab.value}
                     aria-label={
                       count > 0
-                        ? `${tab.label}, ${count} unread conversation${count === 1 ? "" : "s"}`
+                        ? `${tab.label}, ${count} ${countKind} conversation${count === 1 ? "" : "s"}`
                         : tab.label
                     }
                     className={cn(
@@ -124,7 +127,7 @@ export function WidgetConversations({
                     {tab.label}
                     {count > 0 ? (
                       <span
-                        title={`${count} unread conversation${count === 1 ? "" : "s"}`}
+                        title={`${count} ${countKind} conversation${count === 1 ? "" : "s"}`}
                         className={cn(
                           "inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-medium",
                           active

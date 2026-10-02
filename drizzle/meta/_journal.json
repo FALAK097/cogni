@@ -29,6 +29,13 @@
       "when": 1790770349361,
       "tag": "0003_inbox_cursor_pagination",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790932344451,
+      "tag": "0004_conversation_snoozing",
+      "breakpoints": true
     }
   ]
 }

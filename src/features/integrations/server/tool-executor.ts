@@ -137,7 +137,7 @@ async function executeInternalTool({
     const status = requiredString(input, "status");
     await db
       .update(conversation)
-      .set({ status, updatedAt: new Date().toISOString() })
+      .set({ status, snoozedUntil: null, updatedAt: new Date().toISOString() })
       .where(and(eq(conversation.id, conversationId), eq(conversation.workspaceId, workspaceId)));
     return { conversationId, status };
   }

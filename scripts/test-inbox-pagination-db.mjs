@@ -23,6 +23,7 @@ await build({
   stdin: {
     contents: `
       export { getInboxPage, mapConversationToListItem } from "@/features/conversations/server/queries";
+      export { appendConversationMessage } from "@/features/conversations/server/conversation-service";
       export { decodeInboxCursor } from "@/features/conversations/inbox-pagination";
       export { getDb } from "@/lib/db/client";
     `,
@@ -52,9 +53,13 @@ await build({
   ],
 });
 
-const { decodeInboxCursor, getDb, getInboxPage, mapConversationToListItem } = await import(
-  `${pathToFileURL(outputFile).href}?build=${randomUUID()}`
-);
+const {
+  appendConversationMessage,
+  decodeInboxCursor,
+  getDb,
+  getInboxPage,
+  mapConversationToListItem,
+} = await import(`${pathToFileURL(outputFile).href}?build=${randomUUID()}`);
 const raw = postgres(databaseUrl, { max: 1 });
 const workspaceId = randomUUID();
 const otherWorkspaceId = randomUUID();
@@ -115,11 +120,12 @@ before(async () => {
     INSERT INTO "contact" ("id", "name", "updatedAt", "workspaceId")
     VALUES (${otherContactId}, 'Other visitor', ${now}, ${otherWorkspaceId})
   `;
+  const otherConversationId = "ffffffff-ffff-4fff-8fff-ffffffffffff";
   await raw`
     INSERT INTO "conversation" (
-      "id", "subject", "updatedAt", "lastMessageAt", "messages", "workspaceId", "contactId"
+      "id", "subject", "updatedAt", "lastMessageAt", "messages", "workspaceId", "contactId", "snoozedUntil"
     ) VALUES (
-      ${"ffffffff-ffff-4fff-8fff-ffffffffffff"}, 'Other workspace conversation', ${now}, ${now}, ${JSON.stringify([{ id: randomUUID(), body: "private", authorType: "VISITOR", createdAt: now }])}, ${otherWorkspaceId}, ${otherContactId}
+      ${otherConversationId}, 'Other workspace conversation', ${now}, ${now}, ${JSON.stringify([{ id: randomUUID(), body: "private", authorType: "VISITOR", createdAt: now }])}, ${otherWorkspaceId}, ${otherContactId}, ${new Date(Date.now() + 60 * 60 * 1000).toISOString()}
     )
   `;
 });
@@ -145,7 +151,14 @@ test("inbox cursors return complete, stable pages and correct unread view counts
   );
   assert.equal(firstPage.pagination.hasMore, true);
   assert.ok(firstPage.pagination.nextCursor);
-  assert.deepEqual(firstPage.counts, { all: 2, unassigned: 0, mine: 1, open: 1, closed: 1 });
+  assert.deepEqual(firstPage.counts, {
+    all: 2,
+    unassigned: 0,
+    mine: 1,
+    open: 1,
+    closed: 1,
+    snoozed: 0,
+  });
   assert.deepEqual(
     firstItems.map((item) => item.unreadCount),
     [1, 0],
@@ -270,4 +283,54 @@ test("channel and assignee facets are combined and remain workspace scoped", asy
     combined.conversations.map((conversation) => conversation.id),
     [conversationIds[1]],
   );
+});
+
+test("snoozed conversations stay hidden until due and a visitor reply returns them", async () => {
+  const [foreignSnoozed, foreignAll, localSnoozed] = await Promise.all([
+    getInboxPage(otherWorkspaceId, {
+      membershipId: memberId,
+      filter: "snoozed",
+      limit: 20,
+      cursor: null,
+    }),
+    getInboxPage(otherWorkspaceId, { membershipId: memberId, limit: 20, cursor: null }),
+    getInboxPage(workspaceId, {
+      membershipId: memberId,
+      filter: "snoozed",
+      limit: 20,
+      cursor: null,
+    }),
+  ]);
+
+  assert.equal(foreignSnoozed.conversations.length, 1);
+  assert.equal(foreignSnoozed.counts.snoozed, 1);
+  assert.equal(foreignAll.conversations.length, 0);
+  assert.equal(localSnoozed.conversations.length, 0);
+
+  const snoozedConversation = foreignSnoozed.conversations[0];
+  assert.ok(snoozedConversation);
+  const visitorReplyAt = new Date().toISOString();
+  await appendConversationMessage({
+    db: getDb(),
+    workspaceId: otherWorkspaceId,
+    conversationId: snoozedConversation.id,
+    message: {
+      id: randomUUID(),
+      body: "A new visitor reply should bring this conversation back.",
+      authorType: "VISITOR",
+      createdAt: visitorReplyAt,
+    },
+  });
+
+  const [returnedToSnoozed, returnedToAll] = await Promise.all([
+    getInboxPage(otherWorkspaceId, {
+      membershipId: memberId,
+      filter: "snoozed",
+      limit: 20,
+      cursor: null,
+    }),
+    getInboxPage(otherWorkspaceId, { membershipId: memberId, limit: 20, cursor: null }),
+  ]);
+  assert.equal(returnedToSnoozed.conversations.length, 0);
+  assert.equal(returnedToAll.conversations.length, 1);
 });

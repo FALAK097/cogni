@@ -9,7 +9,7 @@ export type InboxCursor = z.infer<typeof inboxCursorSchema>;
 
 export type InboxListParams = {
   search?: string;
-  filter: "all" | "unread" | "unassigned" | "mine" | "open" | "closed";
+  filter: "all" | "unread" | "unassigned" | "mine" | "open" | "closed" | "snoozed";
   channel?: InboxChannel;
   assignee?: string | "unassigned";
   limit: number;
@@ -57,7 +57,15 @@ export function parseInboxListParams(
   };
 }
 
-const inboxListFilterSchema = z.enum(["all", "unread", "unassigned", "mine", "open", "closed"]);
+const inboxListFilterSchema = z.enum([
+  "all",
+  "unread",
+  "unassigned",
+  "mine",
+  "open",
+  "closed",
+  "snoozed",
+]);
 const inboxChannelSchema = z.enum(["WIDGET", "DISCORD", "GCHAT", "SLACK", "TEAMS", "WHATSAPP"]);
 
 export function encodeInboxCursor(cursor: InboxCursor) {

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, isNull, like, lt, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, like, lt, lte, ne, or, sql } from "drizzle-orm";
 
 import { getDb } from "@/lib/db/client";
 import {
@@ -24,7 +24,11 @@ import { encodeInboxCursor, type InboxChannel, type InboxCursor } from "../inbox
 import { broadcastConversationEvent } from "@/lib/realtime/broadcast";
 
 function getInboxConversationBaseCond(c: typeof conversationTable) {
-  return like(c.messages, '%"authorType":"VISITOR"%');
+  return sql`EXISTS (
+    SELECT 1
+    FROM jsonb_array_elements(COALESCE(NULLIF(${c.messages}, '')::jsonb, '[]'::jsonb)) AS message(item)
+    WHERE message.item ->> 'authorType' = 'VISITOR'
+  )`;
 }
 
 function conversationFilterCond(
@@ -33,22 +37,25 @@ function conversationFilterCond(
   membershipId: string | undefined,
 ) {
   const base = getInboxConversationBaseCond(c);
+  const notSnoozed = or(isNull(c.snoozedUntil), lte(c.snoozedUntil, sql`CURRENT_TIMESTAMP`));
 
   switch (filter) {
     case "unread":
-      return and(base, hasUnreadVisitorMessagesSql(c));
+      return and(base, notSnoozed, hasUnreadVisitorMessagesSql(c));
     case "unassigned":
-      return and(base, isNull(c.assignedMemberId), ne(c.status, "CLOSED"));
+      return and(base, notSnoozed, isNull(c.assignedMemberId), ne(c.status, "CLOSED"));
     case "mine":
       return membershipId
-        ? and(base, eq(c.assignedMemberId, membershipId), ne(c.status, "CLOSED"))
+        ? and(base, notSnoozed, eq(c.assignedMemberId, membershipId), ne(c.status, "CLOSED"))
         : sql`1 = 0`;
     case "open":
-      return and(base, ne(c.status, "CLOSED"));
+      return and(base, notSnoozed, ne(c.status, "CLOSED"));
     case "closed":
-      return and(base, eq(c.status, "CLOSED"));
+      return and(base, notSnoozed, eq(c.status, "CLOSED"));
+    case "snoozed":
+      return and(base, gt(c.snoozedUntil, sql`CURRENT_TIMESTAMP`), ne(c.status, "CLOSED"));
     default:
-      return base;
+      return and(base, notSnoozed);
   }
 }
 
@@ -260,6 +267,10 @@ export async function getInboxPage(
 ) {
   const db = getDb();
   const unread = hasUnreadVisitorMessagesSql(conversationTable);
+  const notSnoozed = or(
+    isNull(conversationTable.snoozedUntil),
+    lte(conversationTable.snoozedUntil, sql`CURRENT_TIMESTAMP`),
+  );
   const baseWhere = and(
     eq(conversationTable.workspaceId, workspaceId),
     getInboxConversationBaseCond(conversationTable),
@@ -277,24 +288,31 @@ export async function getInboxPage(
   const [countRows, fetchedConversations] = await Promise.all([
     db
       .select({
-        all: sql<number>`count(*) filter (where ${unread})`.mapWith(Number),
+        all: sql<number>`count(*) filter (where ${unread} and ${notSnoozed})`.mapWith(Number),
         unassigned: sql<number>`count(*) filter (
           where ${unread}
+            and ${notSnoozed}
             and ${conversationTable.assignedMemberId} is null
             and ${conversationTable.status} <> 'CLOSED'
         )`.mapWith(Number),
         mine: options.membershipId
           ? sql<number>`count(*) filter (
               where ${unread}
+                and ${notSnoozed}
                 and ${conversationTable.assignedMemberId} = ${options.membershipId}
                 and ${conversationTable.status} <> 'CLOSED'
             )`.mapWith(Number)
           : sql<number>`0`.mapWith(Number),
         open: sql<number>`count(*) filter (
-          where ${unread} and ${conversationTable.status} <> 'CLOSED'
+          where ${unread} and ${notSnoozed} and ${conversationTable.status} <> 'CLOSED'
         )`.mapWith(Number),
         closed: sql<number>`count(*) filter (
-          where ${unread} and ${conversationTable.status} = 'CLOSED'
+          where ${unread} and ${notSnoozed} and ${conversationTable.status} = 'CLOSED'
+        )`.mapWith(Number),
+        snoozed: sql<number>`count(*) filter (
+          where ${getInboxConversationBaseCond(conversationTable)}
+            and ${conversationTable.snoozedUntil} > CURRENT_TIMESTAMP
+            and ${conversationTable.status} <> 'CLOSED'
         )`.mapWith(Number),
       })
       .from(conversationTable)
@@ -343,7 +361,14 @@ export async function getInboxPage(
           id: lastConversation.id,
         })
       : null;
-  const countRow = countRows[0] ?? { all: 0, unassigned: 0, mine: 0, open: 0, closed: 0 };
+  const countRow = countRows[0] ?? {
+    all: 0,
+    unassigned: 0,
+    mine: 0,
+    open: 0,
+    closed: 0,
+    snoozed: 0,
+  };
 
   return {
     counts: countRow,
@@ -399,6 +424,7 @@ export function mapConversationToListItem(conversation: ParsedConversation) {
 
   return {
     id: conversation.id,
+    snoozedUntil: conversation.snoozedUntil,
     visitorSessionId: conversation.visitorSessionId,
     visitorId: conversation.visitorSession?.visitorId ?? conversation.contactId,
     contactName: conversation.contact.name,

@@ -1,12 +1,14 @@
 "use client";
 
 import { format, isToday, isYesterday } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   Bot,
   CheckCircle2,
+  Clock,
   Filter,
   Loader2,
   MessageSquare,
@@ -44,6 +46,7 @@ import {
   getConversationChannelLabel,
 } from "@/features/conversations/channel-label";
 import type { InboxChannel } from "@/features/conversations/inbox-pagination";
+import { normalizeTimezone } from "@/features/conversations/snooze-schedule";
 import { cn } from "@/lib/utils";
 
 import { scrollPaneClassName } from "./conversation-layout";
@@ -212,7 +215,9 @@ export function ConversationsList({
               ? "No conversations assigned to you"
               : filter === "open"
                 ? "No open conversations"
-                : "No closed conversations";
+                : filter === "snoozed"
+                  ? "Nothing snoozed"
+                  : "No closed conversations";
 
   return (
     <div className="flex h-full flex-col">
@@ -456,7 +461,9 @@ export function ConversationsList({
                     ? "New website chats will appear here. Set up your agent to start receiving conversations."
                     : filter === "unread"
                       ? "Unread visitor messages will show up here."
-                      : "Try another inbox view to find a conversation."}
+                      : filter === "snoozed"
+                        ? "Conversations you snooze will return to the inbox when it’s time."
+                        : "Try another inbox view to find a conversation."}
               </p>
             </div>
             {searchTerm || hasFacetFilters ? (
@@ -534,6 +541,18 @@ export function ConversationsList({
                       <span className="inline-flex rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
                         {getConversationChannelLabel(conversation.channel)}
                       </span>
+                      {conversation.snoozedUntil &&
+                      Date.parse(conversation.snoozedUntil) > Date.now() ? (
+                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                          <Clock className="size-3.5 shrink-0" aria-hidden="true" />
+                          Until{" "}
+                          {formatInTimeZone(
+                            conversation.snoozedUntil,
+                            normalizeTimezone(conversationsData?.workspaceTimezone),
+                            "MMM d, h:mm a",
+                          )}
+                        </span>
+                      ) : null}
                       {conversation.status === "CLOSED" ? (
                         <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
                           <CheckCircle2 className="size-3 shrink-0" aria-hidden="true" />

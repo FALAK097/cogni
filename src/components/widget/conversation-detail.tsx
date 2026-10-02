@@ -1,6 +1,7 @@
 "use client";
 
 import { format, formatDistanceToNow, isToday, isYesterday } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { useMutation } from "@tanstack/react-query";
@@ -48,6 +49,10 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -58,6 +63,7 @@ import {
   useConversation,
   useDeleteConversation,
   useSetConversationAiPaused,
+  useSetConversationSnooze,
   useSetConversationStatus,
   useSendConversationMessage,
   useTakeOverConversation,
@@ -72,6 +78,11 @@ import {
   type ConversationComposerDraftChange,
 } from "@/features/conversations/draft-state";
 import { getConversationChannelLabel } from "@/features/conversations/channel-label";
+import {
+  getSnoozeUntil,
+  normalizeTimezone,
+  type SnoozePreset,
+} from "@/features/conversations/snooze-schedule";
 
 import {
   scrollPaneClassName,
@@ -252,6 +263,7 @@ export function ConversationDetail({
   const deleteConversationMutation = useDeleteConversation();
   const takeOverMutation = useTakeOverConversation();
   const aiPausedMutation = useSetConversationAiPaused();
+  const snoozeMutation = useSetConversationSnooze();
   const statusMutation = useSetConversationStatus();
   const sendMessageMutation = useSendConversationMessage();
   const copilotMutation = useMutation({
@@ -266,6 +278,7 @@ export function ConversationDetail({
   });
 
   const messages = session?.messages;
+  const isSnoozed = Boolean(session?.snoozedUntil && Date.parse(session.snoozedUntil) > Date.now());
 
   useEffect(() => {
     const container = scrollRef.current;
@@ -367,6 +380,41 @@ export function ConversationDetail({
             title: isClosed ? "Could not reopen conversation" : "Could not resolve conversation",
             variant: "destructive",
           }),
+      },
+    );
+  };
+
+  const handleSnooze = (preset: SnoozePreset) => {
+    if (!session) return;
+    const snoozedUntil = getSnoozeUntil(preset, session.workspaceTimezone ?? "UTC");
+    snoozeMutation.mutate(
+      { conversationId, snoozedUntil },
+      {
+        onSuccess: () => {
+          toast({
+            title: "Conversation snoozed",
+            description: `It will return ${formatInTimeZone(
+              snoozedUntil,
+              normalizeTimezone(session.workspaceTimezone),
+              "MMM d, h:mm a zzz",
+            )}.`,
+          });
+          onBack();
+        },
+        onError: () => toast({ title: "Could not snooze conversation", variant: "destructive" }),
+      },
+    );
+  };
+
+  const handleUnsnooze = () => {
+    snoozeMutation.mutate(
+      { conversationId, snoozedUntil: null },
+      {
+        onSuccess: () => {
+          toast({ title: "Conversation returned to the inbox" });
+          onBack();
+        },
+        onError: () => toast({ title: "Could not unsnooze conversation", variant: "destructive" }),
       },
     );
   };
@@ -657,6 +705,61 @@ export function ConversationDetail({
                 }
               />
               <DropdownMenuContent align="end">
+                {isSnoozed ? (
+                  <>
+                    {session.snoozedUntil ? (
+                      <DropdownMenuLabel>
+                        Snoozed until{" "}
+                        {formatInTimeZone(
+                          session.snoozedUntil,
+                          normalizeTimezone(session.workspaceTimezone),
+                          "MMM d, h:mm a zzz",
+                        )}
+                      </DropdownMenuLabel>
+                    ) : null}
+                    <DropdownMenuItem onClick={handleUnsnooze} disabled={snoozeMutation.isPending}>
+                      <Clock className="mr-2 size-4" aria-hidden="true" />
+                      Return to inbox
+                    </DropdownMenuItem>
+                  </>
+                ) : null}
+                {session.conversationStatus !== "CLOSED" ? (
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger disabled={snoozeMutation.isPending}>
+                      <Clock className="size-4" aria-hidden="true" />
+                      {isSnoozed ? "Change snooze" : "Snooze"}
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent>
+                      <DropdownMenuLabel>
+                        Snooze · {normalizeTimezone(session.workspaceTimezone)}
+                      </DropdownMenuLabel>
+                      <DropdownMenuItem
+                        disabled={snoozeMutation.isPending}
+                        onClick={() => handleSnooze("one-hour")}
+                      >
+                        For 1 hour
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        disabled={snoozeMutation.isPending}
+                        onClick={() => handleSnooze("four-hours")}
+                      >
+                        For 4 hours
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        disabled={snoozeMutation.isPending}
+                        onClick={() => handleSnooze("tomorrow-morning")}
+                      >
+                        Tomorrow at 9:00 AM
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        disabled={snoozeMutation.isPending}
+                        onClick={() => handleSnooze("next-monday")}
+                      >
+                        Next Monday at 9:00 AM
+                      </DropdownMenuItem>
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                ) : null}
                 <DropdownMenuItem
                   onClick={handleToggleStatus}
                   disabled={statusMutation.isPending}

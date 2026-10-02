@@ -79,7 +79,7 @@ export function Menu({ isOpen }: MenuProps) {
                     aria-current={isCurrentActive ? "page" : false}
                     className={cn(
                       buttonVariants({ variant: isCurrentActive ? "secondary" : "ghost" }),
-                      "w-full h-10 mb-1 relative overflow-hidden group cursor-pointer flex items-center transition-colors duration-150",
+                      "w-full h-11 lg:h-10 mb-1 relative overflow-hidden group cursor-pointer flex items-center transition-colors duration-150",
                       isOpen === false ? "justify-center px-0" : "justify-start px-4",
                       isCurrentActive && "bg-sidebar-accent text-sidebar-accent-foreground",
                     )}

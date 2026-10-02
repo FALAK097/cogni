@@ -46,7 +46,7 @@ function SidebarContent({ expanded }: { expanded: boolean }) {
           aria-current={pathname.startsWith("/integrations") ? "page" : false}
           title={expanded ? "Workspace connections" : "Settings"}
           className={cn(
-            "flex min-h-10 items-center gap-4 rounded-md px-4 text-sm transition-colors duration-150 hover:bg-sidebar-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+            "flex min-h-11 lg:min-h-10 items-center gap-4 rounded-md px-4 text-sm transition-colors duration-150 hover:bg-sidebar-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
             !expanded && "justify-center px-0",
             pathname.startsWith("/integrations") && "bg-sidebar-accent font-medium",
           )}
