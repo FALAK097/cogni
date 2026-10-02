@@ -225,7 +225,7 @@ function AgentSetupChecklist({ canManage }: { canManage: boolean }) {
         value={completedCount}
         className="mt-4 block h-1.5 w-full overflow-hidden rounded-full [appearance:none] [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-primary [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-bar]:bg-muted [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-primary"
       />
-      <ol className="mt-4 grid gap-3 lg:grid-cols-3">
+      <ol className="mt-4 grid gap-3 md:grid-cols-3">
         {steps.map((step, index) => (
           <li
             key={step.title}
