@@ -55,13 +55,17 @@ async function sendPreviewMessage(message) {
   }
 
   const text = message.trim();
-  const sendButton = state.windowEl?.querySelector(".oc-send-btn");
-  if (!text || text.length > 1000 || sendButton?.disabled) return false;
+  if (!text || text.length > 1000 || state.previewMessagePending) return false;
 
-  show();
-  state.input.value = text;
-  await sendMessage();
-  return true;
+  state.previewMessagePending = true;
+  try {
+    show();
+    state.input.value = text;
+    await sendMessage();
+    return true;
+  } finally {
+    state.previewMessagePending = false;
+  }
 }
 
 (function autoInit() {
