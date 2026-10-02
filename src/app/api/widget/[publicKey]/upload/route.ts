@@ -22,6 +22,7 @@ import { getDb } from "@/lib/db/client";
 import { attachment as attachmentTable } from "@/lib/db/schema";
 import { checkRateLimits, getTrustedClientIp } from "@/lib/rate-limit/shared";
 import { deleteObject, isAllowedUpload, saveObject, uploadPublicPath } from "@/lib/storage/index";
+import { isOversizedUploadRequest } from "@/features/widget/upload-limits";
 
 const metadataSchema = z.object({
   hostname: z.string().trim().min(1).max(253),
@@ -46,37 +47,6 @@ export async function POST(
   { params }: { params: Promise<{ publicKey: string }> },
 ) {
   const { publicKey } = await params;
-  const formData = await request.formData();
-  const file = formData.get("file");
-  const sessionId = formData.get("sessionId");
-  const visitorId = formData.get("visitorId");
-  const interactionId = formData.get("interactionId");
-  const rawMetadata = formData.get("metadata");
-
-  if (
-    !(file instanceof File) ||
-    typeof sessionId !== "string" ||
-    typeof interactionId !== "string" ||
-    typeof rawMetadata !== "string"
-  ) {
-    return Response.json({ error: "Invalid upload request." }, { status: 400 });
-  }
-
-  let metadataJson: unknown;
-  try {
-    metadataJson = JSON.parse(rawMetadata);
-  } catch {
-    return Response.json({ error: "Invalid upload metadata." }, { status: 400 });
-  }
-  const metadata = metadataSchema.safeParse(metadataJson);
-  if (
-    !metadata.success ||
-    !z.string().uuid().safeParse(sessionId).success ||
-    !z.string().uuid().safeParse(interactionId).success
-  ) {
-    return Response.json({ error: "Invalid upload metadata." }, { status: 400 });
-  }
-
   const db = getDb();
   const access = await assertPublicWidgetAccess(db, publicKey, request);
   if ("error" in access) return access.error;
@@ -109,6 +79,41 @@ export async function POST(
         headers: { "Retry-After": String(Math.ceil(rateLimit.retryAfterMs / 1000)) },
       },
     );
+  }
+
+  if (isOversizedUploadRequest(request.headers.get("content-length"))) {
+    return Response.json({ error: "This upload exceeds the allowed size." }, { status: 413 });
+  }
+
+  const formData = await request.formData();
+  const file = formData.get("file");
+  const sessionId = formData.get("sessionId");
+  const visitorId = formData.get("visitorId");
+  const interactionId = formData.get("interactionId");
+  const rawMetadata = formData.get("metadata");
+
+  if (
+    !(file instanceof File) ||
+    typeof sessionId !== "string" ||
+    typeof interactionId !== "string" ||
+    typeof rawMetadata !== "string"
+  ) {
+    return Response.json({ error: "Invalid upload request." }, { status: 400 });
+  }
+
+  let metadataJson: unknown;
+  try {
+    metadataJson = JSON.parse(rawMetadata);
+  } catch {
+    return Response.json({ error: "Invalid upload metadata." }, { status: 400 });
+  }
+  const metadata = metadataSchema.safeParse(metadataJson);
+  if (
+    !metadata.success ||
+    !z.string().uuid().safeParse(sessionId).success ||
+    !z.string().uuid().safeParse(interactionId).success
+  ) {
+    return Response.json({ error: "Invalid upload metadata." }, { status: 400 });
   }
 
   const authorizedSession = token ? await getAuthorizedVisitorSession(db, publicKey, token) : null;

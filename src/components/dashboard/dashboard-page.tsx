@@ -29,6 +29,8 @@ import {
   aggregateWeeklySatisfaction,
 } from "@/features/analytics/aggregation";
 import { InsightsTrendChart } from "@/components/dashboard/insights-trend-chart";
+import { EvilPieChart } from "@/components/evilcharts/charts/recharts-pie-chart";
+import type { ChartConfig } from "@/components/evilcharts/ui/recharts-chart";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -561,75 +563,49 @@ function DonutChart({
   centerValue?: string;
   ariaLabel: string;
 }) {
-  const size = 180;
-  const chart = useMemo(() => {
-    const total = data.reduce((sum, item) => sum + item.value, 0);
-    if (total === 0) return null;
-    const radius = size / 2 - 14;
-    const circumference = 2 * Math.PI * radius;
-    let offset = 0;
-    const segments = data.map((item) => {
-      const length = (item.value / total) * circumference;
-      const segment = {
-        ...item,
-        dashArray: `${length} ${circumference - length}`,
-        dashOffset: -offset,
-      };
-      offset += length;
-      return segment;
-    });
-    return { total, radius, segments };
-  }, [data]);
+  const total = data.reduce((sum, item) => sum + item.value, 0);
+  const chartData = data.map((item, index) => ({ ...item, key: `segment-${index}` }));
+  const config = Object.fromEntries(
+    chartData.map((item) => [
+      item.key,
+      { label: item.label, colors: { light: [item.color], dark: [item.color] } },
+    ]),
+  ) satisfies ChartConfig;
 
-  if (!chart) {
+  if (total === 0) {
     return (
-      <div
-        className="flex size-[180px] items-center justify-center text-sm text-muted-foreground"
-        aria-label={`${ariaLabel}: no data`}
-      >
+      <div className="flex size-[180px] items-center justify-center text-sm text-muted-foreground">
         No data
       </div>
     );
   }
 
   return (
-    <div className="relative size-[180px] shrink-0">
-      <svg
-        width={size}
-        height={size}
-        viewBox={`0 0 ${size} ${size}`}
-        className="size-full -rotate-90"
-        aria-label={ariaLabel}
+    <figure className="relative size-[180px] shrink-0" aria-label={ariaLabel}>
+      <EvilPieChart
+        data={chartData}
+        dataKey="value"
+        nameKey="key"
+        config={config}
+        className="size-full flex-none"
+        chartProps={{ margin: { top: 0, right: 0, bottom: 0, left: 0 } }}
       >
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={chart.radius}
-          fill="none"
-          className="stroke-muted/50"
-          strokeWidth={18}
+        <EvilPieChart.Tooltip roundness="md" />
+        <EvilPieChart.Pie
+          innerRadius={57}
+          outerRadius={82}
+          paddingAngle={2}
+          cornerRadius={2}
+          pieProps={{ isAnimationActive: false }}
         />
-        {chart.segments.map((segment) => (
-          <circle
-            key={segment.label}
-            cx={size / 2}
-            cy={size / 2}
-            r={chart.radius}
-            fill="none"
-            stroke={segment.color}
-            strokeWidth={18}
-            strokeDasharray={segment.dashArray}
-            strokeDashoffset={segment.dashOffset}
-          />
-        ))}
-      </svg>
+      </EvilPieChart>
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
         <span className="text-xs text-muted-foreground">Total</span>
         <span className="text-lg font-semibold tracking-tight">
-          {centerValue ?? chart.total.toLocaleString()}
+          {centerValue ?? total.toLocaleString()}
         </span>
       </div>
-    </div>
+    </figure>
   );
 }
 
@@ -1116,7 +1092,7 @@ export function DashboardPage({ canManage = false }: { canManage?: boolean }) {
       segments: data.map((item, i) => ({
         label: item.label,
         value: item.count,
-        color: CHART_COLORS[i % CHART_COLORS.length],
+        color: CHART_COLORS[i % CHART_COLORS.length]!,
       })),
       legend: data.map((item, i) => ({
         label: item.label,

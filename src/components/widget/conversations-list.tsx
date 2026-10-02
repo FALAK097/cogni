@@ -163,7 +163,6 @@ export function ConversationsList({
     setCursorsByPage((current) => ({ ...current, [page + 1]: nextCursor }));
     setPage((current) => current + 1);
   };
-  const firstConversationId = conversations[0]?.id ?? null;
   const searchTerm = debouncedSearch.trim();
   const emptyTitle = searchTerm
     ? `No matches for “${searchTerm}”`
@@ -178,14 +177,6 @@ export function ConversationsList({
             : filter === "open"
               ? "No open conversations"
               : "No closed conversations";
-
-  useEffect(() => {
-    if (selectedConversationId || !firstConversationId) return;
-    const isDesktop = window.matchMedia("(min-width: 1024px)").matches;
-    if (isDesktop) {
-      onSelectConversation(firstConversationId);
-    }
-  }, [firstConversationId, selectedConversationId, onSelectConversation]);
 
   return (
     <div className="flex h-full flex-col">
