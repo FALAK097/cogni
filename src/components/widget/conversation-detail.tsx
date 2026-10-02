@@ -16,6 +16,7 @@ import {
   Copy,
   Download,
   FileText,
+  Image,
   Loader2,
   MoreVertical,
   Pencil,
@@ -160,6 +161,12 @@ function getInitials(name: string) {
     return `${parts[0]?.[0] ?? ""}${parts[1]?.[0] ?? ""}`.toUpperCase();
   }
   return name.slice(0, 2).toUpperCase();
+}
+
+function formatFileSize(size: number) {
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function splitMessageSources(content: string) {
@@ -1930,6 +1937,47 @@ function SessionDetailsContent({
           </DetailRow>
         </CardContent>
       </Card>
+
+      {(session.attachments?.length ?? 0) > 0 ? (
+        <Card className={cn(detailCardClassName, "shrink-0")}>
+          <CardHeader className={detailCardHeaderClassName()}>
+            <CardTitle className="text-xs font-semibold">
+              Attachments{" "}
+              <span className="text-muted-foreground">({session.attachments?.length})</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className={cn("space-y-1 pb-3", detailCardContentClassName())}>
+            {session.attachments?.map((attachment) => (
+              <a
+                key={attachment.id}
+                href={attachment.url}
+                download={attachment.fileName}
+                className="group flex min-h-11 items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                aria-label={`Download ${attachment.fileName}, ${formatFileSize(attachment.size)}`}
+                title={attachment.fileName}
+              >
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                  {attachment.mimeType.startsWith("image/") ? (
+                    <Image className="size-4" aria-hidden="true" />
+                  ) : (
+                    <FileText className="size-4" aria-hidden="true" />
+                  )}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-xs font-medium text-foreground group-hover:text-primary">
+                    {attachment.fileName}
+                  </span>
+                  <span className="block text-xs text-muted-foreground">
+                    {formatFileSize(attachment.size)} ·{" "}
+                    {format(new Date(attachment.createdAt), "MMM d, p")}
+                  </span>
+                </span>
+                <Download className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+              </a>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
 
       {(session.previousConversations?.length ?? 0) > 0 ? (
         <Card className={cn(detailCardClassName, "shrink-0")}>

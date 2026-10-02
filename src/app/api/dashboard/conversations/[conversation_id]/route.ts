@@ -14,6 +14,7 @@ import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { canManageWorkspace } from "@/lib/auth/permissions";
 import { parseContactTags } from "@/features/contacts/server/contact-tags";
 import { parseConversationLabels } from "@/features/conversations/server/labels";
+import { uploadPublicPath } from "@/lib/storage/index";
 import { isChatSdkChannel, postChannelReply } from "@/features/integrations/server/chat-sdk";
 import {
   conversation as conversationTable,
@@ -59,6 +60,19 @@ export async function GET(_request: Request, context: RouteContext) {
 
   const agentName = conversation.widget?.displayName ?? "Assistant";
   const session = conversation.visitorSession;
+  const attachments = await db.query.attachment.findMany({
+    where: (fields, { eq, and }) =>
+      and(eq(fields.conversationId, conversation.id), eq(fields.workspaceId, workspace.id)),
+    orderBy: (fields, { asc }) => [asc(fields.createdAt)],
+    columns: {
+      id: true,
+      filename: true,
+      mimeType: true,
+      size: true,
+      storageKey: true,
+      createdAt: true,
+    },
+  });
 
   const publicMessages = conversation.messages
     .filter((message) => message.visibility === "PUBLIC" || !message.visibility)
@@ -145,6 +159,14 @@ export async function GET(_request: Request, context: RouteContext) {
       : new Date().toISOString(),
     ipData: session?.ipData ? JSON.parse(session.ipData) : null,
     messages: publicMessages,
+    attachments: attachments.map((attachment) => ({
+      id: attachment.id,
+      fileName: attachment.filename,
+      mimeType: attachment.mimeType,
+      size: attachment.size,
+      createdAt: new Date(attachment.createdAt).toISOString(),
+      url: uploadPublicPath(attachment.storageKey),
+    })),
     contactName: conversation.contact.name,
     contactEmail: conversation.contact.email,
     contactId: conversation.contact.id,

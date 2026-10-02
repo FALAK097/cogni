@@ -94,6 +94,15 @@ export interface WidgetMessage {
   };
 }
 
+export interface WidgetAttachment {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  size: number;
+  createdAt: string;
+  url: string;
+}
+
 export interface WidgetContactNote {
   id: string;
   body: string;
@@ -149,6 +158,7 @@ export interface WidgetSessionDetail {
   lastActivityAt: string;
   ipData?: IpData | null;
   messages: WidgetMessage[];
+  attachments?: WidgetAttachment[];
   contactName?: string | null;
   contactEmail?: string | null;
   contactId?: string | null;

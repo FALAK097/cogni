@@ -674,7 +674,12 @@ export function ConversationsList({
                 Clear filters
               </Button>
             ) : filter === "all" ? (
-              <Button render={<Link href="/playground" />} variant="outline" size="sm">
+              <Button
+                nativeButton={false}
+                render={<Link href="/playground" />}
+                variant="outline"
+                size="sm"
+              >
                 Set up your agent
               </Button>
             ) : (
