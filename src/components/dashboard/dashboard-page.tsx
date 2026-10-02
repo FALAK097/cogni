@@ -591,10 +591,12 @@ function CardSkeleton({ className }: { className?: string }) {
 function DonutChart({
   data,
   centerValue,
+  emptyMessage,
   ariaLabel,
 }: {
   data: Array<{ label: string; value: number; color: string }>;
   centerValue?: string;
+  emptyMessage: string;
   ariaLabel: string;
 }) {
   const total = data.reduce((sum, item) => sum + item.value, 0);
@@ -608,8 +610,8 @@ function DonutChart({
 
   if (total === 0) {
     return (
-      <div className="flex size-[180px] items-center justify-center text-sm text-muted-foreground">
-        No data
+      <div className="flex size-[180px] items-center justify-center px-5 text-center text-sm text-muted-foreground">
+        {emptyMessage}
       </div>
     );
   }
@@ -1371,6 +1373,7 @@ export function DashboardPage({ canManage = false }: { canManage?: boolean }) {
               <DonutChart
                 data={sourceChart.segments}
                 centerValue={sourceChart.total.toLocaleString()}
+                emptyMessage="No source data for this period"
                 ariaLabel="Conversations by source"
               />
               <DonutLegend items={sourceChart.legend} className="w-full" />
@@ -1387,6 +1390,7 @@ export function DashboardPage({ canManage = false }: { canManage?: boolean }) {
               <DonutChart
                 data={statusChart.segments}
                 centerValue={statusChart.total.toLocaleString()}
+                emptyMessage="No status data for this period"
                 ariaLabel="Conversations by status"
               />
               <DonutLegend items={statusChart.legend} className="w-full" />
