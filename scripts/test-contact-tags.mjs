@@ -122,7 +122,7 @@ test("concurrent tag updates preserve all tags and normalize duplicates", async 
         action: "remove",
         tag: "VIP",
       })
-    ).tags,
+    ).tags.sort(),
     ["billing", "follow up"],
   );
 });
