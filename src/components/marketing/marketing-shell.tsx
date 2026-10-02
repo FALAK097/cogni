@@ -6,6 +6,8 @@ import { Menu } from "@/components/icons";
 import { ThemeLogo } from "@/components/theme-logo";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
+const COPYRIGHT_YEAR = new Date().getUTCFullYear();
+
 const NAV_LINKS = [
   { label: "Features", href: "/#features" },
   { label: "Integrations", href: "/#integrations" },
@@ -119,7 +121,7 @@ export function MarketingShell({ children }: MarketingShellProps) {
           </div>
           <div className="border-t border-gray-100 py-6">
             <p className="text-sm text-gray-400">
-              &copy; {new Date().getFullYear()} cogni Inc. All rights reserved.
+              &copy; {COPYRIGHT_YEAR} cogni Inc. All rights reserved.
             </p>
           </div>
         </div>

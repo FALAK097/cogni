@@ -187,6 +187,13 @@ export function WidgetLiveWidgetPreview({
   const [previewStatus, setPreviewStatus] = useState<"loading" | "ready" | "error">("loading");
   const [previewAttempt, setPreviewAttempt] = useState(0);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const hasValidCredentials = Boolean(
+    config.workspaceId && config.publicKey && config.workspaceId !== "your-workspace-id",
+  );
+  const status = hasValidCredentials ? previewStatus : "error";
+  const errorMessage = hasValidCredentials
+    ? previewError
+    : "Your agent preview is not ready yet. Reload the agent settings and try again.";
   const mountedRef = useRef(false);
   const configSnapshotRef = useRef("");
   const credentialsRef = useRef("");
@@ -233,10 +240,6 @@ export function WidgetLiveWidgetPreview({
       configSnapshotRef.current = "";
       credentialsRef.current = "";
       userClosedRef.current = false;
-      setPreviewStatus("error");
-      setPreviewError(
-        "Your agent preview is not ready yet. Reload the agent settings and try again.",
-      );
       return;
     }
 
@@ -404,14 +407,14 @@ export function WidgetLiveWidgetPreview({
     };
   }, []);
 
-  return previewStatus === "ready" ? null : (
+  return status === "ready" ? null : (
     <div
-      role={previewStatus === "error" ? "alert" : "status"}
+      role={status === "error" ? "alert" : "status"}
       aria-live="polite"
       className="absolute inset-0 z-30 flex items-center justify-center bg-background/90 p-6 text-center backdrop-blur-[2px]"
     >
       <div className="flex max-w-64 flex-col items-center gap-3">
-        {previewStatus === "loading" ? (
+        {status === "loading" ? (
           <Loader2
             className="size-5 animate-spin text-muted-foreground motion-reduce:animate-none"
             aria-hidden="true"
@@ -421,13 +424,13 @@ export function WidgetLiveWidgetPreview({
         )}
         <div className="space-y-1">
           <p className="text-sm font-medium text-foreground">
-            {previewStatus === "loading" ? "Loading preview" : "Preview unavailable"}
+            {status === "loading" ? "Loading preview" : "Preview unavailable"}
           </p>
-          {previewError ? (
-            <p className="text-xs leading-relaxed text-muted-foreground">{previewError}</p>
+          {errorMessage ? (
+            <p className="text-xs leading-relaxed text-muted-foreground">{errorMessage}</p>
           ) : null}
         </div>
-        {previewStatus === "error" ? (
+        {status === "error" ? (
           <Button
             type="button"
             size="sm"

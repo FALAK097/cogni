@@ -2,6 +2,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { ThemeLogo } from "@/components/theme-logo";
 
+const COPYRIGHT_YEAR = new Date().getUTCFullYear();
+
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <main className="light grid min-h-svh bg-white text-gray-900 lg:grid-cols-2">
@@ -19,7 +21,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
         {/* Copyright */}
         <p className="shrink-0 pb-2 text-center text-xs text-gray-600">
-          &copy; {new Date().getFullYear()} cogni Inc. All rights reserved.
+          &copy; {COPYRIGHT_YEAR} cogni Inc. All rights reserved.
         </p>
       </div>
 

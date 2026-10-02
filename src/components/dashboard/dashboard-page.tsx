@@ -685,19 +685,21 @@ function getMonthDays(month: Date): Date[] {
 
 function CalendarMonth({
   month,
+  referenceTime,
   timezone,
   rangeStart,
   rangeEnd,
   onDayClick,
 }: {
   month: Date;
+  referenceTime: Date;
   timezone: string;
   rangeStart: Date | null;
   rangeEnd: Date | null;
   onDayClick: (day: Date) => void;
 }) {
   const days = getMonthDays(month);
-  const today = toZonedTime(new Date(), normalizeTimezone(timezone));
+  const today = toZonedTime(referenceTime, normalizeTimezone(timezone));
 
   return (
     <div className="w-[280px] sm:w-[252px]">
@@ -760,6 +762,7 @@ function DateRangePicker({
   timezone: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [referenceTime, setReferenceTime] = useState(() => new Date());
   const [viewMonth, setViewMonth] = useState(() => startOfMonth(value.start));
   const [draftStart, setDraftStart] = useState<Date | null>(null);
   const [draftEnd, setDraftEnd] = useState<Date | null>(null);
@@ -771,6 +774,7 @@ function DateRangePicker({
   const handleOpenChange = (nextOpen: boolean) => {
     setOpen(nextOpen);
     if (nextOpen) {
+      setReferenceTime(new Date());
       setViewMonth(startOfMonth(value.start));
       setDraftStart(value.start);
       setDraftEnd(value.end);
@@ -865,13 +869,14 @@ function DateRangePicker({
                 className="size-11 sm:size-8"
                 onClick={() => setViewMonth((month) => addMonths(month, 1))}
                 aria-label="Next month"
-                disabled={!isBefore(startOfMonth(viewMonth), startOfMonth(new Date()))}
+                disabled={!isBefore(startOfMonth(viewMonth), startOfMonth(referenceTime))}
               >
                 <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-4" />
               </Button>
             </div>
             <CalendarMonth
               month={viewMonth}
+              referenceTime={referenceTime}
               timezone={timezone}
               rangeStart={displayStart}
               rangeEnd={displayEnd}

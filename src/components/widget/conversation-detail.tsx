@@ -1551,6 +1551,11 @@ function SessionDetailsContent({
   const [newLabel, setNewLabel] = useState("");
   const [labelPopoverOpen, setLabelPopoverOpen] = useState(false);
   const [labelError, setLabelError] = useState<string | null>(null);
+  const [clockTime, setClockTime] = useState(() => new Date());
+  useEffect(() => {
+    const timer = window.setInterval(() => setClockTime(new Date()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
   const contactTags = session.contactTags ?? [];
   const conversationLabels = session.conversationLabels ?? [];
   const tagConversationId = session.conversationId ?? session.id;
@@ -1609,7 +1614,7 @@ function SessionDetailsContent({
         hour: "numeric",
         minute: "2-digit",
         timeZone: session.timezone,
-      }).format(new Date())
+      }).format(clockTime)
     : null;
 
   const allNotes = [

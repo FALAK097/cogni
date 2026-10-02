@@ -628,7 +628,8 @@ function KnowledgeSourcesTable({
     });
   }
 
-  // react-doctor-disable-next-line react-hooks-js/incompatible-library -- TanStack Table owns row/header model functions here by design.
+  /* oxlint-disable react/incompatible-library -- This is the single isolated TanStack Table v8 integration. */
+  // react-doctor-disable-next-line react-hooks-js/incompatible-library -- The table adapter intentionally owns its non-memoizable model callbacks.
   const table = useReactTable({
     data: sources,
     columns,
@@ -637,6 +638,7 @@ function KnowledgeSourcesTable({
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
   });
+  /* oxlint-enable react/incompatible-library */
   const rows = table.getRowModel().rows;
 
   return (
