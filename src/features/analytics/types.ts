@@ -37,6 +37,14 @@ export type SatisfactionPoint = {
   responses: number;
 };
 
+export type NegativeFeedbackItem = {
+  conversationId: string;
+  question: string;
+  response: string;
+  reason: string | null;
+  feedbackAt: string;
+};
+
 export type DashboardAnalytics = {
   dateRange: DashboardDateRange;
   previousDateRange: DashboardDateRange;
@@ -51,6 +59,7 @@ export type DashboardAnalytics = {
   conversationsBySource: BreakdownItem[];
   conversationsByStatus: BreakdownItem[];
   topQuestions: TopQuestion[];
+  negativeFeedback: NegativeFeedbackItem[];
   userEngagement: {
     messagesSent: MetricComparison;
     messagesReceived: MetricComparison;

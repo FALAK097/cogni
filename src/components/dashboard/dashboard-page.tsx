@@ -74,6 +74,7 @@ import {
   Message01Icon,
   Refresh01Icon,
   StarIcon,
+  ThumbsDownIcon,
   Tick02Icon,
   UserMultiple02Icon,
 } from "@hugeicons/core-free-icons";
@@ -1417,9 +1418,9 @@ export function DashboardPage({
 
       <section
         hidden={hasInitialError}
-        className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-3"
+        className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-2 xl:grid-cols-4"
       >
-        <DashboardCard className="flex h-full flex-col p-6">
+        <DashboardCard className="flex h-full flex-col p-6 xl:col-span-2">
           <h3 className="text-sm font-semibold tracking-tight">Top Questions</h3>
           <div className="mt-4 flex-1">
             {isLoading ? (
@@ -1491,7 +1492,71 @@ export function DashboardPage({
           </div>
         </DashboardCard>
 
-        <DashboardCard className="flex h-full flex-col p-6">
+        <DashboardCard className="flex h-full flex-col p-6 xl:col-span-2">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold tracking-tight">Needs review</h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Recent AI answers rated negatively
+              </p>
+            </div>
+            <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+              <HugeiconsIcon icon={ThumbsDownIcon} strokeWidth={1.8} className="size-4" />
+            </span>
+          </div>
+          {isLoading ? (
+            <div className="mt-4 space-y-2">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <Skeleton
+                  key={index}
+                  className="h-[92px] w-full rounded-lg border border-border/50 bg-transparent"
+                />
+              ))}
+            </div>
+          ) : (analytics?.negativeFeedback ?? []).length === 0 ? (
+            <p className="mt-4 flex min-h-36 flex-1 items-center justify-center rounded-lg border border-dashed border-border/60 px-5 text-center text-sm text-muted-foreground">
+              No negative feedback from conversations in this period.
+            </p>
+          ) : (
+            <ul className="mt-4 divide-y divide-border/50">
+              {(analytics?.negativeFeedback ?? []).map((item, index) => (
+                <li key={`${item.conversationId}-${item.feedbackAt}-${index}`}>
+                  <Link
+                    href={{
+                      pathname: "/conversations",
+                      query: { conversationId: item.conversationId },
+                    }}
+                    aria-label={`Review AI answer. Visitor asked: ${item.question}. AI replied: ${item.response}`}
+                    className="-mx-2 block rounded-lg px-2 py-3 outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  >
+                    <span className="block truncate text-xs font-medium text-muted-foreground">
+                      {item.question}
+                    </span>
+                    <span className="mt-1 block line-clamp-2 text-sm leading-relaxed text-foreground">
+                      {item.response}
+                    </span>
+                    {item.reason ? (
+                      <span className="mt-1.5 block line-clamp-1 text-xs text-muted-foreground">
+                        Feedback: {item.reason}
+                      </span>
+                    ) : null}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="mt-auto border-t border-border/50 pt-4">
+            <Link
+              href="/conversations"
+              className="inline-flex min-h-8 items-center gap-1 rounded-sm text-sm font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >
+              Open inbox
+              <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-4" />
+            </Link>
+          </div>
+        </DashboardCard>
+
+        <DashboardCard className="flex h-full flex-col p-6 xl:col-span-2">
           <h3 className="text-sm font-semibold tracking-tight">User Engagement</h3>
           <div className="mt-4 grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2">
             {isLoading || !engagement
@@ -1521,7 +1586,7 @@ export function DashboardPage({
           </div>
         </DashboardCard>
 
-        <DashboardCard className="flex h-full flex-col p-6">
+        <DashboardCard className="flex h-full flex-col p-6 xl:col-span-2">
           <div className="mb-5 flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold tracking-tight">Satisfaction Score Over Time</h3>
             <GranularitySelect value={satGranularity} onChange={setSatGranularity} />

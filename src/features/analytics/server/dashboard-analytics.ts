@@ -6,6 +6,7 @@ import { desc } from "drizzle-orm";
 
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
 import { collectAiResponseTimeSamplesMs } from "@/features/analytics/response-time";
+import { collectNegativeFeedbackItems } from "@/features/analytics/negative-feedback";
 import { resolveAnalyticsDateRange } from "@/features/analytics/date-range";
 import { normalizeTimezone } from "@/features/conversations/snooze-schedule";
 import { getWidgetConversationCond } from "@/features/widget/server/widget-data-filters";
@@ -15,6 +16,7 @@ import type {
   BreakdownItem,
   DashboardAnalytics,
   MetricComparison,
+  NegativeFeedbackItem,
   SatisfactionPoint,
   TimeSeriesPoint,
   TopQuestion,
@@ -125,6 +127,7 @@ function aggregatePeriod(conversations: ConversationRow[], timezone: string) {
   const sourceCounts = new Map<string, number>();
   const statusCounts = new Map<string, number>();
   const questionCounts = new Map<string, { count: number; conversationId: string }>();
+  const negativeFeedback: NegativeFeedbackItem[] = [];
   const dailyCounts = new Map<string, number>();
   const dailySatisfaction = new Map<string, { positive: number; negative: number }>();
 
@@ -189,6 +192,8 @@ function aggregatePeriod(conversations: ConversationRow[], timezone: string) {
         dailySatisfaction.set(feedbackDay, entry);
       }
     }
+
+    negativeFeedback.push(...collectNegativeFeedbackItems(conversation.id, messages));
   }
 
   const totalConversations = conversations.length;
@@ -224,6 +229,9 @@ function aggregatePeriod(conversations: ConversationRow[], timezone: string) {
     dailyCounts,
     dailySatisfaction,
     topQuestions,
+    negativeFeedback: negativeFeedback
+      .sort((a, b) => b.feedbackAt.localeCompare(a.feedbackAt))
+      .slice(0, 3),
   };
 }
 
@@ -369,6 +377,7 @@ export async function getDashboardAnalytics(
     conversationsBySource: toBreakdown(current.sourceCounts),
     conversationsByStatus: toBreakdown(current.statusCounts),
     topQuestions: current.topQuestions,
+    negativeFeedback: current.negativeFeedback,
     userEngagement: {
       messagesSent: toMetric(current.messagesSent, previous.messagesSent),
       messagesReceived: toMetric(current.messagesReceived, previous.messagesReceived),
