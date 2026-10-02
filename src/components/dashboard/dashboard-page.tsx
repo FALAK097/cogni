@@ -306,6 +306,40 @@ function formatChangePercent(changePercent: number | null): string {
   return `${sign}${changePercent.toFixed(1)}%`;
 }
 
+function ChangeIndicator({
+  change,
+  invertTrend = false,
+}: {
+  change: number | null;
+  invertTrend?: boolean;
+}) {
+  const hasTrend = change !== null && change !== 0;
+  const isFavorable = change !== null && (invertTrend ? change < 0 : change > 0);
+
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap font-medium",
+        !hasTrend
+          ? "text-muted-foreground"
+          : isFavorable
+            ? "text-emerald-600 dark:text-emerald-400"
+            : "text-rose-600 dark:text-rose-400",
+      )}
+    >
+      {hasTrend && (
+        <HugeiconsIcon
+          icon={change > 0 ? ArrowUp01Icon : ArrowDown01Icon}
+          strokeWidth={2}
+          className="size-3"
+          aria-hidden="true"
+        />
+      )}
+      {change === 0 ? "No change" : formatChangePercent(change)}
+    </span>
+  );
+}
+
 function formatComparisonRange(startIso: string, endIso: string): string {
   const start = parseISO(startIso);
   const end = parseISO(endIso);
@@ -979,10 +1013,6 @@ function MetricCard({
   info?: ReactNode;
   invertTrend?: boolean;
 }) {
-  const rawPositive = (metric.changePercent ?? 0) >= 0;
-  const isPositive = invertTrend ? !rawPositive : rawPositive;
-  const hasTrend = metric.changePercent !== null && metric.changePercent !== 0;
-
   return (
     <DashboardCard className="flex h-full flex-col p-6">
       <div className="flex items-start justify-between gap-2">
@@ -998,25 +1028,7 @@ function MetricCard({
         </p>
       </div>
       <div className="mt-auto flex flex-col items-start gap-0.5 pt-3 text-xs">
-        <span
-          className={cn(
-            "inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap font-medium",
-            !hasTrend
-              ? "text-muted-foreground"
-              : isPositive
-                ? "text-emerald-600 dark:text-emerald-400"
-                : "text-rose-600 dark:text-rose-400",
-          )}
-        >
-          {hasTrend && (
-            <HugeiconsIcon
-              icon={isPositive ? ArrowUp01Icon : ArrowDown01Icon}
-              strokeWidth={2}
-              className="size-3"
-            />
-          )}
-          {metric.changePercent === 0 ? "No change" : formatChangePercent(metric.changePercent)}
-        </span>
+        <ChangeIndicator change={metric.changePercent} invertTrend={invertTrend} />
         <span className="text-muted-foreground">
           vs {formatComparisonRange(previousRange.start, previousRange.end)}
         </span>
@@ -1469,42 +1481,23 @@ export function DashboardPage({ canManage = false }: { canManage?: boolean }) {
                     className="h-24 animate-pulse rounded-lg border border-border/50 bg-transparent"
                   />
                 ))
-              : engagementTiles.map((tile) => {
-                  const isPositive = (tile.change ?? 0) >= 0;
-                  return (
-                    <div
-                      key={tile.label}
-                      className="rounded-lg border border-border/50 bg-transparent p-4"
-                    >
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <HugeiconsIcon
-                          icon={tile.icon}
-                          strokeWidth={2}
-                          className="size-4 shrink-0"
-                        />
-                        <span className="text-sm">{tile.label}</span>
-                      </div>
-                      <p className="mt-2 text-xl font-semibold tracking-tight tabular-nums">
-                        {tile.value}
-                      </p>
-                      <p
-                        className={cn(
-                          "mt-1.5 inline-flex items-center gap-0.5 text-xs font-medium",
-                          isPositive
-                            ? "text-emerald-600 dark:text-emerald-400"
-                            : "text-rose-600 dark:text-rose-400",
-                        )}
-                      >
-                        <HugeiconsIcon
-                          icon={isPositive ? ArrowUp01Icon : ArrowDown01Icon}
-                          strokeWidth={2}
-                          className="size-3"
-                        />
-                        {formatChangePercent(tile.change)}
-                      </p>
+              : engagementTiles.map((tile) => (
+                  <div
+                    key={tile.label}
+                    className="rounded-lg border border-border/50 bg-transparent p-4"
+                  >
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <HugeiconsIcon icon={tile.icon} strokeWidth={2} className="size-4 shrink-0" />
+                      <span className="text-sm">{tile.label}</span>
                     </div>
-                  );
-                })}
+                    <p className="mt-2 text-xl font-semibold tracking-tight tabular-nums">
+                      {tile.value}
+                    </p>
+                    <p className="mt-1.5 text-xs">
+                      <ChangeIndicator change={tile.change} />
+                    </p>
+                  </div>
+                ))}
           </div>
         </DashboardCard>
 
