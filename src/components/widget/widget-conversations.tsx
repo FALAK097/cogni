@@ -84,6 +84,9 @@ export function WidgetConversations({
   const { data: conversationsData } = useConversations({ limit: 20, filter });
 
   const counts = conversationsData?.counts ?? EMPTY_COUNTS;
+  const activeView = FILTER_TABS.find((tab) => tab.value === filter);
+  const activeViewCount = activeView ? counts[activeView.countKey] : 0;
+  const activeCountKind = filter === "snoozed" ? "snoozed" : "unread";
   const composerDraftKey = `${workspaceId}:${selectedConversationId ?? ""}`;
   const composerDraft = composerDrafts[composerDraftKey] ?? EMPTY_CONVERSATION_COMPOSER_DRAFT;
   const updateComposerDraft: ConversationComposerDraftChange = (update) => {
@@ -110,7 +113,17 @@ export function WidgetConversations({
               aria-label="Inbox view"
               className="h-10 w-full justify-between rounded-xl border-border/60 bg-background px-3 shadow-none"
             >
-              <SelectValue placeholder="Choose an inbox view" />
+              <SelectValue placeholder="Choose an inbox view">
+                {activeView?.label ?? "Choose an inbox view"}
+              </SelectValue>
+              {activeViewCount > 0 ? (
+                <span
+                  aria-label={`${activeViewCount} ${activeCountKind} conversation${activeViewCount === 1 ? "" : "s"}`}
+                  className="rounded-full bg-muted px-2 py-0.5 text-xs tabular-nums text-muted-foreground"
+                >
+                  {activeViewCount}
+                </span>
+              ) : null}
             </SelectTrigger>
             <SelectContent align="start" alignItemWithTrigger={false} className="w-64 rounded-xl">
               {FILTER_TABS.map((tab) => {
