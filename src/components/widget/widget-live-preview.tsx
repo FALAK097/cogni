@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { getBackendOrigin } from "@/lib/api/client";
 
 const WIDGET_SCRIPT_ID = "widget-widget-preview";
-const WIDGET_BUNDLE_VERSION = "16";
+const WIDGET_BUNDLE_VERSION = "17";
 const REMOUNT_DEBOUNCE_MS = 300;
 const CONFIG_SYNC_DEBOUNCE_MS = 50;
 
@@ -53,6 +53,7 @@ declare global {
       open: () => void;
       close: () => void;
       resetPreview: () => Promise<boolean>;
+      sendPreviewMessage: (message: string) => Promise<boolean>;
       on: (event: string, listener: (event: Event) => void) => void;
       off: (event: string, listener: (event: Event) => void) => void;
     };

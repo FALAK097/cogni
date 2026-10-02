@@ -1,4 +1,8 @@
+import Link from "next/link";
+import { useState } from "react";
+
 import { BookOpen, CheckCircle2, MessageCircle } from "@/components/icons";
+import { Button } from "@/components/ui/button";
 
 export type WidgetPreviewEvidence = {
   outcome: "answer" | "handoff";
@@ -15,13 +19,34 @@ function getHandoffTerms(value: string) {
 
 export function WidgetTestPanel({
   escalationKeywords,
+  suggestions,
   evidence,
+  sendingPrompt,
+  onTryPrompt,
 }: {
   escalationKeywords: string;
+  suggestions: string[];
   evidence: WidgetPreviewEvidence | null;
+  sendingPrompt: string | null;
+  onTryPrompt: (prompt: string) => Promise<boolean>;
 }) {
+  const [tryError, setTryError] = useState<string | null>(null);
   const handoffTerms = getHandoffTerms(escalationKeywords);
   const visibleTerms = handoffTerms.slice(0, 5);
+  const visibleSuggestions = [...new Set(suggestions.map((suggestion) => suggestion.trim()))]
+    .filter((suggestion) => suggestion.length > 0 && suggestion.length <= 500)
+    .slice(0, 3);
+
+  const tryPrompt = async (prompt: string) => {
+    setTryError(null);
+    try {
+      if (!(await onTryPrompt(prompt))) {
+        setTryError("The preview couldn't start. Retry the preview, then try again.");
+      }
+    } catch {
+      setTryError("Couldn't send that test. Retry the preview and try again.");
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -49,6 +74,38 @@ export function WidgetTestPanel({
               Ask something your indexed sources can answer. The latest result will list the sources
               retrieved for that message.
             </p>
+            {visibleSuggestions.length > 0 ? (
+              <ul className="mt-3 space-y-2" aria-label="Suggested questions to test">
+                {visibleSuggestions.map((suggestion) => (
+                  <li key={suggestion}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-auto min-h-10 w-full justify-between gap-3 whitespace-normal rounded-lg px-3 py-2 text-left text-sm font-normal"
+                      onClick={() => void tryPrompt(suggestion)}
+                      disabled={sendingPrompt !== null}
+                      aria-label={`Send test question: ${suggestion}`}
+                    >
+                      <span className="line-clamp-2 min-w-0">{suggestion}</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        {sendingPrompt === suggestion ? "Sending…" : "Try"}
+                      </span>
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Add a suggested question in{" "}
+                <Link
+                  href="/playground?subtab=customize"
+                  className="rounded-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                >
+                  Customize
+                </Link>{" "}
+                to test a prompt tailored to your agent.
+              </p>
+            )}
           </div>
         </li>
         <li className="flex items-start gap-3 rounded-lg border border-border/60 p-3.5">
@@ -91,9 +148,27 @@ export function WidgetTestPanel({
                 ) : null}
               </ul>
             ) : null}
+            {visibleTerms[0] ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-3 h-9 rounded-lg"
+                onClick={() => void tryPrompt(visibleTerms[0]!)}
+                disabled={sendingPrompt !== null}
+              >
+                {sendingPrompt === visibleTerms[0] ? "Sending…" : "Try handoff in preview"}
+              </Button>
+            ) : null}
           </div>
         </li>
       </ol>
+
+      {tryError ? (
+        <p role="alert" className="text-sm text-destructive">
+          {tryError}
+        </p>
+      ) : null}
 
       <section
         aria-labelledby="preview-evidence-heading"

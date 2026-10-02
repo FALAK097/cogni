@@ -182,6 +182,7 @@ export function WidgetCustomizer({
   const activeSection = resolveInitialSection(initialSubtab);
   const [showMobilePreview, setShowMobilePreview] = useState(false);
   const [previewEvidence, setPreviewEvidence] = useState<WidgetPreviewEvidence | null>(null);
+  const [sendingTestPrompt, setSendingTestPrompt] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [domainInput, setDomainInput] = useState("");
   const [configOverrides, setConfigOverrides] = useState<Partial<WidgetCustomizerConfig>>({});
@@ -200,6 +201,21 @@ export function WidgetCustomizer({
   const { data: widgetConfigData, isLoading } = widgetConfigQuery;
   const saveWidgetConfigMutation = useSaveWidgetConfig();
   const saveWidgetConfig = saveWidgetConfigMutation.mutateAsync;
+
+  const tryPreviewPrompt = useCallback(async (prompt: string) => {
+    setSendingTestPrompt(prompt);
+    setShowMobilePreview(true);
+    try {
+      for (let attempt = 0; attempt < 50; attempt += 1) {
+        const sendPreviewMessage = window.Widget?.sendPreviewMessage;
+        if (sendPreviewMessage) return await sendPreviewMessage(prompt);
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 100));
+      }
+      return false;
+    } finally {
+      setSendingTestPrompt(null);
+    }
+  }, []);
 
   useEffect(() => {
     widgetConfigRef.current = widgetConfigData;
@@ -670,7 +686,10 @@ export function WidgetCustomizer({
               <TabsContent value="test" keepMounted={false}>
                 <WidgetTestPanel
                   escalationKeywords={config.escalationKeywords}
+                  suggestions={config.suggestions}
                   evidence={previewEvidence}
+                  sendingPrompt={sendingTestPrompt}
+                  onTryPrompt={tryPreviewPrompt}
                 />
               </TabsContent>
 

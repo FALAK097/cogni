@@ -8,6 +8,7 @@ import {
   destroyWidget,
   init,
   resetChat,
+  sendMessage,
   toggleChat,
   getScriptInfo,
   updateAppearance,
@@ -48,6 +49,21 @@ async function resetPreview() {
   return true;
 }
 
+async function sendPreviewMessage(message) {
+  if (!state.preview || !state.isInitialized || !state.input || typeof message !== "string") {
+    return false;
+  }
+
+  const text = message.trim();
+  const sendButton = state.windowEl?.querySelector(".oc-send-btn");
+  if (!text || text.length > 1000 || sendButton?.disabled) return false;
+
+  show();
+  state.input.value = text;
+  await sendMessage();
+  return true;
+}
+
 (function autoInit() {
   const { publicKey } = getScriptInfo();
   if (publicKey) {
@@ -69,6 +85,7 @@ window.Widget = {
   open: show,
   close: hide,
   resetPreview,
+  sendPreviewMessage,
   on: (name, listener) => events.addEventListener(name, listener),
   off: (name, listener) => events.removeEventListener(name, listener),
   identify: async (customer) => {
