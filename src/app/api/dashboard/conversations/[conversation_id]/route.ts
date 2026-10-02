@@ -85,6 +85,7 @@ export async function GET(_request: Request, context: RouteContext) {
       id: message.id,
       body: message.body,
       createdAt: message.createdAt,
+      authorName: message.authorName?.trim() || "Team",
     }));
 
   const previous = await db.query.conversation.findMany({

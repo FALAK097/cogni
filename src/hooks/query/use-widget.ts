@@ -115,6 +115,7 @@ export interface WidgetInternalNote {
   id: string;
   body: string;
   createdAt: string;
+  authorName: string;
 }
 
 export interface WidgetPreviousConversation {

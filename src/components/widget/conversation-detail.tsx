@@ -92,6 +92,7 @@ import type { ConversationDetail as ConversationDetailData, WidgetMessage } from
 import { generateAvatarUrl } from "@/lib/avatar-generator";
 import { cn } from "@/lib/utils";
 import { resolveTranscriptScroll } from "@/features/conversations/transcript-scroll";
+import { mergeTranscriptMessages } from "@/features/conversations/transcript-timeline";
 import {
   clearSubmittedDraft,
   type ConversationComposerDraft,
@@ -344,6 +345,10 @@ export function ConversationDetail({
   };
 
   const messages = session?.messages;
+  const transcriptMessages = useMemo(
+    () => mergeTranscriptMessages(messages ?? [], session?.internalNotes ?? []),
+    [messages, session?.internalNotes],
+  );
   const currentTimestamp = useCurrentTimestamp();
   const isSnoozed = Boolean(
     currentTimestamp !== null &&
@@ -355,7 +360,7 @@ export function ConversationDetail({
     const container = scrollRef.current;
     if (!container) return;
 
-    const messageCount = messages?.length ?? 0;
+    const messageCount = transcriptMessages.length;
     const previousMessageCount = previousMessageCountRef.current;
     const scrollUpdate = resolveTranscriptScroll({
       stickToBottom: stickToBottomRef.current,
@@ -369,7 +374,7 @@ export function ConversationDetail({
       setHasNewMessages(true);
     }
     previousMessageCountRef.current = messageCount;
-  }, [messages]);
+  }, [transcriptMessages]);
 
   const displayName = session ? getDisplayName(session) : "";
 
@@ -377,7 +382,7 @@ export function ConversationDetail({
     if (!messages) return [];
 
     const groups: Array<{ date: string; messages: WidgetMessage[] }> = [];
-    for (const message of messages) {
+    for (const message of transcriptMessages) {
       const dateKey = format(new Date(message.timestamp), "yyyy-MM-dd");
       const lastGroup = groups[groups.length - 1];
       if (
@@ -390,7 +395,7 @@ export function ConversationDetail({
       }
     }
     return groups;
-  }, [messages]);
+  }, [messages, transcriptMessages]);
 
   const handleDelete = () => {
     deleteConversationMutation.mutate(conversationId, {

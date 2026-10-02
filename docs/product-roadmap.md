@@ -236,4 +236,7 @@ browser acceptance remains outstanding.
 Transcript polish now shows each message author and local send time, visibly labels internal notes,
 and gives notes a distinct neutral surface. New teammate replies preserve the sender name in the
 transcript JSON; the PostgreSQL append suite verifies this metadata alongside concurrency and
-workspace-isolation behavior.
+workspace-isolation behavior. The dashboard-only detail response now supplies note authors and
+merges internal notes into the transcript in chronological order, while public messages remain a
+separate filtered payload. Focused tests verify timeline ordering and stable same-time ordering;
+rendered note placement remains unverified because the local Inbox currently has no conversations.

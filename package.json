@@ -23,6 +23,7 @@
     "test:conversation-append": "node --test scripts/test-conversation-append.mjs",
     "test:conversation-draft": "node --test scripts/test-conversation-draft.mjs",
     "test:conversation-scroll": "node --test scripts/test-conversation-scroll.mjs",
+    "test:conversation-timeline": "node --test scripts/test-conversation-timeline.mjs",
     "test:integration-action-recovery": "node --test scripts/test-integration-action-recovery.mjs",
     "test:workspace-permissions": "node --test scripts/test-workspace-permissions.mjs",
     "test:attachment-access": "node --test scripts/test-attachment-access.mjs",
