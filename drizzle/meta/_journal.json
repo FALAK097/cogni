@@ -36,6 +36,13 @@
       "when": 1790932344451,
       "tag": "0004_conversation_snoozing",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790935613721,
+      "tag": "0005_inbox_saved_views",
+      "breakpoints": true
     }
   ]
 }

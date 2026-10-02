@@ -46,7 +46,11 @@ export const queryKeys = {
   },
   conversations: {
     all: ["conversations"] as const,
-    list: () => [...queryKeys.conversations.all, "list"] as const,
-    detail: (id: string) => [...queryKeys.conversations.all, "detail", id] as const,
+    list: (workspaceId?: string) =>
+      [...queryKeys.conversations.all, "list", workspaceId ?? "all-workspaces"] as const,
+    detail: (workspaceId: string, id: string) =>
+      [...queryKeys.conversations.all, "detail", workspaceId, id] as const,
+    savedViews: (workspaceId: string) =>
+      [...queryKeys.conversations.all, "saved-views", workspaceId] as const,
   },
 } as const;

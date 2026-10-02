@@ -47,6 +47,7 @@ jobs:
       - run: pnpm test:widget-stream
       - run: pnpm test:widget-settings
       - run: pnpm test:conversation-append
+      - run: pnpm test:inbox-saved-views
       - run: pnpm test:integration-action-recovery
       - run: pnpm test:workspace-permissions
       - run: pnpm test:analytics-response-time

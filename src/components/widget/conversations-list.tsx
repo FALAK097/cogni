@@ -4,6 +4,7 @@ import { format, isToday, isYesterday } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { FormEvent } from "react";
 import {
   AlertCircle,
   Bot,
@@ -38,7 +39,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useConversations, useMarkConversationRead, useWorkspaceMembers } from "@/hooks/query";
+import {
+  useConversations,
+  useCreateInboxSavedView,
+  useMarkConversationRead,
+  useWorkspaceMembers,
+} from "@/hooks/query";
 import { useCurrentTimestamp } from "@/hooks/use-current-timestamp";
 import type { ConversationFilter, ConversationSummary } from "@/hooks/query";
 import { generateAvatarUrl } from "@/lib/avatar-generator";
@@ -57,6 +63,9 @@ interface ConversationsListProps {
   selectedConversationId: string | null;
   onSelectConversation: (conversationId: string | null) => void;
   onClearFilter: () => void;
+  initialChannel: InboxChannel | null;
+  initialAssignee: string | null;
+  onFacetChange: () => void;
 }
 
 const PAGE_SIZE = 20;
@@ -95,19 +104,28 @@ export function ConversationsList({
   selectedConversationId,
   onSelectConversation,
   onClearFilter,
+  initialChannel,
+  initialAssignee,
+  onFacetChange,
 }: ConversationsListProps) {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const currentTimestamp = useCurrentTimestamp();
-  const [channelFilter, setChannelFilter] = useState<InboxChannel | null>(null);
-  const [assigneeFilter, setAssigneeFilter] = useState<string | null>(null);
+  const [channelFilter, setChannelFilter] = useState<InboxChannel | null>(initialChannel);
+  const [assigneeFilter, setAssigneeFilter] = useState<string | null>(initialAssignee);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [savingView, setSavingView] = useState(false);
+  const [savedViewName, setSavedViewName] = useState("");
+  const [saveViewError, setSaveViewError] = useState<string | null>(null);
+  const [saveViewMessage, setSaveViewMessage] = useState<string | null>(null);
+  const savedViewNameRef = useRef<HTMLInputElement>(null);
   const listKey = `${filter}:${debouncedSearch}:${channelFilter ?? "all"}:${assigneeFilter ?? "all"}`;
   const [trackedListKey, setTrackedListKey] = useState(listKey);
   const [pagesCache, setPagesCache] = useState<Record<number, ConversationSummary[]>>({});
   const [cursorsByPage, setCursorsByPage] = useState<Record<number, string | null>>({ 1: null });
   const { mutate: markConversationRead } = useMarkConversationRead();
+  const createSavedView = useCreateInboxSavedView();
   const {
     data: membersData,
     isLoading: isMembersLoading,
@@ -122,6 +140,28 @@ export function ConversationsList({
     setDebouncedSearch("");
   };
 
+  const saveCurrentView = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSaveViewError(null);
+    setSaveViewMessage(null);
+    createSavedView.mutate(
+      {
+        name: savedViewName,
+        filter,
+        channel: channelFilter,
+        assigneeFilter: assigneeFilter ?? "all",
+      },
+      {
+        onSuccess: () => {
+          setSavingView(false);
+          setSavedViewName("");
+          setSaveViewMessage("Saved view is now shared with your team.");
+        },
+        onError: (error) => setSaveViewError(error.message),
+      },
+    );
+  };
+
   if (listKey !== trackedListKey) {
     setTrackedListKey(listKey);
     setPage(1);
@@ -133,6 +173,10 @@ export function ConversationsList({
     const timer = setTimeout(() => setDebouncedSearch(search), 200);
     return () => clearTimeout(timer);
   }, [search]);
+
+  useEffect(() => {
+    if (savingView) savedViewNameRef.current?.focus();
+  }, [savingView]);
 
   const {
     data: conversationsData,
@@ -297,13 +341,15 @@ export function ConversationsList({
                     value={channelFilter ?? "all"}
                     onValueChange={(value) => {
                       setChannelFilter(value === "all" ? null : (value as InboxChannel));
+                      setSaveViewMessage(null);
+                      onFacetChange();
                       onSelectConversation(null);
                     }}
                   >
                     <SelectTrigger
                       aria-label="Filter by channel"
                       aria-labelledby="channel-filter-label"
-                      className="w-full rounded-lg bg-background"
+                      className="h-11 w-full rounded-lg bg-background sm:h-9"
                     >
                       <SelectValue />
                     </SelectTrigger>
@@ -328,13 +374,15 @@ export function ConversationsList({
                     value={assigneeFilter ?? "all"}
                     onValueChange={(value) => {
                       setAssigneeFilter(value === "all" ? null : value);
+                      setSaveViewMessage(null);
+                      onFacetChange();
                       onSelectConversation(null);
                     }}
                   >
                     <SelectTrigger
                       aria-label="Filter by assignee"
                       aria-labelledby="assignee-filter-label"
-                      className="w-full rounded-lg bg-background"
+                      className="h-11 w-full rounded-lg bg-background sm:h-9"
                     >
                       <SelectValue />
                     </SelectTrigger>
@@ -364,6 +412,80 @@ export function ConversationsList({
                     </span>
                   ) : null}
                 </div>
+                {savingView ? (
+                  <form
+                    onSubmit={saveCurrentView}
+                    className="space-y-2 border-t border-border pt-3"
+                  >
+                    <Input
+                      ref={savedViewNameRef}
+                      aria-label="Shared view name"
+                      className="h-11 text-base sm:h-9 sm:text-sm"
+                      placeholder="e.g. Billing questions"
+                      maxLength={40}
+                      value={savedViewName}
+                      onChange={(event) => setSavedViewName(event.target.value)}
+                    />
+                    {saveViewError ? (
+                      <p role="alert" className="text-xs text-destructive">
+                        {saveViewError}
+                      </p>
+                    ) : null}
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-11 sm:h-8"
+                        onClick={() => {
+                          setSavingView(false);
+                          setSaveViewError(null);
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="submit"
+                        size="sm"
+                        className="h-11 sm:h-8"
+                        disabled={!savedViewName.trim() || createSavedView.isPending}
+                      >
+                        {createSavedView.isPending ? "Saving…" : "Save view"}
+                      </Button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="border-t border-border pt-3">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-11 w-full rounded-lg sm:h-9"
+                      disabled={!hasFacetFilters}
+                      title={
+                        hasFacetFilters
+                          ? "Share these filters with your team"
+                          : "Choose a filter first"
+                      }
+                      onClick={() => {
+                        setSavingView(true);
+                        setSaveViewMessage(null);
+                      }}
+                    >
+                      Save as shared view
+                    </Button>
+                    <p className="mt-1.5 text-center text-xs text-muted-foreground">
+                      {hasFacetFilters
+                        ? "Your team can use this view."
+                        : "Add a channel or teammate filter first."}
+                    </p>
+                  </div>
+                )}
+                {saveViewMessage ? (
+                  <output className="block text-center text-xs text-muted-foreground">
+                    {saveViewMessage}
+                  </output>
+                ) : null}
               </div>
             </PopoverContent>
           </Popover>
@@ -375,6 +497,8 @@ export function ConversationsList({
                 type="button"
                 onClick={() => {
                   setChannelFilter(null);
+                  setSaveViewMessage(null);
+                  onFacetChange();
                   onSelectConversation(null);
                 }}
                 className="inline-flex h-7 items-center gap-1.5 rounded-md bg-muted px-2 text-xs text-foreground hover:bg-muted/70 focus-visible:outline-2 focus-visible:outline-ring"
@@ -389,6 +513,8 @@ export function ConversationsList({
                 type="button"
                 onClick={() => {
                   setAssigneeFilter(null);
+                  setSaveViewMessage(null);
+                  onFacetChange();
                   onSelectConversation(null);
                 }}
                 className="inline-flex h-7 items-center gap-1.5 rounded-md bg-muted px-2 text-xs text-foreground hover:bg-muted/70 focus-visible:outline-2 focus-visible:outline-ring"

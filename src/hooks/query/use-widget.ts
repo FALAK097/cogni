@@ -33,6 +33,15 @@ export type ConversationFilter =
   | "closed"
   | "snoozed";
 
+export interface InboxSavedView {
+  id: string;
+  name: string;
+  filter: ConversationFilter;
+  channel: InboxChannel | null;
+  assigneeFilter: string;
+  createdByMembershipId: string | null;
+}
+
 export interface WidgetSessionSummary {
   id: string;
   visitorId: string;
@@ -418,12 +427,13 @@ export function useConversations(
     assignee?: string;
   } = {},
 ) {
+  const workspaceId = useActiveWorkspaceId() ?? "";
   const search = options.search?.trim() || null;
   const cursor = options.cursor ?? null;
 
   return useQuery<ConversationsResponse>({
     queryKey: [
-      ...queryKeys.conversations.list(),
+      ...queryKeys.conversations.list(workspaceId),
       options.limit ?? 20,
       cursor,
       search,
@@ -446,15 +456,79 @@ export function useConversations(
       });
       return requireData(data, error, "Failed to fetch conversations");
     },
-    placeholderData: (previousData) => previousData,
+    enabled: Boolean(workspaceId),
+    placeholderData: (previousData, previousQuery) =>
+      previousQuery?.queryKey[2] === workspaceId ? previousData : undefined,
     refetchInterval: 8_000,
     refetchOnWindowFocus: true,
   });
 }
 
+export function useInboxSavedViews() {
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useQuery<{ views: InboxSavedView[] }>({
+    queryKey: queryKeys.conversations.savedViews(workspaceId),
+    enabled: Boolean(workspaceId),
+    queryFn: async () => {
+      const { data, error } = await api.GET<{ views: InboxSavedView[] }>(
+        "/api/dashboard/inbox-views",
+      );
+      return requireData(data, error, "Failed to fetch saved inbox views");
+    },
+  });
+}
+
+export function useCreateInboxSavedView() {
+  const queryClient = useQueryClient();
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useMutation({
+    mutationFn: async (view: Omit<InboxSavedView, "id" | "createdByMembershipId">) => {
+      const response = await fetch("/api/dashboard/inbox-views", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(view),
+      });
+      const result: { view?: InboxSavedView; error?: string } = await response
+        .json()
+        .catch(() => ({}));
+      if (!response.ok || !result.view) {
+        throw new Error(result.error ?? "Failed to save inbox view.");
+      }
+      return result.view;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.conversations.savedViews(workspaceId),
+      });
+    },
+  });
+}
+
+export function useDeleteInboxSavedView() {
+  const queryClient = useQueryClient();
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useMutation({
+    mutationFn: async (viewId: string) => {
+      const response = await fetch(`/api/dashboard/inbox-views/${viewId}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        const result: { error?: string } = await response.json().catch(() => ({}));
+        throw new Error(result.error ?? "Failed to delete inbox view.");
+      }
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.conversations.savedViews(workspaceId),
+      });
+    },
+  });
+}
+
 export function useConversation(conversationId: string) {
+  const workspaceId = useActiveWorkspaceId() ?? "";
   return useQuery<ConversationDetail>({
-    queryKey: queryKeys.conversations.detail(conversationId),
+    queryKey: queryKeys.conversations.detail(workspaceId, conversationId),
     queryFn: async () => {
       const { data, error } = await api.GET<ConversationDetail>(
         "/api/conversations/{conversation_id}",
@@ -464,7 +538,7 @@ export function useConversation(conversationId: string) {
       );
       return requireData(data, error, "Failed to fetch conversation");
     },
-    enabled: Boolean(conversationId),
+    enabled: Boolean(conversationId && workspaceId),
     refetchInterval: 5_000,
     refetchOnWindowFocus: true,
   });
@@ -507,8 +581,7 @@ export function useSetConversationAiPaused() {
       );
       return requireData(data, error, "Failed to update AI replies");
     },
-    onSuccess: (_data, variables) =>
-      invalidateConversationQueries(queryClient, variables.conversationId),
+    onSuccess: () => invalidateConversationQueries(queryClient),
   });
 }
 
@@ -532,8 +605,7 @@ export function useSetConversationStatus() {
       );
       return requireData(data, error, "Failed to update conversation status");
     },
-    onSuccess: (_data, variables) =>
-      invalidateConversationQueries(queryClient, variables.conversationId),
+    onSuccess: () => invalidateConversationQueries(queryClient),
   });
 }
 
@@ -560,17 +632,12 @@ export function useSetConversationSnooze() {
       );
       return requireData(data, error, "Failed to update snooze");
     },
-    onSuccess: (_data, variables) =>
-      invalidateConversationQueries(queryClient, variables.conversationId),
+    onSuccess: () => invalidateConversationQueries(queryClient),
   });
 }
 
-function invalidateConversationQueries(
-  queryClient: ReturnType<typeof useQueryClient>,
-  conversationId: string,
-) {
+function invalidateConversationQueries(queryClient: ReturnType<typeof useQueryClient>) {
   void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all });
-  void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.detail(conversationId) });
 }
 
 function useConversationStateAction(action: "assign" | "takeover") {
@@ -593,8 +660,8 @@ function useConversationStateAction(action: "assign" | "takeover") {
           : "Failed to assign conversation",
       );
     },
-    onSuccess: (_data, conversationId) => {
-      invalidateConversationQueries(queryClient, conversationId);
+    onSuccess: () => {
+      invalidateConversationQueries(queryClient);
     },
   });
 }
@@ -619,11 +686,8 @@ export function useMarkConversationRead() {
       );
       return requireData(data, error, "Failed to mark conversation as read");
     },
-    onSuccess: (_data, { conversationId }) => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all });
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.conversations.detail(conversationId),
-      });
+    onSuccess: () => {
+      invalidateConversationQueries(queryClient);
     },
     onError: () => {
       toast({
@@ -658,11 +722,8 @@ export function useSendConversationMessage() {
       );
       return requireData(data, error, "Failed to send message");
     },
-    onSuccess: (_data, variables) => {
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.conversations.detail(variables.conversationId),
-      });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all });
+    onSuccess: () => {
+      invalidateConversationQueries(queryClient);
     },
   });
 }

@@ -1,15 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+import { Trash2 } from "@/components/icons";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 
 import {
   Select,
   SelectContent,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useConversations } from "@/hooks/query";
+import { useConversations, useDeleteInboxSavedView, useInboxSavedViews } from "@/hooks/query";
 import type { ConversationFilter } from "@/hooks/query";
 import { useActiveWorkspaceId } from "@/hooks/use-auth";
 import type {
@@ -62,12 +77,34 @@ export function WidgetConversations({
     initialConversationId,
   );
   const [filter, setFilter] = useState<ConversationFilter>("all");
+  const [selectedSavedViewId, setSelectedSavedViewId] = useState<string | null>(null);
+  const [viewSelectionRevision, setViewSelectionRevision] = useState(0);
+  const [deleteViewOpen, setDeleteViewOpen] = useState(false);
+  const [deleteViewError, setDeleteViewError] = useState<string | null>(null);
   const [composerDrafts, setComposerDrafts] = useState<Record<string, ConversationComposerDraft>>(
     {},
   );
   const workspaceId = useActiveWorkspaceId() ?? "";
+  const previousWorkspaceId = useRef(workspaceId);
+  const {
+    data: savedViewsData,
+    isError: savedViewsError,
+    refetch: refetchSavedViews,
+  } = useInboxSavedViews();
+  const deleteSavedView = useDeleteInboxSavedView();
+  const savedViews = savedViewsData?.views ?? [];
+  const selectedSavedView = savedViews.find((view) => view.id === selectedSavedViewId) ?? null;
   const [prevInitialConversationId, setPrevInitialConversationId] = useState(initialConversationId);
   const [prevFilter, setPrevFilter] = useState(filter);
+
+  useEffect(() => {
+    if (previousWorkspaceId.current === workspaceId) return;
+    previousWorkspaceId.current = workspaceId;
+    setSelectedConversationId(null);
+    setSelectedSavedViewId(null);
+    setFilter("all");
+    setViewSelectionRevision((revision) => revision + 1);
+  }, [workspaceId]);
 
   if (initialConversationId !== prevInitialConversationId) {
     setPrevInitialConversationId(initialConversationId);
@@ -82,6 +119,11 @@ export function WidgetConversations({
   }
 
   const { data: conversationsData } = useConversations({ limit: 20, filter });
+  const canDeleteSavedView = Boolean(
+    selectedSavedView &&
+    (canManage ||
+      selectedSavedView.createdByMembershipId === conversationsData?.currentMembershipId),
+  );
 
   const counts = conversationsData?.counts ?? EMPTY_COUNTS;
   const activeView = FILTER_TABS.find((tab) => tab.value === filter);
@@ -102,21 +144,31 @@ export function WidgetConversations({
           Inbox
         </h1>
 
-        <div className="mt-2 lg:mt-3">
+        <div className="mt-2 flex gap-1.5 lg:mt-3">
           <Select
-            value={filter}
+            value={selectedSavedView?.id ?? filter}
             onValueChange={(value) => {
-              if (value) setFilter(value as ConversationFilter);
+              if (!value) return;
+              setSelectedConversationId(null);
+              const savedView = savedViews.find((view) => view.id === value);
+              if (savedView) {
+                setSelectedSavedViewId(savedView.id);
+                setFilter(savedView.filter);
+              } else {
+                setSelectedSavedViewId(null);
+                setFilter(value as ConversationFilter);
+              }
+              setViewSelectionRevision((revision) => revision + 1);
             }}
           >
             <SelectTrigger
               aria-label="Inbox view"
-              className="h-10 w-full justify-between rounded-xl border-border/60 bg-background px-3 shadow-none"
+              className="h-11 min-w-0 flex-1 justify-between rounded-xl border-border/60 bg-background px-3 shadow-none sm:h-10"
             >
               <SelectValue placeholder="Choose an inbox view">
-                {activeView?.label ?? "Choose an inbox view"}
+                {selectedSavedView?.name ?? activeView?.label ?? "Choose an inbox view"}
               </SelectValue>
-              {activeViewCount > 0 ? (
+              {!selectedSavedView && activeViewCount > 0 ? (
                 <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                   {activeViewCount} {activeCountKind}
                 </span>
@@ -138,9 +190,54 @@ export function WidgetConversations({
                   </SelectItem>
                 );
               })}
+              {savedViews.length > 0 ? (
+                <>
+                  <SelectSeparator />
+                  <SelectLabel>Shared views</SelectLabel>
+                </>
+              ) : null}
+              {savedViews.map((view) => (
+                <SelectItem key={view.id} value={view.id} className="min-h-10 rounded-lg">
+                  <span className="min-w-0 truncate">{view.name}</span>
+                  <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+                    Shared
+                  </span>
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
+          {canDeleteSavedView && selectedSavedView ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-11 shrink-0 rounded-xl text-muted-foreground hover:text-destructive sm:size-10"
+              aria-label={`Delete saved view ${selectedSavedView.name}`}
+              title="Delete saved view"
+              onClick={() => {
+                setDeleteViewError(null);
+                setDeleteViewOpen(true);
+              }}
+            >
+              <Trash2 className="size-4" aria-hidden="true" />
+            </Button>
+          ) : null}
         </div>
+        {savedViewsError ? (
+          <p
+            role="alert"
+            className="mt-2 flex items-center justify-between gap-2 text-xs text-destructive"
+          >
+            Could not load shared views.
+            <button
+              type="button"
+              className="shrink-0 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-ring"
+              onClick={() => void refetchSavedViews()}
+            >
+              Retry
+            </button>
+          </p>
+        ) : null}
       </header>
 
       <div className="flex min-h-0 flex-1 gap-2.5 p-2 sm:px-4 sm:pb-4">
@@ -152,10 +249,21 @@ export function WidgetConversations({
           )}
         >
           <ConversationsList
+            key={viewSelectionRevision}
             filter={filter}
             selectedConversationId={selectedConversationId}
             onSelectConversation={setSelectedConversationId}
-            onClearFilter={() => setFilter("all")}
+            onClearFilter={() => {
+              setSelectedSavedViewId(null);
+              setFilter("all");
+            }}
+            initialChannel={selectedSavedView?.channel ?? null}
+            initialAssignee={
+              selectedSavedView?.assigneeFilter === "all"
+                ? null
+                : (selectedSavedView?.assigneeFilter ?? null)
+            }
+            onFacetChange={() => setSelectedSavedViewId(null)}
           />
         </div>
 
@@ -206,6 +314,40 @@ export function WidgetConversations({
           )}
         </div>
       </div>
+      <AlertDialog open={deleteViewOpen} onOpenChange={setDeleteViewOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete “{selectedSavedView?.name}”?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This shared view will be removed for everyone in this workspace. Conversations are not
+              affected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deleteViewError ? <p className="text-sm text-destructive">{deleteViewError}</p> : null}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteSavedView.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!selectedSavedView || deleteSavedView.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 focus-visible:ring-destructive"
+              onClick={(event) => {
+                event.preventDefault();
+                if (!selectedSavedView) return;
+                deleteSavedView.mutate(selectedSavedView.id, {
+                  onSuccess: () => {
+                    setDeleteViewOpen(false);
+                    setSelectedSavedViewId(null);
+                    setFilter("all");
+                    setViewSelectionRevision((revision) => revision + 1);
+                  },
+                  onError: (error) => setDeleteViewError(error.message),
+                });
+              }}
+            >
+              {deleteSavedView.isPending ? "Deleting…" : "Delete view"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

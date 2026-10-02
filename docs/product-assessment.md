@@ -145,6 +145,13 @@ temporary viewport override was reset after capturing the final Agent view.
   shared plus/loading icons and an exposed busy state. Formatting, lint, typecheck, cursor tests,
   conversation draft/scroll tests and React Doctor 100/100 passed. Browser verification of these
   latest changes is not verified because local-app navigation was blocked by the browser policy.
+- Inbox now supports workspace-shared saved filter views inside the existing view picker. Members
+  can save channel/assignee filters with an optional built-in status view; list and detail caches
+  are keyed by workspace to avoid stale cross-workspace display. Creation validates assignee
+  membership, names are case-insensitively unique per workspace, and deletion is limited to the
+  creator or an owner. Migration `0005_inbox_saved_views.sql` and three local PostgreSQL tests
+  cover workspace isolation, foreign assignees, uniqueness, and delete permissions. Formatting,
+  lint, typecheck and production build pass. Browser interaction for this UI remains unverified.
 - Final production-build browser check confirmed all three sidebar destinations, Agent →
   Knowledge navigation with the indexed QA source, Settings → Connections and explicit
   Connect names. Insights displayed No data for missing response/feedback samples and
