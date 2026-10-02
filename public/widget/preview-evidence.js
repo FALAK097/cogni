@@ -39,7 +39,14 @@ export function parseWidgetPreviewEvidence(headerValue) {
     if (value.grounded !== sources.length > 0) return null;
     if (value.outcome === "handoff" && (value.grounded || sources.length > 0)) return null;
 
-    return { outcome: value.outcome, grounded: value.grounded, sources };
+    const prompt =
+      typeof value.prompt === "string" && value.prompt.length <= 1_000 ? value.prompt : undefined;
+    return {
+      outcome: value.outcome,
+      grounded: value.grounded,
+      sources,
+      ...(prompt === undefined ? {} : { prompt }),
+    };
   } catch {
     return null;
   }

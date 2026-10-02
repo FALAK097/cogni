@@ -31,6 +31,8 @@ export const queryKeys = {
   },
   widget: {
     all: ["widget"] as const,
+    agentTests: (workspaceId: string) =>
+      [...queryKeys.widget.all, "agent-tests", workspaceId] as const,
     sessions: () => [...queryKeys.widget.all, "sessions"] as const,
     session: (id: string) => [...queryKeys.widget.all, "session", id] as const,
     config: (workspaceId: string) => [...queryKeys.widget.all, "config", workspaceId] as const,

@@ -8,11 +8,18 @@ import { useActiveWorkspaceId } from "@/hooks/use-auth";
 import type { InboxChannel } from "@/features/conversations/inbox-pagination";
 import type { WidgetWidgetConfig, WidgetBorderRadiusStyle } from "@/features/widget/domain";
 import { toast } from "@/components/ui/use-toast";
+import type { AgentTestCaseInput } from "@/features/agent-tests/input";
 
 export type DashboardWidgetConfig = Omit<WidgetWidgetConfig, "borderRadius"> & {
   agentName: string;
   allowedDomains: string[];
   borderRadius: WidgetBorderRadiusStyle;
+};
+
+export type AgentTestCase = AgentTestCaseInput & {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export interface IpData {
@@ -645,6 +652,73 @@ export function useDeleteInboxMacro() {
       void queryClient.invalidateQueries({
         queryKey: queryKeys.conversations.macros(workspaceId),
       });
+    },
+  });
+}
+
+export function useAgentTestCases() {
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useQuery<{ cases: AgentTestCase[] }>({
+    queryKey: queryKeys.widget.agentTests(workspaceId),
+    enabled: Boolean(workspaceId),
+    queryFn: async () => {
+      const response = await fetch("/api/dashboard/agent-test-cases");
+      const result: { cases?: AgentTestCase[]; error?: string } = await response
+        .json()
+        .catch(() => ({}));
+      if (!response.ok || !result.cases)
+        throw new Error(result.error ?? "Failed to load agent tests.");
+      return { cases: result.cases };
+    },
+  });
+}
+
+export function useSaveAgentTestCase() {
+  const queryClient = useQueryClient();
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useMutation({
+    mutationFn: async (input: AgentTestCaseInput & { id?: string }) => {
+      const response = await fetch(
+        input.id
+          ? `/api/dashboard/agent-test-cases/${encodeURIComponent(input.id)}`
+          : "/api/dashboard/agent-test-cases",
+        {
+          method: input.id ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: input.title,
+            prompt: input.prompt,
+            expectedOutcome: input.expectedOutcome,
+          }),
+        },
+      );
+      const result: { case?: AgentTestCase; error?: string } = await response
+        .json()
+        .catch(() => ({}));
+      if (!response.ok || !result.case)
+        throw new Error(result.error ?? "Failed to save agent test.");
+      return result.case;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.widget.agentTests(workspaceId) });
+    },
+  });
+}
+
+export function useDeleteAgentTestCase() {
+  const queryClient = useQueryClient();
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useMutation({
+    mutationFn: async (caseId: string) => {
+      const response = await fetch(
+        `/api/dashboard/agent-test-cases/${encodeURIComponent(caseId)}`,
+        { method: "DELETE" },
+      );
+      const result: { error?: string } = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error ?? "Failed to delete agent test.");
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.widget.agentTests(workspaceId) });
     },
   });
 }

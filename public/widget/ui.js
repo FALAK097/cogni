@@ -968,7 +968,7 @@ async function callWidgetChat(userMessage, interactionId) {
     if (state.preview && !responseCompleted) {
       window.dispatchEvent(
         new CustomEvent(PREVIEW_EVIDENCE_EVENT, {
-          detail: { outcome: "error", grounded: false, sources: [] },
+          detail: { outcome: "error", grounded: false, sources: [], prompt: userMessage },
         }),
       );
     }

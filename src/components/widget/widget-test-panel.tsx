@@ -1,13 +1,34 @@
 import Link from "next/link";
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 
-import { BookOpen, CheckCircle2, MessageCircle } from "@/components/icons";
+import {
+  BookOpen,
+  CheckCircle2,
+  MessageCircle,
+  Pencil,
+  Play,
+  Plus,
+  Trash2,
+} from "@/components/icons";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  useAgentTestCases,
+  useDeleteAgentTestCase,
+  useSaveAgentTestCase,
+  type AgentTestCase,
+} from "@/hooks/query";
+import {
+  matchesAgentTestOutcome,
+  type AgentTestExpectedOutcome,
+} from "@/features/agent-tests/input";
 
 export type WidgetPreviewEvidence = {
   outcome: "answer" | "handoff" | "error";
   grounded: boolean;
   sources: { title: string }[];
+  prompt?: string;
 };
 
 function getHandoffTerms(value: string) {
@@ -22,15 +43,27 @@ export function WidgetTestPanel({
   suggestions,
   evidence,
   sendingPrompt,
+  canManage,
   onTryPrompt,
 }: {
   escalationKeywords: string;
   suggestions: string[];
   evidence: WidgetPreviewEvidence | null;
   sendingPrompt: string | null;
+  canManage: boolean;
   onTryPrompt: (prompt: string) => Promise<boolean>;
 }) {
   const [tryError, setTryError] = useState<string | null>(null);
+  const [editingCase, setEditingCase] = useState<AgentTestCase | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [title, setTitle] = useState("");
+  const [prompt, setPrompt] = useState("");
+  const [expectedOutcome, setExpectedOutcome] =
+    useState<AgentTestExpectedOutcome>("grounded_answer");
+  const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
+  const casesQuery = useAgentTestCases();
+  const saveCase = useSaveAgentTestCase();
+  const deleteCase = useDeleteAgentTestCase();
   const handoffTerms = getHandoffTerms(escalationKeywords);
   const visibleTerms = handoffTerms.slice(0, 5);
   const visibleSuggestions = [...new Set(suggestions.map((suggestion) => suggestion.trim()))]
@@ -45,6 +78,44 @@ export function WidgetTestPanel({
       }
     } catch {
       setTryError("Couldn't send that test. Retry the preview and try again.");
+    }
+  };
+
+  const openCreate = () => {
+    setEditingCase(null);
+    setTitle("");
+    setPrompt("");
+    setExpectedOutcome("grounded_answer");
+    setShowForm(true);
+  };
+
+  const openEdit = (testCase: AgentTestCase) => {
+    setEditingCase(testCase);
+    setTitle(testCase.title);
+    setPrompt(testCase.prompt);
+    setExpectedOutcome(testCase.expectedOutcome);
+    setShowForm(true);
+  };
+
+  const runCase = async (testCase: AgentTestCase) => {
+    setActiveCaseId(testCase.id);
+    const started = await onTryPrompt(testCase.prompt).catch(() => false);
+    if (!started) setActiveCaseId(null);
+  };
+
+  const submitCase = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    try {
+      await saveCase.mutateAsync({
+        ...(editingCase ? { id: editingCase.id } : {}),
+        title,
+        prompt,
+        expectedOutcome,
+      });
+      setShowForm(false);
+      setTryError(null);
+    } catch (error) {
+      setTryError(error instanceof Error ? error.message : "Couldn't save this test.");
     }
   };
 
@@ -163,6 +234,185 @@ export function WidgetTestPanel({
           </div>
         </li>
       </ol>
+
+      <section
+        aria-labelledby="saved-tests-heading"
+        className="space-y-3 rounded-xl border border-border/70 bg-card p-4"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h3 id="saved-tests-heading" className="text-sm font-semibold">
+              Saved tests
+            </h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Reusable prompts; each run stays in preview.
+            </p>
+          </div>
+          {canManage ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 rounded-lg"
+              onClick={openCreate}
+            >
+              <Plus className="size-4" aria-hidden="true" /> Add test
+            </Button>
+          ) : null}
+        </div>
+        {casesQuery.isLoading ? (
+          <p className="text-sm text-muted-foreground">Loading saved tests…</p>
+        ) : null}
+        {casesQuery.isError ? (
+          <p role="alert" className="text-sm text-destructive">
+            {casesQuery.error.message}
+          </p>
+        ) : null}
+        {casesQuery.data?.cases.length === 0 ? (
+          <p className="rounded-lg bg-muted/40 px-3 py-3 text-sm text-muted-foreground">
+            {canManage
+              ? "Save a prompt to rerun your most important agent checks."
+              : "No saved tests in this workspace yet."}
+          </p>
+        ) : null}
+        <ul className="space-y-2">
+          {casesQuery.data?.cases.map((testCase) => {
+            const outcomeLabel =
+              testCase.expectedOutcome === "grounded_answer"
+                ? "Grounded answer"
+                : testCase.expectedOutcome === "no_evidence"
+                  ? "No evidence"
+                  : "Human handoff";
+            const evaluated =
+              activeCaseId === testCase.id && evidence && evidence.prompt === testCase.prompt
+                ? evidence
+                : null;
+            const passed = evaluated
+              ? matchesAgentTestOutcome(testCase.expectedOutcome, evaluated)
+              : false;
+            return (
+              <li key={testCase.id} className="rounded-lg border border-border/60 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="break-words text-sm font-medium">{testCase.title}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{outcomeLabel}</p>
+                    <p className="mt-2 line-clamp-2 break-words text-sm text-muted-foreground">
+                      {testCase.prompt}
+                    </p>
+                    {evaluated ? (
+                      <p
+                        className={`mt-2 text-xs font-medium ${passed ? "text-primary" : "text-muted-foreground"}`}
+                      >
+                        {evaluated.outcome === "error"
+                          ? "Run didn’t complete; try again"
+                          : passed
+                            ? "Passed"
+                            : "Result differs from expectation"}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Button
+                      type="button"
+                      size="icon-sm"
+                      variant="ghost"
+                      aria-label={`Run ${testCase.title}`}
+                      disabled={sendingPrompt !== null}
+                      onClick={() => void runCase(testCase)}
+                    >
+                      <Play className="size-4" aria-hidden="true" />
+                    </Button>
+                    {canManage ? (
+                      <>
+                        <Button
+                          type="button"
+                          size="icon-sm"
+                          variant="ghost"
+                          aria-label={`Edit ${testCase.title}`}
+                          onClick={() => openEdit(testCase)}
+                        >
+                          <Pencil className="size-4" aria-hidden="true" />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon-sm"
+                          variant="ghost"
+                          aria-label={`Delete ${testCase.title}`}
+                          disabled={deleteCase.isPending}
+                          onClick={() =>
+                            void deleteCase
+                              .mutateAsync(testCase.id)
+                              .catch((error: unknown) =>
+                                setTryError(
+                                  error instanceof Error
+                                    ? error.message
+                                    : "Couldn't delete this test.",
+                                ),
+                              )
+                          }
+                        >
+                          <Trash2 className="size-4" aria-hidden="true" />
+                        </Button>
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+        {showForm ? (
+          <form
+            className="space-y-3 rounded-lg border border-border/70 bg-muted/20 p-3"
+            onSubmit={(event) => void submitCase(event)}
+          >
+            <label htmlFor="agent-test-title" className="block space-y-1.5 text-sm font-medium">
+              Test name
+              <Input
+                id="agent-test-title"
+                maxLength={80}
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                required
+                placeholder="Billing question"
+              />
+            </label>
+            <label htmlFor="agent-test-prompt" className="block space-y-1.5 text-sm font-medium">
+              Prompt
+              <Textarea
+                id="agent-test-prompt"
+                maxLength={1_000}
+                value={prompt}
+                onChange={(event) => setPrompt(event.target.value)}
+                required
+                placeholder="How do I update my billing details?"
+              />
+            </label>
+            <label className="block space-y-1.5 text-sm font-medium">
+              Expected result
+              <select
+                className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+                value={expectedOutcome}
+                onChange={(event) =>
+                  setExpectedOutcome(event.target.value as AgentTestExpectedOutcome)
+                }
+              >
+                <option value="grounded_answer">Grounded answer</option>
+                <option value="no_evidence">No evidence</option>
+                <option value="human_handoff">Human handoff</option>
+              </select>
+            </label>
+            <div className="flex justify-end gap-2">
+              <Button type="button" size="sm" variant="ghost" onClick={() => setShowForm(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" size="sm" disabled={saveCase.isPending}>
+                {saveCase.isPending ? "Saving…" : editingCase ? "Save changes" : "Save test"}
+              </Button>
+            </div>
+          </form>
+        ) : null}
+      </section>
 
       {tryError ? (
         <p role="alert" className="text-sm text-destructive">

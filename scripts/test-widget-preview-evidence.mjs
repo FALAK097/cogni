@@ -80,3 +80,18 @@ test("preview evidence ignores oversized headers and invalid titles", () => {
     0,
   );
 });
+
+test("preview evidence keeps only a bounded prompt for matching a saved preview test", () => {
+  assert.deepEqual(
+    previewEvidence.parseWidgetPreviewEvidence(
+      encode({ outcome: "answer", grounded: false, sources: [], prompt: "  no evidence?  " }),
+    ),
+    { outcome: "answer", grounded: false, sources: [], prompt: "  no evidence?  " },
+  );
+  assert.equal(
+    previewEvidence.parseWidgetPreviewEvidence(
+      encode({ outcome: "answer", grounded: false, sources: [], prompt: "x".repeat(1_001) }),
+    )?.prompt,
+    undefined,
+  );
+});

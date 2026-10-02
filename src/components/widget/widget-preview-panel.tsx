@@ -25,6 +25,13 @@ function isPreviewEvidence(value: unknown): value is WidgetPreviewEvidence {
     return false;
   }
 
+  if (
+    evidence.prompt !== undefined &&
+    (typeof evidence.prompt !== "string" || evidence.prompt.length > 1_000)
+  ) {
+    return false;
+  }
+
   const sources = evidence.sources;
   if (
     !sources.every(

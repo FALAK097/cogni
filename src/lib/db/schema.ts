@@ -3,6 +3,7 @@ import {
   index,
   integer,
   pgTable,
+  pgEnum,
   text,
   timestamp,
   uniqueIndex,
@@ -290,6 +291,40 @@ export const inboxMacro = pgTable(
   (table) => [
     uniqueIndex("inbox_macro_workspace_name_key").on(table.workspaceId, sql`lower(${table.name})`),
     index("inbox_macro_workspace_createdAt_idx").on(table.workspaceId, table.createdAt),
+  ],
+);
+
+export const agentTestExpectedOutcome = pgEnum("agent_test_expected_outcome", [
+  "grounded_answer",
+  "no_evidence",
+  "human_handoff",
+]);
+
+export const agentTestCase = pgTable(
+  "agent_test_case",
+  {
+    id: text().primaryKey().notNull(),
+    title: text().notNull(),
+    prompt: text().notNull(),
+    expectedOutcome: agentTestExpectedOutcome().notNull(),
+    createdAt: timestampString()
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+    updatedAt: timestampString().notNull(),
+    workspaceId: text()
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    createdByMembershipId: text().references(() => workspaceMember.id, {
+      onDelete: "set null",
+      onUpdate: "cascade",
+    }),
+  },
+  (table) => [
+    uniqueIndex("agent_test_case_workspace_title_key").on(
+      table.workspaceId,
+      sql`lower(${table.title})`,
+    ),
+    index("agent_test_case_workspace_createdAt_idx").on(table.workspaceId, table.createdAt),
   ],
 );
 

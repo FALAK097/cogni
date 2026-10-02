@@ -212,6 +212,7 @@ export function WidgetCustomizer({
   const saveWidgetConfig = saveWidgetConfigMutation.mutateAsync;
 
   const tryPreviewPrompt = useCallback((prompt: string) => {
+    setPreviewEvidence(null);
     setSendingTestPrompt(prompt);
     setShowMobilePreview(true);
     return waitForPreviewWidget(prompt).finally(() => setSendingTestPrompt(null));
@@ -689,6 +690,7 @@ export function WidgetCustomizer({
                   suggestions={config.suggestions}
                   evidence={previewEvidence}
                   sendingPrompt={sendingTestPrompt}
+                  canManage={canManage}
                   onTryPrompt={tryPreviewPrompt}
                 />
               </TabsContent>

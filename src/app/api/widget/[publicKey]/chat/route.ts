@@ -109,6 +109,7 @@ type WidgetPreviewEvidence = {
   outcome: "answer" | "handoff";
   grounded: boolean;
   sources: { title: string }[];
+  prompt: string;
 };
 
 function streamHeaders(
@@ -434,7 +435,7 @@ export async function POST(
     return respondWithText(
       handoffReply,
       isPreview && shouldEscalate
-        ? { outcome: "handoff", grounded: false, sources: [] }
+        ? { outcome: "handoff", grounded: false, sources: [], prompt: body.message }
         : undefined,
     );
   }
@@ -635,6 +636,7 @@ export async function POST(
                   outcome: "answer",
                   grounded: result.sources.length > 0,
                   sources: result.sources,
+                  prompt: body.message,
                 }
               : undefined,
           ),
