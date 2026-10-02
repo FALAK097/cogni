@@ -5,6 +5,15 @@ import { useState } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useConversations } from "@/hooks/query";
 import type { ConversationFilter } from "@/hooks/query";
+import { useActiveWorkspaceId } from "@/hooks/use-auth";
+import type {
+  ConversationComposerDraft,
+  ConversationComposerDraftChange,
+} from "@/features/conversations/draft-state";
+import {
+  EMPTY_CONVERSATION_COMPOSER_DRAFT,
+  updateConversationComposerDrafts,
+} from "@/features/conversations/draft-state";
 import { cn } from "@/lib/utils";
 
 import { ConversationDetail } from "./conversation-detail";
@@ -45,6 +54,10 @@ export function WidgetConversations({
     initialConversationId,
   );
   const [filter, setFilter] = useState<ConversationFilter>("all");
+  const [composerDrafts, setComposerDrafts] = useState<Record<string, ConversationComposerDraft>>(
+    {},
+  );
+  const workspaceId = useActiveWorkspaceId() ?? "";
   const [prevInitialConversationId, setPrevInitialConversationId] = useState(initialConversationId);
   const [prevFilter, setPrevFilter] = useState(filter);
 
@@ -63,6 +76,13 @@ export function WidgetConversations({
   const { data: conversationsData } = useConversations({ limit: 20, filter });
 
   const counts = conversationsData?.counts ?? EMPTY_COUNTS;
+  const composerDraftKey = `${workspaceId}:${selectedConversationId ?? ""}`;
+  const composerDraft = composerDrafts[composerDraftKey] ?? EMPTY_CONVERSATION_COMPOSER_DRAFT;
+  const updateComposerDraft: ConversationComposerDraftChange = (update) => {
+    setComposerDrafts((current) =>
+      updateConversationComposerDrafts(current, composerDraftKey, update),
+    );
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-sidebar">
@@ -155,6 +175,8 @@ export function WidgetConversations({
               onBack={() => setSelectedConversationId(null)}
               onSelectConversation={setSelectedConversationId}
               part="chat"
+              composerDraft={composerDraft}
+              onComposerDraftChange={updateComposerDraft}
             />
           ) : (
             <div className="flex h-full items-center justify-center p-6">

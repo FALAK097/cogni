@@ -2,6 +2,7 @@
 
 import { format, formatDistanceToNow, isToday, isYesterday } from "date-fns";
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 import { Streamdown } from "streamdown";
@@ -65,7 +66,11 @@ import type { ConversationDetail as ConversationDetailData, WidgetMessage } from
 import { generateAvatarUrl } from "@/lib/avatar-generator";
 import { cn } from "@/lib/utils";
 import { resolveTranscriptScroll } from "@/features/conversations/transcript-scroll";
-import { clearSubmittedDraft } from "@/features/conversations/draft-state";
+import {
+  clearSubmittedDraft,
+  type ConversationComposerDraft,
+  type ConversationComposerDraftChange,
+} from "@/features/conversations/draft-state";
 import { getConversationChannelLabel } from "@/features/conversations/channel-label";
 
 import {
@@ -80,6 +85,8 @@ interface ConversationDetailProps {
   onBack: () => void;
   onSelectConversation: (conversationId: string) => void;
   part?: "chat" | "details";
+  composerDraft?: ConversationComposerDraft;
+  onComposerDraftChange?: ConversationComposerDraftChange;
 }
 
 const copilotResultSchema = z.object({
@@ -204,6 +211,8 @@ export function ConversationDetail({
   onBack,
   onSelectConversation,
   part = "chat",
+  composerDraft,
+  onComposerDraftChange,
 }: ConversationDetailProps) {
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -211,8 +220,20 @@ export function ConversationDetail({
   const [channelReplyDeliveryUncertain, setChannelReplyDeliveryUncertain] = useState(false);
   const [showDetailsSheet, setShowDetailsSheet] = useState(false);
   const [composerMode, setComposerMode] = useState<"reply" | "note">("reply");
-  const [replyText, setReplyText] = useState("");
-  const [noteText, setNoteText] = useState("");
+  const replyText = composerDraft?.reply ?? "";
+  const noteText = composerDraft?.note ?? "";
+  const setReplyText: Dispatch<SetStateAction<string>> = (value) => {
+    onComposerDraftChange?.((current) => ({
+      ...current,
+      reply: typeof value === "function" ? value(current.reply) : value,
+    }));
+  };
+  const setNoteText: Dispatch<SetStateAction<string>> = (value) => {
+    onComposerDraftChange?.((current) => ({
+      ...current,
+      note: typeof value === "function" ? value(current.note) : value,
+    }));
+  };
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
   const previousMessageCountRef = useRef<number | null>(null);
