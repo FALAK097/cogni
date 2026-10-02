@@ -85,6 +85,7 @@ before(async () => {
     const contactId = randomUUID();
     const status = index === 0 ? "CLOSED" : index === 2 ? "ASSIGNED" : "OPEN";
     const assignee = index === 2 ? memberId : null;
+    const channel = ["WIDGET", "SLACK", "WHATSAPP"][index];
     const messages = JSON.stringify([
       {
         id: visitorMessageIds[index],
@@ -102,9 +103,9 @@ before(async () => {
     `;
     await raw`
       INSERT INTO "conversation" (
-        "id", "subject", "status", "updatedAt", "lastMessageAt", "messages", "workspaceId", "contactId", "assignedMemberId"
+        "id", "subject", "status", "channel", "updatedAt", "lastMessageAt", "messages", "workspaceId", "contactId", "assignedMemberId"
       ) VALUES (
-        ${conversationId}, ${`Cursor sample ${index + 1}`}, ${status}, ${now}, ${now}, ${messages}, ${workspaceId}, ${contactId}, ${assignee}
+        ${conversationId}, ${`Cursor sample ${index + 1}`}, ${status}, ${channel}, ${now}, ${now}, ${messages}, ${workspaceId}, ${contactId}, ${assignee}
       )
     `;
   }
@@ -221,5 +222,52 @@ test("unread view only includes conversations with an unread visitor message", a
     result.conversations.every((conversation) =>
       conversation.messages.some((message) => message.authorType === "VISITOR" && !message.readAt),
     ),
+  );
+});
+
+test("channel and assignee facets are combined and remain workspace scoped", async () => {
+  const [slack, assigned, unassigned] = await Promise.all([
+    getInboxPage(workspaceId, {
+      membershipId: memberId,
+      channel: "SLACK",
+      limit: 20,
+      cursor: null,
+    }),
+    getInboxPage(workspaceId, {
+      membershipId: memberId,
+      assignee: memberId,
+      limit: 20,
+      cursor: null,
+    }),
+    getInboxPage(workspaceId, {
+      membershipId: memberId,
+      assignee: "unassigned",
+      limit: 20,
+      cursor: null,
+    }),
+  ]);
+
+  assert.deepEqual(
+    slack.conversations.map((conversation) => conversation.id),
+    [conversationIds[1]],
+  );
+  assert.deepEqual(
+    assigned.conversations.map((conversation) => conversation.id),
+    [conversationIds[2]],
+  );
+  assert.deepEqual(
+    unassigned.conversations.map((conversation) => conversation.id),
+    [conversationIds[1], conversationIds[0]],
+  );
+  const combined = await getInboxPage(workspaceId, {
+    membershipId: memberId,
+    channel: "SLACK",
+    assignee: "unassigned",
+    limit: 20,
+    cursor: null,
+  });
+  assert.deepEqual(
+    combined.conversations.map((conversation) => conversation.id),
+    [conversationIds[1]],
   );
 });

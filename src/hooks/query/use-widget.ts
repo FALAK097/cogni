@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api, requireData } from "@/lib/api/client";
 import { queryKeys } from "@/lib/query-keys";
+import { useActiveWorkspaceId } from "@/hooks/use-auth";
+import type { InboxChannel } from "@/features/conversations/inbox-pagination";
 import type { WidgetWidgetConfig, WidgetBorderRadiusStyle } from "@/features/widget/domain";
 import { toast } from "@/components/ui/use-toast";
 
@@ -373,12 +375,35 @@ export interface ConversationsResponse {
   };
 }
 
+export interface WorkspaceMemberOption {
+  id: string;
+  name: string;
+}
+
+export function useWorkspaceMembers() {
+  const workspaceId = useActiveWorkspaceId() ?? "";
+
+  return useQuery<{ members: WorkspaceMemberOption[] }>({
+    queryKey: queryKeys.workspaces.members(workspaceId),
+    enabled: Boolean(workspaceId),
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await api.GET<{ members: WorkspaceMemberOption[] }>(
+        "/api/dashboard/workspace-members",
+      );
+      return requireData(data, error, "Failed to fetch workspace members");
+    },
+  });
+}
+
 export function useConversations(
   options: {
     limit?: number;
     cursor?: string | null;
     search?: string;
     filter?: ConversationFilter;
+    channel?: InboxChannel;
+    assignee?: string;
   } = {},
 ) {
   const search = options.search?.trim() || null;
@@ -391,6 +416,8 @@ export function useConversations(
       cursor,
       search,
       options.filter ?? "all",
+      options.channel ?? "all-channels",
+      options.assignee ?? "all-assignees",
     ],
     queryFn: async () => {
       const { data, error } = await api.GET<ConversationsResponse>("/api/conversations", {
@@ -400,6 +427,8 @@ export function useConversations(
             ...(cursor ? { cursor } : {}),
             ...(search ? { search } : {}),
             ...(options.filter && options.filter !== "all" ? { filter: options.filter } : {}),
+            ...(options.channel ? { channel: options.channel } : {}),
+            ...(options.assignee ? { assignee: options.assignee } : {}),
           },
         },
       });

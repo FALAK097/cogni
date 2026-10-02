@@ -7,6 +7,7 @@ import {
   AlertCircle,
   Bot,
   CheckCircle2,
+  Filter,
   Loader2,
   MessageSquare,
   Pause,
@@ -19,11 +20,30 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useConversations, useMarkConversationRead } from "@/hooks/query";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useConversations, useMarkConversationRead, useWorkspaceMembers } from "@/hooks/query";
 import type { ConversationFilter, ConversationSummary } from "@/hooks/query";
 import { generateAvatarUrl } from "@/lib/avatar-generator";
-import { getConversationChannelLabel } from "@/features/conversations/channel-label";
+import {
+  CONVERSATION_CHANNELS,
+  getConversationChannelLabel,
+} from "@/features/conversations/channel-label";
+import type { InboxChannel } from "@/features/conversations/inbox-pagination";
 import { cn } from "@/lib/utils";
 
 import { scrollPaneClassName } from "./conversation-layout";
@@ -31,7 +51,7 @@ import { scrollPaneClassName } from "./conversation-layout";
 interface ConversationsListProps {
   filter: ConversationFilter;
   selectedConversationId: string | null;
-  onSelectConversation: (conversationId: string) => void;
+  onSelectConversation: (conversationId: string | null) => void;
   onClearFilter: () => void;
 }
 
@@ -75,11 +95,22 @@ export function ConversationsList({
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const listKey = `${filter}:${debouncedSearch}`;
+  const [channelFilter, setChannelFilter] = useState<InboxChannel | null>(null);
+  const [assigneeFilter, setAssigneeFilter] = useState<string | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const listKey = `${filter}:${debouncedSearch}:${channelFilter ?? "all"}:${assigneeFilter ?? "all"}`;
   const [trackedListKey, setTrackedListKey] = useState(listKey);
   const [pagesCache, setPagesCache] = useState<Record<number, ConversationSummary[]>>({});
   const [cursorsByPage, setCursorsByPage] = useState<Record<number, string | null>>({ 1: null });
   const { mutate: markConversationRead } = useMarkConversationRead();
+  const {
+    data: membersData,
+    isLoading: isMembersLoading,
+    isError: isMembersError,
+    refetch: refetchMembers,
+  } = useWorkspaceMembers();
+  const members = membersData?.members ?? [];
+  const activeFilterCount = Number(Boolean(channelFilter)) + Number(Boolean(assigneeFilter));
   const markedReadRef = useRef<string | null>(null);
   const clearSearch = () => {
     setSearch("");
@@ -110,6 +141,8 @@ export function ConversationsList({
     cursor: cursorsByPage[page] ?? null,
     search: debouncedSearch,
     filter,
+    channel: channelFilter ?? undefined,
+    assignee: assigneeFilter ?? undefined,
   });
   const isSearchPending =
     search.trim() !== debouncedSearch.trim() || (isFetching && Boolean(search.trim()));
@@ -164,19 +197,22 @@ export function ConversationsList({
     setPage((current) => current + 1);
   };
   const searchTerm = debouncedSearch.trim();
+  const hasFacetFilters = Boolean(channelFilter || assigneeFilter);
   const emptyTitle = searchTerm
     ? `No matches for “${searchTerm}”`
-    : filter === "all"
-      ? "No conversations yet"
-      : filter === "unread"
-        ? "You’re all caught up"
-        : filter === "unassigned"
-          ? "No unassigned conversations"
-          : filter === "mine"
-            ? "No conversations assigned to you"
-            : filter === "open"
-              ? "No open conversations"
-              : "No closed conversations";
+    : hasFacetFilters
+      ? "No conversations match these filters"
+      : filter === "all"
+        ? "No conversations yet"
+        : filter === "unread"
+          ? "You’re all caught up"
+          : filter === "unassigned"
+            ? "No unassigned conversations"
+            : filter === "mine"
+              ? "No conversations assigned to you"
+              : filter === "open"
+                ? "No open conversations"
+                : "No closed conversations";
 
   return (
     <div className="flex h-full flex-col">
@@ -210,7 +246,166 @@ export function ConversationsList({
               {isSearchPending ? "Searching conversations" : ""}
             </output>
           </div>
+          <Popover open={filtersOpen} onOpenChange={setFiltersOpen}>
+            <PopoverTrigger
+              render={
+                <Button
+                  type="button"
+                  variant={activeFilterCount ? "secondary" : "outline"}
+                  size="icon"
+                  aria-label={
+                    activeFilterCount
+                      ? `Filters, ${activeFilterCount} active`
+                      : "Filter conversations"
+                  }
+                  title="Filter conversations"
+                  className="relative size-11 shrink-0 rounded-lg sm:size-9"
+                />
+              }
+            >
+              <Filter className="size-4" aria-hidden="true" />
+              {activeFilterCount ? (
+                <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
+                  {activeFilterCount}
+                </span>
+              ) : null}
+            </PopoverTrigger>
+            <PopoverContent
+              align="end"
+              className="w-[min(20rem,calc(100vw-2rem))] gap-4 rounded-xl"
+            >
+              <PopoverHeader>
+                <PopoverTitle>Filter conversations</PopoverTitle>
+                <PopoverDescription>Find chats by channel or teammate.</PopoverDescription>
+              </PopoverHeader>
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <p
+                    id="channel-filter-label"
+                    className="text-xs font-medium text-muted-foreground"
+                  >
+                    Channel
+                  </p>
+                  <Select
+                    value={channelFilter ?? "all"}
+                    onValueChange={(value) => {
+                      setChannelFilter(value === "all" ? null : (value as InboxChannel));
+                      onSelectConversation(null);
+                    }}
+                  >
+                    <SelectTrigger
+                      aria-label="Filter by channel"
+                      aria-labelledby="channel-filter-label"
+                      className="w-full rounded-lg bg-background"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All channels</SelectItem>
+                      {CONVERSATION_CHANNELS.map((channel) => (
+                        <SelectItem key={channel.value} value={channel.value}>
+                          {channel.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <p
+                    id="assignee-filter-label"
+                    className="text-xs font-medium text-muted-foreground"
+                  >
+                    Assignee
+                  </p>
+                  <Select
+                    value={assigneeFilter ?? "all"}
+                    onValueChange={(value) => {
+                      setAssigneeFilter(value === "all" ? null : value);
+                      onSelectConversation(null);
+                    }}
+                  >
+                    <SelectTrigger
+                      aria-label="Filter by assignee"
+                      aria-labelledby="assignee-filter-label"
+                      className="w-full rounded-lg bg-background"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All teammates</SelectItem>
+                      <SelectItem value="unassigned">Unassigned</SelectItem>
+                      {members.map((member) => (
+                        <SelectItem key={member.id} value={member.id}>
+                          {member.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {isMembersLoading ? (
+                    <span className="block text-xs">Loading teammates…</span>
+                  ) : null}
+                  {isMembersError ? (
+                    <span className="flex items-center justify-between gap-2 text-xs text-destructive">
+                      Could not load teammates.
+                      <button
+                        type="button"
+                        className="underline underline-offset-2"
+                        onClick={() => void refetchMembers()}
+                      >
+                        Retry
+                      </button>
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
+        {activeFilterCount ? (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {channelFilter ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setChannelFilter(null);
+                  onSelectConversation(null);
+                }}
+                className="inline-flex h-7 items-center gap-1.5 rounded-md bg-muted px-2 text-xs text-foreground hover:bg-muted/70 focus-visible:outline-2 focus-visible:outline-ring"
+              >
+                {getConversationChannelLabel(channelFilter)}
+                <X className="size-3" aria-hidden="true" />
+                <span className="sr-only">Clear channel filter</span>
+              </button>
+            ) : null}
+            {assigneeFilter ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setAssigneeFilter(null);
+                  onSelectConversation(null);
+                }}
+                className="inline-flex h-7 items-center gap-1.5 rounded-md bg-muted px-2 text-xs text-foreground hover:bg-muted/70 focus-visible:outline-2 focus-visible:outline-ring"
+              >
+                {assigneeFilter === "unassigned"
+                  ? "Unassigned"
+                  : (members.find((member) => member.id === assigneeFilter)?.name ?? "Teammate")}
+                <X className="size-3" aria-hidden="true" />
+                <span className="sr-only">Clear assignee filter</span>
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => {
+                setChannelFilter(null);
+                setAssigneeFilter(null);
+                onSelectConversation(null);
+              }}
+              className="h-7 px-1 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+            >
+              Clear filters
+            </button>
+          </div>
+        ) : null}
       </div>
 
       {isError && conversations.length > 0 ? (
@@ -255,8 +450,8 @@ export function ConversationsList({
             <div>
               <p className="text-sm font-medium text-foreground">{emptyTitle}</p>
               <p className="mt-1 max-w-[240px] text-xs leading-relaxed text-muted-foreground">
-                {searchTerm
-                  ? "Try another search or clear this one."
+                {searchTerm || hasFacetFilters
+                  ? "Try another search or clear the active filters."
                   : filter === "all"
                     ? "New website chats will appear here. Set up your agent to start receiving conversations."
                     : filter === "unread"
@@ -264,9 +459,20 @@ export function ConversationsList({
                       : "Try another inbox view to find a conversation."}
               </p>
             </div>
-            {searchTerm ? (
-              <Button type="button" variant="outline" size="sm" onClick={clearSearch}>
-                Clear search
+            {searchTerm || hasFacetFilters ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  clearSearch();
+                  setChannelFilter(null);
+                  setAssigneeFilter(null);
+                  if (filter !== "all") onClearFilter();
+                  onSelectConversation(null);
+                }}
+              >
+                Clear filters
               </Button>
             ) : filter === "all" ? (
               <Button render={<Link href="/playground" />} variant="outline" size="sm">

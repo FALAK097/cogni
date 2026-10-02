@@ -14,6 +14,8 @@ export async function GET(request: Request) {
     query: parsed.data.search,
     filter: parsed.data.filter === "all" ? undefined : parsed.data.filter,
     membershipId: membership.id,
+    channel: parsed.data.channel,
+    assignee: parsed.data.assignee,
     limit: parsed.data.limit,
     cursor: parsed.data.cursor,
   });

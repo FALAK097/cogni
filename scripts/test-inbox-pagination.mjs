@@ -54,3 +54,18 @@ test("list params reject malformed continuation cursors", () => {
     error: "Invalid conversation cursor.",
   });
 });
+
+test("list params accept supported channel and assignee facets", () => {
+  assert.deepEqual(
+    parseInboxListParams(new URLSearchParams("channel=SLACK&assignee=member-123")).data,
+    {
+      filter: "all",
+      channel: "SLACK",
+      assignee: "member-123",
+      limit: 20,
+      cursor: null,
+    },
+  );
+  assert.equal(parseInboxListParams(new URLSearchParams("channel=UNKNOWN")).ok, false);
+  assert.equal(parseInboxListParams(new URLSearchParams(`assignee=${"x".repeat(129)}`)).ok, false);
+});

@@ -20,7 +20,7 @@ import {
   markVisitorMessagesAsRead,
   type MessageJson,
 } from "./conversation-service";
-import { encodeInboxCursor, type InboxCursor } from "../inbox-pagination";
+import { encodeInboxCursor, type InboxChannel, type InboxCursor } from "../inbox-pagination";
 import { broadcastConversationEvent } from "@/lib/realtime/broadcast";
 
 function getInboxConversationBaseCond(c: typeof conversationTable) {
@@ -58,9 +58,15 @@ function conversationWhereCond(
   query?: string,
   filter?: string,
   membershipId?: string,
+  channel?: InboxChannel,
+  assignee?: string,
 ) {
   const normalizedQuery = query?.trim();
   const conds = [eq(c.workspaceId, workspaceId), conversationFilterCond(c, filter, membershipId)];
+
+  if (channel) conds.push(eq(c.channel, channel));
+  if (assignee === "unassigned") conds.push(isNull(c.assignedMemberId));
+  else if (assignee) conds.push(eq(c.assignedMemberId, assignee));
 
   if (normalizedQuery) {
     const pattern = `%${normalizedQuery}%`;
@@ -246,6 +252,8 @@ export async function getInboxPage(
     query?: string;
     filter?: string;
     membershipId: string;
+    channel?: InboxChannel;
+    assignee?: string;
     limit: number;
     cursor: InboxCursor | null;
   },
@@ -300,6 +308,8 @@ export async function getInboxPage(
             options.query,
             options.filter,
             options.membershipId,
+            options.channel,
+            options.assignee,
           ),
           cursorWhere,
         ),
