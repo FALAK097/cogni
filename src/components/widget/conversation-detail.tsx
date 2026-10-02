@@ -1066,6 +1066,12 @@ function MessageBubble({
             {getInitials(displayName)}
           </AvatarFallback>
         </Avatar>
+      ) : isTeam ? (
+        <Avatar className="mt-0.5 h-8 w-8 shrink-0">
+          <AvatarFallback className="bg-muted text-[10px] font-medium text-muted-foreground">
+            {getInitials(authorName)}
+          </AvatarFallback>
+        </Avatar>
       ) : (
         <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
           <Bot className="h-4 w-4" />

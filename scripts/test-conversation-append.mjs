@@ -24,6 +24,7 @@ await build({
     contents: `
       export {
         appendConversationMessage,
+        getVisitorConversationMessages,
         markVisitorMessagesAsRead,
         recordVisitorMessage,
         setConversationStatus,
@@ -62,6 +63,7 @@ await build({
 
 const {
   appendConversationMessage,
+  getVisitorConversationMessages,
   markVisitorMessagesAsRead,
   recordVisitorMessage,
   setConversationStatus,
@@ -177,6 +179,31 @@ test("team author names are preserved in transcript messages", async () => {
   const message = storedMessages.find((entry) => entry.id === messageId);
 
   assert.equal(message.authorName, "Mina Support");
+});
+
+test("public conversation history never includes attributed internal notes", async () => {
+  const messageId = randomUUID();
+  await appendConversationMessage({
+    db: appDatabases[0],
+    workspaceId,
+    conversationId,
+    message: {
+      id: messageId,
+      body: "Internal handoff context",
+      authorType: "TEAM",
+      authorName: "Mina Support",
+      visibility: "INTERNAL",
+      createdAt: new Date().toISOString(),
+    },
+  });
+
+  const publicMessages = await getVisitorConversationMessages({
+    db: appDatabases[0],
+    visitorSessionId,
+  });
+
+  assert.ok(publicMessages.every((message) => message.visibility !== "INTERNAL"));
+  assert.ok(publicMessages.every((message) => message.id !== messageId));
 });
 
 test("AI appends are denied after takeover and all appends stay workspace scoped", async () => {
