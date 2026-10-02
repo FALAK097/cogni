@@ -568,13 +568,13 @@ export function WidgetCustomizer({
           type="button"
           onClick={() => setShowMobilePreview((open) => !open)}
           className={cn(
-            "inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-sm font-medium text-muted-foreground shadow-xs transition-colors hover:bg-muted hover:text-foreground lg:hidden",
+            "inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-sm font-medium text-muted-foreground shadow-xs transition-[transform,color,background-color] duration-150 active:scale-[0.96] hover:bg-muted hover:text-foreground motion-reduce:transition-none motion-reduce:active:scale-100 lg:hidden",
             showMobilePreview && "border-[var(--widget-accent)] text-[var(--widget-accent)]",
           )}
           aria-label={showMobilePreview ? "Hide preview" : "Show preview"}
           aria-pressed={showMobilePreview}
         >
-          <Eye className="size-4" />
+          <Eye className="size-4" strokeWidth={2} />
           Preview
         </button>
         <output
@@ -591,7 +591,12 @@ export function WidgetCustomizer({
                   : "Saved"}
           </span>
           {saveWidgetConfigMutation.isError && (
-            <Button variant="outline" size="sm" onClick={() => persistConfig()}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="min-h-11 lg:min-h-10"
+              onClick={() => persistConfig()}
+            >
               Retry save
             </Button>
           )}
@@ -623,8 +628,8 @@ export function WidgetCustomizer({
               className="mx-4 h-12 w-auto shrink-0 justify-start gap-1 rounded-none border-b border-border bg-transparent px-0 sm:mx-6"
             >
               {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
-                <TabsTrigger key={id} value={id} className="h-10 gap-2 px-3">
-                  <Icon className="size-4" />
+                <TabsTrigger key={id} value={id} className="h-11 gap-2 px-3 sm:h-10">
+                  <Icon className="size-4" strokeWidth={2} />
                   {label}
                 </TabsTrigger>
               ))}
