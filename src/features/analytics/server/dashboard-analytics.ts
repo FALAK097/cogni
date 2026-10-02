@@ -1,17 +1,13 @@
 import "server-only";
 
-import {
-  differenceInCalendarDays,
-  eachDayOfInterval,
-  endOfDay,
-  format,
-  startOfDay,
-  subDays,
-} from "date-fns";
+import { eachDayOfInterval, format, parseISO } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import { desc } from "drizzle-orm";
 
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
 import { collectAiResponseTimeSamplesMs } from "@/features/analytics/response-time";
+import { resolveAnalyticsDateRange } from "@/features/analytics/date-range";
+import { normalizeTimezone } from "@/features/conversations/snooze-schedule";
 import { getWidgetConversationCond } from "@/features/widget/server/widget-data-filters";
 import type { Db } from "@/lib/db/client";
 import { conversation } from "@/lib/db/schema";
@@ -116,7 +112,7 @@ function normalizeQuestion(text: string): string {
   return text.trim().replace(/\s+/g, " ");
 }
 
-function aggregatePeriod(conversations: ConversationRow[]) {
+function aggregatePeriod(conversations: ConversationRow[], timezone: string) {
   const uniqueUsers = new Set<string>();
   let closedConversations = 0;
   let messagesSent = 0;
@@ -162,7 +158,7 @@ function aggregatePeriod(conversations: ConversationRow[]) {
           : "Unresolved";
     statusCounts.set(statusLabel, (statusCounts.get(statusLabel) ?? 0) + 1);
 
-    const dayKey = format(conversation.createdAt, "yyyy-MM-dd");
+    const dayKey = formatInTimeZone(conversation.createdAt, timezone, "yyyy-MM-dd");
     dailyCounts.set(dayKey, (dailyCounts.get(dayKey) ?? 0) + 1);
 
     const firstVisitorMessage = visitorMessages[0];
@@ -186,7 +182,7 @@ function aggregatePeriod(conversations: ConversationRow[]) {
       if (message.feedback === "negative") feedbackNegative++;
 
       if (message.feedback && message.feedbackAt) {
-        const feedbackDay = format(new Date(message.feedbackAt), "yyyy-MM-dd");
+        const feedbackDay = formatInTimeZone(new Date(message.feedbackAt), timezone, "yyyy-MM-dd");
         const entry = dailySatisfaction.get(feedbackDay) ?? { positive: 0, negative: 0 };
         if (message.feedback === "positive") entry.positive++;
         if (message.feedback === "negative") entry.negative++;
@@ -243,11 +239,11 @@ function toBreakdown(counts: Map<string, number>): BreakdownItem[] {
 }
 
 function buildTimeSeries(
-  start: Date,
-  end: Date,
+  startDate: string,
+  endDate: string,
   dailyCounts: Map<string, number>,
 ): TimeSeriesPoint[] {
-  return eachDayOfInterval({ start, end }).map((day) => {
+  return eachDayOfInterval({ start: parseISO(startDate), end: parseISO(endDate) }).map((day) => {
     const key = format(day, "yyyy-MM-dd");
     return {
       date: key,
@@ -257,11 +253,11 @@ function buildTimeSeries(
 }
 
 function buildSatisfactionSeries(
-  start: Date,
-  end: Date,
+  startDate: string,
+  endDate: string,
   dailySatisfaction: Map<string, { positive: number; negative: number }>,
 ): SatisfactionPoint[] {
-  return eachDayOfInterval({ start, end }).map((day) => {
+  return eachDayOfInterval({ start: parseISO(startDate), end: parseISO(endDate) }).map((day) => {
     const key = format(day, "yyyy-MM-dd");
     const entry = dailySatisfaction.get(key);
     if (!entry) return { date: key, score: null, responses: 0 };
@@ -279,17 +275,17 @@ async function fetchWidgetConversations(
   db: Db,
   workspaceId: string,
   start: Date,
-  end: Date,
+  endBefore: Date,
 ): Promise<ConversationRow[]> {
   const startIso = start.toISOString();
-  const endIso = end.toISOString();
+  const endBeforeIso = endBefore.toISOString();
 
   const rows = await db.query.conversation.findMany({
-    where: (fields, { and, gte, lte }) =>
+    where: (fields, { and, gte, lt }) =>
       and(
         getWidgetConversationCond(fields as typeof conversation, workspaceId),
         gte(fields.createdAt, startIso),
-        lte(fields.createdAt, endIso),
+        lt(fields.createdAt, endBeforeIso),
       ),
     columns: {
       id: true,
@@ -324,30 +320,27 @@ export async function getDashboardAnalytics(
   workspaceId: string,
   startDateInput?: string | null,
   endDateInput?: string | null,
+  timezone?: string | null,
 ): Promise<DashboardAnalytics> {
-  const end = endDateInput ? endOfDay(new Date(endDateInput)) : endOfDay(new Date());
-  const start = startDateInput ? startOfDay(new Date(startDateInput)) : startOfDay(subDays(end, 6));
-
-  const rangeDays = Math.max(differenceInCalendarDays(end, start) + 1, 1);
-  const previousEnd = endOfDay(subDays(start, 1));
-  const previousStart = startOfDay(subDays(previousEnd, rangeDays - 1));
+  const validTimezone = normalizeTimezone(timezone);
+  const range = resolveAnalyticsDateRange(startDateInput, endDateInput, validTimezone);
 
   const [currentConversations, previousConversations] = await Promise.all([
-    fetchWidgetConversations(db, workspaceId, start, end),
-    fetchWidgetConversations(db, workspaceId, previousStart, previousEnd),
+    fetchWidgetConversations(db, workspaceId, range.startAt, range.endBefore),
+    fetchWidgetConversations(db, workspaceId, range.previousStartAt, range.previousEndBefore),
   ]);
 
-  const current = aggregatePeriod(currentConversations);
-  const previous = aggregatePeriod(previousConversations);
+  const current = aggregatePeriod(currentConversations, validTimezone);
+  const previous = aggregatePeriod(previousConversations, validTimezone);
 
   return {
     dateRange: {
-      start: start.toISOString(),
-      end: end.toISOString(),
+      start: range.startDate,
+      end: range.endDate,
     },
     previousDateRange: {
-      start: previousStart.toISOString(),
-      end: previousEnd.toISOString(),
+      start: range.previousStartDate,
+      end: range.previousEndDate,
     },
     kpis: {
       totalConversations: toMetric(current.totalConversations, previous.totalConversations),
@@ -372,7 +365,7 @@ export async function getDashboardAnalytics(
         max: 5,
       },
     },
-    conversationsOverTime: buildTimeSeries(start, end, current.dailyCounts),
+    conversationsOverTime: buildTimeSeries(range.startDate, range.endDate, current.dailyCounts),
     conversationsBySource: toBreakdown(current.sourceCounts),
     conversationsByStatus: toBreakdown(current.statusCounts),
     topQuestions: current.topQuestions,
@@ -388,6 +381,10 @@ export async function getDashboardAnalytics(
         formatted: formatDecimal(current.conversationsPerUser, 1),
       },
     },
-    satisfactionOverTime: buildSatisfactionSeries(start, end, current.dailySatisfaction),
+    satisfactionOverTime: buildSatisfactionSeries(
+      range.startDate,
+      range.endDate,
+      current.dailySatisfaction,
+    ),
   };
 }

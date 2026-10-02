@@ -19,6 +19,7 @@ import {
   subDays,
   subMonths,
 } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
@@ -56,6 +57,7 @@ import { useDashboardAnalytics } from "@/hooks/query";
 import { useKnowledgeBaseSources } from "@/hooks/query/use-knowledge-base";
 import { useWidgetConfig } from "@/hooks/query/use-widget";
 import { useActiveWorkspaceId } from "@/hooks/use-auth";
+import { normalizeTimezone } from "@/features/conversations/snooze-schedule";
 import { cn } from "@/lib/utils";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -273,13 +275,13 @@ const DEFAULT_EXPORT_SELECTION = Object.fromEntries(
   EXPORT_SECTIONS.map((section) => [section.id, true]),
 ) as Record<ExportSectionId, boolean>;
 
-function getDefaultDateRange(): DateRangeValue {
-  const end = endOfDay(new Date());
+function getDefaultDateRange(timezone: string): DateRangeValue {
+  const end = endOfDay(toZonedTime(new Date(), normalizeTimezone(timezone)));
   return { start: startOfDay(subDays(end, 6)), end };
 }
 
-function getPresetDateRange(preset: DateRangePreset): DateRangeValue {
-  const today = new Date();
+function getPresetDateRange(preset: DateRangePreset, timezone: string): DateRangeValue {
+  const today = toZonedTime(new Date(), normalizeTimezone(timezone));
   const end = endOfDay(today);
 
   switch (preset) {
@@ -340,9 +342,9 @@ function ChangeIndicator({
   );
 }
 
-function formatComparisonRange(startIso: string, endIso: string): string {
-  const start = parseISO(startIso);
-  const end = parseISO(endIso);
+function formatComparisonRange(startDate: string, endDate: string): string {
+  const start = parseISO(startDate);
+  const end = parseISO(endDate);
   const sameYear = start.getFullYear() === end.getFullYear();
   const sameMonth = sameYear && start.getMonth() === end.getMonth();
   if (sameMonth) return `${format(start, "MMM d")} - ${format(end, "d, yyyy")}`;
@@ -355,7 +357,7 @@ function formatChartDate(date: string): string {
 }
 
 function formatRangeLabel(range: DateRangeValue): string {
-  return formatComparisonRange(range.start.toISOString(), range.end.toISOString());
+  return formatComparisonRange(format(range.start, "yyyy-MM-dd"), format(range.end, "yyyy-MM-dd"));
 }
 
 function escapeCsvCell(value: string): string {
@@ -681,16 +683,19 @@ function getMonthDays(month: Date): Date[] {
 
 function CalendarMonth({
   month,
+  timezone,
   rangeStart,
   rangeEnd,
   onDayClick,
 }: {
   month: Date;
+  timezone: string;
   rangeStart: Date | null;
   rangeEnd: Date | null;
   onDayClick: (day: Date) => void;
 }) {
   const days = getMonthDays(month);
+  const today = toZonedTime(new Date(), normalizeTimezone(timezone));
 
   return (
     <div className="w-[280px] sm:w-[252px]">
@@ -714,13 +719,13 @@ function CalendarMonth({
                   end: isAfter(rangeEnd, rangeStart) ? rangeEnd : rangeStart,
                 })
               : false;
-          const isToday = isSameDay(day, new Date());
+          const isToday = isSameDay(day, today);
 
           return (
             <button
               key={day.toISOString()}
               type="button"
-              disabled={!inMonth || isAfter(day, new Date())}
+              disabled={!inMonth || isAfter(day, today)}
               aria-label={format(day, "EEEE, MMMM d, yyyy")}
               aria-pressed={isStart || isEnd || Boolean(inRange)}
               aria-current={isToday ? "date" : undefined}
@@ -746,9 +751,11 @@ function CalendarMonth({
 function DateRangePicker({
   value,
   onChange,
+  timezone,
 }: {
   value: DateRangeValue;
   onChange: (value: DateRangeValue) => void;
+  timezone: string;
 }) {
   const [open, setOpen] = useState(false);
   const [viewMonth, setViewMonth] = useState(() => startOfMonth(value.start));
@@ -789,14 +796,14 @@ function DateRangePicker({
   };
 
   const handlePresetClick = (preset: DateRangePreset) => {
-    onChange(getPresetDateRange(preset));
+    onChange(getPresetDateRange(preset, timezone));
     setOpen(false);
     setDraftStart(null);
     setDraftEnd(null);
   };
 
   const isPresetSelected = (preset: DateRangePreset) => {
-    const range = getPresetDateRange(preset);
+    const range = getPresetDateRange(preset, timezone);
     return isSameDay(value.start, range.start) && isSameDay(value.end, range.end);
   };
 
@@ -863,6 +870,7 @@ function DateRangePicker({
             </div>
             <CalendarMonth
               month={viewMonth}
+              timezone={timezone}
               rangeStart={displayStart}
               rangeEnd={displayEnd}
               onDayClick={handleDayClick}
@@ -1064,15 +1072,23 @@ function GranularitySelect({
 
 // --- page ---
 
-export function DashboardPage({ canManage = false }: { canManage?: boolean }) {
-  const [dateRange, setDateRange] = useState<DateRangeValue>(getDefaultDateRange);
+export function DashboardPage({
+  canManage = false,
+  workspaceTimezone,
+}: {
+  canManage?: boolean;
+  workspaceTimezone: string;
+}) {
+  const [dateRange, setDateRange] = useState<DateRangeValue>(() =>
+    getDefaultDateRange(workspaceTimezone),
+  );
   const [convGranularity, setConvGranularity] = useState<Granularity>("daily");
   const [satGranularity, setSatGranularity] = useState<Granularity>("daily");
 
   const queryParams = useMemo(
     () => ({
-      startDate: dateRange.start.toISOString(),
-      endDate: dateRange.end.toISOString(),
+      startDate: format(dateRange.start, "yyyy-MM-dd"),
+      endDate: format(dateRange.end, "yyyy-MM-dd"),
     }),
     [dateRange],
   );
@@ -1177,7 +1193,7 @@ export function DashboardPage({ canManage = false }: { canManage?: boolean }) {
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
-          <DateRangePicker value={dateRange} onChange={setDateRange} />
+          <DateRangePicker value={dateRange} onChange={setDateRange} timezone={workspaceTimezone} />
           {analytics ? (
             <ExportMenu
               analytics={analytics}

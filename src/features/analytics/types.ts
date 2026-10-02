@@ -9,6 +9,7 @@ export type FormattedMetricComparison = MetricComparison & {
 };
 
 export type DashboardDateRange = {
+  /** Inclusive calendar dates (YYYY-MM-DD) in the workspace timezone. */
   start: string;
   end: string;
 };

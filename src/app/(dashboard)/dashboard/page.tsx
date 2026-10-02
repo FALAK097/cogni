@@ -10,11 +10,15 @@ export const metadata: Metadata = {
 };
 
 export default async function DashboardHomePage() {
-  const { membership } = await requireDashboardContext();
+  const { membership, workspace } = await requireDashboardContext();
 
   return (
     <ContentLayout className="bg-transparent py-6">
-      <DashboardPage canManage={membership.role === "OWNER"} />
+      <DashboardPage
+        key={workspace.id}
+        canManage={membership.role === "OWNER"}
+        workspaceTimezone={workspace.timezone}
+      />
     </ContentLayout>
   );
 }
