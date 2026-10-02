@@ -50,6 +50,7 @@ jobs:
       - run: pnpm test:inbox-pagination
       - run: pnpm test:inbox-pagination-db
       - run: pnpm test:inbox-saved-views
+      - run: pnpm test:inbox-macros
       - run: pnpm test:contact-tags
       - run: pnpm test:integration-action-recovery
       - run: pnpm test:workspace-permissions

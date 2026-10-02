@@ -81,6 +81,14 @@ an exact label filter, and persists that filter in workspace-shared views. Local
 cover concurrent updates, case normalization, limits, cross-workspace denial, combined label/status/
 channel filtering and saved-view persistence. A localhost browser pass added a temporary label in the existing Details card, confirmed it on the Inbox row, applied the exact label filter, and removed the test label afterward. This workspace has one conversation, so the browser pass confirmed a match; database tests cover non-matches and combined facets.
 
+Saved replies keep frequent customer answers inside the existing composer. Members can create and
+edit their own workspace replies, owners can manage all replies, and choosing a reply appends it to
+the current draft without sending. Content and names are bounded and saved replies remain plain
+text. PostgreSQL tests cover workspace isolation, duplicate names, creator/owner permissions and
+input bounds. A localhost browser pass created a temporary reply, appended it after an existing
+draft, confirmed the text remained unsent with focus in the composer, then cleared the draft and
+deleted the temporary reply through the confirmation dialog.
+
 Agent setup follow-up keeps all configuration in the existing page:
 
 | Before                                                                                    | After                                                                                 | Why                                                                 |

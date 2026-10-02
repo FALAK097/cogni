@@ -52,5 +52,7 @@ export const queryKeys = {
       [...queryKeys.conversations.all, "detail", workspaceId, id] as const,
     savedViews: (workspaceId: string) =>
       [...queryKeys.conversations.all, "saved-views", workspaceId] as const,
+    macros: (workspaceId: string) =>
+      [...queryKeys.conversations.all, "macros", workspaceId] as const,
   },
 } as const;

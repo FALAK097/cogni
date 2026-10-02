@@ -269,6 +269,30 @@ export const inboxSavedView = pgTable(
   ],
 );
 
+export const inboxMacro = pgTable(
+  "inbox_macro",
+  {
+    id: text().primaryKey().notNull(),
+    name: text().notNull(),
+    content: text().notNull(),
+    createdAt: timestampString()
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+    updatedAt: timestampString().notNull(),
+    workspaceId: text()
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    createdByMembershipId: text().references(() => workspaceMember.id, {
+      onDelete: "set null",
+      onUpdate: "cascade",
+    }),
+  },
+  (table) => [
+    uniqueIndex("inbox_macro_workspace_name_key").on(table.workspaceId, sql`lower(${table.name})`),
+    index("inbox_macro_workspace_createdAt_idx").on(table.workspaceId, table.createdAt),
+  ],
+);
+
 export const widget = pgTable(
   "widget",
   {

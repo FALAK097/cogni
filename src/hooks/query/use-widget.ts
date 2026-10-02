@@ -43,6 +43,13 @@ export interface InboxSavedView {
   createdByMembershipId: string | null;
 }
 
+export interface InboxMacro {
+  id: string;
+  name: string;
+  content: string;
+  createdByMembershipId: string | null;
+}
+
 export interface WidgetSessionSummary {
   id: string;
   visitorId: string;
@@ -527,6 +534,104 @@ export function useDeleteInboxSavedView() {
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: queryKeys.conversations.savedViews(workspaceId),
+      });
+    },
+  });
+}
+
+export function useInboxMacros() {
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useQuery<{ macros: InboxMacro[] }>({
+    queryKey: queryKeys.conversations.macros(workspaceId),
+    enabled: Boolean(workspaceId),
+    queryFn: async () => {
+      const response = await fetch("/api/dashboard/inbox-macros");
+      const result: { macros?: InboxMacro[]; error?: string } = await response
+        .json()
+        .catch(() => ({}));
+      if (!response.ok || !result.macros) {
+        throw new Error(result.error ?? "Failed to load saved replies.");
+      }
+      return { macros: result.macros };
+    },
+  });
+}
+
+export function useCreateInboxMacro() {
+  const queryClient = useQueryClient();
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useMutation({
+    mutationFn: async (input: { name: string; content: string }) => {
+      const response = await fetch("/api/dashboard/inbox-macros", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      const result: { macro?: InboxMacro; error?: string } = await response
+        .json()
+        .catch(() => ({}));
+      if (!response.ok || !result.macro) {
+        throw new Error(result.error ?? "Failed to save reply.");
+      }
+      return result.macro;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.conversations.macros(workspaceId),
+      });
+    },
+  });
+}
+
+export function useUpdateInboxMacro() {
+  const queryClient = useQueryClient();
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useMutation({
+    mutationFn: async ({
+      macroId,
+      ...input
+    }: {
+      macroId: string;
+      name: string;
+      content: string;
+    }) => {
+      const response = await fetch(`/api/dashboard/inbox-macros/${encodeURIComponent(macroId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      const result: { macro?: InboxMacro; error?: string } = await response
+        .json()
+        .catch(() => ({}));
+      if (!response.ok || !result.macro) {
+        throw new Error(result.error ?? "Failed to update saved reply.");
+      }
+      return result.macro;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.conversations.macros(workspaceId),
+      });
+    },
+  });
+}
+
+export function useDeleteInboxMacro() {
+  const queryClient = useQueryClient();
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useMutation({
+    mutationFn: async (macroId: string) => {
+      const response = await fetch(`/api/dashboard/inbox-macros/${encodeURIComponent(macroId)}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        const result: { error?: string } = await response.json().catch(() => ({}));
+        throw new Error(result.error ?? "Failed to delete saved reply.");
+      }
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.conversations.macros(workspaceId),
       });
     },
   });

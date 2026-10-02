@@ -73,6 +73,10 @@ import { useToast } from "@/components/ui/use-toast";
 import {
   useConversation,
   useDeleteConversation,
+  useDeleteInboxMacro,
+  useInboxMacros,
+  useCreateInboxMacro,
+  useUpdateInboxMacro,
   useSetConversationAiPaused,
   useSetConversationSnooze,
   useSetConversationStatus,
@@ -242,9 +246,17 @@ export function ConversationDetail({
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showDuplicateReplyDialog, setShowDuplicateReplyDialog] = useState(false);
+  const [macroToDelete, setMacroToDelete] = useState<string | null>(null);
+  const [savedRepliesOpen, setSavedRepliesOpen] = useState(false);
+  const [macroEditor, setMacroEditor] = useState<{
+    id: string | null;
+    name: string;
+    content: string;
+  } | null>(null);
   const [channelReplyDeliveryUncertain, setChannelReplyDeliveryUncertain] = useState(false);
   const [showDetailsSheet, setShowDetailsSheet] = useState(false);
   const [composerMode, setComposerMode] = useState<"reply" | "note">("reply");
+  const replyTextareaRef = useRef<HTMLTextAreaElement>(null);
   const replyText = composerDraft?.reply ?? "";
   const noteText = composerDraft?.note ?? "";
   const setReplyText: Dispatch<SetStateAction<string>> = (value) => {
@@ -280,6 +292,10 @@ export function ConversationDetail({
   const snoozeMutation = useSetConversationSnooze();
   const statusMutation = useSetConversationStatus();
   const sendMessageMutation = useSendConversationMessage();
+  const macrosQuery = useInboxMacros();
+  const createMacroMutation = useCreateInboxMacro();
+  const updateMacroMutation = useUpdateInboxMacro();
+  const deleteMacroMutation = useDeleteInboxMacro();
   const copilotMutation = useMutation({
     mutationFn: () => generateCopilotDraft(conversationId),
     onError: (error) => {
@@ -290,6 +306,34 @@ export function ConversationDetail({
       });
     },
   });
+
+  const saveMacro = () => {
+    if (!macroEditor) return;
+    const input = { name: macroEditor.name, content: macroEditor.content };
+    const onSuccess = () => {
+      setMacroEditor(null);
+      toast({ title: macroEditor.id ? "Saved reply updated" : "Saved reply created" });
+    };
+    const onError = (error: Error) =>
+      toast({ title: "Could not save reply", description: error.message, variant: "destructive" });
+    if (macroEditor.id) {
+      updateMacroMutation.mutate({ macroId: macroEditor.id, ...input }, { onSuccess, onError });
+    } else {
+      createMacroMutation.mutate(input, { onSuccess, onError });
+    }
+  };
+
+  const insertSavedReply = (content: string) => {
+    const nextReply = replyText.trim() ? `${replyText.replace(/\s+$/, "")}\n\n${content}` : content;
+    setComposerMode("reply");
+    setReplyText(nextReply);
+    setSavedRepliesOpen(false);
+    requestAnimationFrame(() => {
+      const textarea = replyTextareaRef.current;
+      textarea?.focus();
+      textarea?.setSelectionRange(nextReply.length, nextReply.length);
+    });
+  };
 
   const messages = session?.messages;
   const currentTimestamp = useCurrentTimestamp();
@@ -592,6 +636,45 @@ export function ConversationDetail({
             <AlertDialogCancel>Keep draft</AlertDialogCancel>
             <AlertDialogAction onClick={() => handleSend(true)}>
               Send again anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog
+        open={macroToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setMacroToDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete saved reply?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Teammates will no longer see this reusable reply. Replies already sent are unchanged.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMacroMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleteMacroMutation.isPending}
+              onClick={() => {
+                if (!macroToDelete) return;
+                deleteMacroMutation.mutate(macroToDelete, {
+                  onSuccess: () => {
+                    setMacroToDelete(null);
+                    toast({ title: "Saved reply deleted" });
+                  },
+                  onError: (error) =>
+                    toast({
+                      title: "Could not delete saved reply",
+                      description: error.message,
+                      variant: "destructive",
+                    }),
+                });
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMacroMutation.isPending ? "Deleting…" : "Delete saved reply"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -981,6 +1064,7 @@ export function ConversationDetail({
               )}
             </div>
             <Textarea
+              ref={replyTextareaRef}
               value={composerText}
               onChange={(event) => setComposerText(event.target.value)}
               aria-label={composerMode === "reply" ? "Reply to customer" : "Internal note"}
@@ -999,17 +1083,216 @@ export function ConversationDetail({
             <div className="mt-2 flex items-center justify-between gap-2">
               <div className="flex items-center gap-0.5">
                 {composerMode === "reply" ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-11 gap-1.5 px-2 text-sm text-muted-foreground sm:h-9"
-                    disabled={copilotMutation.isPending}
-                    onClick={() => copilotMutation.mutate()}
-                  >
-                    <Bot className="size-4" aria-hidden="true" />
-                    {copilotMutation.isPending ? "Thinking…" : "Copilot"}
-                  </Button>
+                  <>
+                    <Popover
+                      open={savedRepliesOpen}
+                      onOpenChange={(open) => {
+                        setSavedRepliesOpen(open);
+                        if (!open) setMacroEditor(null);
+                      }}
+                    >
+                      <PopoverTrigger
+                        render={
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-11 gap-1.5 px-2 text-sm text-muted-foreground sm:h-9"
+                            aria-label="Open saved replies"
+                          />
+                        }
+                      >
+                        <span className="inline-flex items-center gap-1.5">
+                          <FileText className="size-4" aria-hidden="true" />
+                          Saved replies
+                        </span>
+                      </PopoverTrigger>
+                      <PopoverContent align="start" className="w-[min(22rem,calc(100vw-2rem))] p-0">
+                        {macroEditor ? (
+                          <div className="space-y-3 p-3">
+                            <PopoverHeader>
+                              <PopoverTitle>
+                                {macroEditor.id ? "Edit saved reply" : "New saved reply"}
+                              </PopoverTitle>
+                              <PopoverDescription>
+                                Shared with your workspace. Choosing one adds it to your draft.
+                              </PopoverDescription>
+                            </PopoverHeader>
+                            <label
+                              htmlFor="saved-reply-name"
+                              className="block space-y-1.5 text-xs font-medium"
+                            >
+                              Name
+                              <Input
+                                id="saved-reply-name"
+                                value={macroEditor.name}
+                                maxLength={40}
+                                onChange={(event) =>
+                                  setMacroEditor({ ...macroEditor, name: event.target.value })
+                                }
+                                placeholder="e.g. Refund update"
+                                className="h-9 text-sm font-normal"
+                              />
+                            </label>
+                            <label
+                              htmlFor="saved-reply-content"
+                              className="block space-y-1.5 text-xs font-medium"
+                            >
+                              Reply
+                              <Textarea
+                                id="saved-reply-content"
+                                value={macroEditor.content}
+                                maxLength={4_000}
+                                onChange={(event) =>
+                                  setMacroEditor({ ...macroEditor, content: event.target.value })
+                                }
+                                placeholder="Write the reusable customer reply…"
+                                className="min-h-24 resize-y text-sm font-normal"
+                              />
+                            </label>
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setMacroEditor(null)}
+                              >
+                                Cancel
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                disabled={
+                                  !macroEditor.name.trim() ||
+                                  !macroEditor.content.trim() ||
+                                  createMacroMutation.isPending ||
+                                  updateMacroMutation.isPending
+                                }
+                                onClick={saveMacro}
+                              >
+                                {createMacroMutation.isPending || updateMacroMutation.isPending
+                                  ? "Saving…"
+                                  : "Save reply"}
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="p-2">
+                            <PopoverHeader className="px-2 pb-2 pt-1">
+                              <PopoverTitle>Saved replies</PopoverTitle>
+                              <PopoverDescription>
+                                Insert a reply into your draft. Nothing sends automatically.
+                              </PopoverDescription>
+                            </PopoverHeader>
+                            {macrosQuery.isPending ? (
+                              <p className="px-2 py-4 text-center text-xs text-muted-foreground">
+                                Loading saved replies…
+                              </p>
+                            ) : macrosQuery.isError ? (
+                              <div className="space-y-2 px-2 py-3 text-center">
+                                <p className="text-xs text-muted-foreground">
+                                  Couldn’t load saved replies.
+                                </p>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => void macrosQuery.refetch()}
+                                >
+                                  Retry
+                                </Button>
+                              </div>
+                            ) : macrosQuery.data.macros.length > 0 ? (
+                              <div className="max-h-64 space-y-1 overflow-y-auto">
+                                {macrosQuery.data.macros.map((macro) => {
+                                  const canEdit =
+                                    canManage ||
+                                    macro.createdByMembershipId === session.currentMembershipId;
+                                  return (
+                                    <div key={macro.id} className="flex items-center gap-1">
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        className="h-auto min-w-0 flex-1 justify-start px-2 py-2 text-left"
+                                        onClick={() => insertSavedReply(macro.content)}
+                                      >
+                                        <span className="block min-w-0">
+                                          <span className="block truncate text-xs font-medium text-foreground">
+                                            {macro.name}
+                                          </span>
+                                          <span className="line-clamp-2 block whitespace-pre-line text-xs font-normal text-muted-foreground">
+                                            {macro.content}
+                                          </span>
+                                        </span>
+                                      </Button>
+                                      {canEdit ? (
+                                        <>
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="size-8 shrink-0"
+                                            aria-label={`Edit ${macro.name}`}
+                                            onClick={() =>
+                                              setMacroEditor({
+                                                id: macro.id,
+                                                name: macro.name,
+                                                content: macro.content,
+                                              })
+                                            }
+                                          >
+                                            <Pencil className="size-3.5" aria-hidden="true" />
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="size-8 shrink-0 text-muted-foreground hover:text-destructive"
+                                            aria-label={`Delete ${macro.name}`}
+                                            onClick={() => setMacroToDelete(macro.id)}
+                                          >
+                                            <Trash2 className="size-3.5" aria-hidden="true" />
+                                          </Button>
+                                        </>
+                                      ) : null}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <p className="px-2 py-4 text-center text-xs text-muted-foreground">
+                                No saved replies yet. Create one for a question your team answers
+                                often.
+                              </p>
+                            )}
+                            <div className="mt-2 border-t border-border/60 pt-2">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="w-full justify-start"
+                                onClick={() => setMacroEditor({ id: null, name: "", content: "" })}
+                              >
+                                <Plus className="mr-2 size-3.5" aria-hidden="true" />
+                                Create saved reply
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </PopoverContent>
+                    </Popover>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-11 gap-1.5 px-2 text-sm text-muted-foreground sm:h-9"
+                      disabled={copilotMutation.isPending}
+                      onClick={() => copilotMutation.mutate()}
+                    >
+                      <Bot className="size-4" aria-hidden="true" />
+                      {copilotMutation.isPending ? "Thinking…" : "Copilot"}
+                    </Button>
+                  </>
                 ) : null}
               </div>
 

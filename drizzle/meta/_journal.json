@@ -57,6 +57,13 @@
       "when": 1790938833874,
       "tag": "0007_inbox_view_label_filter",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790939871556,
+      "tag": "0008_inbox_saved_replies",
+      "breakpoints": true
     }
   ]
 }
