@@ -176,7 +176,10 @@ for reduced-motion preferences, and provide an interactive tooltip plus a View d
 give the primary trend half the chart row and let source/status breakdowns keep their 180px chart
 above the full-width legend; do not compress legends beside the donut. Keep the local adapter
 limited to the chart features this screen uses rather than adding unused brush or series-selection
-controls. Other chart styling and exact palette matching await the owner's additional visual
+controls. Satisfaction uses the conversation-start cohort: KPI totals, daily and weekly buckets,
+tooltips, accessible tables and exports include the same ratings attached to conversations created
+inside the selected range, even when a rating is submitted later. Other chart styling and exact
+palette matching await the owner's additional visual
 references; do not claim pixel fidelity to screenshots that have not been provided.
 
 Tickets use an Inbox queue and contextual detail view with linked conversation/contact, number/title, assignee/team,

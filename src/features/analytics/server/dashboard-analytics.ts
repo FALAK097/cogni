@@ -5,6 +5,7 @@ import { formatInTimeZone } from "date-fns-tz";
 import { desc } from "drizzle-orm";
 
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
+import { aggregateSatisfactionByCohort } from "@/features/analytics/aggregation";
 import { collectAiResponseTimeSamplesMs } from "@/features/analytics/response-time";
 import { collectNegativeFeedbackItems } from "@/features/analytics/negative-feedback";
 import { resolveAnalyticsDateRange } from "@/features/analytics/date-range";
@@ -122,14 +123,12 @@ function aggregatePeriod(conversations: ConversationRow[], timezone: string) {
   let engagedConversations = 0;
   let responseTimeTotal = 0;
   let aiResponseSamples = 0;
-  let feedbackPositive = 0;
-  let feedbackNegative = 0;
+  const satisfactionResponses: { cohortDate: string; rating: "positive" | "negative" }[] = [];
   const sourceCounts = new Map<string, number>();
   const statusCounts = new Map<string, number>();
   const questionCounts = new Map<string, { count: number; conversationId: string }>();
   const negativeFeedback: NegativeFeedbackItem[] = [];
   const dailyCounts = new Map<string, number>();
-  const dailySatisfaction = new Map<string, { positive: number; negative: number }>();
 
   for (const conversation of conversations) {
     const messages = parseMessages(conversation.messages);
@@ -181,15 +180,8 @@ function aggregatePeriod(conversations: ConversationRow[], timezone: string) {
     aiResponseSamples += responseTimes.length;
 
     for (const message of messages) {
-      if (message.feedback === "positive") feedbackPositive++;
-      if (message.feedback === "negative") feedbackNegative++;
-
-      if (message.feedback && message.feedbackAt) {
-        const feedbackDay = formatInTimeZone(new Date(message.feedbackAt), timezone, "yyyy-MM-dd");
-        const entry = dailySatisfaction.get(feedbackDay) ?? { positive: 0, negative: 0 };
-        if (message.feedback === "positive") entry.positive++;
-        if (message.feedback === "negative") entry.negative++;
-        dailySatisfaction.set(feedbackDay, entry);
+      if (message.feedback === "positive" || message.feedback === "negative") {
+        satisfactionResponses.push({ cohortDate: dayKey, rating: message.feedback });
       }
     }
 
@@ -199,9 +191,10 @@ function aggregatePeriod(conversations: ConversationRow[], timezone: string) {
   const totalConversations = conversations.length;
   const uniqueUserCount = uniqueUsers.size;
   const avgAiResponseTimeMs = aiResponseSamples > 0 ? responseTimeTotal / aiResponseSamples : 0;
+  const satisfaction = aggregateSatisfactionByCohort(satisfactionResponses);
 
-  const feedbackTotal = feedbackPositive + feedbackNegative;
-  const satisfactionScore = feedbackTotal > 0 ? (feedbackPositive / feedbackTotal) * 5 : 0;
+  const feedbackTotal = satisfaction.positive + satisfaction.negative;
+  const satisfactionScore = feedbackTotal > 0 ? (satisfaction.positive / feedbackTotal) * 5 : 0;
 
   const engagementRate =
     totalConversations > 0 ? (engagedConversations / totalConversations) * 100 : 0;
@@ -227,7 +220,7 @@ function aggregatePeriod(conversations: ConversationRow[], timezone: string) {
     sourceCounts,
     statusCounts,
     dailyCounts,
-    dailySatisfaction,
+    dailySatisfaction: satisfaction.daily,
     topQuestions,
     negativeFeedback: negativeFeedback
       .sort((a, b) => b.feedbackAt.localeCompare(a.feedbackAt))
@@ -371,6 +364,7 @@ export async function getDashboardAnalytics(
             ? toMetric(current.satisfactionScore, previous.satisfactionScore).changePercent
             : null,
         max: 5,
+        responses: current.feedbackTotal,
       },
     },
     conversationsOverTime: buildTimeSeries(range.startDate, range.endDate, current.dailyCounts),

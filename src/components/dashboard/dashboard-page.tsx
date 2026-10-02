@@ -419,6 +419,7 @@ function buildExportSections(
           String(analytics.kpis.satisfactionScore.previousValue),
           pct(analytics.kpis.satisfactionScore.changePercent),
         ],
+        ["Satisfaction Responses", String(analytics.kpis.satisfactionScore.responses), "—", "—"],
       ],
     });
   }
@@ -499,8 +500,8 @@ function buildExportSections(
 
   if (selected.has("satisfactionOverTime")) {
     sections.push({
-      title: "Satisfaction Over Time",
-      headers: ["Date", "Score", "Responses"],
+      title: "Satisfaction by Conversation Start",
+      headers: ["Conversation Start Date", "Score", "Responses"],
       rows: analytics.satisfactionOverTime.map((point) => [
         point.date,
         point.score === null ? "—" : point.score.toFixed(1),
@@ -1112,10 +1113,15 @@ export function DashboardPage({
       satGranularity === "weekly"
         ? aggregateWeeklySatisfaction(analytics?.satisfactionOverTime ?? [])
         : (analytics?.satisfactionOverTime ?? []);
-    return series
-      .filter((point) => point.score !== null)
-      .map((point) => ({ label: point.date, value: point.score ?? 0 }));
+    return series.map((point) => ({
+      label: point.date,
+      value: point.score,
+      responses: point.responses,
+    }));
   }, [analytics?.satisfactionOverTime, satGranularity]);
+  const hasSatisfactionResponses = (analytics?.satisfactionOverTime ?? []).some(
+    (point) => point.responses > 0,
+  );
 
   const sourceChart = useMemo(() => {
     const data = analytics?.conversationsBySource ?? [];
@@ -1349,7 +1355,11 @@ export function DashboardPage({
                     />
                   </TooltipTrigger>
                   <TooltipContent side="top" className="max-w-xs">
-                    Calculated from visitor feedback on AI responses. Scores range from 0 to 5.
+                    Average of visitor feedback on AI responses in conversations started during the
+                    selected period. Each rating is counted on its conversation&apos;s start date,
+                    even if the visitor rated it later. Scores range from 0 to 5. Based on{" "}
+                    {analytics.kpis.satisfactionScore.responses}{" "}
+                    {analytics.kpis.satisfactionScore.responses === 1 ? "response." : "responses."}
                   </TooltipContent>
                 </Tooltip>
               }
@@ -1588,23 +1598,29 @@ export function DashboardPage({
 
         <DashboardCard className="flex h-full flex-col p-6 xl:col-span-2">
           <div className="mb-5 flex items-center justify-between gap-3">
-            <h3 className="text-sm font-semibold tracking-tight">Satisfaction Score Over Time</h3>
+            <div>
+              <h3 className="text-sm font-semibold tracking-tight">
+                Satisfaction by Conversation Start
+              </h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Ratings are grouped by when each conversation began.
+              </p>
+            </div>
             <GranularitySelect value={satGranularity} onChange={setSatGranularity} />
           </div>
           {isLoading ? (
             <Skeleton className="h-60 w-full rounded-lg border border-border/50 bg-transparent" />
-          ) : satChartData.length === 0 ? (
-            <div className="flex h-60 items-center justify-center text-sm text-muted-foreground">
-              No satisfaction feedback in this period.
-            </div>
           ) : (
             <InsightsTrendChart
               data={satChartData}
+              empty={!hasSatisfactionResponses}
+              emptyMessage="No satisfaction feedback in this period."
               labelFormatter={formatChartDate}
               valueFormatter={(v) => v.toFixed(1)}
               seriesLabel="Satisfaction score"
+              showResponseCount
               yAxisDomain={[0, 5]}
-              ariaLabel="Satisfaction score over time"
+              ariaLabel="Satisfaction by conversation start date"
             />
           )}
         </DashboardCard>

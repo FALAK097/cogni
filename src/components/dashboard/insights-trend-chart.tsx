@@ -5,7 +5,7 @@ import { EvilAreaChart } from "@/components/evilcharts/charts/recharts-area-char
 import type { ChartConfig } from "@/components/evilcharts/ui/recharts-chart";
 import { cn } from "@/lib/utils";
 
-type TrendPoint = { label: string; value: number };
+type TrendPoint = { label: string; value: number | null; responses?: number };
 type YAxisDomain = readonly [number, number | "auto"];
 
 const formatDefaultValue = (value: number) => value.toLocaleString();
@@ -24,6 +24,7 @@ export function InsightsTrendChart({
   ariaLabel,
   seriesLabel = ariaLabel,
   yAxisDomain = [0, "auto"],
+  showResponseCount = false,
 }: {
   data: TrendPoint[];
   className?: string;
@@ -34,6 +35,7 @@ export function InsightsTrendChart({
   labelFormatter?: (label: string) => string;
   seriesLabel?: string;
   yAxisDomain?: YAxisDomain;
+  showResponseCount?: boolean;
   ariaLabel: string;
 }) {
   const chartConfig = useMemo(
@@ -105,9 +107,21 @@ export function InsightsTrendChart({
               tickFormatter={valueFormatter}
             />
             <EvilAreaChart.Tooltip
-              formatter={(value: number | string | readonly (number | string)[] | undefined) =>
-                valueFormatter(Number(value))
-              }
+              formatter={(value, _name, item) => {
+                if (value === null || value === undefined) return "No response";
+                const formattedValue = valueFormatter(Number(value));
+                if (
+                  !showResponseCount ||
+                  typeof item.payload !== "object" ||
+                  item.payload === null
+                ) {
+                  return formattedValue;
+                }
+                const responses = (item.payload as Record<string, unknown>).responses;
+                return typeof responses === "number"
+                  ? `${formattedValue} / 5 · ${responses} ${responses === 1 ? "response" : "responses"}`
+                  : formattedValue;
+              }}
             />
             <EvilAreaChart.Area
               dataKey="value"
@@ -132,11 +146,16 @@ export function InsightsTrendChart({
             <thead>
               <tr className="border-b border-border">
                 <th scope="col" className="px-3 py-2">
-                  Date
+                  {showResponseCount ? "Conversation start" : "Date"}
                 </th>
                 <th scope="col" className="px-3 py-2">
                   Value
                 </th>
+                {showResponseCount ? (
+                  <th scope="col" className="px-3 py-2 text-right">
+                    Responses
+                  </th>
+                ) : null}
               </tr>
             </thead>
             <tbody>
@@ -145,7 +164,12 @@ export function InsightsTrendChart({
                   <th scope="row" className="px-3 py-2 font-normal">
                     {labelFormatter(point.label)}
                   </th>
-                  <td className="px-3 py-2">{valueFormatter(point.value)}</td>
+                  <td className="px-3 py-2">
+                    {point.value === null ? "—" : valueFormatter(point.value)}
+                  </td>
+                  {showResponseCount ? (
+                    <td className="px-3 py-2 text-right tabular-nums">{point.responses ?? 0}</td>
+                  ) : null}
                 </tr>
               ))}
             </tbody>

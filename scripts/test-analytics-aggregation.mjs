@@ -13,7 +13,20 @@ const compiled = await build({
 const analytics = await import(
   `data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString("base64")}`
 );
-const { aggregateWeeklyCounts, aggregateWeeklySatisfaction } = analytics;
+const { aggregateSatisfactionByCohort, aggregateWeeklyCounts, aggregateWeeklySatisfaction } =
+  analytics;
+
+test("satisfaction KPI totals and daily series use the same conversation cohort", () => {
+  const result = aggregateSatisfactionByCohort([
+    { cohortDate: "2026-06-02", rating: "positive" },
+    { cohortDate: "2026-06-02", rating: "negative" },
+    { cohortDate: "2026-06-03", rating: "positive" },
+  ]);
+
+  assert.equal(result.positive + result.negative, 3);
+  assert.deepEqual(result.daily.get("2026-06-02"), { positive: 1, negative: 1 });
+  assert.deepEqual(result.daily.get("2026-06-03"), { positive: 1, negative: 0 });
+});
 
 test("weekly conversation counts use ISO week-years across New Year", () => {
   const [week] = aggregateWeeklyCounts([

@@ -53,7 +53,7 @@ export type DashboardAnalytics = {
     uniqueUsers: MetricComparison;
     closedConversations: MetricComparison;
     avgAiResponseTime: FormattedMetricComparison;
-    satisfactionScore: FormattedMetricComparison & { max: number };
+    satisfactionScore: FormattedMetricComparison & { max: number; responses: number };
   };
   conversationsOverTime: TimeSeriesPoint[];
   conversationsBySource: BreakdownItem[];
