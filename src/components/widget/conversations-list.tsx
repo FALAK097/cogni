@@ -65,6 +65,7 @@ interface ConversationsListProps {
   onClearFilter: () => void;
   initialChannel: InboxChannel | null;
   initialAssignee: string | null;
+  initialLabel: string | null;
   onFacetChange: () => void;
 }
 
@@ -106,6 +107,7 @@ export function ConversationsList({
   onClearFilter,
   initialChannel,
   initialAssignee,
+  initialLabel,
   onFacetChange,
 }: ConversationsListProps) {
   const [page, setPage] = useState(1);
@@ -114,13 +116,18 @@ export function ConversationsList({
   const currentTimestamp = useCurrentTimestamp();
   const [channelFilter, setChannelFilter] = useState<InboxChannel | null>(initialChannel);
   const [assigneeFilter, setAssigneeFilter] = useState<string | null>(initialAssignee);
+  const [labelFilter, setLabelFilter] = useState<string>(initialLabel ?? "");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [savingView, setSavingView] = useState(false);
   const [savedViewName, setSavedViewName] = useState("");
   const [saveViewError, setSaveViewError] = useState<string | null>(null);
   const [saveViewMessage, setSaveViewMessage] = useState<string | null>(null);
   const savedViewNameRef = useRef<HTMLInputElement>(null);
-  const listKey = `${filter}:${debouncedSearch}:${channelFilter ?? "all"}:${assigneeFilter ?? "all"}`;
+  const normalizedLabel = labelFilter.trim().toLowerCase();
+  const isValidLabel =
+    !normalizedLabel || /^[\p{L}\p{N}][\p{L}\p{N} ._-]{0,31}$/u.test(normalizedLabel);
+  const appliedLabel = isValidLabel ? normalizedLabel : "";
+  const listKey = `${filter}:${debouncedSearch}:${channelFilter ?? "all"}:${assigneeFilter ?? "all"}:${appliedLabel}`;
   const [trackedListKey, setTrackedListKey] = useState(listKey);
   const [pagesCache, setPagesCache] = useState<Record<number, ConversationSummary[]>>({});
   const [cursorsByPage, setCursorsByPage] = useState<Record<number, string | null>>({ 1: null });
@@ -133,7 +140,10 @@ export function ConversationsList({
     refetch: refetchMembers,
   } = useWorkspaceMembers();
   const members = membersData?.members ?? [];
-  const activeFilterCount = Number(Boolean(channelFilter)) + Number(Boolean(assigneeFilter));
+  const activeFilterCount =
+    Number(Boolean(channelFilter)) +
+    Number(Boolean(assigneeFilter)) +
+    Number(Boolean(appliedLabel));
   const markedReadRef = useRef<string | null>(null);
   const clearSearch = () => {
     setSearch("");
@@ -150,6 +160,7 @@ export function ConversationsList({
         filter,
         channel: channelFilter,
         assigneeFilter: assigneeFilter ?? "all",
+        labelFilter: appliedLabel || null,
       },
       {
         onSuccess: () => {
@@ -192,6 +203,7 @@ export function ConversationsList({
     filter,
     channel: channelFilter ?? undefined,
     assignee: assigneeFilter ?? undefined,
+    label: appliedLabel || undefined,
   });
   const isSearchPending =
     search.trim() !== debouncedSearch.trim() || (isFetching && Boolean(search.trim()));
@@ -246,7 +258,7 @@ export function ConversationsList({
     setPage((current) => current + 1);
   };
   const searchTerm = debouncedSearch.trim();
-  const hasFacetFilters = Boolean(channelFilter || assigneeFilter);
+  const hasFacetFilters = Boolean(channelFilter || assigneeFilter || appliedLabel);
   const emptyTitle = searchTerm
     ? `No matches for “${searchTerm}”`
     : hasFacetFilters
@@ -327,7 +339,9 @@ export function ConversationsList({
             >
               <PopoverHeader>
                 <PopoverTitle>Filter conversations</PopoverTitle>
-                <PopoverDescription>Find chats by channel or teammate.</PopoverDescription>
+                <PopoverDescription>
+                  Find conversations by channel, teammate or label.
+                </PopoverDescription>
               </PopoverHeader>
               <div className="space-y-3">
                 <div className="space-y-1.5">
@@ -411,6 +425,38 @@ export function ConversationsList({
                       </button>
                     </span>
                   ) : null}
+                </div>
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="conversation-label-filter"
+                    className="text-xs font-medium text-muted-foreground"
+                  >
+                    Conversation label
+                  </label>
+                  <Input
+                    id="conversation-label-filter"
+                    aria-label="Filter by conversation label"
+                    aria-invalid={!isValidLabel}
+                    className="h-11 text-base sm:h-9 sm:text-sm"
+                    placeholder="e.g. billing"
+                    maxLength={32}
+                    value={labelFilter}
+                    onChange={(event) => {
+                      setLabelFilter(event.target.value);
+                      setSaveViewMessage(null);
+                      onFacetChange();
+                      onSelectConversation(null);
+                    }}
+                  />
+                  {!isValidLabel ? (
+                    <p role="alert" className="text-xs text-destructive">
+                      Use up to 32 letters, numbers, spaces, periods, underscores or hyphens.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Matches a label on the conversation.
+                    </p>
+                  )}
                 </div>
                 {savingView ? (
                   <form
@@ -526,11 +572,28 @@ export function ConversationsList({
                 <span className="sr-only">Clear assignee filter</span>
               </button>
             ) : null}
+            {appliedLabel ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setLabelFilter("");
+                  setSaveViewMessage(null);
+                  onFacetChange();
+                  onSelectConversation(null);
+                }}
+                className="inline-flex h-7 items-center gap-1.5 rounded-md bg-muted px-2 text-xs text-foreground hover:bg-muted/70 focus-visible:outline-2 focus-visible:outline-ring"
+              >
+                {appliedLabel}
+                <X className="size-3" aria-hidden="true" />
+                <span className="sr-only">Clear label filter</span>
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => {
                 setChannelFilter(null);
                 setAssigneeFilter(null);
+                setLabelFilter("");
                 onSelectConversation(null);
               }}
               className="h-7 px-1 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
@@ -603,6 +666,7 @@ export function ConversationsList({
                   clearSearch();
                   setChannelFilter(null);
                   setAssigneeFilter(null);
+                  setLabelFilter("");
                   if (filter !== "all") onClearFilter();
                   onSelectConversation(null);
                 }}
@@ -669,6 +733,20 @@ export function ConversationsList({
                       <span className="inline-flex rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
                         {getConversationChannelLabel(conversation.channel)}
                       </span>
+                      {conversation.labels.slice(0, 2).map((label) => (
+                        <span
+                          key={label}
+                          className="inline-flex max-w-24 truncate rounded border border-border/70 bg-background px-1.5 py-0.5 text-xs text-muted-foreground"
+                          title={label}
+                        >
+                          {label}
+                        </span>
+                      ))}
+                      {conversation.labels.length > 2 ? (
+                        <span className="text-xs text-muted-foreground">
+                          +{conversation.labels.length - 2}
+                        </span>
+                      ) : null}
                       {conversation.snoozedUntil &&
                       currentTimestamp !== null &&
                       Date.parse(conversation.snoozedUntil) > currentTimestamp ? (

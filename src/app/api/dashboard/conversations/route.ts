@@ -16,6 +16,7 @@ export async function GET(request: Request) {
     membershipId: membership.id,
     channel: parsed.data.channel,
     assignee: parsed.data.assignee,
+    label: parsed.data.label,
     limit: parsed.data.limit,
     cursor: parsed.data.cursor,
   });

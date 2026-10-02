@@ -79,6 +79,7 @@ import {
   useSendConversationMessage,
   useTakeOverConversation,
   useUpdateContactTag,
+  useUpdateConversationLabel,
 } from "@/hooks/query";
 import { useCurrentTimestamp } from "@/hooks/use-current-timestamp";
 import type { ConversationDetail as ConversationDetailData, WidgetMessage } from "@/hooks/query";
@@ -1215,12 +1216,18 @@ function SessionDetailsContent({
 }) {
   const { toast } = useToast();
   const updateContactTag = useUpdateContactTag();
+  const updateConversationLabel = useUpdateConversationLabel();
   const [newTag, setNewTag] = useState("");
   const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
   const [showAllTags, setShowAllTags] = useState(false);
   const [tagError, setTagError] = useState<string | null>(null);
+  const [newLabel, setNewLabel] = useState("");
+  const [labelPopoverOpen, setLabelPopoverOpen] = useState(false);
+  const [labelError, setLabelError] = useState<string | null>(null);
   const contactTags = session.contactTags ?? [];
+  const conversationLabels = session.conversationLabels ?? [];
   const tagConversationId = session.conversationId ?? session.id;
+  const labelConversationId = session.conversationId ?? session.id;
   const visibleTags = showAllTags ? contactTags : contactTags.slice(0, 8);
   const addContactTag = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -1243,6 +1250,29 @@ function SessionDetailsContent({
     updateContactTag.mutate(
       { conversationId: tagConversationId, action: "remove", tag },
       { onError: (error) => setTagError(error.message) },
+    );
+  };
+  const addConversationLabel = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setLabelError(null);
+    const label = newLabel.trim();
+    if (!label) return;
+    updateConversationLabel.mutate(
+      { conversationId: labelConversationId, action: "add", label },
+      {
+        onSuccess: () => {
+          setNewLabel("");
+          setLabelPopoverOpen(false);
+        },
+        onError: (error) => setLabelError(error.message),
+      },
+    );
+  };
+  const removeConversationLabel = (label: string) => {
+    setLabelError(null);
+    updateConversationLabel.mutate(
+      { conversationId: labelConversationId, action: "remove", label },
+      { onError: (error) => setLabelError(error.message) },
     );
   };
   const userId = session.contactExternalId ?? session.visitorId;
@@ -1470,6 +1500,99 @@ function SessionDetailsContent({
           <CardTitle className="text-xs font-semibold">Conversation details</CardTitle>
         </CardHeader>
         <CardContent className={cn("space-y-0 pb-3", detailCardContentClassName())}>
+          <div className="mb-2 border-b border-border/60 pb-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-medium text-muted-foreground">Labels</p>
+              <Popover
+                open={labelPopoverOpen}
+                onOpenChange={(open) => {
+                  setLabelPopoverOpen(open);
+                  if (open) setLabelError(null);
+                }}
+              >
+                <PopoverTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="size-11 shrink-0 rounded-lg text-muted-foreground sm:size-8"
+                      aria-label="Add conversation label"
+                      title="Add conversation label"
+                      disabled={conversationLabels.length >= 50}
+                    />
+                  }
+                >
+                  <Plus className="size-4" aria-hidden="true" />
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-[min(18rem,calc(100vw-2rem))] rounded-xl">
+                  <PopoverHeader>
+                    <PopoverTitle>Add a conversation label</PopoverTitle>
+                    <PopoverDescription>
+                      Labels help your team find related conversations.
+                    </PopoverDescription>
+                  </PopoverHeader>
+                  <form onSubmit={addConversationLabel} className="mt-3 space-y-2">
+                    <Input
+                      aria-label="New conversation label"
+                      className="h-11 text-base sm:h-9 sm:text-sm"
+                      placeholder="e.g. billing"
+                      maxLength={32}
+                      value={newLabel}
+                      onChange={(event) => setNewLabel(event.target.value)}
+                    />
+                    {labelError ? (
+                      <p role="alert" className="text-xs text-destructive">
+                        {labelError}
+                      </p>
+                    ) : null}
+                    <div className="flex justify-end">
+                      <Button
+                        type="submit"
+                        size="sm"
+                        className="h-11 sm:h-8"
+                        disabled={!newLabel.trim() || updateConversationLabel.isPending}
+                      >
+                        {updateConversationLabel.isPending ? "Adding…" : "Add label"}
+                      </Button>
+                    </div>
+                  </form>
+                </PopoverContent>
+              </Popover>
+            </div>
+            {conversationLabels.length > 0 ? (
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {conversationLabels.map((label) => (
+                  <Badge
+                    key={label}
+                    variant="outline"
+                    className="max-w-full gap-1 rounded-md px-2 py-1 text-xs font-normal"
+                  >
+                    <span className="max-w-32 truncate" title={label}>
+                      {label}
+                    </span>
+                    <button
+                      type="button"
+                      className="-mr-1 inline-flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring sm:size-5"
+                      aria-label={`Remove ${label} conversation label`}
+                      title={`Remove ${label} label`}
+                      disabled={updateConversationLabel.isPending}
+                      onClick={() => removeConversationLabel(label)}
+                    >
+                      <X className="size-3" aria-hidden="true" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-1 text-xs text-muted-foreground">No labels yet</p>
+            )}
+            {labelError && !labelPopoverOpen ? (
+              <p role="alert" className="mt-2 text-xs text-destructive">
+                {labelError}
+              </p>
+            ) : null}
+          </div>
           <DetailRow label="Status">
             <Badge
               variant={statusBadgeVariant(session.conversationStatus ?? "OPEN")}

@@ -75,6 +75,12 @@ row lock and enforces the 50-tag limit. Local PostgreSQL tests cover concurrent 
 workspace isolation and limits. A localhost Inbox browser pass added a temporary tag, confirmed
 it appeared in the card, removed it and confirmed the empty state returned. No tag remained.
 
+Conversation labels are separate from contact tags and stay on the conversation. Agents can
+add/remove up to 50 labels in the existing Details card; the Inbox shows compact labels, supports
+an exact label filter, and persists that filter in workspace-shared views. Local PostgreSQL tests
+cover concurrent updates, case normalization, limits, cross-workspace denial, combined label/status/
+channel filtering and saved-view persistence. A localhost browser pass added a temporary label in the existing Details card, confirmed it on the Inbox row, applied the exact label filter, and removed the test label afterward. This workspace has one conversation, so the browser pass confirmed a match; database tests cover non-matches and combined facets.
+
 Agent setup follow-up keeps all configuration in the existing page:
 
 | Before                                                                                    | After                                                                                 | Why                                                                 |

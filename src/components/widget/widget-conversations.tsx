@@ -263,6 +263,7 @@ export function WidgetConversations({
                 ? null
                 : (selectedSavedView?.assigneeFilter ?? null)
             }
+            initialLabel={selectedSavedView?.labelFilter ?? null}
             onFacetChange={() => setSelectedSavedViewId(null)}
           />
         </div>

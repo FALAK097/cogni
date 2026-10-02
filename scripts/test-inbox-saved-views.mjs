@@ -105,12 +105,16 @@ test("saved inbox views are workspace scoped and names are unique without case s
     filter: "open",
     channel: "SLACK",
     assigneeFilter: "all",
+    labelFilter: "Billing",
   };
   const first = await createInboxSavedView(workspaceId, memberIds[0], input);
   const otherWorkspaceView = await createInboxSavedView(otherWorkspaceId, memberIds[2], input);
 
   assert.equal(first.name, input.name);
-  assert.equal((await listInboxSavedViews(workspaceId)).length, 1);
+  assert.equal(first.labelFilter, "billing");
+  const listedViews = await listInboxSavedViews(workspaceId);
+  assert.equal(listedViews.length, 1);
+  assert.equal(listedViews[0].labelFilter, "billing");
   assert.equal((await listInboxSavedViews(otherWorkspaceId)).length, 1);
   await assert.rejects(
     createInboxSavedView(workspaceId, memberIds[1], { ...input, name: "billing QUESTIONS" }),

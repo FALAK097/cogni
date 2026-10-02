@@ -25,6 +25,7 @@ await build({
       export { getInboxPage, mapConversationToListItem } from "@/features/conversations/server/queries";
       export { appendConversationMessage } from "@/features/conversations/server/conversation-service";
       export { decodeInboxCursor } from "@/features/conversations/inbox-pagination";
+      export { changeConversationLabel, parseConversationLabels } from "@/features/conversations/server/labels";
       export { getDb } from "@/lib/db/client";
     `,
     resolveDir: process.cwd(),
@@ -55,10 +56,12 @@ await build({
 
 const {
   appendConversationMessage,
+  changeConversationLabel,
   decodeInboxCursor,
   getDb,
   getInboxPage,
   mapConversationToListItem,
+  parseConversationLabels,
 } = await import(`${pathToFileURL(outputFile).href}?build=${randomUUID()}`);
 const raw = postgres(databaseUrl, { max: 1 });
 const workspaceId = randomUUID();
@@ -235,6 +238,95 @@ test("unread view only includes conversations with an unread visitor message", a
     result.conversations.every((conversation) =>
       conversation.messages.some((message) => message.authorType === "VISITOR" && !message.readAt),
     ),
+  );
+});
+
+test("conversation labels normalize concurrent updates and remain workspace scoped", async () => {
+  const labels = ["billing", "VIP", "follow up", "Billing"];
+  await Promise.all(
+    labels.map((label) =>
+      changeConversationLabel({
+        db: getDb(),
+        workspaceId,
+        conversationId: conversationIds[1],
+        action: "add",
+        label,
+      }),
+    ),
+  );
+  const [row] = await raw`SELECT "labels" FROM "conversation" WHERE "id" = ${conversationIds[1]}`;
+  assert.deepEqual(JSON.parse(row.labels).sort(), ["billing", "follow up", "vip"]);
+  assert.deepEqual(
+    await changeConversationLabel({
+      db: getDb(),
+      workspaceId,
+      conversationId: conversationIds[1],
+      action: "remove",
+      label: "VIP",
+    }),
+    { kind: "updated", labels: ["billing", "follow up"] },
+  );
+  assert.deepEqual(parseConversationLabels("not-json"), []);
+  assert.deepEqual(
+    await changeConversationLabel({
+      db: getDb(),
+      workspaceId,
+      conversationId: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+      action: "add",
+      label: "private",
+    }),
+    { kind: "not-found" },
+  );
+});
+
+test("label filters are exact and scoped to the selected workspace", async () => {
+  const foreignConversationId = "ffffffff-ffff-4fff-8fff-ffffffffffff";
+  await changeConversationLabel({
+    db: getDb(),
+    workspaceId,
+    conversationId: conversationIds[0],
+    action: "add",
+    label: "billing",
+  });
+  await raw`UPDATE "conversation" SET "labels" = '["billing"]' WHERE "id" = ${foreignConversationId}`;
+
+  const result = await getInboxPage(workspaceId, {
+    membershipId: memberId,
+    filter: "closed",
+    channel: "WIDGET",
+    label: "billing",
+    limit: 20,
+    cursor: null,
+  });
+
+  assert.deepEqual(
+    result.conversations.map((conversation) => conversation.id),
+    [conversationIds[0]],
+  );
+  assert.deepEqual(mapConversationToListItem(result.conversations[0]).labels, ["billing"]);
+});
+
+test("conversation label limits reject invalid additions", async () => {
+  await raw`UPDATE "conversation" SET "labels" = ${JSON.stringify(Array.from({ length: 50 }, (_, index) => `label-${index}`))} WHERE "id" = ${conversationIds[2]}`;
+  assert.deepEqual(
+    await changeConversationLabel({
+      db: getDb(),
+      workspaceId,
+      conversationId: conversationIds[2],
+      action: "add",
+      label: "extra",
+    }),
+    { kind: "limit" },
+  );
+  await assert.rejects(
+    changeConversationLabel({
+      db: getDb(),
+      workspaceId,
+      conversationId: conversationIds[2],
+      action: "add",
+      label: "bad\nlabel",
+    }),
+    /valid conversation label/,
   );
 });
 

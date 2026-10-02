@@ -39,6 +39,7 @@ export interface InboxSavedView {
   filter: ConversationFilter;
   channel: InboxChannel | null;
   assigneeFilter: string;
+  labelFilter: string | null;
   createdByMembershipId: string | null;
 }
 
@@ -149,6 +150,7 @@ export interface WidgetSessionDetail {
   contactLastSeenAt?: string | null;
   contactPhone?: string | null;
   contactTags?: string[];
+  conversationLabels?: string[];
   contactSource?: string | null;
   contactCapturedAt?: string | null;
   contactCaptureContext?: Record<string, unknown> | null;
@@ -374,6 +376,7 @@ export interface ConversationSummary {
   channel: string;
   subject: string;
   snoozedUntil: string | null;
+  labels: string[];
 }
 
 export type ConversationDetail = WidgetSessionDetail;
@@ -426,6 +429,7 @@ export function useConversations(
     filter?: ConversationFilter;
     channel?: InboxChannel;
     assignee?: string;
+    label?: string;
   } = {},
 ) {
   const workspaceId = useActiveWorkspaceId() ?? "";
@@ -441,6 +445,7 @@ export function useConversations(
       options.filter ?? "all",
       options.channel ?? "all-channels",
       options.assignee ?? "all-assignees",
+      options.label ?? "all-labels",
     ],
     queryFn: async () => {
       const { data, error } = await api.GET<ConversationsResponse>("/api/conversations", {
@@ -452,6 +457,7 @@ export function useConversations(
             ...(options.filter && options.filter !== "all" ? { filter: options.filter } : {}),
             ...(options.channel ? { channel: options.channel } : {}),
             ...(options.assignee ? { assignee: options.assignee } : {}),
+            ...(options.label ? { label: options.label } : {}),
           },
         },
       });
@@ -554,6 +560,39 @@ export function useUpdateContactTag() {
         queryKeys.conversations.detail(workspaceId, conversationId),
         (current) => (current ? { ...current, contactTags: tags } : current),
       );
+    },
+  });
+}
+
+export function useUpdateConversationLabel() {
+  const queryClient = useQueryClient();
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useMutation({
+    mutationFn: async (input: {
+      conversationId: string;
+      action: "add" | "remove";
+      label: string;
+    }) => {
+      const response = await fetch(
+        `/api/dashboard/conversations/${encodeURIComponent(input.conversationId)}/labels`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: input.action, label: input.label }),
+        },
+      );
+      const result: { labels?: string[]; error?: string } = await response.json().catch(() => ({}));
+      if (!response.ok || !result.labels) {
+        throw new Error(result.error ?? "Could not update conversation labels.");
+      }
+      return { conversationId: input.conversationId, labels: result.labels };
+    },
+    onSuccess: ({ conversationId, labels }) => {
+      queryClient.setQueryData<ConversationDetail>(
+        queryKeys.conversations.detail(workspaceId, conversationId),
+        (current) => (current ? { ...current, conversationLabels: labels } : current),
+      );
+      void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.list(workspaceId) });
     },
   });
 }

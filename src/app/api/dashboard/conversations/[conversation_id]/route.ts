@@ -13,6 +13,7 @@ import { setConversationStatus } from "@/features/conversations/server/conversat
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { canManageWorkspace } from "@/lib/auth/permissions";
 import { parseContactTags } from "@/features/contacts/server/contact-tags";
+import { parseConversationLabels } from "@/features/conversations/server/labels";
 import { isChatSdkChannel, postChannelReply } from "@/features/integrations/server/chat-sdk";
 import {
   conversation as conversationTable,
@@ -154,6 +155,7 @@ export async function GET(_request: Request, context: RouteContext) {
       : null,
     contactPhone: conversation.contact.phone,
     contactTags: parseContactTags(conversation.contact.tags),
+    conversationLabels: parseConversationLabels(conversation.labels),
     contactSource: conversation.contact.source,
     contactCapturedAt: conversation.contact.capturedAt
       ? new Date(conversation.contact.capturedAt).toISOString()

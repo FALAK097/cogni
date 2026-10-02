@@ -73,3 +73,12 @@ test("list params accept supported channel and assignee facets", () => {
   assert.equal(parseInboxListParams(new URLSearchParams("channel=UNKNOWN")).ok, false);
   assert.equal(parseInboxListParams(new URLSearchParams(`assignee=${"x".repeat(129)}`)).ok, false);
 });
+
+test("list params normalize and validate conversation-label filters", () => {
+  assert.deepEqual(parseInboxListParams(new URLSearchParams("label=%20Billing%20")), {
+    ok: true,
+    data: { filter: "all", label: "billing", limit: 20, cursor: null },
+  });
+  assert.equal(parseInboxListParams(new URLSearchParams("label=bad%0Alabel")).ok, false);
+  assert.equal(parseInboxListParams(new URLSearchParams(`label=${"x".repeat(33)}`)).ok, false);
+});

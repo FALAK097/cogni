@@ -47,6 +47,8 @@ jobs:
       - run: pnpm test:widget-stream
       - run: pnpm test:widget-settings
       - run: pnpm test:conversation-append
+      - run: pnpm test:inbox-pagination
+      - run: pnpm test:inbox-pagination-db
       - run: pnpm test:inbox-saved-views
       - run: pnpm test:contact-tags
       - run: pnpm test:integration-action-recovery

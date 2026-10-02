@@ -5,12 +5,14 @@ import { and, asc, eq } from "drizzle-orm";
 
 import { getDb, type Db } from "@/lib/db/client";
 import { inboxSavedView, workspaceMember } from "@/lib/db/schema";
+import { conversationLabelSchema } from "@/features/conversations/inbox-pagination";
 
 export interface CreateInboxSavedViewInput {
   name: string;
   filter: string;
   channel: string | null;
   assigneeFilter: string;
+  labelFilter?: string | null;
 }
 
 export class InboxSavedViewNameConflictError extends Error {
@@ -42,6 +44,7 @@ export async function listInboxSavedViews(workspaceId: string, db: Db = getDb())
       filter: true,
       channel: true,
       assigneeFilter: true,
+      labelFilter: true,
       createdByMembershipId: true,
     },
     orderBy: [asc(inboxSavedView.name)],
@@ -64,6 +67,9 @@ export async function createInboxSavedView(
     });
     if (!assignedMember) throw new InboxSavedViewAssigneeError();
   }
+  if (input.labelFilter && !conversationLabelSchema.safeParse(input.labelFilter).success) {
+    throw new Error("That conversation label is invalid.");
+  }
 
   try {
     const [view] = await db
@@ -74,6 +80,7 @@ export async function createInboxSavedView(
         filter: input.filter,
         channel: input.channel,
         assigneeFilter: input.assigneeFilter,
+        labelFilter: input.labelFilter?.trim().toLowerCase() ?? null,
         workspaceId,
         createdByMembershipId: membershipId,
         updatedAt: new Date().toISOString(),
@@ -84,6 +91,7 @@ export async function createInboxSavedView(
         filter: inboxSavedView.filter,
         channel: inboxSavedView.channel,
         assigneeFilter: inboxSavedView.assigneeFilter,
+        labelFilter: inboxSavedView.labelFilter,
         createdByMembershipId: inboxSavedView.createdByMembershipId,
       });
 

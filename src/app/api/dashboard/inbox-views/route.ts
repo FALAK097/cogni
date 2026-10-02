@@ -8,12 +8,14 @@ import {
   InboxSavedViewNameConflictError,
   listInboxSavedViews,
 } from "@/features/conversations/server/saved-views";
+import { conversationLabelSchema } from "@/features/conversations/inbox-pagination";
 
 const savedViewSchema = z.object({
   name: z.string().trim().min(1).max(40),
   filter: z.enum(["all", "unread", "unassigned", "mine", "open", "closed", "snoozed"]),
   channel: z.enum(["WIDGET", "DISCORD", "GCHAT", "SLACK", "TEAMS", "WHATSAPP"]).nullable(),
   assigneeFilter: z.string().min(1).max(128),
+  labelFilter: conversationLabelSchema.nullable().optional(),
 });
 
 export async function GET() {

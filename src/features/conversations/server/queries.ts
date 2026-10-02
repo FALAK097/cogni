@@ -22,6 +22,7 @@ import {
 } from "./conversation-service";
 import { encodeInboxCursor, type InboxChannel, type InboxCursor } from "../inbox-pagination";
 import { broadcastConversationEvent } from "@/lib/realtime/broadcast";
+import { parseConversationLabels } from "@/features/conversations/server/labels";
 
 function getInboxConversationBaseCond(c: typeof conversationTable) {
   return sql`EXISTS (
@@ -67,6 +68,7 @@ function conversationWhereCond(
   membershipId?: string,
   channel?: InboxChannel,
   assignee?: string,
+  label?: string,
 ) {
   const normalizedQuery = query?.trim();
   const conds = [eq(c.workspaceId, workspaceId), conversationFilterCond(c, filter, membershipId)];
@@ -74,6 +76,15 @@ function conversationWhereCond(
   if (channel) conds.push(eq(c.channel, channel));
   if (assignee === "unassigned") conds.push(isNull(c.assignedMemberId));
   else if (assignee) conds.push(eq(c.assignedMemberId, assignee));
+
+  if (label) {
+    conds.push(
+      sql`exists (
+        select 1 from jsonb_array_elements_text(${c.labels}::jsonb) as label(value)
+        where lower(label.value) = ${label.toLowerCase()}
+      )`,
+    );
+  }
 
   if (normalizedQuery) {
     const pattern = `%${normalizedQuery}%`;
@@ -263,6 +274,7 @@ export async function getInboxPage(
     membershipId: string;
     channel?: InboxChannel;
     assignee?: string;
+    label?: string;
     limit: number;
     cursor: InboxCursor | null;
   },
@@ -330,6 +342,7 @@ export async function getInboxPage(
             options.membershipId,
             options.channel,
             options.assignee,
+            options.label,
           ),
           cursorWhere,
         ),
@@ -427,6 +440,7 @@ export function mapConversationToListItem(conversation: ParsedConversation) {
   return {
     id: conversation.id,
     snoozedUntil: conversation.snoozedUntil,
+    labels: parseConversationLabels(conversation.labels),
     visitorSessionId: conversation.visitorSessionId,
     visitorId: conversation.visitorSession?.visitorId ?? conversation.contactId,
     contactName: conversation.contact.name,

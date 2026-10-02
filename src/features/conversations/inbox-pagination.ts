@@ -12,6 +12,7 @@ export type InboxListParams = {
   filter: "all" | "unread" | "unassigned" | "mine" | "open" | "closed" | "snoozed";
   channel?: InboxChannel;
   assignee?: string | "unassigned";
+  label?: string;
   limit: number;
   cursor: InboxCursor | null;
 };
@@ -25,6 +26,7 @@ export function parseInboxListParams(
   const filter = searchParams.get("filter") ?? "all";
   const channel = searchParams.get("channel") ?? "";
   const assignee = searchParams.get("assignee") ?? "";
+  const label = searchParams.get("label")?.trim() ?? "";
   const limit = Number(searchParams.get("limit") ?? "20");
   const rawCursor = searchParams.get("cursor");
   const cursor = decodeInboxCursor(rawCursor);
@@ -39,6 +41,9 @@ export function parseInboxListParams(
   if (assignee && assignee !== "unassigned" && assignee.length > 128) {
     return { ok: false, error: "Assignee filter is invalid." };
   }
+  if (label && !conversationLabelSchema.safeParse(label).success) {
+    return { ok: false, error: "Label filter is invalid." };
+  }
   if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
     return { ok: false, error: "Page size must be between 1 and 100." };
   }
@@ -51,6 +56,7 @@ export function parseInboxListParams(
       ...(search ? { search } : {}),
       ...(channel ? { channel: inboxChannelSchema.parse(channel) } : {}),
       ...(assignee ? { assignee } : {}),
+      ...(label ? { label: conversationLabelSchema.parse(label).toLowerCase() } : {}),
       limit,
       cursor,
     },
@@ -67,6 +73,12 @@ const inboxListFilterSchema = z.enum([
   "snoozed",
 ]);
 const inboxChannelSchema = z.enum(["WIDGET", "DISCORD", "GCHAT", "SLACK", "TEAMS", "WHATSAPP"]);
+export const conversationLabelSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(32)
+  .regex(/^[\p{L}\p{N}][\p{L}\p{N} ._-]*$/u);
 
 export function encodeInboxCursor(cursor: InboxCursor) {
   return Buffer.from(JSON.stringify(cursor)).toString("base64url");

@@ -1,0 +1,1 @@
+ALTER TABLE "inbox_saved_view" ADD COLUMN "labelFilter" text;

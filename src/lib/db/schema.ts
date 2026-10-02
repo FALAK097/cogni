@@ -198,6 +198,7 @@ export const conversation = pgTable(
       .default(sql`(CURRENT_TIMESTAMP)`)
       .notNull(),
     messages: text().default("[]").notNull(),
+    labels: text().default("[]").notNull(),
     workspaceId: text()
       .notNull()
       .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
@@ -246,6 +247,7 @@ export const inboxSavedView = pgTable(
     filter: text().default("all").notNull(),
     channel: text(),
     assigneeFilter: text().default("all").notNull(),
+    labelFilter: text(),
     createdAt: timestampString()
       .default(sql`(CURRENT_TIMESTAMP)`)
       .notNull(),
