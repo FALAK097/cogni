@@ -5,7 +5,7 @@ import { BookOpen, CheckCircle2, MessageCircle } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 
 export type WidgetPreviewEvidence = {
-  outcome: "answer" | "handoff";
+  outcome: "answer" | "handoff" | "error";
   grounded: boolean;
   sources: { title: string }[];
 };
@@ -191,6 +191,13 @@ export function WidgetTestPanel({
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
               The preview returned the configured human-handoff response. No customer conversation
               was created.
+            </p>
+          </div>
+        ) : evidence.outcome === "error" ? (
+          <div className="mt-3 rounded-lg border border-destructive/20 bg-destructive/5 p-3">
+            <p className="text-sm font-medium">The agent couldn&apos;t complete this test</p>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+              The preview didn&apos;t receive an answer. Check the model connection and try again.
             </p>
           </div>
         ) : evidence.grounded && evidence.sources.length > 0 ? (

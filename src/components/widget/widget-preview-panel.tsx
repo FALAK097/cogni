@@ -15,18 +15,30 @@ const PREVIEW_EVIDENCE_EVENT = "cogni:widget-preview-evidence";
 function isPreviewEvidence(value: unknown): value is WidgetPreviewEvidence {
   if (typeof value !== "object" || value === null) return false;
   const evidence = value as Record<string, unknown>;
-  return (
-    (evidence.outcome === "answer" || evidence.outcome === "handoff") &&
-    typeof evidence.grounded === "boolean" &&
-    Array.isArray(evidence.sources) &&
-    evidence.sources.every(
+  if (
+    (evidence.outcome !== "answer" &&
+      evidence.outcome !== "handoff" &&
+      evidence.outcome !== "error") ||
+    typeof evidence.grounded !== "boolean" ||
+    !Array.isArray(evidence.sources)
+  ) {
+    return false;
+  }
+
+  const sources = evidence.sources;
+  if (
+    !sources.every(
       (source: unknown) =>
         typeof source === "object" &&
         source !== null &&
         "title" in source &&
         typeof source.title === "string",
     )
-  );
+  ) {
+    return false;
+  }
+
+  return evidence.outcome !== "error" || (!evidence.grounded && sources.length === 0);
 }
 
 type WidgetPreviewPanelProps = {

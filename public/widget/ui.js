@@ -22,6 +22,7 @@ import {
 } from "./documents.js";
 import { createFeedbackButtons, attachFeedbackListeners } from "./feedback.js";
 import { detectLeadCapture } from "./lead-capture.js";
+import { PREVIEW_EVIDENCE_EVENT } from "./preview-evidence.js";
 import { state, resetChatState } from "./state.js";
 import {
   getOrCreateVisitorId,
@@ -884,6 +885,7 @@ export async function sendMessage() {
  */
 async function callWidgetChat(userMessage, interactionId) {
   let streamingMessage = null;
+  let responseCompleted = false;
   try {
     const leadInfo = state.savedLeadInfo
       ? {
@@ -920,6 +922,7 @@ async function callWidgetChat(userMessage, interactionId) {
       bubble.innerHTML = formatBotMessage(text);
       scrollToBottom();
     });
+    responseCompleted = true;
 
     // Remove streaming class when done
     bubble.classList.remove("oc-streaming");
@@ -961,6 +964,14 @@ async function callWidgetChat(userMessage, interactionId) {
     else bubble.classList.remove("oc-streaming");
     removeTypingIndicator();
     addBotMessage("Sorry, I'm having trouble responding right now. Please try again.");
+
+    if (state.preview && !responseCompleted) {
+      window.dispatchEvent(
+        new CustomEvent(PREVIEW_EVIDENCE_EVENT, {
+          detail: { outcome: "error", grounded: false, sources: [] },
+        }),
+      );
+    }
 
     const sendBtn = state.windowEl.querySelector(".oc-send-btn");
     if (sendBtn) sendBtn.disabled = false;

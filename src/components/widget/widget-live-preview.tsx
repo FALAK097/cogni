@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { getBackendOrigin } from "@/lib/api/client";
 
 const WIDGET_SCRIPT_ID = "widget-widget-preview";
-const WIDGET_BUNDLE_VERSION = "18";
+const WIDGET_BUNDLE_VERSION = "19";
 const REMOUNT_DEBOUNCE_MS = 300;
 const CONFIG_SYNC_DEBOUNCE_MS = 50;
 
