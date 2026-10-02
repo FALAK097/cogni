@@ -79,6 +79,7 @@ async function executeInternalTool({
       .set({
         assignedMemberId: membershipId,
         status: "ASSIGNED",
+        snoozedUntil: null,
         updatedAt: new Date().toISOString(),
       })
       .where(and(eq(conversation.id, conversationId), eq(conversation.workspaceId, workspaceId)));

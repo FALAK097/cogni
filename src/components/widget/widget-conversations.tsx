@@ -117,11 +117,8 @@ export function WidgetConversations({
                 {activeView?.label ?? "Choose an inbox view"}
               </SelectValue>
               {activeViewCount > 0 ? (
-                <span
-                  aria-label={`${activeViewCount} ${activeCountKind} conversation${activeViewCount === 1 ? "" : "s"}`}
-                  className="rounded-full bg-muted px-2 py-0.5 text-xs tabular-nums text-muted-foreground"
-                >
-                  {activeViewCount}
+                <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                  {activeViewCount} {activeCountKind}
                 </span>
               ) : null}
             </SelectTrigger>
@@ -134,11 +131,8 @@ export function WidgetConversations({
                   <SelectItem key={tab.value} value={tab.value} className="min-h-10 rounded-lg">
                     <span>{tab.label}</span>
                     {count > 0 ? (
-                      <span
-                        aria-label={`${count} ${countKind} conversation${count === 1 ? "" : "s"}`}
-                        className="ml-auto rounded-full bg-muted px-2 py-0.5 text-xs tabular-nums text-muted-foreground"
-                      >
-                        {count}
+                      <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                        {count} {countKind}
                       </span>
                     ) : null}
                   </SelectItem>
