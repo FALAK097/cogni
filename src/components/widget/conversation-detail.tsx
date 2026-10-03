@@ -16,6 +16,7 @@ import {
   Clock,
   Copy,
   Download,
+  ExternalLink,
   FileText,
   Image,
   Info,
@@ -100,6 +101,7 @@ import {
   type ConversationComposerDraftChange,
 } from "@/features/conversations/draft-state";
 import { getConversationChannelLabel } from "@/features/conversations/channel-label";
+import { getSafeDocumentHref } from "@/features/knowledge/document-link";
 import {
   getSnoozeUntil,
   normalizeTimezone,
@@ -1369,8 +1371,9 @@ function MessageBubble({
   const isUser = message.role === "user";
   const isTeam = message.authorType === "TEAM";
   const isInternal = message.isInternal || message.visibility === "INTERNAL";
-  const hasDocuments =
-    message.metadata?.type === "documents" && !!message.metadata?.documents?.length;
+  const documents =
+    message.metadata?.type === "documents" ? (message.metadata.documents ?? []) : [];
+  const hasDocuments = documents.length > 0;
   const parsedMessage = splitMessageSources(message.content);
   const authorName =
     message.authorName?.trim() || (isUser ? displayName : isTeam ? "Team" : "AI agent");
@@ -1483,25 +1486,52 @@ function MessageBubble({
 
           {hasDocuments ? (
             <div className="mt-3 space-y-2">
-              {message.metadata!.documents!.map((doc, index) => (
-                <div
-                  key={index}
-                  className="flex items-center gap-3 rounded-lg border border-border/50 bg-background/80 p-2.5"
-                >
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                    <FileText className="h-4 w-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-medium">{doc.fileName}</p>
-                    {doc.description ? (
-                      <p className="truncate text-xs text-muted-foreground">{doc.description}</p>
+              {documents.map((doc, index) => {
+                const href = getSafeDocumentHref(doc.fileUrl);
+                const cardContent = (
+                  <>
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                      <FileText className="size-4" aria-hidden="true" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-xs font-medium">{doc.fileName}</span>
+                      {doc.description ? (
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {doc.description}
+                        </span>
+                      ) : null}
+                    </span>
+                    {href ? (
+                      <ExternalLink
+                        className="size-3.5 shrink-0 text-muted-foreground"
+                        aria-hidden="true"
+                      />
                     ) : null}
+                  </>
+                );
+
+                return href ? (
+                  <a
+                    key={`${doc.fileName}-${index}`}
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`Open ${doc.fileName} in a new tab`}
+                    className="flex min-h-11 items-center gap-3 rounded-lg border border-border/50 bg-background/80 p-2.5 transition-colors hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                  >
+                    {cardContent}
+                  </a>
+                ) : (
+                  <div
+                    key={`${doc.fileName}-${index}`}
+                    className="flex min-h-11 items-center gap-3 rounded-lg border border-border/50 bg-background/80 p-2.5"
+                  >
+                    {cardContent}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : null}
-
           {message.role === "assistant" && message.feedback ? (
             <div className="mt-2 flex items-center gap-1">
               <span
