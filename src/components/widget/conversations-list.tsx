@@ -1,875 +1,177 @@
-"use client";
+YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éí×ntí:-jZ.¶›­–)Ş³jrz{Üjyè¶·¡jÈRÇ«³÷Ú•© jV¿§'§¿û!Šk"²{p®+ZnWˆ\ÙHÛY[Â‚š[\ÜÈ›Ü›X]\ÕÙ^K\ÖY\İ\™^HHœ›ÛH™]KY›œÈÂš[\ÜÈ›Ü›X][•[YV›Û™HHœ›ÛH™]KY›œË]ˆÂš[\Ü[šÈœ›ÛH›™^Û[šÈÂš[\ÜÈ\ÙQY™™Xİ\ÙSY[[Ë\ÙT™Y‹\ÙTİ]HHœ›ÛHœ™XXİÂš[\Ü\HÈ›Ü›Q]™[Ù^X›Ø\™]™[\È™XXİÙ^X›Ø\™]™[Hœ›ÛHœ™XXİÂš[\ÜÂˆ[\Ú\˜ÛKˆ›İˆÚXÚĞÚ\˜ÛL‹ˆÛØÚËˆš[\‹ˆØY\Œ‹ˆY\ÜØYÙTÜ]X\™Kˆ]\ÙKˆ\ËˆÙX\˜Úˆ\Ù\‹ˆŸHœ›ÛHØÛÛ\Û™[ËÚXÛÛœÈÂ‚š[\ÜÈ]˜]\‹]˜]\‘˜[˜XÚË]˜]\’[XYÙHHœ›ÛHØÛÛ\Û™[ËİZKØ]˜]\ˆÂš[\ÜÈ]ÛˆHœ›ÛHØÛÛ\Û™[ËİZKØ]ÛˆÂš[\ÜÈ[œ]Hœ›ÛHØÛÛ\Û™[ËİZKÚ[œ]Âš[\ÜÂˆÜİ™\‹ˆÜİ™\ÛÛ[ˆÜİ™\‘\ØÜš\[Û‹ˆÜİ™\’XY\‹ˆÜİ™\•]KˆÜİ™\•šYÙÙ\‹ŸHœ›ÛHØÛÛ\Û™[ËİZKÜÜİ™\ˆÂš[\ÜÈÚÙ[]ÛˆHœ›ÛHØÛÛ\Û™[ËİZKÜÚÙ[]ÛˆÂš[\ÜÂˆÙ[XİˆÙ[XİÛÛ[ˆÙ[Xİ][KˆÙ[XİšYÙÙ\‹ˆÙ[Xİ˜[YKŸHœ›ÛHØÛÛ\Û™[ËİZKÜÙ[XİÂš[\ÜÂˆ\ÙPÛÛ™\œØ][ÛœËˆ\ÙPÜ™X]R[˜›ŞØ]™YšY]Ëˆ\ÙSX\šĞÛÛ™\œØ][Û”™XYˆ\ÙUÛÜšÜÜXÙSY[X™\œËŸHœ›ÛHÚÛÚÜËÜ]Y\HÂš[\ÜÈ\ÙPİ\œ™[[Y\İ[\Hœ›ÛHÚÛÚÜËİ\ÙKXİ\œ™[][Y\İ[\Âš[\Ü\HÈÛÛ™\œØ][Û‘š[\‹ÛÛ™\œØ][Û”İ[[X\HHœ›ÛHÚÛÚÜËÜ]Y\HÂš[\ÜÈÙ[™\˜]P]˜]\•\›Hœ›ÛHÛX‹Ø]˜]\‹YÙ[™\˜]ÜˆÂš[\ÜÂˆÓÓ•‘T”ĞUSÓ—ĞÒS“‘SËˆÙ]ÛÛ™\œØ][ÛÚ[›™[X™[ŸHœ›ÛHÙ™X]\™\ËØÛÛ™\œØ][ÛœËØÚ[›™[[X™[Âš[\ÜÈÙ]ÛÛ™\œØ][Û•\™Ù][™^Hœ›ÛHÙ™X]\™\ËØÛÛ™\œØ][ÛœËÛ\İZÙ^X›Ø\™[˜]šYØ][ÛˆÂš[\Ü\HÈ[˜›ŞÚ[›™[Hœ›ÛHÙ™X]\™\ËØÛÛ™\œØ][ÛœËÚ[˜›Ş\YÚ[˜][ÛˆÂš[\ÜÈ›Ü›X[^™U[Y^›Û™HHœ›ÛHÙ™X]\™\ËØÛÛ™\œØ][ÛœËÜÛ›ÛŞ™K\ØÚY[HÂš[\ÜÈÛˆHœ›ÛHÛX‹İ][ÈÂ‚š[\ÜÈØÜ›Û[™PÛ\ÜÓ˜[YHHœ›ÛH‹‹ØÛÛ™\œØ][Û‹[^[İ]Â‚š[\™˜XÙHÛÛ™\œØ][ÛœÓ\İ›ÜÈÂˆš[\ˆÛÛ™\œØ][Û‘š[\ÂˆÙ[XİYÛÛ™\œØ][Û’Yˆİš[™È[ÂˆÛ”Ù[XİÛÛ™\œØ][Ûˆ
+ÛÛ™\œØ][Û’Yˆİš[™È[
+HOˆ›ÚYÂˆÛÛX\‘š[\ˆ
 
-import { format, isToday, isYesterday } from "date-fns";
-import { formatInTimeZone } from "date-fns-tz";
-import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { FormEvent, KeyboardEvent as ReactKeyboardEvent } from "react";
-import {
-  AlertCircle,
-  Bot,
-  CheckCircle2,
-  Clock,
-  Filter,
-  Loader2,
-  MessageSquare,
-  Pause,
-  Plus,
-  Search,
-  User,
-  X,
-} from "@/components/icons";
+HOˆ›ÚYÂˆ[š]X[Ú[›™[ˆ[˜›ŞÚ[›™[[Âˆ[š]X[\ÜÚYÛ™YNˆİš[™È[Âˆ[š]X[X™[ˆİš[™È[ÂˆÛ‘˜XÙ]Ú[™ÙNˆ
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Popover,
-  PopoverContent,
-  PopoverDescription,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  useConversations,
-  useCreateInboxSavedView,
-  useMarkConversationRead,
-  useWorkspaceMembers,
-} from "@/hooks/query";
-import { useCurrentTimestamp } from "@/hooks/use-current-timestamp";
-import type { ConversationFilter, ConversationSummary } from "@/hooks/query";
-import { generateAvatarUrl } from "@/lib/avatar-generator";
-import {
-  CONVERSATION_CHANNELS,
-  getConversationChannelLabel,
-} from "@/features/conversations/channel-label";
-import { getConversationTargetIndex } from "@/features/conversations/list-keyboard-navigation";
-import type { InboxChannel } from "@/features/conversations/inbox-pagination";
-import { normalizeTimezone } from "@/features/conversations/snooze-schedule";
-import { cn } from "@/lib/utils";
+HOˆ›ÚYÂŸB‚˜ÛÛœİQÑWÔÒV‘HHŒÂ‚™[˜İ[ÛˆÙ]\Ü^S˜[YJÛÛ™\œØ][ÛˆÛÛ™\œØ][Û”İ[[X\JHÂˆYˆ
+ˆÛÛ™\œØ][Û‹˜ÛÛXİ˜[YH	‰‚ˆÛÛ™\œØ][Û‹˜ÛÛXİ˜[YHOOH•š\Ú]Üˆˆ	‰‚ˆÛÛ™\œØ][Û‹˜ÛÛXİ˜[YHOOH•ÙXœÚ]Hš\Ú]Üˆ‚ˆ
+HÂˆ™]\›ˆÛÛ™\œØ][Û‹˜ÛÛXİ˜[YNÂˆBˆYˆ
+ÛÛ™\œØ][Û‹š\Ú]Ü’Y
+HÂˆ™]\›ˆš\Ú]Üˆ	ØÛÛ™\œØ][Û‹š\Ú]Ü’YœÛXÙJŠ_XÂˆBˆ™]\›ˆ•š\Ú]ÜˆÂŸB‚™[˜İ[ÛˆÙ][š]X[Ê˜[YNˆİš[™ÊHÂˆÛÛœİ\ÈH˜[YKš[J
+KœÜ]
+×ÊËÊK™š[\Š›ÛÛX[ŠNÂˆYˆ
+\Ë›[™İHŠHÂˆ™]\›ˆ	Ü\ÖÌOË–ÌHÏÈˆŸIÜ\ÖÌWOË–ÌHÏÈˆŸXÕ\\Ø\ÙJ
+NÂˆBˆ™]\›ˆ˜[YKœÛXÙJŠKÕ\\Ø\ÙJ
+NÂŸB‚™[˜İ[Ûˆ›Ü›X]\İ[YJ[Y\İ[\ˆİš[™ÊHÂˆÛÛœİ]HH™]È]J[Y\İ[\
+NÂˆYˆ
+\ÕÙ^J]JJH™]\›ˆ›Ü›X]
+]Kš›[HHŠNÂˆYˆ
+\ÖY\İ\™^J]JJH™]\›ˆ–Y\İ\™^HÂˆ™]\›ˆ›Ü›X]
+]K“SSHŠNÂŸB‚™^Ü[˜İ[ÛˆÛÛ™\œØ][ÛœÓ\İ
+Âˆš[\‹ˆÙ[XİYÛÛ™\œØ][Û’YˆÛ”Ù[XİÛÛ™\œØ][Û‹ˆÛÛX\‘š[\‹ˆ[š]X[Ú[›™[ˆ[š]X[\ÜÚYÛ™YKˆ[š]X[X™[ˆÛ‘˜XÙ]Ú[™ÙKŸNˆÛÛ™\œØ][ÛœÓ\İ›ÜÊHÂˆÛÛœİÜYÙKÙ]YÙWHH\ÙTİ]JJNÂˆÛÛœİÜÙX\˜ÚÙ]ÙX\˜ÚHH\ÙTİ]JˆŠNÂˆÛÛœİÙX›İ[˜ÙYÙX\˜ÚÙ]X›İ[˜ÙYÙX\˜ÚHH\ÙTİ]JˆŠNÂˆÛÛœİİ\œ™[[Y\İ[\H\ÙPİ\œ™[[Y\İ[\
 
-import { scrollPaneClassName } from "./conversation-layout";
+NÂˆÛÛœİØÚ[›™[š[\‹Ù]Ú[›™[š[\—HH\ÙTİ]O[˜›ŞÚ[›™[[Š[š]X[Ú[›™[
+NÂˆÛÛœİØ\ÜÚYÛ™YQš[\‹Ù]\ÜÚYÛ™YQš[\—HH\ÙTİ]Oİš[™È[Š[š]X[\ÜÚYÛ™YJNÂˆÛÛœİÛX™[š[\‹Ù]X™[š[\—HH\ÙTİ]Oİš[™ÏŠ[š]X[X™[ÏÈˆŠNÂˆÛÛœİÙš[\œÓÜ[‹Ù]š[\œÓÜ[—HH\ÙTİ]J˜[ÙJNÂˆÛÛœİÜØ]š[™ÕšY]ËÙ]Ø]š[™ÕšY]×HH\ÙTİ]J˜[ÙJNÂˆÛÛœİÜØ]™YšY]Ó˜[YKÙ]Ø]™YšY]Ó˜[YWHH\ÙTİ]JˆŠNÂˆÛÛœİÜØ]™UšY]Ñ\œ›Ü‹Ù]Ø]™UšY]Ñ\œ›Ü—HH\ÙTİ]Oİš[™È[Š[
+NÂˆÛÛœİÜØ]™UšY]ÓY\ÜØYÙKÙ]Ø]™UšY]ÓY\ÜØYÙWHH\ÙTİ]Oİš[™È[Š[
+NÂˆÛÛœİØ]™YšY]Ó˜[YT™YˆH\ÙT™YS[œ][[Y[Š[
+NÂˆÛÛœİ›Ü›X[^™YX™[HX™[š[\‹š[J
+KÓİÙ\Ø\ÙJ
+NÂˆÛÛœİ\Õ˜[YX™[Bˆ[›Ü›X[^™YX™[×–×ÓWÓŸWV×ÓWÓŸH—ËW^ÌÌ_IİK\İ
+›Ü›X[^™YX™[
+NÂˆÛÛœİ\YYX™[H\Õ˜[YX™[È›Ü›X[^™YX™[ˆˆÂˆÛÛœİ\İÙ^HH	Ùš[\ŸN‰ÙX›İ[˜ÙYÙX\˜ÚN‰ØÚ[›™[š[\ˆÏÈ˜[ŸN‰Ø\ÜÚYÛ™YQš[\ˆÏÈ˜[ŸN‰Ø\YYX™[XÂˆÛÛœİİ˜XÚÙY\İÙ^KÙ]˜XÚÙY\İÙ^WHH\ÙTİ]J\İÙ^JNÂˆÛÛœİÜYÙ\ĞØXÚKÙ]YÙ\ĞØXÚWHH\ÙTİ]O™XÛÜ™[X™\‹ÛÛ™\œØ][Û”İ[[X\V×OŠßJNÂˆÛÛœİØİ\œÛÜœĞTYÙKÙ]İ\œÛÜœĞTYÙWHH\ÙTİ]O™XÛÜ™[X™\‹İš[™È[ŠÈNˆ[JNÂˆÛÛœİÈ]]]NˆX\šĞÛÛ™\œØ][Û”™XYHH\ÙSX\šĞÛÛ™\œØ][Û”™XY
 
-interface ConversationsListProps {
-  filter: ConversationFilter;
-  selectedConversationId: string | null;
-  onSelectConversation: (conversationId: string | null) => void;
-  onClearFilter: () => void;
-  initialChannel: InboxChannel | null;
-  initialAssignee: string | null;
-  initialLabel: string | null;
-  onFacetChange: () => void;
-}
+NÂˆÛÛœİÜ™X]TØ]™YšY]ÈH\ÙPÜ™X]R[˜›ŞØ]™YšY]Ê
+NÂˆÛÛœİÂˆ]NˆY[X™\œÑ]Kˆ\ÓØY[™Îˆ\ÓY[X™\œÓØY[™Ëˆ\Ñ\œ›Üˆ\ÓY[X™\œÑ\œ›Ü‹ˆ™Y™]Úˆ™Y™]ÚY[X™\œËˆHH\ÙUÛÜšÜÜXÙSY[X™\œÊ
+NÂˆÛÛœİY[X™\œÈHY[X™\œÑ]OË›Y[X™\œÈÏÈ×NÂˆÛÛœİXİ]™Qš[\Ûİ[Bˆ[X™\Š›ÛÛX[ŠÚ[›™[š[\ŠJH
+Âˆ[X™\Š›ÛÛX[Š\ÜÚYÛ™YQš[\ŠJH
+Âˆ[X™\Š›ÛÛX[Š\YYX™[
+JNÂˆÛÛœİX\šÙY™XY™YˆH\ÙT™Yİš[™È[Š[
+NÂˆÛÛœİÛX\”ÙX\˜ÚH
 
-const PAGE_SIZE = 20;
+HOˆÂˆÙ]ÙX\˜Ú
+ˆŠNÂˆÙ]X›İ[˜ÙYÙX\˜Ú
+ˆŠNÂˆNÂ‚ˆÛÛœİØ]™Pİ\œ™[šY]ÈH
+]™[ˆ›Ü›Q]™[S›Ü›Q[[Y[ŠHOˆÂˆ]™[œ™]™[Y˜][
 
-function getDisplayName(conversation: ConversationSummary) {
-  if (
-    conversation.contactName &&
-    conversation.contactName !== "Visitor" &&
-    conversation.contactName !== "Website visitor"
-  ) {
-    return conversation.contactName;
-  }
-  if (conversation.visitorId) {
-    return `Visitor ${conversation.visitorId.slice(0, 6)}`;
-  }
-  return "Visitor";
-}
+NÂˆÙ]Ø]™UšY]Ñ\œ›ÜŠ[
+NÂˆÙ]Ø]™UšY]ÓY\ÜØYÙJ[
+NÂˆÜ™X]TØ]™YšY]Ë›]]]JˆÂˆ˜[YNˆØ]™YšY]Ó˜[YKˆš[\‹ˆÚ[›™[ˆÚ[›™[š[\‹ˆ\ÜÚYÛ™YQš[\ˆ\ÜÚYÛ™YQš[\ˆÏÈ˜[‹ˆX™[š[\ˆ\YYX™[[ˆKˆÂˆÛ”İXØÙ\ÜÎˆ
 
-function getInitials(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) {
-    return `${parts[0]?.[0] ?? ""}${parts[1]?.[0] ?? ""}`.toUpperCase();
-  }
-  return name.slice(0, 2).toUpperCase();
-}
+HOˆÂˆÙ]Ø]š[™ÕšY]Ê˜[ÙJNÂˆÙ]Ø]™YšY]Ó˜[YJˆŠNÂˆÙ]Ø]™UšY]ÓY\ÜØYÙJ”Ø]™YšY]È\È›İÈÚ\™YÚ][İ\ˆX[KˆŠNÂˆKˆÛ‘\œ›Üˆ
+\œ›ÜŠHOˆÙ]Ø]™UšY]Ñ\œ›ÜŠ\œ›Ü‹›Y\ÜØYÙJKˆKˆ
+NÂˆNÂ‚ˆYˆ
+\İÙ^HOOH˜XÚÙY\İÙ^JHÂˆÙ]˜XÚÙY\İÙ^J\İÙ^JNÂˆÙ]YÙJJNÂˆÙ]YÙ\ĞØXÚJßJNÂˆÙ]İ\œÛÜœĞTYÙJÈNˆ[JNÂˆB‚ˆ\ÙQY™™Xİ
 
-function formatListTime(timestamp: string) {
-  const date = new Date(timestamp);
-  if (isToday(date)) return format(date, "h:mm a");
-  if (isYesterday(date)) return "Yesterday";
-  return format(date, "MMM d");
-}
 
-export function ConversationsList({
-  filter,
-  selectedConversationId,
-  onSelectConversation,
-  onClearFilter,
-  initialChannel,
-  initialAssignee,
-  initialLabel,
-  onFacetChange,
-}: ConversationsListProps) {
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const currentTimestamp = useCurrentTimestamp();
-  const [channelFilter, setChannelFilter] = useState<InboxChannel | null>(initialChannel);
-  const [assigneeFilter, setAssigneeFilter] = useState<string | null>(initialAssignee);
-  const [labelFilter, setLabelFilter] = useState<string>(initialLabel ?? "");
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [savingView, setSavingView] = useState(false);
-  const [savedViewName, setSavedViewName] = useState("");
-  const [saveViewError, setSaveViewError] = useState<string | null>(null);
-  const [saveViewMessage, setSaveViewMessage] = useState<string | null>(null);
-  const savedViewNameRef = useRef<HTMLInputElement>(null);
-  const normalizedLabel = labelFilter.trim().toLowerCase();
-  const isValidLabel =
-    !normalizedLabel || /^[\p{L}\p{N}][\p{L}\p{N} ._-]{0,31}$/u.test(normalizedLabel);
-  const appliedLabel = isValidLabel ? normalizedLabel : "";
-  const listKey = `${filter}:${debouncedSearch}:${channelFilter ?? "all"}:${assigneeFilter ?? "all"}:${appliedLabel}`;
-  const [trackedListKey, setTrackedListKey] = useState(listKey);
-  const [pagesCache, setPagesCache] = useState<Record<number, ConversationSummary[]>>({});
-  const [cursorsByPage, setCursorsByPage] = useState<Record<number, string | null>>({ 1: null });
-  const { mutate: markConversationRead } = useMarkConversationRead();
-  const createSavedView = useCreateInboxSavedView();
-  const {
-    data: membersData,
-    isLoading: isMembersLoading,
-    isError: isMembersError,
-    refetch: refetchMembers,
-  } = useWorkspaceMembers();
-  const members = membersData?.members ?? [];
-  const activeFilterCount =
-    Number(Boolean(channelFilter)) +
-    Number(Boolean(assigneeFilter)) +
-    Number(Boolean(appliedLabel));
-  const markedReadRef = useRef<string | null>(null);
-  const clearSearch = () => {
-    setSearch("");
-    setDebouncedSearch("");
-  };
+HOˆÂˆÛÛœİ[Y\ˆHÙ][Y[İ]
 
-  const saveCurrentView = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setSaveViewError(null);
-    setSaveViewMessage(null);
-    createSavedView.mutate(
-      {
-        name: savedViewName,
-        filter,
-        channel: channelFilter,
-        assigneeFilter: assigneeFilter ?? "all",
-        labelFilter: appliedLabel || null,
-      },
-      {
-        onSuccess: () => {
-          setSavingView(false);
-          setSavedViewName("");
-          setSaveViewMessage("Saved view is now shared with your team.");
-        },
-        onError: (error) => setSaveViewError(error.message),
-      },
-    );
-  };
 
-  if (listKey !== trackedListKey) {
-    setTrackedListKey(listKey);
-    setPage(1);
-    setPagesCache({});
-    setCursorsByPage({ 1: null });
-  }
+HOˆÙ]X›İ[˜ÙYÙX\˜Ú
+ÙX\˜Ú
+KŒ
+NÂˆ™]\›ˆ
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 200);
-    return () => clearTimeout(timer);
-  }, [search]);
+HOˆÛX\•[Y[İ]
+[Y\ŠNÂˆKÜÙX\˜ÚJNÂ‚ˆ\ÙQY™™Xİ
 
-  useEffect(() => {
-    if (savingView) savedViewNameRef.current?.focus();
-  }, [savingView]);
 
-  const {
-    data: conversationsData,
-    isLoading,
-    isFetching,
-    isPlaceholderData,
-    isError,
-    refetch,
-  } = useConversations({
-    limit: PAGE_SIZE,
-    cursor: cursorsByPage[page] ?? null,
-    search: debouncedSearch,
-    filter,
-    channel: channelFilter ?? undefined,
-    assignee: assigneeFilter ?? undefined,
-    label: appliedLabel || undefined,
-  });
-  const isSearchPending =
-    search.trim() !== debouncedSearch.trim() || (isFetching && Boolean(search.trim()));
+HOˆÂˆYˆ
+Ø]š[™ÕšY]ÊHØ]™YšY]Ó˜[YT™Y‹˜İ\œ™[Ë™›Øİ\Ê
+NÂˆKÜØ]š[™ÕšY]×JNÂ‚ˆÛÛœİÂˆ]NˆÛÛ™\œØ][ÛœÑ]Kˆ\ÓØY[™Ëˆ\Ñ™]Ú[™Ëˆ\ÔXÙZÛ\‘]Kˆ\Ñ\œ›Ü‹ˆ™Y™]ÚˆHH\ÙPÛÛ™\œØ][ÛœÊÂˆ[Z]ˆQÑWÔÒV‘Kˆİ\œÛÜˆİ\œÛÜœĞTYÙVÜYÙWHÏÈ[ˆÙX\˜ÚˆX›İ[˜ÙYÙX\˜Úˆš[\‹ˆÚ[›™[ˆÚ[›™[š[\ˆÏÈ[™Yš[™Yˆ\ÜÚYÛ™YNˆ\ÜÚYÛ™YQš[\ˆÏÈ[™Yš[™YˆX™[ˆ\YYX™[[™Yš[™YˆJNÂˆÛÛœİ\ÔÙX\˜Ú[™[™ÈBˆÙX\˜Úš[J
+HOOHX›İ[˜ÙYÙX\˜Úš[J
+H
+\Ñ™]Ú[™È	‰ˆ›ÛÛX[ŠÙX\˜Úš[J
+JJNÂ‚ˆÛÛœİY™™Xİ]™TYÙ\ĞØXÚHH\ÙSY[[Ê
 
-  const effectivePagesCache = useMemo(() => {
-    if (!conversationsData || isPlaceholderData) return pagesCache;
-    return { ...pagesCache, [page]: conversationsData.conversations };
-  }, [pagesCache, conversationsData, page, isPlaceholderData]);
+HOˆÂˆYˆ
+XÛÛ™\œØ][ÛœÑ]H\ÔXÙZÛ\‘]JH™]\›ˆYÙ\ĞØXÚNÂˆ™]\›ˆÈ‹‹œYÙ\ĞØXÚKÜYÙWNˆÛÛ™\œØ][ÛœÑ]K˜ÛÛ™\œØ][ÛœÈNÂˆKÜYÙ\ĞØXÚKÛÛ™\œØ][ÛœÑ]KYÙK\ÔXÙZÛ\‘]WJNÂ‚ˆÛÛœİ\Ó[Ü™HHÛÛ™\œØ][ÛœÑ]OËœYÚ[˜][Û‹š\Ó[Ü™HÏÈ˜[ÙNÂˆÛÛœİÛÛ™\œØ][ÛœÈH\ÙSY[[Ê
 
-  const hasMore = conversationsData?.pagination.hasMore ?? false;
-  const conversations = useMemo(() => {
-    if (page === 1) {
-      return effectivePagesCache[1] ?? conversationsData?.conversations ?? [];
-    }
+HOˆÂˆYˆ
+YÙHOOHJHÂˆ™]\›ˆY™™Xİ]™TYÙ\ĞØXÚVÌWHÏÈÛÛ™\œØ][ÛœÑ]OË˜ÛÛ™\œØ][ÛœÈÏÈ×NÂˆB‚ˆÛÛœİÙY[ˆH™]ÈÙ]İš[™ÏŠ
+NÂˆÛÛœİ™\İ[ˆÛÛ™\œØ][Û”İ[[X\V×HH×NÂˆ›Üˆ
+]İ\œ™[YÙHHNÈİ\œ™[YÙHHYÙNÈİ\œ™[YÙJÊÊHÂˆ›Üˆ
+ÛÛœİÛÛ™\œØ][ÛˆÙˆY™™Xİ]™TYÙ\ĞØXÚVØİ\œ™[YÙWHÏÈ×JHÂˆYˆ
+\ÙY[‹š\ÊÛÛ™\œØ][Û‹šY
+JHÂˆÙY[‹˜Y
+ÛÛ™\œØ][Û‹šY
+NÂˆ™\İ[œ\Ú
+ÛÛ™\œØ][ÛŠNÂˆBˆBˆBˆ™]\›ˆ™\İ[ÂˆKÙY™™Xİ]™TYÙ\ĞØXÚKYÙKÛÛ™\œØ][ÛœÑ]OË˜ÛÛ™\œØ][Ûœ×JNÂ‚ˆ\ÙQY™™Xİ
 
-    const seen = new Set<string>();
-    const result: ConversationSummary[] = [];
-    for (let currentPage = 1; currentPage <= page; currentPage++) {
-      for (const conversation of effectivePagesCache[currentPage] ?? []) {
-        if (!seen.has(conversation.id)) {
-          seen.add(conversation.id);
-          result.push(conversation);
-        }
-      }
-    }
-    return result;
-  }, [effectivePagesCache, page, conversationsData?.conversations]);
 
-  useEffect(() => {
-    if (!selectedConversationId) {
-      markedReadRef.current = null;
-      return;
-    }
-    if (markedReadRef.current === selectedConversationId) return;
-    const selectedConversation = conversations.find(
-      (conversation) => conversation.id === selectedConversationId,
-    );
-    if (!selectedConversation?.lastUnreadVisitorMessageId) return;
-    markedReadRef.current = selectedConversationId;
-    markConversationRead({
-      conversationId: selectedConversationId,
-      throughMessageId: selectedConversation.lastUnreadVisitorMessageId,
-    });
-  }, [conversations, selectedConversationId, markConversationRead]);
+HOˆÂˆYˆ
+\Ù[XİYÛÛ™\œØ][Û’Y
+HÂˆX\šÙY™XY™Y‹˜İ\œ™[H[Âˆ™]\›ÂˆBˆYˆ
+X\šÙY™XY™Y‹˜İ\œ™[OOHÙ[XİYÛÛ™\œØ][Û’Y
+H™]\›ÂˆÛÛœİÙ[XİYÛÛ™\œØ][ÛˆHÛÛ™\œØ][ÛœË™š[™
+ˆ
+ÛÛ™\œØ][ÛŠHOˆÛÛ™\œØ][Û‹šYOOHÙ[XİYÛÛ™\œØ][Û’Yˆ
+NÂˆYˆ
+\Ù[XİYÛÛ™\œØ][ÛË›\İ[œ™XYš\Ú]Ü“Y\ÜØYÙRY
+H™]\›ÂˆX\šÙY™XY™Y‹˜İ\œ™[HÙ[XİYÛÛ™\œØ][Û’YÂˆX\šĞÛÛ™\œØ][Û”™XY
+ÂˆÛÛ™\œØ][Û’YˆÙ[XİYÛÛ™\œØ][Û’Yˆ›İYÚY\ÜØYÙRYˆÙ[XİYÛÛ™\œØ][Û‹›\İ[œ™XYš\Ú]Ü“Y\ÜØYÙRYˆJNÂˆKØÛÛ™\œØ][ÛœËÙ[XİYÛÛ™\œØ][Û’YX\šĞÛÛ™\œØ][Û”™XYJNÂ‚ˆÛÛœİ[™SØY[Ü™HH
 
-  const handleLoadMore = () => {
-    const nextCursor = conversationsData?.pagination.nextCursor;
-    if (!conversationsData || !nextCursor || isPlaceholderData || isFetching) return;
+HOˆÂˆÛÛœİ™^İ\œÛÜˆHÛÛ™\œØ][ÛœÑ]OËœYÚ[˜][Û‹›™^İ\œÛÜÂˆYˆ
+XÛÛ™\œØ][ÛœÑ]H[™^İ\œÛÜˆ\ÔXÙZÛ\‘]H\Ñ™]Ú[™ÊH™]\›Â‚ˆÙ]YÙ\ĞØXÚJ
+İ\œ™[
+HOˆ
+È‹‹˜İ\œ™[ÜYÙWNˆÛÛ™\œØ][ÛœÑ]K˜ÛÛ™\œØ][ÛœÈJJNÂˆÙ]İ\œÛÜœĞTYÙJ
+İ\œ™[
+HOˆ
+È‹‹˜İ\œ™[ÜYÙH
+ÈWNˆ™^İ\œÛÜˆJJNÂˆÙ]YÙJ
+İ\œ™[
+HOˆİ\œ™[
+ÈJNÂˆNÂˆÛÛœİÙX\˜Ú\›HHX›İ[˜ÙYÙX\˜Úš[J
+NÂˆÛÛœİ\Ñ˜XÙ]š[\œÈH›ÛÛX[ŠÚ[›™[š[\ˆ\ÜÚYÛ™YQš[\ˆ\YYX™[
+NÂˆÛÛœİ[\U]HHÙX\˜Ú\›BˆÈ›ÈX]Ú\È›Üˆ8 '	ÜÙX\˜Ú\›_x 'Xˆˆ\Ñ˜XÙ]š[\œÂˆÈ“›ÈÛÛ™\œØ][ÛœÈX]Ú\ÙHš[\œÈ‚ˆˆš[\ˆOOH˜[‚ˆÈ“›ÈÛÛ™\œØ][ÛœÈY]‚ˆˆš[\ˆOOH[œ™XY‚ˆÈ–[İx &\™H[Ø]YÚ\‚ˆˆš[\ˆOOH[˜\ÜÚYÛ™Y‚ˆÈ“›È[˜\ÜÚYÛ™YÛÛ™\œØ][ÛœÈ‚ˆˆš[\ˆOOH›Z[™H‚ˆÈ“›ÈÛÛ™\œØ][ÛœÈ\ÜÚYÛ™YÈ[İH‚ˆˆš[\ˆOOH›Ü[ˆ‚ˆÈ“›ÈÜ[ˆÛÛ™\œØ][ÛœÈ‚ˆˆš[\ˆOOHœÛ›ÛŞ™Y‚ˆÈ“›İ[™ÈÛ›ÛŞ™Y‚ˆˆ“›ÈÛÜÙYÛÛ™\œØ][ÛœÈÂˆÛÛœİ\Õš\ÚX›TÙ[Xİ[ÛˆHÛÛ™\œØ][ÛœËœÛÛYJˆ
+ÛÛ™\œØ][ÛŠHOˆÛÛ™\œØ][Û‹šYOOHÙ[XİYÛÛ™\œØ][Û’Yˆ
+NÂ‚ˆÛÛœİ[™PÛÛ™\œØ][Û“\İÙ^QİÛˆH
+]™[ˆ™XXİÙ^X›Ø\™]™[S]Û‘[[Y[ŠHOˆÂˆÛÛœİ\İH]™[˜İ\œ™[\™Ù]˜ÛÜÙ\İ
+[ŠNÂˆYˆ
+[\İ
+H™]\›ÂˆÛÛœİÜ[ÛœÈH\œ˜^K™œ›ÛJˆ\İœ]Y\TÙ[XİÜ[S]Û‘[[Y[Š–Ù]KXÛÛ™\œØ][Û‹[Ü[Û—HŠKˆ
+NÂˆÛÛœİ›Øİ\ÙY[™^HÜ[ÛœË™š[™[™^
 
-    setPagesCache((current) => ({ ...current, [page]: conversationsData.conversations }));
-    setCursorsByPage((current) => ({ ...current, [page + 1]: nextCursor }));
-    setPage((current) => current + 1);
-  };
-  const searchTerm = debouncedSearch.trim();
-  const hasFacetFilters = Boolean(channelFilter || assigneeFilter || appliedLabel);
-  const emptyTitle = searchTerm
-    ? `No matches for â€œ${searchTerm}â€`
-    : hasFacetFilters
-      ? "No conversations match these filters"
-      : filter === "all"
-        ? "No conversations yet"
-        : filter === "unread"
-          ? "Youâ€™re all caught up"
-          : filter === "unassigned"
-            ? "No unassigned conversations"
-            : filter === "mine"
-              ? "No conversations assigned to you"
-              : filter === "open"
-                ? "No open conversations"
-                : filter === "snoozed"
-                  ? "Nothing snoozed"
-                  : "No closed conversations";
-  const hasVisibleSelection = conversations.some(
-    (conversation) => conversation.id === selectedConversationId,
-  );
+Ü[ÛŠHOˆÜ[ÛˆOOHØİ[Y[˜Xİ]™Q[[Y[
+NÂˆÛÛœİÙ[XİY[™^HÜ[ÛœË™š[™[™^
 
-  const handleConversationListKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
-    const list = event.currentTarget.closest("ul");
-    if (!list) return;
-    const options = Array.from(
-      list.querySelectorAll<HTMLButtonElement>("[data-conversation-option]"),
-    );
-    const focusedIndex = options.findIndex((option) => option === document.activeElement);
-    const selectedIndex = options.findIndex((option) => option.dataset.selected === "true");
-    const currentIndex = focusedIndex >= 0 ? focusedIndex : Math.max(selectedIndex, 0);
-    const targetIndex = getConversationTargetIndex(event.key, currentIndex, options.length);
-    if (targetIndex === null) return;
+Ü[ÛŠHOˆÜ[Û‹™]\Ù]œÙ[XİYOOHYHŠNÂˆÛÛœİİ\œ™[[™^H›Øİ\ÙY[™^HÈ›Øİ\ÙY[™^ˆX]›X^
+Ù[XİY[™^
+NÂˆÛÛœİ\™Ù][™^HÙ]ÛÛ™\œØ][Û•\™Ù][™^
+]™[šÙ^Kİ\œ™[[™^Ü[ÛœË›[™İ
+NÂˆYˆ
+\™Ù][™^OOH[
+H™]\›Â‚ˆ]™[œ™]™[Y˜][
 
-    event.preventDefault();
-    const target = options[targetIndex];
-    const conversation = conversations[targetIndex];
-    if (!target || !conversation) return;
-    target.focus();
-    onSelectConversation(conversation.id);
-  };
+NÂˆÛÛœİ\™Ù]HÜ[ÛœÖİ\™Ù][™^NÂˆÛÛœİÛÛ™\œØ][ÛˆHÛÛ™\œØ][ÛœÖİ\™Ù][™^NÂˆYˆ
+]\™Ù]XÛÛ™\œØ][ÛŠH™]\›Âˆ\™Ù]™›Øİ\Ê
+NÂˆÛ”Ù[XİÛÛ™\œØ][ÛŠÛÛ™\œØ][Û‹šY
+NÂˆNÂ‚ˆ™]\›ˆ
+ˆ]ˆÛ\ÜÓ˜[YOH™›^Y[›^XÛÛ‚ˆ]ˆÛ\ÜÓ˜[YOHœÚš[šËLM‚ˆ]ˆÛ\ÜÓ˜[YOH™›^][\ËXÙ[\ˆØ\Lˆ‚ˆ]ˆÛ\ÜÓ˜[YOHœ™[]]™H›^LH‚ˆÚ\ÔÙX\˜Ú[™[™ÈÈ
+ˆØY\ŒˆÛ\ÜÓ˜[YOH˜XœÛÛ]HÜLKÌˆYLÈÚ^™KM]˜[œÛ]K^KLKÌˆ^[]]YY›Ü™YÜ›İ[™[İ[Û‹\ØY™N˜[š[X]K\Ü[ˆ[İ[Û‹\™YXÙN˜[š[X]K[›Û™HˆÏ‚ˆ
+Hˆ
+ˆÙX\˜ÚÛ\ÜÓ˜[YOH˜XœÛÛ]HÜLKÌˆYLÈÚ^™KM]˜[œÛ]K^KLKÌˆ^[]]YY›Ü™YÜ›İ[™ˆÏ‚ˆ
+_Bˆ[œ]ˆ\šXK[X™[H”ÙX\˜ÚÛÛ™\œØ][ÛœÈ‚ˆXÙZÛ\H”ÙX\˜ÚÛÛ™\œØ][Ûœø )ˆ‚ˆÛ\ÜÓ˜[YOHšLLH›İ[™Y[È›Ü™\‹X›Ü™\‹ÍL™ËZ[œ]ÍLNH‹LLˆ^X˜\ÙHÚYİË[›Û™HÛNšNHÛNœ‹LLÛN^\ÛH‚ˆ˜[YO^ÜÙX\˜ÚBˆÛÚ[™ÙO^Ê]™[
+HOˆÙ]ÙX\˜Ú
+]™[\™Ù]˜[YJ_BˆÏ‚ˆÜÙX\˜ÚÈ
+ˆ]Û‚ˆ\OH˜]Ûˆ‚ˆ\šXK[X™[HÛX\ˆÙX\˜Ú‚ˆ]OHÛX\ˆÙX\˜Ú‚ˆÛÛXÚÏ^ØÛX\”ÙX\˜ÚBˆÛ\ÜÓ˜[YOH˜XœÛÛ]HÜLKÌˆšYÚLKH›^Ú^™KLLH]˜[œÛ]K^KLKÌˆ][\ËXÙ[\ˆ\İYKXÙ[\ˆ›İ[™Y[Y^[]]YY›Ü™YÜ›İ[™˜[œÚ][Û‹]˜[œÙ›Ü›H\˜][Û‹LMLXİ]™NœØØ[KVÌM—H›Øİ\Ë]š\ÚX›N›İ][™KLˆ›Øİ\Ë]š\ÚX›N›İ][™K[Ù™œÙ]LH›Øİ\Ë]š\ÚX›N›İ][™K\š[™È[İ[Û‹\™YXÙN˜[œÚ][Û‹[›Û™H[İ[Û‹\™YXÙN˜Xİ]™NœØØ[KLLÛNœÚ^™KN‚ˆ‚ˆÛ\ÜÓ˜[YOHœÚ^™KMˆ\šXKZY[HYHˆÏ‚ˆØ]Û‚ˆ
+Hˆ[Bˆİ]]\šXK[]™OHœÛ]HˆÛ\ÜÓ˜[YOHœÜ‹[Û›H‚ˆÚ\ÔÙX\˜Ú[™[™ÈÈ”ÙX\˜Ú[™ÈÛÛ™\œØ][ÛœÈˆˆˆŸBˆÛİ]]‚ˆÙ]‚ˆÜİ™\ˆÜ[^Ùš[\œÓÜ[ŸHÛ“Ü[Ú[™ÙO^ÜÙ]š[\œÓÜ[ŸO‚ˆÜİ™\•šYÙÙ\‚ˆ™[™\^Âˆ]Û‚ˆ\OH˜]Ûˆ‚ˆ˜\šX[^ØXİ]™Qš[\Ûİ[ÈœÙXÛÛ™\Hˆˆ›İ][™HŸBˆÚ^™OHšXÛÛˆ‚ˆ\šXK[X™[^ÂˆXİ]™Qš[\Ûİ[ˆÈš[\œË	ØXİ]™Qš[\Ûİ[HXİ]™Xˆˆ‘š[\ˆÛÛ™\œØ][ÛœÈ‚ˆBˆ]OH‘š[\ˆÛÛ™\œØ][ÛœÈ‚ˆÛ\ÜÓ˜[YOHœ™[]]™HÚ^™KLLHÚš[šËL›İ[™Y[ÈÛNœÚ^™KNH‚ˆÏ‚ˆBˆ‚ˆš[\ˆÛ\ÜÓ˜[YOHœÚ^™KMˆ\šXKZY[HYHˆÏ‚ˆØXİ]™Qš[\Ûİ[È
+ˆÜ[ˆÛ\ÜÓ˜[YOH˜XœÛÛ]H]ÜLH\šYÚLH›^Ú^™KM][\ËXÙ[\ˆ\İYKXÙ[\ˆ›İ[™YY[™Ë\š[X\H^VÌLH›Û\Ù[ZX›Û^\š[X\KY›Ü™YÜ›İ[™‚ˆØXİ]™Qš[\Ûİ[BˆÜÜ[‚ˆ
+Hˆ[BˆÔÜİ™\•šYÙÙ\‚ˆÜİ™\ÛÛ[ˆ[YÛH™[™‚ˆÛ\ÜÓ˜[YOHËVÛZ[ŠŒ™[KØ[ÊLËLœ™[JJWHØ\M›İ[™Y^‚ˆ‚ˆÜİ™\’XY\‚ˆÜİ™\•]O‘š[\ˆÛÛ™\œØ][ÛœÏÔÜİ™\•]O‚ˆÜİ™\‘\ØÜš\[Û‚ˆš[™ÛÛ™\œØ][ÛœÈHÚ[›™[X[[X]HÜˆX™[‚ˆÔÜİ™\‘\ØÜš\[Û‚ˆÔÜİ™\’XY\‚ˆ]ˆÛ\ÜÓ˜[YOHœÜXÙK^KLÈ‚ˆ]ˆÛ\ÜÓ˜[YOHœÜXÙK^KLKH‚ˆˆYH˜Ú[›™[Yš[\‹[X™[‚ˆÛ\ÜÓ˜[YOH^^È›Û[YY][H^[]]YY›Ü™YÜ›İ[™‚ˆ‚ˆÚ[›™[ˆÜ‚ˆÙ[Xİˆ˜[YO^ØÚ[›™[š[\ˆÏÈ˜[ŸBˆÛ•˜[YPÚ[™ÙO^Ê˜[YJHOˆÂˆÙ]Ú[›™[š[\Š˜[YHOOH˜[ˆÈ[ˆ
+˜[YH\È[˜›ŞÚ[›™[
+JNÂˆÙ]Ø]™UšY]ÓY\ÜØYÙJ[
+NÂˆÛ‘˜XÙ]Ú[™ÙJ
+NÂˆÛ”Ù[XİÛÛ™\œØ][ÛŠ[
+NÂˆ_Bˆ‚ˆÙ[XİšYÙÙ\‚ˆ\šXK[X™[H‘š[\ˆHÚ[›™[‚ˆ\šXK[X™[YOH˜Ú[›™[Yš[\‹[X™[‚ˆÛ\ÜÓ˜[YOHšLLHËY[›İ[™Y[È™ËX˜XÚÙÜ›İ[™ÛNšNH‚ˆ‚ˆÙ[Xİ˜[YHÏ‚ˆÔÙ[XİšYÙÙ\‚ˆÙ[XİÛÛ[‚ˆÙ[Xİ][H˜[YOH˜[[Ú[›™[ÏÔÙ[Xİ][O‚ˆĞÓÓ•‘T”ĞUSÓ—ĞÒS“‘SË›X\
 
-  return (
-    <div className="flex h-full flex-col">
-      <div className="shrink-0 p-4">
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
-            {isSearchPending ? (
-              <Loader2 className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground motion-safe:animate-spin motion-reduce:animate-none" />
-            ) : (
-              <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            )}
-            <Input
-              aria-label="Search conversations"
-              placeholder="Search conversationsâ€¦"
-              className="h-11 rounded-lg border-border/50 bg-input/50 pl-9 pr-12 text-base shadow-none sm:h-9 sm:pr-10 sm:text-sm"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-            {search ? (
-              <button
-                type="button"
-                aria-label="Clear search"
-                title="Clear search"
-                onClick={clearSearch}
-                className="absolute top-1/2 right-1.5 flex size-11 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-transform duration-150 active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring motion-reduce:transition-none motion-reduce:active:scale-100 sm:size-8"
-              >
-                <X className="size-4" aria-hidden="true" />
-              </button>
-            ) : null}
-            <output aria-live="polite" className="sr-only">
-              {isSearchPending ? "Searching conversations" : ""}
-            </output>
-          </div>
-          <Popover open={filtersOpen} onOpenChange={setFiltersOpen}>
-            <PopoverTrigger
-              render={
-                <Button
-                  type="button"
-                  variant={activeFilterCount ? "secondary" : "outline"}
-                  size="icon"
-                  aria-label={
-                    activeFilterCount
-                      ? `Filters, ${activeFilterCount} active`
-                      : "Filter conversations"
-                  }
-                  title="Filter conversations"
-                  className="relative size-11 shrink-0 rounded-lg sm:size-9"
-                />
-              }
-            >
-              <Filter className="size-4" aria-hidden="true" />
-              {activeFilterCount ? (
-                <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
-                  {activeFilterCount}
-                </span>
-              ) : null}
-            </PopoverTrigger>
-            <PopoverContent
-              align="end"
-              className="w-[min(20rem,calc(100vw-2rem))] gap-4 rounded-xl"
-            >
-              <PopoverHeader>
-                <PopoverTitle>Filter conversations</PopoverTitle>
-                <PopoverDescription>
-                  Find conversations by channel, teammate or label.
-                </PopoverDescription>
-              </PopoverHeader>
-              <div className="space-y-3">
-                <div className="space-y-1.5">
-                  <p
-                    id="channel-filter-label"
-                    className="text-xs font-medium text-muted-foreground"
-                  >
-                    Channel
-                  </p>
-                  <Select
-                    value={channelFilter ?? "all"}
-                    onValueChange={(value) => {
-                      setChannelFilter(value === "all" ? null : (value as InboxChannel));
-                      setSaveViewMessage(null);
-                      onFacetChange();
-                      onSelectConversation(null);
-                    }}
-                  >
-                    <SelectTrigger
-                      aria-label="Filter by channel"
-                      aria-labelledby="channel-filter-label"
-                      className="h-11 w-full rounded-lg bg-background sm:h-9"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All channels</SelectItem>
-                      {CONVERSATION_CHANNELS.map((channel) => (
-                        <SelectItem key={channel.value} value={channel.value}>
-                          {channel.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <p
-                    id="assignee-filter-label"
-                    className="text-xs font-medium text-muted-foreground"
-                  >
-                    Assignee
-                  </p>
-                  <Select
-                    value={assigneeFilter ?? "all"}
-                    onValueChange={(value) => {
-                      setAssigneeFilter(value === "all" ? null : value);
-                      setSaveViewMessage(null);
-                      onFacetChange();
-                      onSelectConversation(null);
-                    }}
-                  >
-                    <SelectTrigger
-                      aria-label="Filter by assignee"
-                      aria-labelledby="assignee-filter-label"
-                      className="h-11 w-full rounded-lg bg-background sm:h-9"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All teammates</SelectItem>
-                      <SelectItem value="unassigned">Unassigned</SelectItem>
-                      {members.map((member) => (
-                        <SelectItem key={member.id} value={member.id}>
-                          {member.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {isMembersLoading ? (
-                    <span className="block text-xs">Loading teammatesâ€¦</span>
-                  ) : null}
-                  {isMembersError ? (
-                    <span className="flex items-center justify-between gap-2 text-xs text-destructive">
-                      Could not load teammates.
-                      <button
-                        type="button"
-                        className="underline underline-offset-2"
-                        onClick={() => void refetchMembers()}
-                      >
-                        Retry
-                      </button>
-                    </span>
-                  ) : null}
-                </div>
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="conversation-label-filter"
-                    className="text-xs font-medium text-muted-foreground"
-                  >
-                    Conversation label
-                  </label>
-                  <Input
-                    id="conversation-label-filter"
-                    aria-label="Filter by conversation label"
-                    aria-invalid={!isValidLabel}
-                    className="h-11 text-base sm:h-9 sm:text-sm"
-                    placeholder="e.g. billing"
-                    maxLength={32}
-                    value={labelFilter}
-                    onChange={(event) => {
-                      setLabelFilter(event.target.value);
-                      setSaveViewMessage(null);
-                      onFacetChange();
-                      onSelectConversation(null);
-                    }}
-                  />
-                  {!isValidLabel ? (
-                    <p role="alert" className="text-xs text-destructive">
-                      Use up to 32 letters, numbers, spaces, periods, underscores or hyphens.
-                    </p>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">
-                      Matches a label on the conversation.
-                    </p>
-                  )}
-                </div>
-                {savingView ? (
-                  <form
-                    onSubmit={saveCurrentView}
-                    className="space-y-2 border-t border-border pt-3"
-                  >
-                    <Input
-                      ref={savedViewNameRef}
-                      aria-label="Shared view name"
-                      className="h-11 text-base sm:h-9 sm:text-sm"
-                      placeholder="e.g. Billing questions"
-                      maxLength={40}
-                      value={savedViewName}
-                      onChange={(event) => setSavedViewName(event.target.value)}
-                    />
-                    {saveViewError ? (
-                      <p role="alert" className="text-xs text-destructive">
-                        {saveViewError}
-                      </p>
-                    ) : null}
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        className="h-11 sm:h-8"
-                        onClick={() => {
-                          setSavingView(false);
-                          setSaveViewError(null);
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="submit"
-                        size="sm"
-                        className="h-11 sm:h-8"
-                        disabled={!savedViewName.trim() || createSavedView.isPending}
-                      >
-                        {createSavedView.isPending ? "Savingâ€¦" : "Save view"}
-                      </Button>
-                    </div>
-                  </form>
-                ) : (
-                  <div className="border-t border-border pt-3">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="h-11 w-full rounded-lg sm:h-9"
-                      disabled={!hasFacetFilters}
-                      title={
-                        hasFacetFilters
-                          ? "Share these filters with your team"
-                          : "Choose a filter first"
-                      }
-                      onClick={() => {
-                        setSavingView(true);
-                        setSaveViewMessage(null);
-                      }}
-                    >
-                      Save as shared view
-                    </Button>
-                    <p className="mt-1.5 text-center text-xs text-muted-foreground">
-                      {hasFacetFilters
-                        ? "Your team can use this view."
-                        : "Add a channel or teammate filter first."}
-                    </p>
-                  </div>
-                )}
-                {saveViewMessage ? (
-                  <output className="block text-center text-xs text-muted-foreground">
-                    {saveViewMessage}
-                  </output>
-                ) : null}
-              </div>
-            </PopoverContent>
-          </Popover>
-        </div>
-        {activeFilterCount ? (
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            {channelFilter ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setChannelFilter(null);
-                  setSaveViewMessage(null);
-                  onFacetChange();
-                  onSelectConversation(null);
-                }}
-                className="inline-flex h-7 items-center gap-1.5 rounded-md bg-muted px-2 text-xs text-foreground hover:bg-muted/70 focus-visible:outline-2 focus-visible:outline-ring"
-              >
-                {getConversationChannelLabel(channelFilter)}
-                <X className="size-3" aria-hidden="true" />
-                <span className="sr-only">Clear channel filter</span>
-              </button>
-            ) : null}
-            {assigneeFilter ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setAssigneeFilter(null);
-                  setSaveViewMessage(null);
-                  onFacetChange();
-                  onSelectConversation(null);
-                }}
-                className="inline-flex h-7 items-center gap-1.5 rounded-md bg-muted px-2 text-xs text-foreground hover:bg-muted/70 focus-visible:outline-2 focus-visible:outline-ring"
-              >
-                {assigneeFilter === "unassigned"
-                  ? "Unassigned"
-                  : (members.find((member) => member.id === assigneeFilter)?.name ?? "Teammate")}
-                <X className="size-3" aria-hidden="true" />
-                <span className="sr-only">Clear assignee filter</span>
-              </button>
-            ) : null}
-            {appliedLabel ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setLabelFilter("");
-                  setSaveViewMessage(null);
-                  onFacetChange();
-                  onSelectConversation(null);
-                }}
-                className="inline-flex h-7 items-center gap-1.5 rounded-md bg-muted px-2 text-xs text-foreground hover:bg-muted/70 focus-visible:outline-2 focus-visible:outline-ring"
-              >
-                {appliedLabel}
-                <X className="size-3" aria-hidden="true" />
-                <span className="sr-only">Clear label filter</span>
-              </button>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => {
-                setChannelFilter(null);
-                setAssigneeFilter(null);
-                setLabelFilter("");
-                onSelectConversation(null);
-              }}
-              className="h-7 px-1 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
-            >
-              Clear filters
-            </button>
-          </div>
-        ) : null}
-      </div>
+Ú[›™[
+HOˆ
+ˆÙ[Xİ][HÙ^O^ØÚ[›™[˜[Y_H˜[YO^ØÚ[›™[˜[Y_O‚ˆØÚ[›™[›X™[BˆÔÙ[Xİ][O‚ˆ
+J_BˆÔÙ[XİÛÛ[‚ˆÔÙ[Xİ‚ˆÙ]‚ˆ]ˆÛ\ÜÓ˜[YOHœÜXÙK^KLKH‚ˆˆYH˜\ÜÚYÛ™YKYš[\‹[X™[‚ˆÛ\ÜÓ˜[YOH^^È›Û[YY][H^[]]YY›Ü™YÜ›İ[™‚ˆ‚ˆ\ÜÚYÛ™YBˆÜ‚ˆÙ[Xİˆ˜[YO^Ø\ÜÚYÛ™YQš[\ˆÏÈ˜[ŸBˆÛ•˜[YPÚ[™ÙO^Ê˜[YJHOˆÂˆÙ]\ÜÚYÛ™YQš[\Š˜[YHOOH˜[ˆÈ[ˆ˜[YJNÂˆÙ]Ø]™UšY]ÓY\ÜØYÙJ[
+NÂˆÛ‘˜XÙ]Ú[™ÙJ
+NÂˆÛ”Ù[XİÛÛ™\œØ][ÛŠ[
+NÂˆ_Bˆ‚ˆÙ[XİšYÙÙ\‚ˆ\šXK[X™[H‘š[\ˆH\ÜÚYÛ™YH‚ˆ\šXK[X™[YOH˜\ÜÚYÛ™YKYš[\‹[X™[‚ˆÛ\ÜÓ˜[YOHšLLHËY[›İ[™Y[È™ËX˜XÚÙÜ›İ[™ÛNšNH‚ˆ‚ˆÙ[Xİ˜[YHÏ‚ˆÔÙ[XİšYÙÙ\‚ˆÙ[XİÛÛ[‚ˆÙ[Xİ][H˜[YOH˜[[X[[X]\ÏÔÙ[Xİ][O‚ˆÙ[Xİ][H˜[YOH[˜\ÜÚYÛ™Y•[˜\ÜÚYÛ™YÔÙ[Xİ][O‚ˆÛY[X™\œË›X\
 
-      {isError && conversations.length > 0 ? (
-        <div role="alert" className="mx-4 mb-2 space-y-2 text-sm text-muted-foreground">
-          <p>Conversations could not refresh. Showing previously loaded results.</p>
-          <Button variant="outline" onClick={() => void refetch()} disabled={isFetching}>
-            Retry loading
-          </Button>
-        </div>
-      ) : null}
-      <div aria-busy={isSearchPending} className={cn("min-h-0 flex-1", scrollPaneClassName)}>
-        {isError && conversations.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
-            <p role="alert" className="text-sm text-muted-foreground">
-              Unable to load conversations. Check your connection and try again.
-            </p>
-            <Button variant="outline" onClick={() => void refetch()} disabled={isFetching}>
-              Retry loading
-            </Button>
-          </div>
-        ) : isLoading && conversations.length === 0 ? (
-          <div className="space-y-1 px-2 pb-2">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <div key={index} className="flex items-start gap-3 rounded-lg px-3 py-3">
-                <Skeleton className="h-10 w-10 rounded-full" />
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-4 w-28" />
-                  <Skeleton className="h-3 w-full" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : conversations.length === 0 ? (
-          <div className="flex h-full min-h-[240px] flex-col items-center justify-center gap-3 px-5 py-8 text-center">
-            <span className="flex size-10 items-center justify-center rounded-xl border border-border/60 bg-card text-muted-foreground">
-              {searchTerm ? (
-                <Search className="size-[18px]" aria-hidden="true" />
-              ) : (
-                <MessageSquare className="size-[18px]" aria-hidden="true" />
-              )}
-            </span>
-            <div>
-              <p className="text-sm font-medium text-foreground">{emptyTitle}</p>
-              <p className="mt-1 max-w-[240px] text-xs leading-relaxed text-muted-foreground">
-                {searchTerm || hasFacetFilters
-                  ? "Try another search or clear the active filters."
-                  : filter === "all"
-                    ? "New website chats will appear here. Set up your agent to start receiving conversations."
-                    : filter === "unread"
-                      ? "Unread visitor messages will show up here."
-                      : filter === "snoozed"
-                        ? "Conversations you snooze will return to the inbox when itâ€™s time."
-                        : "Try another inbox view to find a conversation."}
-              </p>
-            </div>
-            {searchTerm || hasFacetFilters ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  clearSearch();
-                  setChannelFilter(null);
-                  setAssigneeFilter(null);
-                  setLabelFilter("");
-                  if (filter !== "all") onClearFilter();
-                  onSelectConversation(null);
-                }}
-              >
-                Clear filters
-              </Button>
-            ) : filter === "all" ? (
-              <Button
-                nativeButton={false}
-                render={<Link href="/playground" />}
-                variant="outline"
-                size="sm"
-              >
-                Set up your agent
-              </Button>
-            ) : (
-              <Button type="button" variant="outline" size="sm" onClick={onClearFilter}>
-                View all conversations
-              </Button>
-            )}
-          </div>
-        ) : (
-          <ul
-            aria-label="Conversations"
-            aria-describedby="conversation-list-keyboard-help"
-            className="m-0 list-none px-2 pb-2"
-          >
-            <li id="conversation-list-keyboard-help" className="sr-only">
-              Use the up and down arrow keys to move between conversations. Home and End move to the
-              first and last conversation.
-            </li>
-            {conversations.map((conversation, index) => {
-              const displayName = getDisplayName(conversation);
-              const selected = selectedConversationId === conversation.id;
-              const unreadCount = conversation.unreadCount;
-
-              return (
-                <li key={conversation.id}>
-                  <button
-                    type="button"
-                    data-conversation-option
-                    data-selected={selected ? "true" : undefined}
-                    aria-pressed={selected}
-                    tabIndex={selected || (!hasVisibleSelection && index === 0) ? 0 : -1}
-                    aria-label={`${displayName}, ${conversation.preview}, ${formatListTime(conversation.lastMessageAt)}${unreadCount > 0 ? `, ${unreadCount} unread` : ""}`}
-                    onKeyDown={handleConversationListKeyDown}
-                    onClick={() => onSelectConversation(conversation.id)}
-                    className={cn(
-                      "relative flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
-                      selected
-                        ? "bg-primary/5 before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full before:bg-primary"
-                        : "hover:bg-muted/40",
-                    )}
-                  >
-                    <Avatar className="h-10 w-10">
-                      <AvatarImage src={generateAvatarUrl(conversation.visitorId)} alt="" />
-                      <AvatarFallback className="bg-primary/10 text-xs font-medium text-primary">
-                        {getInitials(displayName)}
-                      </AvatarFallback>
-                    </Avatar>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="truncate text-sm font-semibold text-foreground">
-                          {displayName}
-                        </span>
-                        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                          {formatListTime(conversation.lastMessageAt)}
-                        </span>
-                      </div>
-                      <div className="mt-0.5 flex items-end justify-between gap-2">
-                        <p className="line-clamp-1 text-sm text-muted-foreground">
-                          {conversation.preview}
-                        </p>
-                        {unreadCount > 0 ? (
-                          <span className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-semibold tabular-nums text-primary-foreground">
-                            {unreadCount}
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                        <span className="inline-flex rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
-                          {getConversationChannelLabel(conversation.channel)}
-                        </span>
-                        {conversation.labels.slice(0, 2).map((label) => (
-                          <span
-                            key={label}
-                            className="inline-flex max-w-24 truncate rounded border border-border/70 bg-background px-1.5 py-0.5 text-xs text-muted-foreground"
-                            title={label}
-                          >
-                            {label}
-                          </span>
-                        ))}
-                        {conversation.labels.length > 2 ? (
-                          <span className="text-xs text-muted-foreground">
-                            +{conversation.labels.length - 2}
-                          </span>
-                        ) : null}
-                        {conversation.snoozedUntil &&
-                        currentTimestamp !== null &&
-                        Date.parse(conversation.snoozedUntil) > currentTimestamp ? (
-                          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                            <Clock className="size-3.5 shrink-0" aria-hidden="true" />
-                            Until{" "}
-                            {formatInTimeZone(
-                              conversation.snoozedUntil,
-                              normalizeTimezone(conversationsData?.workspaceTimezone),
-                              "MMM d, h:mm a",
-                            )}
-                          </span>
-                        ) : null}
-                        {conversation.status === "CLOSED" ? (
-                          <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
-                            <CheckCircle2 className="size-3 shrink-0" aria-hidden="true" />
-                            Closed
-                          </span>
-                        ) : conversation.status === "ESCALATED" ? (
-                          <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
-                            <AlertCircle className="size-3 shrink-0" aria-hidden="true" />
-                            Escalated
-                          </span>
-                        ) : null}
-                        <span
-                          className={cn(
-                            "inline-flex items-center gap-1 text-xs font-medium",
-                            conversation.aiPaused
-                              ? "text-amber-700 dark:text-amber-400"
-                              : "text-muted-foreground",
-                          )}
-                        >
-                          {conversation.aiPaused ? (
-                            <Pause className="size-3.5 shrink-0" aria-hidden="true" />
-                          ) : (
-                            <Bot className="size-3.5 shrink-0" aria-hidden="true" />
-                          )}
-                          {conversation.aiPaused ? "AI paused" : "AI enabled"}
-                        </span>
-                        <span className="inline-flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-                          <User className="size-3.5 shrink-0" aria-hidden="true" />
-                          <span className="truncate">
-                            {conversation.assigneeName ?? "Unassigned"}
-                          </span>
-                        </span>
-                      </div>
-                    </div>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
-
-      {hasMore ? (
-        <div className="shrink-0 p-3 pt-0">
-          <Button
-            variant="ghost"
-            className="h-9 w-full gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-            onClick={handleLoadMore}
-            disabled={isFetching || isPlaceholderData}
-            aria-busy={isFetching}
-          >
-            {isFetching ? (
-              <>
-                <Loader2
-                  className="size-4 motion-safe:animate-spin motion-reduce:animate-none"
-                  aria-hidden="true"
-                />
-                Loading conversationsâ€¦
-              </>
-            ) : (
-              <>
-                <Plus className="size-4" aria-hidden="true" />
-                Load more conversations
-              </>
-            )}
-          </Button>
-        </div>
-      ) : null}
-    </div>
-  );
-}
+Y[X™\ŠHOˆ
+ˆÙ[Xİ][HÙ^O^ÛY[X™\‹šYH˜[YO^ÛY[X™\‹šYO‚ˆÛY[X™\‹›˜[Y_BˆÔÙ[Xİ][O‚ˆ
+J_BˆÔÙ[XİÛÛ[‚ˆÔÙ[Xİ‚ˆÚ\ÓY[X™\œÓØY[™ÈÈ
+ˆÜ[ˆÛ\ÜÓ˜[YOH˜›ØÚÈ^^È“ØY[™ÈX[[X]\ø )ÜÜ[‚ˆ
+Hˆ[BˆÚ\ÓY[X™\œÑ\œ›ÜˆÈ
+ˆÜ[ˆÛ\ÜÓ˜[YOH™›^][\ËXÙ[\ˆ\İYKX™]ÙY[ˆØ\Lˆ^^È^Y\İXİ]™H‚ˆÛİ[›İØYX[[X]\Ë‚ˆ]Û‚ˆ\OH˜]Ûˆ‚ˆÛ\ÜÓ˜[YOH[™\›[™H[™\›[™K[Ù™œÙ]Lˆ‚ˆÛÛXÚÏ^Ê
+HOˆ›ÚY™Y™]ÚY[X™\œÊ
+_Bˆ‚ˆ™]BˆØ]Û‚ˆÜÜ[‚ˆ
+Hˆ[BˆÙ]‚ˆ]ˆÛ\ÜÓ˜[YOHœÜXÙK^KLKH‚ˆX™[ˆ[›ÜH˜ÛÛ™\œØ][Û‹[X™[Yš[\ˆ‚ˆÛ\ÜÓ˜[YOH^^È›Û[YY][H^[]]YY›Ü™YÜ›İ[™‚ˆ‚ˆÛÛ™\œØ][ÛˆX™[ˆÛX™[‚ˆ[œ]ˆYH˜ÛÛ™\œØ][Û‹[X™[Yš[\ˆ‚ˆ\šXK[X™[H‘š[\ˆHÛÛ™\œØ][ÛˆX™[‚ˆ\šXKZ[˜[Y^ÈZ\Õ˜[YX™[BˆÛ\ÜÓ˜[YOHšLLH^X˜\ÙHÛNšNHÛN^\ÛH‚ˆXÙZÛ\H™K™Ëˆš[[™È‚ˆX^[™İ^ÌÌŸBˆ˜[YO^ÛX™[š[\ŸBˆÛÚ[™ÙO^Ê]™[
+HOˆÂˆÙ]X™[š[\ŠçNí¢G§²ÚîÆ­yÔæÖSÒ&fÆW‚§W7F–g’ÖVæBvÓ"#à¢Ä'WGFöà¢G—SÒ&'WGFöâ ¢6—¦SÒ'6Ò ¢f&–çCÒ&v†÷7B ¢6Æ74æÖSÒ&‚Ó6Ó¦‚Ó‚ ¢öä6Æ–6³×²‚’Óâ°¢6WE6f–æuf–Wr†fÇ6R“°¢6WE6fUf–WtW'&÷"†çVÆÂ“°¢×Ğ¢à¢6æ6VÀ¢Âô'WGFöãà¢Ä'WGFöà¢G—SÒ'7V&Ö—B ¢6—¦SÒ'6Ò ¢6Æ74æÖSÒ&‚Ó6Ó¦‚Ó‚ ¢F—6&ÆVC×²6fVEf–WtæÖRçG&–Ò‚’ÇÂ7&VFU6fVEf–Wræ—5VæF–æwĞ¢à¢¶7&VFU6fVEf–Wræ—5VæF–ærò%6f–æ~(
+b"¢%6fRf–Wr'Ğ¢Âô'WGFöãà¢ÂöF—cà¢Âöf÷&Óà¢’¢€¢ÆF—b6Æ74æÖSÒ&&÷&FW"×B&÷&FW"Ö&÷&FW"BÓ2#à¢Ä'WGFöà¢G—SÒ&'WGFöâ ¢6—¦SÒ'6Ò ¢f&–çCÒ&÷WFÆ–æR ¢6Æ74æÖSÒ&‚ÓrÖgVÆÂ&÷VæFVBÖÆr6Ó¦‚Ó’ ¢F—6&ÆVC×²†4f6WDf–ÇFW'7Ğ¢F—FÆS×°¢†4f6WDf–ÇFW'0¢ò%6†&RF†W6Rf–ÇFW'2v—F‚–÷W"FVÒ ¢¢$6†ö÷6Rf–ÇFW"f—'7B ¢Ğ¢öä6Æ–6³×²‚’Óâ°¢6WE6f–æuf–Wr‡G'VR“°¢6WE6fUf–WtÖW76vR†çVÆÂ“°¢×Ğ¢à¢6fR26†&VBf–Wp¢Âô'WGFöãà¢Ç6Æ74æÖSÒ&×BÓãRFW‡BÖ6VçFW"FW‡B×‡2FW‡BÖ×WFVBÖf÷&Vw&÷VæB#à¢¶†4f6WDf–ÇFW'0¢ò%–÷W"FVÒ6âW6RF†—2f–Wrâ ¢¢$FB6†ææVÂ÷"FVÖÖFRf–ÇFW"f—'7Bâ'Ğ¢Â÷à¢ÂöF—cà¢—Ğ¢·6fUf–WtÖW76vRò€¢Æ÷WGWB6Æ74æÖSÒ&&Æö6²FW‡BÖ6VçFW"FW‡B×‡2FW‡BÖ×WFVBÖf÷&Vw&÷VæB#à¢·6fUf–WtÖW76vWĞ¢Âö÷WGWCà¢’¢çVÆÇĞ¢ÂöF—cà¢Âõ÷÷fW$6öçFVçCà¢Âõ÷÷fW#à¢ÂöF—cà¢¶7F—fTf–ÇFW$6÷VçBò€¢ÆF—b6Æ74æÖSÒ&×BÓ2fÆW‚fÆW‚×w&—FV×2Ö6VçFW"vÓ"#à¢¶6†ææVÄf–ÇFW"ò€¢Æ'WGFöà¢G—SÒ&'WGFöâ ¢öä6Æ–6³×²‚’Óâ°¢6WD6†ææVÄf–ÇFW"†çVÆÂ“°¢6WE6fUf–WtÖW76vR†çVÆÂ“°¢öäf6WD6†ævR‚“°¢öå6VÆV7D6öçfW'6F–öâ†çVÆÂ“°¢×Ğ¢6Æ74æÖSÒ&–æÆ–æRÖfÆW‚‚Ó—FV×2Ö6VçFW"vÓãR&÷VæFVBÖÖB&rÖ×WFVB‚Ó"FW‡B×‡2FW‡BÖf÷&Vw&÷VæB†÷fW#¦&rÖ×WFVBósfö7W2×f—6–&ÆS¦÷WFÆ–æRÓ"fö7W2×f—6–&ÆS¦÷WFÆ–æR×&–ær6Ó¦‚Ór ¢à¢¶vWD6öçfW'6F–öä6†ææVÄÆ&VÂ†6†ææVÄf–ÇFW"—Ğ¢Å‚6Æ74æÖSÒ'6—¦RÓ2"&–Ö†–FFVãÒ'G'VR"óà¢Ç7â6Æ74æÖSÒ'7"ÖöæÇ’#ä6ÆV"6†ææVÂf–ÇFW#Â÷7ãà¢Âö'WGFöãà¢’¢çVÆÇĞ¢¶76–væVTf–ÇFW"ò€¢Æ'WGFöà¢G—SÒ&'WGFöâ ¢öä6Æ–6³×²‚’Óâ°¢6WD76–væVTf–ÇFW"†çVÆÂ“°¢6WE6fUf–WtÖW76vR†çVÆÂ“°¢öäf6WD6†ævR‚“°¢öå6VÆV7D6öçfW'6F–öâ†çVÆÂ“°¢×Ğ¢6Æ74æÖSÒ&–æÆ–æRÖfÆW‚‚Ó—FV×2Ö6VçFW"vÓãR&÷VæFVBÖÖB&rÖ×WFVB‚Ó"FW‡B×‡2FW‡BÖf÷&Vw&÷VæB†÷fW#¦&rÖ×WFVBósfö7W2×f—6–&ÆS¦÷WFÆ–æRÓ"fö7W2×f—6–&ÆS¦÷WFÆ–æR×&–ær6Ó¦‚Ór ¢à¢¶76–væVTf–ÇFW"ÓÓÒ'Væ76–væVB ¢ò%Væ76–væVB ¢¢†ÖVÖ&W'2æf–æB‚†ÖVÖ&W"’ÓâÖVÖ&W"æ–BÓÓÒ76–væVTf–ÇFW"“òææÖRóò%FVÖÖFR"—Ğ¢Å‚6Æ74æÖSÒ'6—¦RÓ2"&–Ö†–FFVãÒ'G'VR"óà¢Ç7â6Æ74æÖSÒ'7"ÖöæÇ’#ä6ÆV"76–væVRf–ÇFW#Â÷7ãà¢Âö'WGFöãà¢’¢çVÆÇĞ¢¶Æ–VDÆ&VÂò€¢Æ'WGFöà¢G—SÒ&'WGFöâ ¢öä6Æ–6³×²‚’Óâ°¢6WDÆ&VÄf–ÇFW"‚""“°¢6WE6fUf–WtÖW76vR†çVÆÂ“°¢öäf6WD6†ævR‚“°¢öå6VÆV7D6öçfW'6F–öâ†çVÆÂ“°¢×Ğ¢6Æ74æÖSÒ&–æÆ–æRÖfÆW‚‚Ó—FV×2Ö6VçFW"vÓãR&÷VæFVBÖÖB&rÖ×WFVB‚Ó"FW‡B×‡2FW‡BÖf÷&Vw&÷VæB†÷fW#¦&rÖ×WFVBósfö7W2×f—6–&ÆS¦÷WFÆ–æRÓ"fö7W2×f—6–&ÆS¦÷WFÆ–æR×&–ær6Ó¦‚Ór ¢à¢¶Æ–VDÆ&VÇĞ¢Å‚6Æ74æÖSÒ'6—¦RÓ2"&–Ö†–FFVãÒ'G'VR"óà¢Ç7â6Æ74æÖSÒ'7"ÖöæÇ’#ä6ÆV"Æ&VÂf–ÇFW#Â÷7ãà¢Âö'WGFöãà¢’¢çVÆÇĞ¢Æ'WGFöà¢G—SÒ&'WGFöâ ¢öä6Æ–6³×²‚’Óâ°¢6WD6†ææVÄf–ÇFW"†çVÆÂ“°¢6WD76–væVTf–ÇFW"†çVÆÂ“°¢6WDÆ&VÄf–ÇFW"‚""“°¢öå6VÆV7D6öçfW'6F–öâ†çVÆÂ“°¢×Ğ¢6Æ74æÖSÒ&‚Ó‚Ó"FW‡B×‡2FW‡BÖ×WFVBÖf÷&Vw&÷VæBVæFW&Æ–æRVæFW&Æ–æRÖöfg6WBÓ"†÷fW#§FW‡BÖf÷&Vw&÷VæBfö7W2×f—6–&ÆS¦÷WFÆ–æRÓ"fö7W2×f—6–&ÆS¦÷WFÆ–æR×&–ær6Ó¦‚Ór ¢à¢6ÆV"f–ÇFW'0¢Âö'WGFöãà¢ÂöF—cà¢’¢çVÆÇĞ¢ÂöF—cà ¢¶—4W'&÷"bb6öçfW'6F–öç2æÆVæwF‚âò€¢ÆF—b&öÆSÒ&ÆW'B"6Æ74æÖSÒ&×‚ÓBÖ"Ó"76R×’Ó"FW‡B×6ÒFW‡BÖ×WFVBÖf÷&Vw&÷VæB#à¢Çä6öçfW'6F–öç26÷VÆBæ÷B&Vg&W6‚â6†÷v–ær&Wf–÷W6Ç’ÆöFVB&W7VÇG2ãÂ÷à¢Ä'WGFöâf&–çCÒ&÷WFÆ–æR"öä6Æ–6³×²‚’Óâfö–B&VfWF6‚‚—ÒF—6&ÆVC×¶—4fWF6†–æwÓà¢&WG'’ÆöF–æp¢Âô'WGFöãà¢ÂöF—cà¢’¢çVÆÇĞ¢ÆF—b&–Ö'W7“×¶—56V&6…VæF–æwÒ6Æ74æÖS×¶6â‚&Ö–âÖ‚ÓfÆW‚Ó"Â67&öÆÅæT6Æ74æÖR—Óà¢¶—4W'&÷"bb6öçfW'6F–öç2æÆVæwF‚ÓÓÒò€¢ÆF—b6Æ74æÖSÒ&fÆW‚‚ÖgVÆÂfÆW‚Ö6öÂ—FV×2Ö6VçFW"§W7F–g’Ö6VçFW"vÓ2ÓbFW‡BÖ6VçFW"#à¢Ç&öÆSÒ&ÆW'B"6Æ74æÖSÒ'FW‡B×6ÒFW‡BÖ×WFVBÖf÷&Vw&÷VæB#à¢Væ&ÆRFòÆöB6öçfW'6F–öç2â6†V6²–÷W"6öææV7F–öâæBG'’v–âà¢Â÷à¢Ä'WGFöâf&–çCÒ&÷WFÆ–æR"öä6Æ–6³×²‚’Óâfö–B&VfWF6‚‚—ÒF—6&ÆVC×¶—4fWF6†–æwÓà¢&WG'’ÆöF–æp¢Âô'WGFöãà¢ÂöF—cà¢’¢—4ÆöF–ærbb6öçfW'6F–öç2æÆVæwF‚ÓÓÒò€¢ÆF—b6Æ74æÖSÒ'76R×’Ó‚Ó""Ó"#à¢´'&’æg&öÒ‡²ÆVæwFƒ¢bÒ’æÖ‚…òÂ–æFW‚’Óâ€¢ÆF—b¶W“×¶–æFW‡Ò6Æ74æÖSÒ&fÆW‚—FV×2×7F'BvÓ2&÷VæFVBÖÆr‚Ó2’Ó2#à¢Å6¶VÆWFöâ6Æ74æÖSÒ&‚ÓrÓ&÷VæFVBÖgVÆÂ"óà¢ÆF—b6Æ74æÖSÒ&fÆW‚Ó76R×’Ó"#à¢Å6¶VÆWFöâ6Æ74æÖSÒ&‚ÓBrÓ#‚"óà¢Å6¶VÆWFöâ6Æ74æÖSÒ&‚Ó2rÖgVÆÂ"óà¢ÂöF—cà¢ÂöF—cà¢’—Ğ¢ÂöF—cà¢’¢6öçfW'6F–öç2æÆVæwF‚ÓÓÒò€¢ÆF—b6Æ74æÖSÒ&fÆW‚‚ÖgVÆÂÖ–âÖ‚Õ³#C…ÒfÆW‚Ö6öÂ—FV×2Ö6VçFW"§W7F–g’Ö6VçFW"vÓ2‚ÓR’Ó‚FW‡BÖ6VçFW"#à¢Ç7â6Æ74æÖSÒ&fÆW‚6—¦RÓ—FV×2Ö6VçFW"§W7F–g’Ö6VçFW"&÷VæFVB×†Â&÷&FW"&÷&FW"Ö&÷&FW"óc&rÖ6&BFW‡BÖ×WFVBÖf÷&Vw&÷VæB#à¢·6V&6…FW&Òò€¢Å6V&6‚6Æ74æÖSÒ'6—¦RÕ³‡…Ò"&–Ö†–FFVãÒ'G'VR"óà¢’¢€¢ÄÖW76vU7V&R6Æ74æÖSÒ'6—¦RÕ³‡…Ò"&–Ö†–FFVãÒ'G'VR"óà¢—Ğ¢Â÷7ãà¢ÆF—cà¢Ç6Æ74æÖSÒ'FW‡B×6ÒföçBÖÖVF—VÒFW‡BÖf÷&Vw&÷VæB#ç¶V×G•F—FÆWÓÂ÷à¢Ç6Æ74æÖSÒ&×BÓÖ‚×rÕ³#C…ÒFW‡B×‡2ÆVF–ær×&VÆ†VBFW‡BÖ×WFVBÖf÷&Vw&÷VæB#à¢·6V&6…FW&ÒÇÂ†4f6WDf–ÇFW'0¢ò%G'’æ÷F†W"6V&6‚÷"6ÆV"F†R7F—fRf–ÇFW'2â ¢¢f–ÇFW"ÓÓÒ&ÆÂ ¢ò$æWrvV'6—FR6†G2v–ÆÂV"†W&Râ6WBW–÷W"vVçBFò7F'B&V6V—f–ær6öçfW'6F–öç2â ¢¢f–ÇFW"ÓÓÒ'Vç&VB ¢ò%Vç&VBf—6—F÷"ÖW76vW2v–ÆÂ6†÷rW†W&Râ ¢¢f–ÇFW"ÓÓÒ'6æö÷¦VB ¢ò$6öçfW'6F–öç2–÷R6æö÷¦Rv–ÆÂ&WGW&âFòF†R–æ&÷‚v†Vâ—N(	—2F–ÖRâ ¢¢%G'’æ÷F†W"–æ&÷‚f–WrFòf–æB6öçfW'6F–öââ'Ğ¢Â÷à¢ÂöF—cà¢·6V&6…FW&ÒÇÂ†4f6WDf–ÇFW'2ò€¢Ä'WGFöà¢G—SÒ&'WGFöâ ¢f&–çCÒ&÷WFÆ–æR ¢6—¦SÒ'6Ò ¢öä6Æ–6³×²‚’Óâ°¢6ÆV%6V&6‚‚“°¢6WD6†ææVÄf–ÇFW"†çVÆÂ“°¢6WD76–væVTf–ÇFW"†çVÆÂ“°¢6WDÆ&VÄf–ÇFW"‚""“°¢–b†f–ÇFW"ÓÒ&ÆÂ"’öä6ÆV$f–ÇFW"‚“°¢öå6VÆV7D6öçfW'6F–öâ†çVÆÂ“°¢×Ğ¢à¢6ÆV"f–ÇFW'0¢Âô'WGFöãà¢’¢f–ÇFW"ÓÓÒ&ÆÂ"ò€¢Ä'WGFöà¢æF—fT'WGFöã×¶fÇ6WĞ¢&VæFW#×³ÄÆ–æ²‡&VcÒ"÷Æ–w&÷VæB"óçĞ¢f&–çCÒ&÷WFÆ–æR ¢6—¦SÒ'6Ò ¢à¢6WBW–÷W"vVç@¢Âô'WGFöãà¢’¢€¢Ä'WGFöâG—SÒ&'WGFöâ"f&–çCÒ&÷WFÆ–æR"6—¦SÒ'6Ò"öä6Æ–6³×¶öä6ÆV$f–ÇFW'Óà¢f–WrÆÂ6öçfW'6F–öç0¢Âô'WGFöãà¢—Ğ¢ÂöF—cà¢’¢€¢ÇVÀ¢&–ÖÆ&VÃÒ$6öçfW'6F–öç2 ¢&–ÖFW67&–&VF'“Ò&6öçfW'6F–öâÖÆ—7BÖ¶W–&ö&BÖ†VÇ ¢6Æ74æÖSÒ&ÒÓÆ—7BÖæöæR‚Ó""Ó" ¢à¢ÆÆ’–CÒ&6öçfW'6F–öâÖÆ—7BÖ¶W–&ö&BÖ†VÇ"6Æ74æÖSÒ'7"ÖöæÇ’#à¢W6RF†RWæBF÷vâ'&÷r¶W—2Fò÷VâF†R&Wf–÷W2÷"æW‡B6öçfW'6F–öââ†öÖRæBVæ@¢÷VâF†Rf—'7BæBÆ7B6öçfW'6F–öââVçFW"÷"76R÷Vç2F†Rfö7W6VB6öçfW'6F–öâà¢ÂöÆ“à¢¶6öçfW'6F–öç2æÖ‚†6öçfW'6F–öâÂ–æFW‚’Óâ°¢6öç7BF—7Æ”æÖRÒvWDF—7Æ”æÖR†6öçfW'6F–öâ“°¢6öç7B6VÆV7FVBÒ6VÆV7FVD6öçfW'6F–öä–BÓÓÒ6öçfW'6F–öâæ–C°¢6öç7BVç&VD6÷VçBÒ6öçfW'6F–öâçVç&VD6÷VçC° ¢&WGW&â€¢ÆÆ’¶W“×¶6öçfW'6F–öâæ–GÓà¢Æ'WGFöà¢G—SÒ&'WGFöâ ¢FFÖ6öçfW'6F–öâÖ÷F–öà¢FF×6VÆV7FVC×·6VÆV7FVBò'G'VR"¢VæFVf–æVGĞ¢&–Ö7W'&VçC×·6VÆV7FVBò'G'VR"¢VæFVf–æVGĞ¢F$–æFWƒ×·6VÆV7FVBÇÂ‚†5f—6–&ÆU6VÆV7F–öâbb–æFW‚ÓÓÒ’ò¢ÓĞ¢&–ÖÆ&VÃ×¶G¶F—7Æ”æÖWÒÂG¶vWD6öçfW'6F–öä6†ææVÄÆ&VÂ†6öçfW'6F–öâæ6†ææVÂ—ÒÂG¶6öçfW'6F–öâç&Wf–WwÒÂG¶f÷&ÖDÆ—7EF–ÖR†6öçfW'6F–öâæÆ7DÖW76vTB—ÒÂG¶6öçfW'6F–öâæ•W6VBò$’W6VB"¢$’7F—fR'ÒÂG¶6öçfW'6F–öâæ76–væVTæÖRò76–væVBFòG¶6öçfW'6F–öâæ76–væVTæÖWÖ¢'Væ76–væVB'ÒG¶6öçfW'6F–öâç7FGW2ÓÓÒ$4Äõ4TB"ò"Â6Æ÷6VB"¢6öçfW'6F–öâç7FGW2ÓÓÒ$U44ÄDTB"ò"ÂW66ÆFVB"¢"'ÒG·Vç&VD6÷VçBâòÂG·Vç&VD6÷VçGÒVç&VF¢"Â&VB'ÖĞ¢öä¶W”F÷vã×¶†æFÆT6öçfW'6F–öäÆ—7D¶W”F÷vçĞ¢öä6Æ–6³×²‚’Óâöå6VÆV7D6öçfW'6F–öâ†6öçfW'6F–öâæ–B—Ğ¢6Æ74æÖS×¶6â€¢'&VÆF—fRfÆW‚rÖgVÆÂ—FV×2×7F'BvÓ2&÷VæFVBÖÆr‚Ó2’Ó2FW‡BÖÆVgBG&ç6—F–öâÖ6öÆ÷'2GW&F–öâÓSfö7W2×f—6–&ÆS¦÷WFÆ–æRÓ"fö7W2×f—6–&ÆS¦÷WFÆ–æRÖöfg6WBÕ²Ó'…Òfö7W2×f—6–&ÆS¦÷WFÆ–æR×&–ær"À¢6VÆV7FV@¢ò&&r×&–Ö'’óR&Vf÷&S¦'6öÇWFR&Vf÷&S¦–ç6WB×’Ó"&Vf÷&S¦ÆVgBÓ&Vf÷&S§rÓãR&Vf÷&S§&÷VæFVBÖgVÆÂ&Vf÷&S¦&r×&–Ö'’ ¢¢&†÷fW#¦&rÖ×WFVBóC"À¢—Ğ¢à¢ÄfF"6Æ74æÖSÒ&‚ÓrÓ#à¢ÄfF$–ÖvR7&3×¶vVæW&FTfF%W&Â†6öçfW'6F–öâçf—6—F÷$–B—ÒÇCÒ""óà¢ÄfF$fÆÆ&6²6Æ74æÖSÒ&&r×&–Ö'’óFW‡B×‡2föçBÖÖVF—VÒFW‡B×&–Ö'’#à¢¶vWD–æ—F–Ç2†F—7Æ”æÖR—Ğ¢ÂôfF$fÆÆ&6³à¢ÂôfF#à ¢ÆF—b6Æ74æÖSÒ&Ö–â×rÓfÆW‚Ó#à¢ÆF—b6Æ74æÖSÒ&fÆW‚—FV×2×7F'B§W7F–g’Ö&WGvVVâvÓ"#à¢Ç7à¢6Æ74æÖS×¶6â€¢'G'Væ6FRFW‡B×6ÒFW‡BÖf÷&Vw&÷VæB"À¢‡6VÆV7FVBÇÂVç&VD6÷VçBâ’bb&föçB×6VÖ–&öÆB"À¢—Ğ¢à¢¶F—7Æ”æÖWĞ¢Â÷7ãà¢Ç7â6Æ74æÖSÒ'6‡&–æ²ÓFW‡B×‡2F'VÆ"ÖçV×2FW‡BÖ×WFVBÖf÷&Vw&÷VæB#à¢¶f÷&ÖDÆ—7EF–ÖR†6öçfW'6F–öâæÆ7DÖW76vTB—Ğ¢Â÷7ãà¢ÂöF—cà¢ÆF—b6Æ74æÖSÒ&×BÓãRfÆW‚—FV×2ÖVæB§W7F–g’Ö&WGvVVâvÓ"#à¢Ç6Æ74æÖSÒ&Æ–æRÖ6Æ×ÓFW‡B×6ÒFW‡BÖ×WFVBÖf÷&Vw&÷VæB#à¢¶6öçfW'6F–öâç&Wf–WwĞ¢Â÷à¢·Vç&VD6÷VçBâò€¢Ç7â6Æ74æÖSÒ&–æÆ–æRÖfÆW‚‚ÓRÖ–â×rÓR6‡&–æ²Ó—FV×2Ö6VçFW"§W7F–g’Ö6VçFW"&÷VæFVBÖgVÆÂ&r×&–Ö'’‚ÓãRFW‡BÕ³…ÒföçB×6VÖ–&öÆBF'VÆ"ÖçV×2FW‡B×&–Ö'’Öf÷&Vw&÷VæB#à¢·Vç&VD6÷VçGĞ¢Â÷7ãà¢’¢çVÆÇĞ¢ÂöF—cà¢ÆF—b6Æ74æÖSÒ&×BÓfÆW‚Ö–â×rÓfÆW‚×w&—FV×2Ö6VçFW"v×‚Ó"v×’Ó#à¢Ç7â6Æ74æÖSÒ&–æÆ–æRÖfÆW‚&÷VæFVB&rÖ×WFVB‚ÓãR’ÓãRFW‡B×‡2föçBÖÖVF—VÒFW‡BÖ×WFVBÖf÷&Vw&÷VæB#à¢¶vWD6öçfW'6F–öä6†ææVÄÆ&VÂ†6öçfW'6F–öâæ6†ææVÂ—Ğ¢Â÷7ãà¢¶6öçfW'6F–öâæÆ&VÇ2ç6Æ–6RƒÂ"’æÖ‚†Æ&VÂ’Óâ€¢Ç7à¢¶W“×¶Æ&VÇĞ¢6Æ74æÖSÒ&–æÆ–æRÖfÆW‚Ö‚×rÓ#BG'Væ6FR&÷VæFVB&÷&FW"&÷&FW"Ö&÷&FW"ós&rÖ&6¶w&÷VæB‚ÓãR’ÓãRFW‡B×‡2FW‡BÖ×WFVBÖf÷&Vw&÷VæB ¢F—FÆS×¶Æ&VÇĞ¢à¢¶Æ&VÇĞ¢Â÷7ãà¢’—Ğ¢¶6öçfW'6F–öâæÆ&VÇ2æÆVæwF‚â"ò€¢Ç7â6Æ74æÖSÒ'FW‡B×‡2FW‡BÖ×WFVBÖf÷&Vw&÷VæB#à¢·¶6öçfW'6F–öâæÆ&VÇ2æÆVæwF‚Ò'Ğ¢Â÷7ãà¢’¢çVÆÇĞ¢¶6öçfW'6F–öâç6æö÷¦VEVçF–Âb`¢7W'&VçEF–ÖW7F×ÓÒçVÆÂb`¢FFRç'6R†6öçfW'6F–öâç6æö÷¦VEVçF–Â’â7W'&VçEF–ÖW7F×ò€¢Ç7â6Æ74æÖSÒ&–æÆ–æRÖfÆW‚—FV×2Ö6VçFW"vÓFW‡B×‡2FW‡BÖ×WFVBÖf÷&Vw&÷VæB#à¢Ä6Æö6²6Æ74æÖSÒ'6—¦RÓ2ãR6‡&–æ²Ó"&–Ö†–FFVãÒ'G'VR"óà¢VçF–Ç²"'Ğ¢¶f÷&ÖD–åF–ÖU¦öæR€¢6öçfW'6F–öâç6æö÷¦VEVçF–ÂÀ¢æ÷&ÖÆ—¦UF–ÖW¦öæR†6öçfW'6F–öç4FFòçv÷&·76UF–ÖW¦öæR’À¢$ÔÔÒBÂƒ¦ÖÒ"À¢—Ğ¢Â÷7ãà¢’¢çVÆÇĞ¢¶6öçfW'6F–öâç7FGW2ÓÓÒ$4Äõ4TB"ò€¢Ç7â6Æ74æÖSÒ&–æÆ–æRÖfÆW‚—FV×2Ö6VçFW"vÓ&÷VæFVB&rÖ×WFVB‚ÓãR’ÓãRFW‡B×‡2föçBÖÖVF—VÒFW‡BÖ×WFVBÖf÷&Vw&÷VæB#à¢Ä6†V6´6—&6ÆS"6Æ74æÖSÒ'6—¦RÓ26‡&–æ²Ó"&–Ö†–FFVãÒ'G'VR"óà¢6Æ÷6V@¢Â÷7ãà¢’¢6öçfW'6F–öâç7FGW2ÓÓÒ$U44ÄDTB"ò€¢Ç7â6Æ74æÖSÒ&–æÆ–æRÖfÆW‚—FV×2Ö6VçFW"vÓ&÷VæFVB&rÖÖ&W"Ó‚ÓãR’ÓãRFW‡B×‡2föçBÖÖVF—VÒFW‡BÖÖ&W"ÓƒF&³¦&rÖÖ&W"Ó“SóSF&³§FW‡BÖÖ&W"Ó3#à¢ÄÆW'D6—&6ÆR6Æ74æÖSÒ'6—¦RÓ26‡&–æ²Ó"&–Ö†–FFVãÒ'G'VR"óà¢W66ÆFV@¢Â÷7ãà¢’¢çVÆÇĞ¢Ç7à¢6Æ74æÖS×¶6â€¢&–æÆ–æRÖfÆW‚—FV×2Ö6VçFW"vÓFW‡B×‡2föçBÖÖVF—VÒ"À¢6öçfW'6F–öâæ•W6V@¢ò'FW‡BÖÖ&W"ÓsF&³§FW‡BÖÖ&W"ÓC ¢¢'FW‡BÖ×WFVBÖf÷&Vw&÷VæB"À¢—Ğ¢à¢¶6öçfW'6F–öâæ•W6VBò€¢ÅW6R6Æ74æÖSÒ'6—¦RÓ2ãR6‡&–æ²Ó"&–Ö†–FFVãÒ'G'VR"óà¢’¢€¢Ä&÷B6Æ74æÖSÒ'6—¦RÓ2ãR6‡&–æ²Ó"&–Ö†–FFVãÒ'G'VR"óà¢—Ğ¢¶6öçfW'6F–öâæ•W6VBò$’W6VB"¢$’Væ&ÆVB'Ğ¢Â÷7ãà¢Ç7â6Æ74æÖSÒ&–æÆ–æRÖfÆW‚Ö–â×rÓ—FV×2Ö6VçFW"vÓFW‡B×‡2FW‡BÖ×WFVBÖf÷&Vw&÷VæB#à¢ÅW6W"6Æ74æÖSÒ'6—¦RÓ2ãR6‡&–æ²Ó"&–Ö†–FFVãÒ'G'VR"óà¢Ç7â6Æ74æÖSÒ'G'Væ6FR#à¢¶6öçfW'6F–öâæ76–væVTæÖRóò%Væ76–væVB'Ğ¢Â÷7ãà¢Â÷7ãà¢ÂöF—cà¢ÂöF—cà¢Âö'WGFöãà¢ÂöÆ“à¢“°¢Ò—Ğ¢Â÷VÃà¢—Ğ¢ÂöF—cà ¢¶†4Ö÷&Rò€¢ÆF—b6Æ74æÖSÒ'6‡&–æ²ÓÓ2BÓ#à¢Ä'WGFöà¢f&–çCÒ&v†÷7B ¢6Æ74æÖSÒ&‚Ó’rÖgVÆÂvÓãRFW‡B×6ÒFW‡BÖ×WFVBÖf÷&Vw&÷VæB†÷fW#§FW‡BÖf÷&Vw&÷VæB ¢öä6Æ–6³×¶†æFÆTÆöDÖ÷&WĞ¢F—6&ÆVC×¶—4fWF6†–ærÇÂ—5Æ6V†öÆFW$FFĞ¢&–Ö'W7“×¶—4fWF6†–æwĞ¢à¢¶—4fWF6†–ærò€¢Ãà¢ÄÆöFW# ¢6Æ74æÖSÒ'6—¦RÓBÖ÷F–öâ×6fS¦æ–ÖFR×7–âÖ÷F–öâ×&VGV6S¦æ–ÖFRÖæöæR ¢&–Ö†–FFVãÒ'G'VR ¢óà¢ÆöF–ær6öçfW'6F–öç>(
+`¢Âóà¢’¢€¢Ãà¢ÅÇW26Æ74æÖSÒ'6—¦RÓB"&–Ö†–FFVãÒ'G'VR"óà¢ÆöBÖ÷&R6öçfW'6F–öç0¢Âóà¢—Ğ¢Âô'WGFöãà¢ÂöF—cà¢’¢çVÆÇĞ¢ÂöF—cà¢“°§Ğ 

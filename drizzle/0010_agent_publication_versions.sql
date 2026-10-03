@@ -1,121 +1,2 @@
-CREATE TABLE "widget_publication" (
-	"id" text PRIMARY KEY NOT NULL,
-	"version" integer NOT NULL,
-	"config" jsonb NOT NULL,
-	"publishedAt" timestamp with time zone DEFAULT (CURRENT_TIMESTAMP) NOT NULL,
-	"widgetId" text NOT NULL,
-	"createdByUserId" text
-);
---> statement-breakpoint
-ALTER TABLE "widget" ADD COLUMN "publishedVersion" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
-ALTER TABLE "widget_publication" ADD CONSTRAINT "widget_publication_widgetId_widget_id_fk" FOREIGN KEY ("widgetId") REFERENCES "public"."widget"("id") ON DELETE cascade ON UPDATE cascade;--> statement-breakpoint
-ALTER TABLE "widget_publication" ADD CONSTRAINT "widget_publication_createdByUserId_user_id_fk" FOREIGN KEY ("createdByUserId") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE cascade;--> statement-breakpoint
-CREATE UNIQUE INDEX "widget_publication_widgetId_version_key" ON "widget_publication" USING btree ("widgetId","version");--> statement-breakpoint
-CREATE INDEX "widget_publication_widgetId_publishedAt_idx" ON "widget_publication" USING btree ("widgetId","publishedAt");--> statement-breakpoint
-CREATE FUNCTION pg_temp.widget_json_array_or_empty(value text, max_items integer, max_chars integer) RETURNS jsonb
-LANGUAGE plpgsql IMMUTABLE AS $$
-DECLARE parsed jsonb;
-BEGIN
-	parsed := value::jsonb;
-	IF jsonb_typeof(parsed) = 'array' THEN
-		RETURN COALESCE((
-			SELECT jsonb_agg(item.value ORDER BY item.ordinality)
-			FROM jsonb_array_elements(parsed) WITH ORDINALITY AS item(value, ordinality)
-			WHERE jsonb_typeof(item.value) = 'string'
-				AND item.ordinality <= max_items
-				AND char_length(item.value #>> '{}') <= max_chars
-		), '[]'::jsonb);
-	END IF;
-	RETURN '[]'::jsonb;
-EXCEPTION WHEN others THEN
-	RETURN '[]'::jsonb;
-END;
-$$;--> statement-breakpoint
-CREATE FUNCTION pg_temp.widget_json_object_or_default(value text) RETURNS jsonb
-LANGUAGE plpgsql IMMUTABLE AS $$
-DECLARE
-	parsed jsonb;
-	weekdays jsonb;
-BEGIN
-	parsed := value::jsonb;
-	IF jsonb_typeof(parsed) = 'object'
-		AND jsonb_typeof(parsed->'start') = 'string'
-		AND jsonb_typeof(parsed->'end') = 'string'
-		AND parsed->>'start' ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'
-		AND parsed->>'end' ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'
-		AND jsonb_typeof(parsed->'weekdays') = 'array'
-		AND jsonb_array_length(parsed->'weekdays') > 0 THEN
-		SELECT COALESCE(jsonb_agg(item.value ORDER BY item.ordinality), '[]'::jsonb)
-		INTO weekdays
-		FROM jsonb_array_elements(parsed->'weekdays') WITH ORDINALITY AS item(value, ordinality)
-		WHERE jsonb_typeof(item.value) = 'number'
-			AND item.value::text ~ '^[0-6]$';
-		IF jsonb_array_length(weekdays) > 0 THEN
-			RETURN jsonb_build_object('start', parsed->'start', 'end', parsed->'end', 'weekdays', weekdays);
-		END IF;
-	END IF;
-	RETURN '{"start":"09:00","end":"17:00","weekdays":[1,2,3,4,5]}'::jsonb;
-EXCEPTION WHEN others THEN
-	RETURN '{"start":"09:00","end":"17:00","weekdays":[1,2,3,4,5]}'::jsonb;
-END;
-$$;--> statement-breakpoint
-INSERT INTO "widget_publication" ("id", "version", "config", "publishedAt", "widgetId", "createdByUserId")
-SELECT
-	"id" || ':v1',
-	1,
-	jsonb_build_object('schemaVersion', 1, 'config', jsonb_build_object(
-		'booking', jsonb_build_object(
-			'enabled', "bookingEnabled",
-			'timezone', "bookingTimezone",
-			'durationMinutes', "bookingDurationMinutes",
-			'minimumNoticeMinutes', "bookingMinimumNoticeMinutes",
-			'workingHours', pg_temp.widget_json_object_or_default("bookingWorkingHours")
-		),
-		'displayName', "displayName",
-		'welcomeMessage', "welcomeMessage",
-		'inputPlaceholder', "inputPlaceholder",
-		'primaryColor', "primaryColor",
-		'backgroundColor', "backgroundColor",
-		'textColor', "textColor",
-		'borderColor', "borderColor",
-		'fontFamily', "fontFamily",
-		'fontSize', "fontSize",
-		'position', "position",
-		'launcherSize', "launcherSize",
-		'panelWidth', "panelWidth",
-		'panelHeight', "panelHeight",
-		'borderRadius', "borderRadius",
-		'borderRadiusStyle', "borderRadiusStyle",
-		'logoUrl', "logoUrl",
-		'instructions', "instructions",
-		'escalationKeywords', "escalationKeywords",
-		'modelProvider', "modelProvider",
-		'modelName', "modelName",
-		'theme', "theme",
-		'userBubbleColor', "userBubbleColor",
-		'userBubbleTextColor', "userBubbleTextColor",
-		'botBubbleColor', "botBubbleColor",
-		'botBubbleTextColor', "botBubbleTextColor",
-		'headerGradientFrom', "headerGradientFrom",
-		'headerGradientTo', "headerGradientTo",
-		'shadowSize', "shadowSize",
-		'suggestions', pg_temp.widget_json_array_or_empty("suggestions", 10, 500),
-		'hideSuggestionsOnInteract', "hideSuggestionsOnInteract",
-		'previewMessages', pg_temp.widget_json_array_or_empty("previewMessages", 10, 500),
-		'autoShowPreviewDelay', "autoShowPreviewDelay",
-		'showBranding', "showBranding",
-		'privacyPolicyUrl', "privacyPolicyUrl",
-		'enableLeadCapture', "enableLeadCapture",
-		'leadCaptureKeywords', pg_temp.widget_json_array_or_empty("leadCaptureKeywords", 20, 100),
-		'leadCaptureMinutesThreshold', "leadCaptureMinutesThreshold",
-		'leadCaptureMessageThreshold', "leadCaptureMessageThreshold",
-		'enableBrochure', "enableBrochure",
-		'brochureSuggestionText', "brochureSuggestionText"
-	)),
-	"updatedAt",
-	"id",
-	NULL
-FROM "widget";--> statement-breakpoint
-UPDATE "widget" SET "publishedVersion" = 1;--> statement-breakpoint
-DROP FUNCTION pg_temp.widget_json_array_or_empty(text, integer, integer);--> statement-breakpoint
-DROP FUNCTION pg_temp.widget_json_object_or_default(text);
+§'§½Æ§ž‹kz¬‡õ,z»?}©Z’¥kúrz{ÿ²¦²+'·
+âµ¦åyIQQ	1€‰Ý¥‘•Ñ}ÁÕ‰±¥…Ñ¥½¸ˆ€ ($‰¥ˆÑ•áÐAI%5Id-d9=P9U10°($‰Ù•ÉÍ¥½¸ˆ¥¹Ñ••È9=P9U10°($‰½¹™¥œˆ©Í½¹ˆ9=P9U10°($‰ÁÕ‰±¥Í¡•‘ÐˆÑ¥µ•ÍÑ…µÀÝ¥Ñ Ñ¥µ”é½¹”U1P€¡UII9Q}Q%5MQ5@¤9=P9U10°($‰Ý¥‘•Ñ%ˆÑ•áÐ9=P9U10°($‰É•…Ñ•‘	åUÍ•É%ˆÑ•áÐ(¤ì(´´øÍÑ…Ñ•µ•¹Ðµ‰É•…­Á½¥¹Ð)1QHQ	1€‰Ý¥‘•Ðˆ=1U58€‰ÁÕ‰±¥Í¡•‘Y•ÉÍ¥½¸ˆ¥¹Ñ••ÈU1P€À9=P9U10ì´´øÍÑ…Ñ•µ•¹Ðµ‰É•…­Á½¥¹Ð)1QHQ	1€‰Ý¥‘•Ñ}ÁÕ‰±¥…Ñ¥½¸ˆ=9MQI%9P€‰Ý¥‘•Ñ}ÁÕ‰±¥…Ñ¥½¹}Ý¥‘•Ñ%‘}Ý¥‘•Ñ}¥‘}™¬ˆ=I%8-d€ ‰Ý¥‘•Ñ%ˆ¤II9L€‰ÁÕ‰±¥Œˆ¸‰Ý¥‘•Ðˆ ‰¥ˆ¤=81Q…Í…‘”=8UAQ…Í…‘”ì´´øÍÑ…Ñ•µ•¹Ðµ‰É•…­Á½¥¹Ð)1QHQ	1€‰Ý¥‘•Ñ}ÁÕ‰±¥…Ñ¥½¸ˆ=9MQI%9P€‰Ý¥‘•Ñ}ÁÕ‰±¥…Ñ¥½¹}É•…Ñ•‘	åUÍ•É%‘}ÕÍ•É}¥‘}™¬ˆ=I%8-d€ ‰É•…Ñ•‘	åUÍ•É%ˆ¤II9L€‰ÁÕ‰±¥Œˆ¸‰ÕÍ•Èˆ ‰¥ˆ¤=81QÍ•Ð¹Õ±°=8UAQ…Í…‘”ì´´øÍÑ…Ñ•µ•¹Ðµ‰É•…­Á½¥¹Ð)IQU9%EU%9`€‰Ý¥‘•Ñ}ÁÕ‰±¥…Ñ¥½¹}Ý¥‘•Ñ%‘}Ù•ÉÍ¥½¹}­•äˆ=8€‰Ý¥‘•Ñ}ÁÕ‰±¥…Ñ¥½¸ˆUM%9‰ÑÉ•”€ ‰Ý¥‘•Ñ%ˆ°‰Ù•ÉÍ¥½¸ˆ¤ì´´øÍÑ…Ñ•µ•¹Ðµ‰É•…­Á½¥¹Ð)IQ%9`€‰Ý¥‘•Ñ}ÁÕ‰±¥…Ñ¥½¹}Ý¥‘•Ñ%‘}ÁÕ‰±¥Í¡•‘Ñ}¥‘àˆ=8€‰Ý¥‘•Ñ}ÁÕ‰±¥…Ñ¥½¸ˆUM%9‰ÑÉ•”€ ‰Ý¥‘•Ñ%ˆ°‰ÁÕ‰±¥Í¡•‘Ðˆ¤ì´´øÍÑ…Ñ•µ•¹Ðµ‰É•…­Á½¥¹Ð)IQU9Q%=8Á}Ñ•µÀ¹Ý¥‘•Ñ}©Í½¹}…ÉÉ…å}½É}•µÁÑä¡Ù…±Õ”Ñ•áÐ°µ…á}¥Ñ•µÌ¥¹Ñ••È°µ…á}¡…ÉÌ¥¹Ñ••È¤IQUI9L©Í½¹ˆ)19UÁ±ÁÍÅ°%55UQ	1L€)1IÁ…ÉÍ•©Í½¹ˆì)	%8(%Á…ÉÍ•€èôÙ…±Õ”èé©Í½¹ˆì(%%©Í½¹‰}ÑåÁ•½˜¡Á…ÉÍ•¤€ô€…ÉÉ…äœQ!8($%IQUI8=1M  ($$%M1P©Í½¹‰}…œ¡¥Ñ•´¹Ù…±Õ”=IH	d¥Ñ•´¹½É‘¥¹…±¥Ñä¤($$%I=4©Í½¹‰}…ÉÉ…å}•±•µ•¹ÑÌ¡Á…ÉÍ•¤]%Q =I%91%QdL¥Ñ•´¡Ù…±Õ”°½É‘¥¹…±¥Ñä¤($$%]!I©Í½¹‰}ÑåÁ•½˜¡¥Ñ•´¹Ù…±Õ”¤€ô€ÍÑÉ¥¹œœ($$$%9¥Ñ•´¹½É‘¥¹…±¥Ñä€ðôµ…á}¥Ñ•µÌ($$$%9¡…É}±•¹Ñ ¡¥Ñ•´¹Ù…±Õ”€Œøø€íôœ¤€ðôµ…á}¡…ÉÌ($$¤°€mtœèé©Í½¹ˆ¤ì(%9%ì(%IQUI8€mtœèé©Í½¹ˆì)aAQ%=8]!8½Ñ¡•ÉÌQ!8(%IQUI8€mtœèé©Í½¹ˆì)9ì(ì´´øÍÑ…Ñ•µ•¹Ðµ‰É•…­Á½¥¹Ð)IQU9Q%=8Á}Ñ•µÀ¹Ý¥‘•Ñ}©Í½¹}½‰©•Ñ}½É}‘•™…Õ±Ð¡Ù…±Õ”Ñ•áÐ¤IQUI9L©Í½¹ˆ)19UÁ±ÁÍÅ°%55UQ	1L€)1I(%Á…ÉÍ•©Í½¹ˆì(%Ý••­‘…åÌ©Í½¹ˆì)	%8(%Á…ÉÍ•€èôÙ…±Õ”èé©Í½¹ˆì(%%©Í½¹‰}ÑåÁ•½˜¡Á…ÉÍ•¤€ô€½‰©•Ðœ($%9©Í½¹‰}ÑåÁ•½˜¡Á…ÉÍ•´øÍÑ…ÉÐœ¤€ô€ÍÑÉ¥¹œœ($%9©Í½¹‰}ÑåÁ•½˜¡Á…ÉÍ•´ø•¹œ¤€ô€ÍÑÉ¥¹œœ($%9Á…ÉÍ•´øøÍÑ…ÉÐœø€x¡lÀÅulÀ´åuðÉlÀ´Ít¤élÀ´ÕulÀ´åtœ($%9Á…ÉÍ•´øø•¹œø€x¡lÀÅulÀ´åuðÉlÀ´Ít¤élÀ´ÕulÀ´åtœ($%9©Í½¹‰}ÑåÁ•½˜¡Á…ÉÍ•´øÝ••­‘…åÌœ¤€ô€…ÉÉ…äœ($%9©Í½¹‰}…ÉÉ…å}±•¹Ñ ¡Á…ÉÍ•´øÝ••­‘…åÌœ¤€ø€ÀQ!8($%M1P=1M¡©Í½¹‰}…œ¡¥Ñ•´¹Ù…±Õ”=IH	d¥Ñ•´¹½É‘¥¹…±¥Ñä¤°€mtœèé©Í½¹ˆ¤($%%9Q<Ý••­‘…åÌ($%I=4©Í½¹‰}…ÉÉ…å}•±•µ•¹ÑÌ¡Á…ÉÍ•´øÝ••­‘…åÌœ¤]%Q =I%91%QdL¥Ñ•´¡Ù…±Õ”°½É‘¥¹…±¥Ñä¤($%]!I©Í½¹‰}ÑåÁ•½˜¡¥Ñ•´¹Ù…±Õ”¤€ô€¹Õµ‰•Èœ($$%9¥Ñ•´¹Ù…±Õ”èéÑ•áÐø€ylÀ´Ùtœì($%%©Í½¹‰}…ÉÉ…å}±•¹Ñ ¡Ý••­‘…åÌ¤€ø€ÀQ!8($$%IQUI8©Í½¹‰}‰Õ¥±‘}½‰©•Ð ÍÑ…ÉÐœ°Á…ÉÍ•´øÍÑ…ÉÐœ°€•¹œ°Á…ÉÍ•´ø•¹œ°€Ý••­‘…åÌœ°Ý••­‘…åÌ¤ì($%9%ì(%9%ì(%IQUI8€ì‰ÍÑ…ÉÐˆèˆÀäèÀÀˆ°‰•¹ˆèˆÄÜèÀÀˆ°‰Ý••­‘…åÌˆélÄ°È°Ì°Ð°Õuôœèé©Í½¹ˆì)aAQ%=8]!8½Ñ¡•ÉÌQ!8(%IQUI8€ì‰ÍÑ…ÉÐˆèˆÀäèÀÀˆ°‰•¹ˆèˆÄÜèÀÀˆ°‰Ý••­‘…åÌˆélÄ°È°Ì°Ð°Õuôœèé©Í½¹ˆì)9ì(ì´´øÍÑ…Ñ•µ•¹Ðµ‰É•…­Á½¥¹Ð)IQU9Q%=8Á}Ñ•µÀ¹Ý¥‘•Ñ}Ñ•áÑ}½É}‘•™…Õ±Ð¡Ù…±Õ”Ñ•áÐ°µ…á}¡…ÉÌ¥¹Ñ••È°™…±±‰…¬Ñ•áÐ¤IQUI9LÑ•áÐ)19UÁ±ÁÍÅ°%55UQ	1L€)1I¹½Éµ…±¥é•Ñ•áÐì)	%8(%¹½Éµ…±¥é•€èô±•™Ð¡‰ÑÉ¥´¡Ù…±Õ”¤°µ…á}¡…ÉÌ¤ì(%IQUI8=1M¡9U11%¡¹½Éµ…±¥é•°€œœ¤°™…±±‰…¬¤ì)9ì(ì´´øÍÑ…Ñ•µ•¹Ðµ‰É•…­Á½¥¹Ð)IQU9Q%=8Á}Ñ•µÀ¹Ý¥‘•Ñ}½±½É}½É}‘•™…Õ±Ð¡Ù…±Õ”Ñ•áÐ°™…±±‰…¬Ñ•áÐ¤IQUI9LÑ•áÐ)19UÁ±ÁÍÅ°%55UQ	1L€)	%8(%%Ù…±Õ”ø€xlÀ´å„µ™µuìÙôœQ!8IQUI8Ù…±Õ”ì9%ì(%IQUI8™…±±‰…¬ì)9ì(ì´´øÍÑ…Ñ•µ•¹Ðµ‰É•…­Á½¥¹Ð)IQU9Q%=8Á}Ñ•µÀ¹Ý¥‘•Ñ}•¹Õµ}½É}‘•™…Õ±Ð¡Ù…±Õ”Ñ•áÐ°…±±½Ý•Ñ•áÑmt°™…±±‰…¬Ñ•áÐ¤IQUI9LÑ•áÐ)19UÁ±ÁÍÅ°%55UQ	1L€)	%8(%%Ù…±Õ”€ô9d¡…±±½Ý•¤Q!8IQUI8Ù…±Õ”ì9%ì(%IQUI8™…±±‰…¬ì)9ì(ì´´øÍÑ…Ñ•µ•¹Ðµ‰É•…­Á½¥¹Ð)IQU9Q%=8Á}Ñ•µÀ¹Ý¥‘•Ñ}¥¹Ñ}½É}‘•™…Õ±Ð¡Ù…±Õ”¥¹Ñ••È°µ¥¹¥µÕ´¥¹Ñ••È°µ…á¥µÕ´¥¹Ñ••È°™…±±‰…¬¥¹Ñ••È¤IQUI9L¥¹Ñ••È)19UÁ±ÁÍÅ°%55UQ	1L€)	%8(%%Ù…±Õ”	Q]8µ¥¹¥µÕ´9µ…á¥µÕ´Q!8IQUI8Ù…±Õ”ì9%ì(%IQUI8™…±±‰…¬ì)9ì(ì´´øÍÑ…Ñ•µ•¹Ðµ‰É•…­Á½¥¹Ð)%9MIP%9Q<€‰Ý¥‘•Ñ}ÁÕ‰±¥…Ñ¥½¸ˆ€ ‰¥ˆ°€‰Ù•ÉÍ¥½¸ˆ°€‰½¹™¥œˆ°€‰ÁÕ‰±¥Í¡•‘Ðˆ°€‰Ý¥‘•Ñ%ˆ°€‰É•…Ñ•‘	åUÍ•É%ˆ¤)M1P($‰¥ˆñð€œéØÄœ°($Ä°(%©Í½¹‰}‰Õ¥±‘}½‰©•Ð Í¡•µ…Y•ÉÍ¥½¸œ°€Ä°€½¹™¥œœ°©Í½¹‰}‰Õ¥±‘}½‰©•Ð ($$‰½½­¥¹œœ°©Í½¹‰}‰Õ¥±‘}½‰©•Ð ($$$•¹…‰±•œ°€‰‰½½­¥¹¹…‰±•ˆ°($$$Ñ¥µ•é½¹”œ°Á}Ñ•µÀ¹Ý¥‘•Ñ}Ñ•áÑ}½É}‘•™…Õ±Ð ‰‰½½­¥¹Q¥µ•é½¹”ˆ°€àÀ°€UQœ¤°($$$‘ÕÉ…Ñ¥½¹5¥¹ÕÑ•Ìœ°Á}Ñ•µÀ¹Ý¥‘•Ñ}¥¹Ñ}½É}‘•™…Õ±Ð ‰‰½½­¥¹ÕÉ…Ñ¥½¹5¥¹ÕÑ•Ìˆ°€ÄÔ°€ÈÐÀ°€ÌÀ¤°($$$µ¥¹¥µÕµ9½Ñ¥•5¥¹ÕÑ•Ìœ°Á}Ñ•µÀ¹Ý¥‘•Ñ}¥¹Ñ}½É}‘•™…Õ±Ð ‰‰½½­¥¹5¥¹¥µÕµ9½Ñ¥•5¥¹ÕÑ•Ìˆ°€À°€ÄÀÀàÀ°€ØÀ¤°($$$Ý½É­¥¹!½ÕÉÌœ°Á}Ñ•µÀ¹Ý¥‘•Ñ}©Í½¹}½‰©•Ñ}½É}‘•™…Õ±Ð ‰‰½½­¥¹]½É­¥¹!½ÕÉÌˆ¤($$¤°($$‘¥ÍÁ±…å9…µ”œ°Á}Ñ•µÀ¹Ý¥‘•Ñ}Ñ•áÑ}½É}‘•™…Õ±Ð ‰‘¥ÍÁ±…å9…µ”ˆ°€ØÀ°€MÕÁÁ½ÉÐœ¤°($$Ý•±½µ•5•ÍÍ…”œ°Á}Ñ•µÀ¹Ý¥‘•Ñ}Ñ•áÑ}½É}‘•™…Õ±Ð ‰Ý•±½µ•5•ÍÍ…”ˆ°€ÈÐÀ°€!¤„!½Ü…¸Ý”¡•±Àüœ¤°($$¥¹ÁÕÑA±…•¡½±‘•Èœ°Á}Ñ•µÀ¹Ý¥‘•Ñ}Ñ•áÑ}½É}‘•™…Õ±Ð ‰¥¹ÁÕÑA±…•¡½±‘•Èˆ°€àÀ°€Í¬„ÅÕ•ÍÑ¥½»Š˜œ¤°($$ÁÉ¥µ…Éå½±½Èœ°Á}Ñ•µÀ¹Ý¥‘•Ñ}½±½É}½É}‘•™…Õ±Ð ‰ÁÉ¥µ…Éå½±½Èˆ°€œŒÝŒÍ…•œ¤°($$‰…­É½Õ¹‘½±½Èœ°Á}Ñ•µÀ¹Ý¥‘•Ñ}½±½É}½É}‘•™…Õ±Ð ‰‰…­É½Õ¹‘½±½Èˆ°€œ™™™™™˜œ¤°($$Ñ•áÑ½±½Èœ°Á}Ñ•µÀ¹Ý¥‘•Ñ}½±½É}½É}‘•™…Õ±Ð ‰Ñ•áÑ½±½Èˆ°€œŒÄÜÄÜÄÜœ¤°($$‰½É‘•É½±½Èœ°Á}Ñ•µÀ¹Ý¥‘•Ñ}½±½É}½É}‘•™…Õ±Ð ‰‰½É‘•É½±½Èˆ°€œÀœ¤°($$™½¹Ñ…µ¥±äœ°Á}Ñ•µÀ¹Ý¥‘•Ñ}•¹Õµ}½É}‘•™…Õ±Ð ‰™½¹Ñ…µ¥±äˆ°IIel%¹Ñ•Èœ°€•¥ÍÐœ°€MåÍÑ•´U$œ°€I½‰½Ñ¼œ°€=Á•¸M…¹Ìt°€%¹Ñ•Èœ¤°($$™½¹ÑM¥é”œ°Á}Ñ•µÀ¹Ý¥‘•Ñ}•¹Õµ}½É}‘•™…Õ±Ð ‰™½¹ÑM¥é”ˆ°IIelœÄÉÁàœ°€œÄÍÁàœ°€œÄÑÁàœ°€œÄÕÁàœ°€œÄÙÁàt°€œÄÑÁàœ¤°($$Á½Í¥Ñ¥½¸œ°Á}Ñ•µÀ¹Ý¥‘•Ñ}•¹Õµ}½É}‘•™…Õ±Ð ‰Á½Í¥Ñ¥½¸ˆ°IIel‰½ÑÑ½´µ±•™Ðœ°€‰½ÑÑ½´µÉ¥¡Ðt°€‰½ÑÑ½´µÉ¥¡Ðœ¤°($$±…Õ¹¡•ÉM¥é”œ°Á}Ñ•µÀ¹Ý¥‘•Ñ}•¹Õµ}½É}‘•™…Õ±Ð ‰±…Õ¹¡•ÉM¥é”ˆ°IIelÍ´œ°€µœ°€±œt°€µœ¤°($$Á…¹•±]¥‘Ñ œ°Á}Ñ•µÀ¹Ý¥‘•Ñ}¥¹Ñ}½É}‘•™…Õ±Ð ‰Á…¹•±]¥‘Ñ ˆ°€ÈàÀ°€ØÐÀ°€ÌàÀ¤°($$Á…¹•±!•¥¡Ðœ°Á}Ñ•µÀ¹Ý¥‘•Ñ}¥¹Ñ}½É}‘•™…Õ±Ð ‰Á…¹•±!•¥¡Ðˆ°€ÐÀÀ°€äÀÀ°€ØÐÀ¤°($$‰½É‘•ÉI…‘¥ÕÌœ°Á}Ñ•µÀ¹Ý¥‘•Ñ}¥¹Ñ}½É}‘•™…Õ±Ð ‰‰½É‘•ÉI…‘¥ÕÌˆ°€À°€Ðà°€ÈÀ¤°($$‰½É‘•ÉI…‘¥ÕÍMÑå±”œ°Á}Ñ•µÀ¹Ý¥‘•Ñ}•¹Õµ}½É}‘•™…Õ±Ð ‰‰½É‘•ÉI…‘¥ÕÍMÑå±”ˆ°IIel¹½¹”œ°€‘•™…Õ±Ðœ°€™Õ±°t°€‘•™…Õ±Ðœ¤°($$±½½UÉ°œ°€‰±½½UÉ°ˆ°($$¥¹ÍÑÉÕÑ¥½¹Ìœ°Á}Ñ•µÀ¹Ý¥‘•Ñ}Ñ•áÑ}½É}‘•™…Õ±Ð ‰¥¹ÍÑÉÕÑ¥½¹Ìˆ°€ÐÀÀÀ°€¹ÍÝ•È±•…É±ä…¹½¹±äÕÍ”¥¹™½Éµ…Ñ¥½¸å½Ô­¹½Ü¥ÌÉ•±¥…‰±”¸%˜å½Ô…É”Õ¹ÍÕÉ”°Í…äÍ¼¸œ¤°($$•Í…±…Ñ¥½¹-•åÝ½É‘Ìœ°Á}Ñ•µÀ¹Ý¥‘•Ñ}Ñ•áÑ}½É}‘•™…Õ±Ð ‰•Í…±…Ñ¥½¹-•åÝ½É‘Ìˆ°€ÔÀÀ°€¡Õµ…¸±…•¹Ð±Á•ÉÍ½¸±É•ÁÉ•Í•¹Ñ…Ñ¥Ù”±ÍÕÁÁ½ÉÐÑ•…´œ¤°($$µ½‘•±AÉ½Ù¥‘•Èœ°Á}Ñ•µÀ¹Ý¥‘•Ñ}•¹Õµ}½É}‘•™…Õ±Ð ‰µ½‘•±AÉ½Ù¥‘•Èˆ°IIel=A9$œ°€==1t°€=A9$œ¤°($$µ½‘•±9…µ”œ°M($$%]!8Á}Ñ•µÀ¹Ý¥‘•Ñ}•¹Õµ}½É}‘•™…Õ±Ð ‰µ½‘•±AÉ½Ù¥‘•Èˆ°IIel=A9$œ°€==1t°€=A9$œ¤€ô€==1œ($$$%9€‰µ½‘•±9…µ”ˆ%8€ •µ¥¹¤´Ä¸Ôµ™±…Í œ°€•µ¥¹¤´È¸Ôµ™±…Í œ°€•µ¥¹¤´È¸ÔµÁÉ¼œ¤Q!8€‰µ½‘•±9…µ”ˆ($$%]!8Á}Ñ•µÀ¹Ý¥‘•Ñ}•¹Õµ}½É}‘•™…Õ±Ð ‰µ½‘•±AÉ½Ù¥‘•Èˆ°IIel=A9$œ°€==1t°€=A9$œ¤€ô€==1œQ!8€•µ¥¹¤´È¸Ôµ™±…Í œ($$%]!8€‰µ½‘•±9…µ”ˆ%8€ ÁÐ´Ñ¼µµ¥¹¤œ°€ÁÐ´Ñ¼œ°€ÁÐ´Ôµµ¥¹¤œ°€ÁÐ´Ô¸Äœ¤Q!8€‰µ½‘•±9…µ”ˆ($$%1M€ÁÐ´Ñ¼µµ¥¹¤œ($%9°($$Ñ¡•µ”œ°Á}Ñ•µÀ¹Ý¥‘•Ñ}•¹Õµ}½É}‘•™…Õ±Ð ‰Ñ¡•µ”ˆ°IIel±¥¡Ðœ°€‘…É¬t°€±¥¡Ðœ¤°($$ÕÍ•É	Õ‰‰±•½±½Èœ°Á}Ñ•µÀ¹Ý¥‘•Ñ}½±½É}½É}‘•™…Õ±Ð ‰ÕÍ•É	Õ‰‰±•½±½Èˆ°€œŒÝŒÍ…•œ¤°($$ÕÍ•É	Õ‰‰±•Q•áÑ½±½Èœ°Á}Ñ•µÀ¹Ý¥‘•Ñ}½±½É}½É}‘•™…Õ±Ð ‰ÕÍ•É	Õ‰‰±•Q•áÑ½±½Èˆ°€œ™™™™™˜œ¤°($$‰½Ñ	Õ‰‰±•½±½Èœ°Á}Ñ•µÀ¹Ý¥‘•Ñ}½±½É}½É}‘•™…Õ±Ð ‰‰½Ñ	Õ‰‰±•½±½Èˆ°€œ˜É˜É˜àœ¤°($$‰½Ñ	Õ‰‰±•Q•áÑ½±½Èœ°Á}Ñ•µÀ¹Ý¥‘•Ñ}½±½É}½É}‘•™…Õ±Ð ‰‰½Ñ	Õ‰‰±•Q•áÑ½±½Èˆ°€œŒÄÜÄÜÄÜœ¤°($$¡•…‘•ÉÉ…‘¥•¹ÑÉ½´œ°Á}Ñ•µÀ¹Ý¥‘•Ñ}½±½É}½É}‘•™…Õ±Ð ‰¡•…‘•ÉÉ…‘¥•¹ÑÉ½´ˆ°€œŒÝŒÍ…•œ¤°($$¡•…‘•ÉÉ…‘¥•¹ÑQ¼œ°Á}Ñ•µÀ¹Ý¥‘•Ñ}½±½É}½É}‘•™…Õ±Ð ‰¡•…‘•ÉÉ…‘¥•¹ÑQ¼ˆ°€œŒÝŒÍ…•œ¤°($$Í¡…‘½ÝM¥é”œ°Á}Ñ•µÀ¹Ý¥‘•Ñ}•¹Õµ}½É}‘•™…Õ±Ð ‰Í¡…‘½ÝM¥é”ˆ°IIel¹½¹”œ°€µœ°€±œt°€µœ¤°($$ÍÕ•ÍÑ¥½¹Ìœ°Á}Ñ•µÀ¹Ý¥‘•Ñ}©Í½¹}…ÉÉ…å}½É}•µÁÑä ‰ÍÕ•ÍÑ¥½¹Ìˆ°€ÄÀ°€ÔÀÀ¤°($$¡¥‘•MÕ•ÍÑ¥½¹Í=¹%¹Ñ•É…Ðœ°€‰¡¥‘•MÕ•ÍÑ¥½¹Í=¹%¹Ñ•É…Ðˆ°($$ÁÉ•Ù¥•Ý5•ÍÍ…•Ìœ°Á}Ñ•µÀ¹Ý¥‘•Ñ}©Í½¹}…ÉÉ…å}½É}•µÁÑä ‰ÁÉ•Ù¥•Ý5•ÍÍ…•Ìˆ°€ÄÀ°€ÔÀÀ¤°($$…ÕÑ½M¡½ÝAÉ•Ù¥•Ý•±…äœ°Á}Ñ•µÀ¹Ý¥‘•Ñ}¥¹Ñ}½É}‘•™…Õ±Ð ‰…ÕÑ½M¡½ÝAÉ•Ù¥•Ý•±…äˆ°€À°€ÌÀÀÀÀ°€ÌÀÀÀ¤°($$Í¡½Ý	É…¹‘¥¹œœ°€‰Í¡½Ý	É…¹‘¥¹œˆ°($$ÁÉ¥Ù…åA½±¥åUÉ°œ°±•™Ð ‰ÁÉ¥Ù…åA½±¥åUÉ°ˆ°€ÔÀÀ¤°($$•¹…‰±•1•…‘…ÁÑÕÉ”œ°€‰•¹…‰±•1•…‘…ÁÑÕÉ”ˆ°($$±•…‘…ÁÑÕÉ•-•åÝ½É‘Ìœ°Á}Ñ•µÀ¹Ý¥‘•Ñ}©Í½¹}…ÉÉ…å}½É}•µÁÑä ‰±•…‘…ÁÑÕÉ•-•åÝ½É‘Ìˆ°€ÈÀ°€ÄÀÀ¤°($$±•…‘…ÁÑÕÉ•5¥¹ÕÑ•ÍQ¡É•Í¡½±œ°Á}Ñ•µÀ¹Ý¥‘•Ñ}¥¹Ñ}½É}‘•™…Õ±Ð ‰±•…‘…ÁÑÕÉ•5¥¹ÕÑ•ÍQ¡É•Í¡½±ˆ°€Ä°€ÄÈÀ°€Ô¤°($$±•…‘…ÁÑÕÉ•5•ÍÍ…•Q¡É•Í¡½±œ°Á}Ñ•µÀ¹Ý¥‘•Ñ}¥¹Ñ}½É}‘•™…Õ±Ð ‰±•…‘…ÁÑÕÉ•5•ÍÍ…•Q¡É•Í¡½±ˆ°€Ä°€ÄÀÀ°€Ð¤°($$•¹…‰±•	É½¡ÕÉ”œ°€‰•¹…‰±•	É½¡ÕÉ”ˆ°($$‰É½¡ÕÉ•MÕ•ÍÑ¥½¹Q•áÐœ°Á}Ñ•µÀ¹Ý¥‘•Ñ}Ñ•áÑ}½É}‘•™…Õ±Ð ‰‰É½¡ÕÉ•MÕ•ÍÑ¥½¹Q•áÐˆ°€ÄÈÀ°€I••¥Ù”	É½¡ÕÉ”œ¤($¤¤°($‰ÕÁ‘…Ñ•‘Ðˆ°($‰¥ˆ°(%9U10)I=4€‰Ý¥‘•Ðˆì´´øÍÑ…Ñ•µ•¹Ðµ‰É•…­Á½¥¹Ð)UAQ€‰Ý¥‘•ÐˆMP€‰ÁÕ‰±¥Í¡•‘Y•ÉÍ¥½¸ˆ€ô€Äì´´øÍÑ…Ñ•µ•¹Ðµ‰É•…­Á½¥¹Ð)I=@U9Q%=8Á}Ñ•µÀ¹Ý¥‘•Ñ}©Í½¹}…ÉÉ…å}½É}•µÁÑä¡Ñ•áÐ°¥¹Ñ••È°¥¹Ñ••È¤ì´´øÍÑ…Ñ•µ•¹Ðµ‰É•…­Á½¥¹Ð)I=@U9Q%=8Á}Ñ•µÀ¹Ý¥‘•Ñ}©Í½¹}½‰©•Ñ}½É}‘•™…Õ±Ð¡Ñ•áÐ¤ì´´øÍÑ…Ñ•µ•¹Ðµ‰É•…­Á½¥¹Ð)I=@U9Q%=8Á}Ñ•µÀ¹Ý¥‘•Ñ}Ñ•áÑ}½É}‘•™…Õ±Ð¡Ñ•áÐ°¥¹Ñ••È°Ñ•áÐ¤ì´´øÍÑ…Ñ•µ•¹Ðµ‰É•…­Á½¥¹Ð)I=@U9Q%=8Á}Ñ•µÀ¹Ý¥‘•Ñ}½±½É}½É}‘•™…Õ±Ð¡Ñ•áÐ°Ñ•áÐ¤ì´´øÍÑ…Ñ•µ•¹Ðµ‰É•…­Á½¥¹Ð)I=@U9Q%=8Á}Ñ•µÀ¹Ý¥‘•Ñ}•¹Õµ}½É}‘•™…Õ±Ð¡Ñ•áÐ°Ñ•áÑmt°Ñ•áÐ¤ì´´øÍÑ…Ñ•µ•¹Ðµ‰É•…­Á½¥¹Ð)I=@U9Q%=8Á}Ñ•µÀ¹Ý¥‘•Ñ}¥¹Ñ}½É}‘•™…Õ±Ð¡¥¹Ñ••È°¥¹Ñ••È°¥¹Ñ••È°¥¹Ñ••È¤ì(

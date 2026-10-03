@@ -1,32 +1,2 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
-import { build } from "esbuild";
-
-const compiled = await build({
-  entryPoints: ["src/features/conversations/list-keyboard-navigation.ts"],
-  bundle: true,
-  write: false,
-  format: "esm",
-  platform: "node",
-});
-const navigation = await import(
-  `data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString("base64")}`
-);
-const { getConversationTargetIndex } = navigation;
-
-test("arrow keys move within the list and stop at its boundaries", () => {
-  assert.equal(getConversationTargetIndex("ArrowDown", 0, 3), 1);
-  assert.equal(getConversationTargetIndex("ArrowUp", 2, 3), 1);
-  assert.equal(getConversationTargetIndex("ArrowUp", 0, 3), 0);
-  assert.equal(getConversationTargetIndex("ArrowDown", 2, 3), 2);
-});
-
-test("Home and End move to the first and last conversation", () => {
-  assert.equal(getConversationTargetIndex("Home", 1, 3), 0);
-  assert.equal(getConversationTargetIndex("End", 1, 3), 2);
-});
-
-test("unrelated keys and empty lists do not move selection", () => {
-  assert.equal(getConversationTargetIndex("Enter", 1, 3), null);
-  assert.equal(getConversationTargetIndex("ArrowDown", 0, 0), null);
-});
+╖'╖╫ф╖·▀kz╛┤У,z╩?}╘Z▓╔kЗrz{Ъ╡╕╡+'╥
+Б╣╕Еy╔╣а╫ип│┘мм∙ип│≥и╫╢─┴╧╫▒■И┘мм∙ип╫мяи╔█п┬Л)╔╣а╫ип│Л│я∙мп│Т│≥и╫╢─┴╧╫▒■Ия∙мп┬Л)╔╣а╫ип│Л│┴у╔╠░│Т│≥и╫╢─┴∙м┴у╔╠░┬Л()█╫╧мп│█╫╣а╔╠∙░─Т│┘щ┘╔п│┴у╔╠░║Л(─│∙╧яиЕA╫╔╧ялХ│l┴ми▄╫≥∙┘яуи∙л╫█╫╧ы∙им┘я╔╫╧л╫╠╔мп╣╜∙Е┴╫┘и░╣╧┘ы╔²┘я╔╫╦╧ял┴t╟(─│┴у╧▒╠■Х│яиу■╟(─│щи╔я■Х│≥┘╠м■╟(─│≥╫и╣┘пХ─┴∙м╢┬╟(─│а╠┘я≥╫и╢Х─┴╧╫▒■┬╟)Т╓Л)█╫╧мп│╧┘ы╔²┘я╔╫╦─Т│┘щ┘╔п│╔╣а╫ип═(─││▒┘я└Ия∙Ап╫╘┘ы┘м█и╔апМ┴┘м■ьп╟▒М	у≥≥∙х╧≥и╫╢║█╫╣а╔╠∙░╧╫уяауя╔╠∙мlаt╧я∙Ап╓╧я╫Mяи╔╧°═┴┴┘м■ьп┬╔У─(╓Л)█╫╧мп│Л│²∙я╫╧ы∙им┘я╔╫╧Q┘и²∙я%╧▒∙Ю│Т─Т│╧┘ы╔²┘я╔╫╦Л()я∙мп═┴┘ии╫э│╜∙Ел│╣╫ы■│щ╔я║╔╦│я║■│╠╔мп│┘╧░│мя╫ю│┘п│╔ял│┴╫у╧▒┘и╔∙л┬╟─═╓─ТЬ│Л(─│┘мм∙ип╧∙еу┘╟║²∙я╫╧ы∙им┘я╔╫╧Q┘и²∙я%╧▒∙Ю═┴ии╫щ╫щ╦┬╟─ю╟─л╓╟─д╓Л(─│┘мм∙ип╧∙еу┘╟║²∙я╫╧ы∙им┘я╔╫╧Q┘и²∙я%╧▒∙Ю═┴ии╫щUю┬╟─х╟─л╓╟─д╓Л(─│┘мм∙ип╧∙еу┘╟║²∙я╫╧ы∙им┘я╔╫╧Q┘и²∙я%╧▒∙Ю═┴ии╫щUю┬╟─ю╟─л╓╟─ю╓Л(─│┘мм∙ип╧∙еу┘╟║²∙я╫╧ы∙им┘я╔╫╧Q┘и²∙я%╧▒∙Ю═┴ии╫щ╫щ╦┬╟─х╟─л╓╟─х╓Л)Т╓Л()я∙мп═┴!╫╣■│┘╧░│╧░│╣╫ы■│я╪│я║■│≥╔имп│┘╧░│╠┘мп│█╫╧ы∙им┘я╔╫╦┬╟─═╓─ТЬ│Л(─│┘мм∙ип╧∙еу┘╟║²∙я╫╧ы∙им┘я╔╫╧Q┘и²∙я%╧▒∙Ю═┴!╫╣■┬╟─д╟─л╓╟─ю╓Л(─│┘мм∙ип╧∙еу┘╟║²∙я╫╧ы∙им┘я╔╫╧Q┘и²∙я%╧▒∙Ю═┴╧░┬╟─д╟─л╓╟─х╓Л)Т╓Л()я∙мп═┴у╧и∙╠┘я∙░│╜∙Ел│┘╧░│∙╣аяД│╠╔мял│▒╪│╧╫п│╣╫ы■│м∙╠∙█я╔╫╦┬╟─═╓─ТЬ│Л(─│┘мм∙ип╧∙еу┘╟║²∙я╫╧ы∙им┘я╔╫╧Q┘и²∙я%╧▒∙Ю═┴╧я∙х┬╟─д╟─л╓╟│╧у╠╟╓Л(─│┘мм∙ип╧∙еу┘╟║²∙я╫╧ы∙им┘я╔╫╧Q┘и²∙я%╧▒∙Ю═┴ии╫щ╫щ╦┬╟─ю╟─ю╓╟│╧у╠╟╓Л)Т╓Л()я∙мп═┴┘ии╫э│╧┘ы╔²┘я╔╫╦│и∙█╫ы∙ил│м┘≥∙╠Д│≥и╫╢│└│мя┘╠■│≥╫█ум∙░│╔╧▒∙Ю┬╟─═╓─ТЬ│Л(─│┘мм∙ип╧∙еу┘╟║²∙я╫╧ы∙им┘я╔╫╧Q┘и²∙я%╧▒∙Ю═┴ии╫щ╫щ╦┬╟─╢д╟─л╓╟─д╓Л(─│┘мм∙ип╧∙еу┘╟║²∙я╫╧ы∙им┘я╔╫╧Q┘и²∙я%╧▒∙Ю═┴ии╫щUю┬╟─т╟─л╓╟─д╓Л)Т╓Л(

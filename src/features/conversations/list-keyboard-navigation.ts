@@ -1,12 +1,2 @@
-export function getConversationTargetIndex(
-  key: string,
-  currentIndex: number,
-  optionCount: number,
-): number | null {
-  if (optionCount === 0) return null;
-  if (key === "Home") return 0;
-  if (key === "End") return optionCount - 1;
-  if (key === "ArrowDown") return Math.min(currentIndex + 1, optionCount - 1);
-  if (key === "ArrowUp") return Math.max(currentIndex - 1, 0);
-  return null;
-}
+§'§½Æ§‹kz¬‡õ,z»?}©Z’¥kúrz{ÿ²¦²+'·
+âµ¦åy•áÁ½ÉĞ™Õ¹Ñ¥½¸•Ñ½¹Ù•ÉÍ…Ñ¥½¹Q…É•Ñ%¹‘•à (€­•äèÍÑÉ¥¹œ°(€ÕÉÉ•¹Ñ%¹‘•àè¹Õµ‰•È°(€½ÁÑ¥½¹½Õ¹Ğè¹Õµ‰•È°(¤è¹Õµ‰•Èğ¹Õ±°ì(€¥˜€¡½ÁÑ¥½¹½Õ¹Ğ€ôôô€À¤É•ÑÕÉ¸¹Õ±°ì(€½¹ÍĞ‰½Õ¹‘•‘%¹‘•à€ô5…Ñ ¹µ…à À°5…Ñ ¹µ¥¸¡ÕÉÉ•¹Ñ%¹‘•à°½ÁÑ¥½¹½Õ¹Ğ€´€Ä¤¤ì(€¥˜€¡­•ä€ôôô€‰!½µ”ˆ¤É•ÑÕÉ¸€Àì(€¥˜€¡­•ä€ôôô€‰¹ˆ¤É•ÑÕÉ¸½ÁÑ¥½¹½Õ¹Ğ€´€Äì(€¥˜€¡­•ä€ôôô€‰ÉÉ½İ½İ¸ˆ¤É•ÑÕÉ¸5…Ñ ¹µ¥¸¡‰½Õ¹‘•‘%¹‘•à€¬€Ä°½ÁÑ¥½¹½Õ¹Ğ€´€Ä¤ì(€¥˜€¡­•ä€ôôô€‰ÉÉ½İUÀˆ¤É•ÑÕÉ¸5…Ñ ¹µ…à¡‰½Õ¹‘•‘%¹‘•à€´€Ä°€À¤ì(€É•ÑÕÉ¸¹Õ±°ì)ô(
