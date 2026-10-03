@@ -1,6 +1,7 @@
 import { stepCountIs, streamText } from "ai";
 
 import type { WidgetModelProvider } from "@/features/widget/domain";
+import { WIDGET_AGENT_RUN_TIMEOUT_MS } from "@/features/widget/agent-timeouts";
 import { retrieveKnowledgeContext } from "@/features/knowledge/server/retrieval";
 import { createWidgetAgentTools } from "@/features/integrations/server/widget-agent-tools";
 import { getWidgetModel } from "@/lib/ai/providers";
@@ -63,7 +64,10 @@ export async function streamWidgetAgent({
 
   const { convertToModelMessages } = await import("ai");
   const abortController = new AbortController();
-  const timeout = setTimeout(() => abortController.abort(), config.runTimeoutMs ?? 55_000);
+  const timeout = setTimeout(
+    () => abortController.abort(),
+    config.runTimeoutMs ?? WIDGET_AGENT_RUN_TIMEOUT_MS,
+  );
   const completion = createWidgetCompletion();
 
   const result = streamText({

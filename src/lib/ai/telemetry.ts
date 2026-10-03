@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import type { WidgetModelProvider } from "@/features/widget/domain";
+import { WIDGET_AGENT_RUN_TIMEOUT_MS } from "@/features/widget/agent-timeouts";
 import type { Db } from "@/lib/db/client";
 import { agentRun } from "@/lib/db/schema";
 
@@ -37,7 +38,7 @@ export type AgentRunUsage = z.infer<typeof agentUsageSchema>;
 export type AgentRunSourceRef = z.infer<typeof sourceRefSchema>;
 
 export const WIDGET_AGENT_TIMEOUTS = {
-  runTimeoutMs: 55_000,
+  runTimeoutMs: WIDGET_AGENT_RUN_TIMEOUT_MS,
   stepTimeoutMs: 20_000,
   chunkTimeoutMs: 10_000,
   toolTimeoutMs: 15_000,

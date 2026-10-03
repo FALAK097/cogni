@@ -11,6 +11,7 @@ import { useWidgetConfig, useSaveWidgetConfig, usePublishWidgetConfig } from "@/
 import { isValidDomain, sanitizeDomain } from "@/lib/domain-validation";
 import { getWidgetAccentVars, WIDGET_BRAND_COLOR } from "@/lib/widget-accent";
 import { normalizeFontFamily, normalizeFontSize, normalizeLogoUrl } from "@/features/widget/domain";
+import { WIDGET_PREVIEW_RESPONSE_TIMEOUT_MS } from "@/features/widget/agent-timeouts";
 import { BookingSettingsCard } from "@/features/integrations/components/booking-settings-card";
 import { WidgetKnowledgeManager } from "@/components/workspace/widget-knowledge-manager";
 import { cn } from "@/lib/utils";
@@ -64,9 +65,6 @@ const LEGACY_TAB_MAP: Record<string, AgentSection> = {
 const WIDGET_CARD_CLASS = "rounded-xl border border-border";
 
 const WIDGET_SETTINGS_CARD_CLASS = `${WIDGET_CARD_CLASS} overflow-hidden`;
-// The API aborts model runs at 55 seconds; keep the test UI open long enough to receive that result.
-const PREVIEW_RESPONSE_TIMEOUT_MS = 59_000;
-
 async function waitForPreviewWidget(prompt: string): Promise<WidgetPreviewEvidence | null> {
   for (let attempt = 0; attempt < 50; attempt += 1) {
     const sendPreviewMessage = window.Widget?.sendPreviewMessage;
@@ -97,7 +95,7 @@ async function waitForPreviewWidget(prompt: string): Promise<WidgetPreviewEviden
         };
 
         window.addEventListener("cogni:widget-preview-evidence", onEvidence);
-        timeoutId = window.setTimeout(() => finish(null), PREVIEW_RESPONSE_TIMEOUT_MS);
+        timeoutId = window.setTimeout(() => finish(null), WIDGET_PREVIEW_RESPONSE_TIMEOUT_MS);
         void sendPreviewMessage(prompt).then(
           (sent) => {
             sendFinished = true;
