@@ -1290,15 +1290,16 @@ export function DashboardPage({
                 No conversations in this date range
               </h2>
               <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                Try a longer date range, or send a preview message to see how your agent responds.
+                Insights charts appear when visitors start conversations. Try a longer range for
+                recent activity, or review your live installation.
               </p>
             </div>
           </div>
           <Link
-            href="/playground?subtab=test"
+            href="/playground?subtab=deploy"
             className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9 shrink-0 gap-2")}
           >
-            Test your agent
+            Review deployment
             <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-4" />
           </Link>
         </section>
@@ -1412,7 +1413,7 @@ export function DashboardPage({
       </section>
 
       <section
-        hidden={hasInitialError}
+        hidden={hasInitialError || (!isLoading && analytics?.kpis.totalConversations.value === 0)}
         className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 xl:grid-cols-4"
       >
         <DashboardCard className="flex min-h-[320px] flex-1 flex-col p-6 md:col-span-2 xl:col-span-2">
@@ -1470,7 +1471,7 @@ export function DashboardPage({
       </section>
 
       <section
-        hidden={hasInitialError}
+        hidden={hasInitialError || (!isLoading && analytics?.kpis.totalConversations.value === 0)}
         className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-2 xl:grid-cols-4"
       >
         <DashboardCard className="flex h-full flex-col p-6 xl:col-span-2">
