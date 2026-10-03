@@ -253,6 +253,14 @@ export function formatBotMessage(text) {
   return result;
 }
 
+export function getAssistantAnnouncement(agentName, state = "complete") {
+  const name = agentName.trim() || "Assistant";
+  if (state === "typing") return `${name} is typing.`;
+  if (state === "interrupted") return `${name}'s response was interrupted.`;
+  if (state === "error") return `${name} couldn't respond. Please try again.`;
+  return `${name} has replied.`;
+}
+
 function normalizeMessageHref(destination) {
   const value = destination.trim();
   if (!value) return null;

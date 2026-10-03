@@ -44,7 +44,7 @@ globalThis.document = {
   },
 };
 
-const { formatBotMessage } = await import(
+const { formatBotMessage, getAssistantAnnouncement } = await import(
   `data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString("base64")}`
 );
 const feedbackCompiled = await build({
@@ -129,4 +129,17 @@ test("negative feedback reasons expose keyboard and screen-reader semantics", ()
   assert.ok(markup.includes('aria-label="Additional feedback details"'));
   assert.ok(markup.includes(">Skip details</button>"));
   assert.ok(markup.includes(">Submit feedback</button>"));
+});
+
+test("assistant live announcements summarize typing, completion, and interruption", () => {
+  assert.equal(getAssistantAnnouncement("Cogni", "typing"), "Cogni is typing.");
+  assert.equal(getAssistantAnnouncement("Cogni"), "Cogni has replied.");
+  assert.equal(
+    getAssistantAnnouncement("Cogni", "interrupted"),
+    "Cogni's response was interrupted.",
+  );
+  assert.equal(
+    getAssistantAnnouncement(" ", "error"),
+    "Assistant couldn't respond. Please try again.",
+  );
 });

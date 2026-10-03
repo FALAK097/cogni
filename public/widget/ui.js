@@ -41,6 +41,7 @@ import {
   scrollToBottom,
   formatBotMessage,
   getCurrentTime,
+  getAssistantAnnouncement,
   generateUUID,
   renderAvatarMarkup,
   renderBotAvatarMarkup,
@@ -728,6 +729,7 @@ export function addBotMessage(
   isRestored = false,
   messageId = null,
   existingFeedback = null,
+  announce = false,
 ) {
   const msg = document.createElement("div");
   msg.className = "oc-message bot";
@@ -743,6 +745,7 @@ export function addBotMessage(
 			<span class="oc-bot-name">${escapeHtml(state.config.agentName)}</span>
 		</div>
 		<div class="oc-bubble">${formatBotMessage(text)}</div>
+		${announce ? `<span class="oc-screen-reader-only" role="status" aria-live="polite">${escapeHtml(getAssistantAnnouncement(state.config.agentName, "error"))}</span>` : ""}
 		${feedbackHtml}
 		<div class="oc-timestamp">${formatTimestamp(timestamp)}</div>
 	`;
@@ -817,10 +820,12 @@ export function showTypingIndicator() {
 			</div>
 			<span class="oc-bot-name">${escapeHtml(state.config.agentName)}</span>
 		</div>
-		<div class="oc-bubble oc-typing-bubble">
-			<span class="oc-typing-dot"></span>
-			<span class="oc-typing-dot"></span>
-			<span class="oc-typing-dot"></span>
+		<div class="oc-bubble oc-typing-bubble" role="status" aria-live="polite" aria-label="${escapeHtml(getAssistantAnnouncement(state.config.agentName, "typing"))}">
+			<span aria-hidden="true">
+				<span class="oc-typing-dot"></span>
+				<span class="oc-typing-dot"></span>
+				<span class="oc-typing-dot"></span>
+			</span>
 		</div>
 	`;
   state.messagesContainer.appendChild(indicator);
@@ -908,8 +913,8 @@ async function callWidgetChat(userMessage, interactionId) {
 			<div class="oc-bot-header">
 				<div class="oc-bot-avatar">
 					${renderBotAvatarMarkup(state.config.logoUrl)}
-				</div>
-				<span class="oc-bot-name">${escapeHtml(state.config.agentName)}</span>
+			</div>
+			<span class="oc-bot-name">${escapeHtml(state.config.agentName)}</span>
 			</div>
 			<div class="oc-bubble oc-streaming"></div>
 			<div class="oc-timestamp">${getCurrentTime()}</div>
@@ -917,12 +922,18 @@ async function callWidgetChat(userMessage, interactionId) {
     state.messagesContainer.appendChild(msg);
     streamingMessage = msg;
     const bubble = msg.querySelector(".oc-bubble");
+    const liveStatus = document.createElement("span");
+    liveStatus.className = "oc-screen-reader-only oc-message-live-status";
+    liveStatus.setAttribute("role", "status");
+    liveStatus.setAttribute("aria-live", "polite");
+    msg.appendChild(liveStatus);
 
     const fullResponse = await readWidgetTextStream(response.body, (text) => {
       bubble.innerHTML = formatBotMessage(text);
       scrollToBottom();
     });
     responseCompleted = true;
+    liveStatus.textContent = getAssistantAnnouncement(state.config.agentName);
 
     // Remove streaming class when done
     bubble.classList.remove("oc-streaming");
@@ -960,10 +971,24 @@ async function callWidgetChat(userMessage, interactionId) {
   } catch (error) {
     console.error("Widget: chat stream error", error);
     const bubble = streamingMessage?.querySelector(".oc-bubble");
-    if (!bubble?.textContent?.trim()) streamingMessage?.remove();
-    else bubble.classList.remove("oc-streaming");
+    const hasPartialResponse = Boolean(bubble?.textContent?.trim());
+    if (!hasPartialResponse) streamingMessage?.remove();
+    else {
+      bubble.classList.remove("oc-streaming");
+      const liveStatus = streamingMessage?.querySelector(".oc-message-live-status");
+      if (liveStatus) {
+        liveStatus.textContent = getAssistantAnnouncement(state.config.agentName, "interrupted");
+      }
+    }
     removeTypingIndicator();
-    addBotMessage("Sorry, I'm having trouble responding right now. Please try again.");
+    addBotMessage(
+      "Sorry, I'm having trouble responding right now. Please try again.",
+      null,
+      false,
+      null,
+      null,
+      !hasPartialResponse,
+    );
 
     if (state.preview && !responseCompleted) {
       window.dispatchEvent(

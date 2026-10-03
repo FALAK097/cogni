@@ -246,6 +246,8 @@ and local paths; credentialed and unsafe schemes stay inert), wrapping for long 
 accessible feedback names/pressed state/live status, 36px feedback targets, and reduced-motion
 support. The negative-feedback reason panel now has named controls, visible keyboard focus,
 Escape-to-dismiss with focus return, mutually exclusive reason state, and an honest retryable
-failure message when feedback cannot be saved. The full local suite passes 124 tests and the production build passes. The Codex in-app
+failure message when feedback cannot be saved. The public widget announces typing, completed
+responses, interruptions, and request failures without reading every stream chunk aloud. The
+focused widget suite passes six tests and the production build passes. The Codex in-app
 browser did not return a controllable preview tab, so visual acceptance remains unverified and
 issue #40 stays open for the remaining attachment, citation, and manual keyboard/mobile checks.
