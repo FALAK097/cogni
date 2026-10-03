@@ -9,6 +9,7 @@ import {
   flexRender,
   tableFeatures,
   type Header,
+  sortFn_alphanumeric,
   useTable,
   type SortingState,
 } from "@tanstack/react-table";
@@ -68,7 +69,7 @@ import {
   useDeleteKnowledgeBaseSource,
   useImportSitemapSource,
   useKnowledgeBaseSources,
-  useRetryKnowledgeBaseSource,
+  useProcessKnowledgeBaseSource,
   useUploadRagDocument,
 } from "@/hooks/query/use-knowledge-base";
 import { cn } from "@/lib/utils";
@@ -91,6 +92,7 @@ const SORT_VALUES = [
 const knowledgeTableFeatures = tableFeatures({
   rowSortingFeature,
   sortedRowModel: createSortedRowModel(),
+  sortFns: { alphanumeric: sortFn_alphanumeric },
 });
 
 type SortValue = (typeof SORT_VALUES)[number];
@@ -214,7 +216,7 @@ function formatSortValue(state: SortingState): SortValue {
 export function WidgetKnowledgeManager({ canManage }: { canManage: boolean }) {
   const sourcesQuery = useKnowledgeBaseSources("default");
   const deleteMutation = useDeleteKnowledgeBaseSource();
-  const retryMutation = useRetryKnowledgeBaseSource();
+  const processMutation = useProcessKnowledgeBaseSource();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [addDialog, setAddDialog] = useState<AddDialog>(null);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
@@ -249,14 +251,15 @@ export function WidgetKnowledgeManager({ canManage }: { canManage: boolean }) {
     setAddError(message);
   }
 
-  async function handleRetrySource(source: KnowledgeBaseSource) {
+  async function handleProcessSource(source: KnowledgeBaseSource, action: "retry" | "sync") {
     if (!canManage) return;
     setAddError(null);
     try {
-      await retryMutation.mutateAsync(source.id);
+      await processMutation.mutateAsync({ sourceId: source.id, action });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to retry indexing";
-      setAddError(`Couldn’t retry “${source.displayName}”: ${message}`);
+      const actionLabel = action === "sync" ? "sync" : "retry";
+      const message = error instanceof Error ? error.message : `Failed to ${actionLabel} source`;
+      setAddError(`Couldn’t ${actionLabel} “${source.displayName}”: ${message}`);
     }
   }
 
@@ -287,7 +290,8 @@ export function WidgetKnowledgeManager({ canManage }: { canManage: boolean }) {
       {addError ? <ErrorBanner message={addError} onDismiss={() => setAddError(null)} /> : null}
       {!canManage ? (
         <output className="block rounded-lg border border-border/70 bg-muted/30 px-3 py-2.5 text-sm text-muted-foreground">
-          You can review source health. Only workspace owners can add, retry, or delete sources.
+          You can review source health. Only workspace owners can add, sync, retry, or delete
+          sources.
         </output>
       ) : null}
 
@@ -302,8 +306,10 @@ export function WidgetKnowledgeManager({ canManage }: { canManage: boolean }) {
         onAddFirstSource={() => setAddDialog("url")}
         onSortChange={handleSortChange}
         onDeleteSource={setDeleteTarget}
-        retryingSourceId={retryMutation.isPending ? retryMutation.variables : null}
-        onRetrySource={(source) => void handleRetrySource(source)}
+        retryingSourceId={
+          processMutation.isPending ? (processMutation.variables?.sourceId ?? null) : null
+        }
+        onProcessSource={(source, action) => void handleProcessSource(source, action)}
       />
 
       <KnowledgeDialogs
@@ -394,7 +400,7 @@ function KnowledgeSourcesPanel({
   onAddFirstSource,
   onSortChange,
   onDeleteSource,
-  onRetrySource,
+  onProcessSource,
   retryingSourceId,
 }: {
   canManage: boolean;
@@ -407,7 +413,7 @@ function KnowledgeSourcesPanel({
   onAddFirstSource: () => void;
   onSortChange: (updater: SortingState | ((old: SortingState) => SortingState)) => void;
   onDeleteSource: (source: KnowledgeBaseSource) => void;
-  onRetrySource: (source: KnowledgeBaseSource) => void;
+  onProcessSource: (source: KnowledgeBaseSource, action: "retry" | "sync") => void;
   retryingSourceId: string | null;
 }) {
   return (
@@ -424,7 +430,7 @@ function KnowledgeSourcesPanel({
             canManage={canManage}
             sources={sources}
             onDeleteSource={onDeleteSource}
-            onRetrySource={onRetrySource}
+            onProcessSource={onProcessSource}
             retryingSourceId={retryingSourceId}
           />
           <KnowledgeSourcesTable
@@ -433,7 +439,7 @@ function KnowledgeSourcesPanel({
             sorting={sorting}
             onSortChange={onSortChange}
             onDeleteSource={onDeleteSource}
-            onRetrySource={onRetrySource}
+            onProcessSource={onProcessSource}
             retryingSourceId={retryingSourceId}
           />
           <KnowledgeSourcesFooter
@@ -478,13 +484,13 @@ function KnowledgeSourcesMobileList({
   canManage,
   sources,
   onDeleteSource,
-  onRetrySource,
+  onProcessSource,
   retryingSourceId,
 }: {
   canManage: boolean;
   sources: KnowledgeBaseSource[];
   onDeleteSource: (source: KnowledgeBaseSource) => void;
-  onRetrySource: (source: KnowledgeBaseSource) => void;
+  onProcessSource: (source: KnowledgeBaseSource, action: "retry" | "sync") => void;
   retryingSourceId: string | null;
 }) {
   return (
@@ -523,8 +529,8 @@ function KnowledgeSourcesMobileList({
                 <SourceActions
                   source={source}
                   onDeleteSource={onDeleteSource}
-                  onRetrySource={onRetrySource}
-                  isRetrying={retryingSourceId === source.id}
+                  onProcessSource={onProcessSource}
+                  isProcessing={retryingSourceId === source.id}
                 />
               ) : null}
             </div>
@@ -565,7 +571,7 @@ function KnowledgeSourcesTable({
   sorting,
   onSortChange,
   onDeleteSource,
-  onRetrySource,
+  onProcessSource,
   retryingSourceId,
 }: {
   canManage: boolean;
@@ -573,7 +579,7 @@ function KnowledgeSourcesTable({
   sorting: SortingState;
   onSortChange: (updater: SortingState | ((old: SortingState) => SortingState)) => void;
   onDeleteSource: (source: KnowledgeBaseSource) => void;
-  onRetrySource: (source: KnowledgeBaseSource) => void;
+  onProcessSource: (source: KnowledgeBaseSource, action: "retry" | "sync") => void;
   retryingSourceId: string | null;
 }) {
   "use no memo";
@@ -627,8 +633,8 @@ function KnowledgeSourcesTable({
         <SourceActions
           source={row.original}
           onDeleteSource={onDeleteSource}
-          onRetrySource={onRetrySource}
-          isRetrying={retryingSourceId === row.original.id}
+          onProcessSource={onProcessSource}
+          isProcessing={retryingSourceId === row.original.id}
         />
       ),
     });
@@ -768,14 +774,17 @@ function SourceIdentity({ source }: { source: KnowledgeBaseSource }) {
 function SourceActions({
   source,
   onDeleteSource,
-  onRetrySource,
-  isRetrying,
+  onProcessSource,
+  isProcessing,
 }: {
   source: KnowledgeBaseSource;
   onDeleteSource: (source: KnowledgeBaseSource) => void;
-  onRetrySource: (source: KnowledgeBaseSource) => void;
-  isRetrying: boolean;
+  onProcessSource: (source: KnowledgeBaseSource, action: "retry" | "sync") => void;
+  isProcessing: boolean;
 }) {
+  const canSync = source.status === "ready" && ["website", "sitemap"].includes(source.sourceType);
+  const canRetry = source.status === "failed";
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -791,18 +800,18 @@ function SourceActions({
         }
       />
       <DropdownMenuContent align="end" sideOffset={8} className="w-44">
-        {source.status === "failed" ? (
+        {canRetry || canSync ? (
           <DropdownMenuItem
             className="cursor-pointer gap-2"
-            disabled={isRetrying}
-            onClick={() => onRetrySource(source)}
+            disabled={isProcessing}
+            onClick={() => onProcessSource(source, canSync ? "sync" : "retry")}
           >
-            {isRetrying ? (
+            {isProcessing ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <RefreshCw className="h-4 w-4" />
             )}
-            {isRetrying ? "Retrying…" : "Retry indexing"}
+            {isProcessing ? "Starting…" : canSync ? "Sync now" : "Retry indexing"}
           </DropdownMenuItem>
         ) : null}
         <DropdownMenuItem
