@@ -20,6 +20,7 @@ minimumReleaseAgeExclude:
   - "@ai-sdk/openai@4.0.5"
   - "@ai-sdk/provider-utils@5.0.3"
   - ai@7.0.11
+  - esbuild@0.24.3
 
 overrides:
   esbuild@<=0.24.2: 0.25.12
