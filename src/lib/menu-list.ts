@@ -1,4 +1,4 @@
-import { BookOpen, LayoutGrid, MessageCircle, MessageSquare, Plug } from "@/components/icons";
+import { LayoutGrid, MessageCircle, MessageSquare } from "@/components/icons";
 
 export type MenuItem = {
   href: string;
@@ -21,33 +21,21 @@ export function getStaticMenuList(): MenuList {
       groupLabel: "",
       menus: [
         {
-          href: "/dashboard",
-          label: "Dashboard",
-          icon: LayoutGrid,
-          submenus: [],
-        },
-        {
           href: "/conversations",
-          label: "Conversations",
+          label: "Inbox",
           icon: MessageSquare,
           submenus: [],
         },
         {
-          href: "/widget",
-          label: "Widget",
+          href: "/playground",
+          label: "Agent",
           icon: MessageCircle,
           submenus: [],
         },
         {
-          href: "/integrations",
-          label: "Integrations",
-          icon: Plug,
-          submenus: [],
-        },
-        {
-          href: "/knowledge-base",
-          label: "Knowledge Base",
-          icon: BookOpen,
+          href: "/dashboard",
+          label: "Insights",
+          icon: LayoutGrid,
           submenus: [],
         },
       ],

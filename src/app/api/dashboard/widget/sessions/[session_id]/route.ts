@@ -5,10 +5,10 @@ import { and, eq } from "drizzle-orm";
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
 import { getDashboardEngagedVisitorSessionCond } from "@/features/widget/server/widget-data-filters";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
+import { canManageWorkspace } from "@/lib/auth/permissions";
 import {
   conversation as conversationTable,
   contact as contactTable,
-  lead as leadTable,
   visitorSession as visitorSessionTable,
 } from "@/lib/db/schema";
 
@@ -73,9 +73,6 @@ export async function GET(_request: Request, context: RouteContext) {
             },
           },
         },
-      },
-      widgetLeadCaptures: {
-        columns: { leadId: true },
       },
       conversations: {
         where: (fields, { eq, and, like }) =>
@@ -307,7 +304,13 @@ export async function PATCH(request: Request, context: RouteContext) {
 }
 
 export async function DELETE(_request: Request, context: RouteContext) {
-  const { db, workspace } = await requireDashboardContext();
+  const { db, workspace, membership } = await requireDashboardContext();
+  if (!canManageWorkspace(membership.role)) {
+    return NextResponse.json(
+      { error: "Only workspace owners can delete visitor sessions." },
+      { status: 403 },
+    );
+  }
   const { session_id: sessionId } = await context.params;
   const widget = await db.query.widget.findFirst({
     where: (fields, { eq }) => eq(fields.workspaceId, workspace.id),
@@ -324,23 +327,12 @@ export async function DELETE(_request: Request, context: RouteContext) {
         eq(fields.widgetId, widget.id),
         getDashboardEngagedVisitorSessionCond(fields),
       ),
-    with: {
-      widgetLeadCaptures: {
-        columns: { leadId: true },
-      },
-    },
   });
 
   if (!session) {
     return NextResponse.json({ error: "Session not found." }, { status: 404 });
   }
 
-  const leadId = session.widgetLeadCaptures[0]?.leadId;
-  if (leadId) {
-    await db
-      .delete(leadTable)
-      .where(and(eq(leadTable.id, leadId), eq(leadTable.workspaceId, workspace.id)));
-  }
   await db
     .delete(conversationTable)
     .where(
@@ -356,16 +348,12 @@ export async function DELETE(_request: Request, context: RouteContext) {
       where: (fields, { eq }) => eq(fields.contactId, session.contactId!),
       columns: { id: true },
     });
-    const hasLeads = await db.query.lead.findFirst({
-      where: (fields, { eq }) => eq(fields.contactId, session.contactId!),
-      columns: { id: true },
-    });
     const hasSessions = await db.query.visitorSession.findFirst({
       where: (fields, { eq }) => eq(fields.contactId, session.contactId!),
       columns: { id: true },
     });
 
-    if (!hasConvos && !hasLeads && !hasSessions) {
+    if (!hasConvos && !hasSessions) {
       await db.delete(contactTable).where(eq(contactTable.id, session.contactId));
     }
   }

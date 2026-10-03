@@ -15,13 +15,9 @@ import {
 } from "@/features/widget/domain";
 import { ensureWorkspaceWidget } from "@/features/widget/server/widget-service";
 import { requireAuth, requireDashboardContext } from "@/lib/auth/dashboard-context";
+import { canManageWorkspace } from "@/lib/auth/permissions";
 
 export type WidgetActionState = {
-  error?: string;
-  savedAt?: number;
-};
-
-export type WidgetAgentActionState = {
   error?: string;
   savedAt?: number;
 };
@@ -84,7 +80,10 @@ export async function saveWidgetWidgetSettingsAction(
   formData: FormData,
 ): Promise<WidgetActionState> {
   await requireAuth();
-  const { db, workspace } = await requireDashboardContext();
+  const { db, workspace, membership } = await requireDashboardContext();
+  if (!canManageWorkspace(membership.role)) {
+    return { error: "Only workspace owners can change agent settings." };
+  }
 
   const parsed = widgetWidgetSettingsSchema.safeParse({
     displayName: formData.get("displayName"),
@@ -169,7 +168,7 @@ export async function saveWidgetWidgetSettingsAction(
     })
     .where(eq(widgetTable.id, widget.id));
 
-  revalidatePath("/dashboard/widget");
+  revalidatePath("/playground");
   return { savedAt: Date.now() };
 }
 
@@ -179,40 +178,4 @@ export async function saveWidgetSettingsAction(
 ): Promise<WidgetActionState> {
   await requireAuth();
   return saveWidgetWidgetSettingsAction(previousState, formData);
-}
-
-const widgetAgentSettingsSchema = z.object({
-  instructions: z.string().trim().min(1).max(4_000),
-  escalationKeywords: z.string().trim().min(1).max(500),
-});
-
-export async function saveWidgetAgentSettingsAction(
-  _previousState: WidgetAgentActionState,
-  formData: FormData,
-): Promise<WidgetAgentActionState> {
-  await requireAuth();
-  const { db, workspace } = await requireDashboardContext();
-
-  const parsed = widgetAgentSettingsSchema.safeParse({
-    instructions: formData.get("instructions"),
-    escalationKeywords: formData.get("escalationKeywords"),
-  });
-
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Check the agent settings." };
-  }
-  const widget = await ensureWorkspaceWidget(db, workspace.id);
-
-  await db
-    .update(widgetTable)
-    .set({
-      instructions: parsed.data.instructions,
-      escalationKeywords: parsed.data.escalationKeywords,
-      updatedAt: new Date().toISOString(),
-    })
-    .where(eq(widgetTable.id, widget.id));
-
-  revalidatePath("/dashboard/agent");
-  revalidatePath("/dashboard/widget");
-  return { savedAt: Date.now() };
 }

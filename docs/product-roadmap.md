@@ -1,595 +1,256 @@
-# widget Product Roadmap
-
-Last updated: 2026-07-02
-
-## North Star
-
-Build widget into an AI-first customer support and product feedback suite for SaaS teams:
-
-- Intercom-style helpdesk: shared inbox, AI agent, tickets, SLAs, customer profiles, automations, reporting.
-- Chatbase/Cossistant-style AI agent builder: knowledge ingestion, actions, guardrails, playground, deployment channels, analytics.
-- Chatwoot-style open support suite: multi-channel inbox, teams, labels, macros, APIs, webhooks.
-- Productlane-style product ops: feedback capture, feature requests, votes, roadmap, changelog.
-
-The first sellable product should not try to equal every competitor at once. It should ship a tight wedge:
-
-1. Embedded AI widget answers from knowledge.
-2. Human team takes over in shared inbox.
-3. Leads/customers/tickets stay tracked.
-4. Knowledge gaps and bad answers become improvement tasks.
-5. Integrations/actions turn conversations into outcomes.
-
-## Source Findings
-
-### Current Codebase Snapshot
-
-Implemented today:
-
-- Next.js 16 App Router, React 19, TypeScript, Tailwind v4, shadcn/base-ui components.
-- Better Auth with Google OAuth, workspace provisioning, members, invites, workspace switching.
-- Dashboard shell: sidebar, topbar, workspace switcher, theme support, session guard.
-- Marketing site: landing, pricing, integrations, testimonials, FAQ, footer, legal, contact.
-- Embedded widget runtime in `public/widget.js` and modular files under `public/widget/`.
-- Widget settings: branding, colors, typography, dimensions, position, suggestions, preview messages, lead capture, brochure prompt, model provider/name, instructions, escalation keywords, domains.
-- Public widget APIs: config, session/bootstrap, identify, history, message/chat, feedback, upload, documents, lead capture.
-- Conversation persistence using JSON message arrays per project invariant.
-- Visitor sessions with browser/session identity, metadata, location fields, contact links.
-- Attachments linked to conversation.
-- Dashboard conversation list/detail with polling, filters, assignment, reply, internal notes, read state.
-- Contact notes and previous conversation context in conversation detail.
-- AI widget agent using Vercel AI SDK `streamText`, retrieved knowledge, memory context hook, citations, token capture.
-- Knowledge manager with manual text, URL, sitemap, upload, table sorting, deletion, chunk counts, statuses.
-- Knowledge extraction/chunking/retrieval, Cloudflare AI Search integration, local fallbacks.
-- R2 upload storage with local fallback.
-- Dashboard analytics: conversations, users, resolved, response time, satisfaction, engagement, sources, status, top questions, time series.
-- Integrations catalog for Gmail, Google Calendar, Slack with placeholder connection/actions.
-- Domain events, notifications, local workflow run records, integration action records.
-- Cloudflare Workers deployment config with D1, R2, AI Search, OpenNext, observability.
-- CI checks lint, typecheck, format on PR. React Doctor runs on PR and main.
-
-Major gaps:
-
-- No first-class tickets, priorities, SLAs, due dates, queue views, macros, saved views, labels, or business hours.
-- No realtime inbox transport. Dashboard relies on TanStack Query polling.
-- No Durable Objects, Queues, Workflows, or Email Sending bindings yet.
-- No true email/Slack/WhatsApp/Teams channels, only widget channel plus placeholder integrations.
-- No Composio connection model, tool auth, tool approvals, action run UI, or retry/approval workflow.
-- No agent copilot for human support reps.
-- No AI SDK 7 migration, `ToolLoopAgent`, tool context, runtime context, approvals, `WorkflowAgent`, timeouts, telemetry callbacks, or performance stats.
-- No Streamdown markdown rendering.
-- No AI QA/eval layer: answer scoring, grounding checks, hallucination detection, sentiment/topics, deflection metrics, low-quality alerts.
-- Knowledge has static ingestion but lacks scheduled sync, connector sources, versioning, Q&A pairs, source health, incremental reindex.
-- Customer model is contact-only. Missing companies/accounts, custom attributes, events, segments, timeline, lead score, enrichment.
-- Lead schema exists but no lead dashboard/pipeline/routing/scoring UI.
-- No proactive campaigns: banners, targeted messages, tours, checklists, sequences.
-- No feedback/roadmap/changelog module.
-- No billing, usage counters, plan gates, or upgrade flows.
-- No developer API keys, webhooks, or public API docs.
-- No dedicated automated test suite is planned for this roadmap pass. Verification will rely on format, lint, typecheck, build, and manual smoke checks unless a future issue explicitly adds tests.
-
-## Correct AI SDK 7 Direction
-
-Previous version of this document incorrectly said official docs showed v6 as latest. That was based on `ai-sdk.dev/docs` navigation still showing v6 on 2026-07-02. Vercel's AI SDK 7 announcement was published on 2026-06-25 and explicitly says AI SDK 7 is available.
-
-Product implications:
-
-- Upgrade package target from `ai@6.x` to `ai@7.x`.
-- Run codemod during implementation: `npx @ai-sdk/codemod v7`.
-- Use AI SDK 7 reasoning controls for model policy by task type:
-  - low reasoning: greeting, simple FAQ, rewrite, summarization.
-  - medium reasoning: support troubleshooting, KB synthesis, lead qualification.
-  - high reasoning: multi-step account actions, complex ticket triage, workflow planning.
-- Use typed tool context for Composio and internal tools so tool secrets/config are scoped per tool, not exposed globally.
-- Use runtime context for workspace, conversation, contact, plan, approval policy, locale, channel, and current agent mode.
-- Use tool approvals for side effects: email send, CRM update, calendar booking, ticket mutation, Slack/WhatsApp send, refund/coupon/admin actions.
-- Use HMAC-signed approval continuation for high-risk actions.
-- Use `WorkflowAgent` or equivalent AI SDK 7 workflow support for long-running runs that wait for approvals or survive deploys.
-- Use timeout controls for total run, step, chunk, and tool budgets.
-- Capture lifecycle events and performance statistics for billing, debugging, QA, and customer-facing reliability metrics.
-- Consider provider file uploads for large attachments and uploaded docs where provider-native file reference improves repeated inference.
-- Consider MCP Apps later for rich tool configuration/approval UIs, not M0.
-- Voice/video generation are future optional channels, not part of MVP.
-
-## Product Shape
-
-### Primary Users
-
-- Founder/operator: wants AI support installed fast, fewer repetitive questions, lead capture, simple analytics.
-- Support teammate: wants a clean inbox, context, assignment, macros, AI drafts, tickets, customer history.
-- Product teammate: wants feedback linked to customers, votes, roadmap, changelog.
-- Developer/admin: wants integration setup, domains, API keys, webhooks, deployment reliability.
-
-### Core Objects
-
-Already present:
-
-- `workspace`, `workspace_member`, `workspace_invite`
-- `user`, `session`, `account`, `verification`
-- `widget`
-- `visitor_session`
-- `contact`, `contact_note`
-- `conversation` with JSON `messages`
-- `attachment`
-- `document`, `document_chunk`
-- `lead`, `widget_lead_capture`
-- `integration`, `integration_action`
-- `notification`, `domain_event`, `workflow_run`
-
-Needed soon:
-
-- `ticket`: title, number, status, priority, type, source, assignee, due date, SLA timestamps, workspace, contact, conversation.
-- `conversation_label` or JSON labels if kept simple.
-- `macro`: saved replies/actions scoped by workspace/team.
-- `customer_event`: tracked app/page/action events.
-- `company`: account/org profile for contacts.
-- `segment`: saved audience filters.
-- `knowledge_source_sync`: runs, hashes, health, scheduling, stats.
-- `agent_run`: AI SDK 7 run metadata, lifecycle, usage, performance, status.
-- `agent_tool_call`: tool input/result/approval/audit.
-- `approval_request`: human approval state for side-effecting actions.
-- `channel_connection`: Chat SDK/Composio/email channel credentials/config state.
-- `email_message`: provider IDs, headers, threading metadata.
-- `feedback_item`, `feedback_vote`, `roadmap_item`, `changelog_entry`.
-- `campaign`, `campaign_audience`, `campaign_event`.
-- `api_key`, `webhook_endpoint`, `webhook_delivery`.
-- `usage_meter`, `billing_plan`, `plan_limit`.
-
-Keep project invariants:
-
-- `Conversation.messages` remains JSON array. Do not create `Message` table unless invariant changes.
-- `Widget.authorizedDomains` remains JSON string array.
-- `Attachment` links directly to `Conversation`.
-- Every query stays workspace-scoped and membership-checked.
-
-## Technical Operating Model
-
-### Next.js App
-
-- Route handlers for public widget, dashboard API, webhooks, and channel callbacks.
-- Server actions only where existing UI patterns expect them; dashboard data should mostly use typed route handlers with TanStack Query.
-- Shared domain logic in `src/features/*/server` modules.
-- Zod schemas at API boundaries and form boundaries.
-- No in-memory state for production-critical behavior.
-
-### Client State
-
-- TanStack Query: dashboard reads/writes, cache invalidation, polling fallback.
-- TanStack Table: all heavy tables: conversations, tickets, leads, KB sources, integrations, feedback, analytics exports, logs.
-- TanStack Form: all non-trivial dashboard forms going forward.
-- Zustand: local panel/UI state only, not server truth.
-
-### Cloudflare
-
-- D1: product DB and audit records.
-- R2: uploads, attachments, transcripts, exports, large crawl artifacts.
-- AI Search: retrieval index.
-- Queues:
-  - `ingestion-jobs`: URL/file/sitemap/source sync.
-  - `ai-eval-jobs`: QA scoring, topic/sentiment extraction.
-  - `notification-jobs`: Slack/email/in-app notification fanout.
-  - `webhook-deliveries`: webhook retries.
-  - `action-jobs`: side-effecting integration actions.
-- Workflows:
-  - source crawl and sync workflow.
-  - approved AI action workflow.
-  - post-conversation processing workflow.
-  - campaign delivery workflow.
-- Durable Objects:
-  - per-conversation realtime room.
-  - typing/read/presence state.
-  - AI stream coordination.
-  - ordering/dedupe guard for concurrent widget/dashboard sends.
-- Email Sending:
-  - outbound support replies.
-  - invite/notification/digest emails.
-  - roadmap/changelog notifications.
-
-### AI Runtime
-
-- AI SDK 7 is target runtime.
-- `streamWidgetAgent` evolves into agent layer:
-  - shared agent config.
-  - typed runtime context.
-  - tool registry.
-  - approval policy.
-  - per-channel response adapters.
-  - lifecycle telemetry.
-  - timeouts and cost guards.
-- Streamdown renders AI markdown in widget/dashboard.
-- Agent eval jobs score all important conversations.
-- Agent run data powers cost, latency, deflection, quality, and audit views.
-
-### Integrations
-
-- Composio handles external connectors/actions where supported.
-- Chat SDK handles chat platform adapters where relevant.
-- Internal action registry remains for first-party operations: assign conversation, create ticket, add note, create lead, update contact, create feedback, send email.
-- Every side-effecting action must have:
-  - Zod input schema.
-  - workspace-scoped context.
-  - idempotency key.
-  - approval policy.
-  - audit row.
-  - retry/dead-letter strategy if async.
-
-## Build Order
-
-### Phase M0 - Foundation Hardening
-
-Goal: create rails so teammates/agents can build safely without breaking architecture.
-
-Order:
-
-1. AI SDK 7 migration and agent telemetry.
-2. Streamdown migration for AI markdown.
-3. TanStack Form migration pattern.
-4. Cloudflare platform bindings: Queues, Workflows, Durable Objects, Email Sending.
-5. Queue-backed async ingestion and retries.
-6. Cloudflare Workflows for durable source sync.
-
-Why first:
-
-- AI SDK 7 changes affect agent/tool design, so do before Composio/copilot.
-- Cloudflare bindings define how realtime, ingestion, email, actions, evals work.
-- Verification stays lightweight for now: format, lint, typecheck, build, and manual smoke checks.
-
-### Phase M1 - Core Support Suite
-
-Goal: make product usable by support team daily.
-
-Order:
-
-1. Realtime conversation rooms with Durable Objects.
-2. Chat UI component polish pass.
-3. Ticket lifecycle MVP.
-4. Customer intelligence profiles.
-5. Cloudflare Email Sending channel.
-6. Reporting builder and saved analytics views.
-
-Why:
-
-- Realtime + polished chat improves current core UX.
-- Tickets/customer profiles turn conversations into tracked support work.
-- Email expands beyond widget.
-
-### Phase M2 - AI Agent Platform
-
-Goal: AI becomes controllable, auditable, actionable.
-
-Order:
-
-1. Agent inbox copilot.
-2. Composio tool connections and action approvals.
-3. Integration marketplace with connection health.
-4. AI evaluation and QA scoring.
-5. Unanswered questions optimization center.
-
-Why:
-
-- Copilot gives immediate value without autonomous risk.
-- Tool approvals enable safe actions.
-- Eval/optimization turns support data into product quality loop.
-
-### Phase M3 - Knowledge + Omnichannel
-
-Goal: more sources and channels without losing reliability.
-
-Order:
-
-1. Knowledge source health and scheduled sync.
-2. Chat SDK adapter foundation.
-3. Developer API keys and webhooks.
-4. Lead qualification dashboard.
-
-Why:
-
-- Better knowledge improves AI answer quality.
-- Channel adapters should reuse mature conversation/ticket/customer systems.
-- API/webhooks support customer integrations.
-
-### Phase M4 - Growth + Product Ops
-
-Goal: convert support into activation, feedback, roadmap.
-
-Order:
-
-1. Feedback portal and roadmap MVP.
-2. Changelog publishing.
-3. Proactive outbound campaigns MVP.
-4. Billing, usage limits, and plan gates.
-
-Why:
-
-- Feedback/roadmap differentiates from plain chatbots.
-- Campaigns need segments/events from customer intelligence.
-- Billing should gate usage once product value paths exist.
-
-### Phase M5 - Enterprise Later
-
-Not immediate:
-
-- Advanced roles/permissions.
-- SSO/SAML unless Google-only rule changes.
-- Data residency.
-- Retention policies.
-- Audit export.
-- SOC2 evidence automation.
-- Voice/video support.
-- MCP App UIs.
-
-## Prioritized Issue Plan
-
-| Order | Issue                                                | Phase | Priority | Size | Estimate | Status  | Depends on |
-| ----- | ---------------------------------------------------- | ----- | -------- | ---- | -------- | ------- | ---------- |
-| 1     | #44 AI SDK 7 migration and agent telemetry           | M0    | P0       | L    | 8        | Ready   | none       |
-| 2     | #42 Streamdown migration for AI markdown             | M0    | P0       | M    | 5        | Ready   | none       |
-| 3     | #41 TanStack Form migration pattern                  | M0    | P1       | M    | 5        | Ready   | none       |
-| 4     | #24 Queue-backed async ingestion and retries         | M0    | P0       | L    | 8        | Ready   | none       |
-| 5     | #25 Cloudflare Workflows for durable source sync     | M0    | P0       | L    | 8        | Ready   | #24        |
-| 6     | #20 Realtime conversation rooms with Durable Objects | M1    | P0       | XL   | 13       | Backlog | none       |
-| 7     | #40 Chat UI component polish pass                    | M1    | P1       | M    | 5        | Backlog | #42        |
-| 8     | #21 Ticket lifecycle MVP                             | M1    | P0       | L    | 8        | Backlog | none       |
-| 9     | #29 Customer intelligence profiles                   | M1    | P0       | L    | 8        | Backlog | #21        |
-| 10    | #26 Cloudflare Email Sending channel                 | M1    | P1       | L    | 8        | Backlog | #21        |
-| 11    | #36 Reporting builder and saved analytics views      | M1    | P2       | M    | 5        | Backlog | #21        |
-| 12    | #22 Agent inbox copilot                              | M2    | P0       | L    | 8        | Backlog | #44        |
-| 13    | #23 Composio tool connections and action approvals   | M2    | P0       | XL   | 13       | Backlog | #44        |
-| 14    | #37 Integration marketplace with connection health   | M2    | P1       | M    | 5        | Backlog | #23        |
-| 15    | #31 AI evaluation and QA scoring                     | M2    | P0       | L    | 8        | Backlog | #44        |
-| 16    | #32 Unanswered questions optimization center         | M2    | P1       | M    | 5        | Backlog | #31        |
-| 17    | #28 Knowledge source health and scheduled sync       | M3    | P1       | L    | 8        | Backlog | #25        |
-| 18    | #27 Chat SDK adapter foundation                      | M3    | P1       | XL   | 13       | Backlog | #21, #23   |
-| 19    | #39 Developer API keys and webhooks                  | M3    | P1       | L    | 8        | Backlog | #24        |
-| 20    | #30 Lead qualification dashboard                     | M3    | P1       | M    | 5        | Backlog | #29        |
-| 21    | #34 Feedback portal and roadmap MVP                  | M4    | P1       | XL   | 13       | Backlog | #29        |
-| 22    | #35 Changelog publishing                             | M4    | P2       | M    | 5        | Backlog | #34        |
-| 23    | #33 Proactive outbound campaigns MVP                 | M4    | P2       | XL   | 13       | Backlog | #29, #39   |
-| 24    | #38 Billing, usage limits, and plan gates            | M4    | P1       | L    | 8        | Backlog | #44        |
-
-Closed/superseded:
-
-- #1 -> #30 and #29.
-- #2 -> #44 and #22.
-- #3 -> #40 and #42.
-- #4 -> #23, #22, and #27.
-- #5 -> #20, #40, and #33.
-- #6 -> #30 and #26.
-- #7 -> #27 and a future WhatsApp adapter slice.
-- #8 -> #21.
-- #9 -> #24, #25, and #28.
-- #43 closed because automated test-writing is out of scope for this roadmap pass.
-
-## Feature Detail
-
-### 1. AI Widget + Agent Builder
-
-MVP:
-
-- Current widget settings continue.
-- Add agent playground with sample conversation, selected sources, model, reasoning mode, and output preview.
-- Add AI SDK 7 runtime context:
-  - `workspaceId`
-  - `widgetId`
-  - `conversationId`
-  - `contactId`
-  - `channel`
-  - `plan`
-  - `locale`
-  - `approvalPolicy`
-- Store `agent_run` rows with model, provider, reasoning, tokens, latency, timeouts, finish reason, error, tool count.
-- Support per-agent instructions, tone, escalation rules, tool enablement, source filters.
-
-Later:
-
-- Multiple agents per workspace.
-- A/B model evaluation.
-- Voice agent.
-- MCP App UI.
-
-### 2. Shared Inbox
-
-MVP:
-
-- Realtime room per conversation.
-- Assignment, status, labels, internal notes, public replies.
-- Saved views: Mine, Unassigned, Open, Snoozed, Waiting, Closed.
-- Macros with text and optional actions.
-- Read state and typing indicators.
-- Customer side receives human replies in widget/email.
-
-Later:
-
-- Collision detection, agent presence, workload balancing.
-- Team routing and business hours.
-
-### 3. Ticketing
-
-MVP:
-
-- Ticket created from conversation or manually from contact.
-- Status: open, pending, waiting_on_customer, resolved, closed.
-- Priority: low, normal, high, urgent.
-- Type: question, bug, task, feature_request, billing, incident.
-- SLA target timestamps: first response, next response, resolution.
-- Linked conversation, contact, assignee.
-
-Later:
-
-- Custom fields.
-- Forms.
-- Customer portal ticket tracking.
-- Incident grouping.
-
-### 4. Knowledge
-
-MVP:
-
-- Existing manual URL/file/sitemap stays.
-- Move ingestion to queue.
-- Add source health:
-  - last sync
-  - next sync
-  - interval
-  - content hash
-  - chunk count
-  - error
-  - retrieval coverage
-- Add re-sync button and scheduled sync.
-- Add Q&A source type.
-- Add unanswered questions -> source gap flow.
-
-Later:
-
-- Notion, Google Drive, GitHub, Help Center, API docs connectors.
-- ACL-aware retrieval.
-- Version diff.
-
-### 5. Integrations + Actions
-
-MVP:
-
-- Composio connection for first external app.
-- Internal tools:
-  - create ticket
-  - assign conversation
-  - add internal note
-  - create/update lead
-  - update contact
-  - send email
-- External tools:
-  - Gmail/send email or Cloudflare Email send path.
-  - Google Calendar/create meeting.
-  - Slack notify.
-- AI SDK 7 tool approvals for side effects.
-- Action run details: input, approval, status, result, error, retry.
-
-Later:
-
-- CRM sync, Stripe lookup, Linear/Jira issue creation, WhatsApp follow-up.
-
-### 6. Omnichannel
-
-MVP:
-
-- Email channel using Cloudflare Email Sending.
-- Chat SDK adapter boundary for future Slack/Teams/WhatsApp.
-- Single conversation service normalizes inbound events.
-
-Later:
-
-- WhatsApp lead follow-up.
-- Slack/Teams agent.
-- Social DMs.
-
-### 7. Customer Intelligence + Leads
-
-MVP:
-
-- Contact profile with tags, custom fields, notes, sessions, conversations, tickets, leads.
-- Lead list/table with status, score, owner, source, last activity.
-- Qualification rules from conversation and form data.
-- Notifications on high-score lead.
-
-Later:
-
-- Companies/accounts.
-- Segments.
-- Revenue/account impact.
-- Enrichment.
-
-### 8. AI QA + Optimization
-
-MVP:
-
-- Post-conversation queue job scores:
-  - helpfulness
-  - source grounding
-  - escalation appropriateness
-  - sentiment
-  - topic
-  - deflection
-- Bad feedback and low confidence become improvement tasks.
-- Dashboard shows unanswered questions and suggested KB fixes.
-
-Later:
-
-- Custom QA rubrics.
-- Agent coaching.
-- Automated experiments.
-
-### 9. Feedback + Roadmap + Changelog
-
-MVP:
-
-- Convert conversation message into feedback item.
-- Public portal with planned/in-progress/shipped.
-- Voting with identity guardrails.
-- Changelog entries linked to roadmap items.
-
-Later:
-
-- Revenue-weighted prioritization.
-- Customer notifications.
-- Private roadmap boards.
-
-### 10. Billing + Usage
-
-MVP:
-
-- Counters:
-  - messages
-  - AI tokens
-  - seats
-  - sources
-  - storage
-  - sync runs
-  - tool actions
-- Server-side plan gates before expensive work.
-- Dashboard usage page.
-
-Later:
-
-- Stripe subscription, invoices, trial, metered billing.
-
-## Agent Instructions For Future Work
-
-Every issue should be implemented as a vertical slice:
-
-- Schema/migration if needed.
-- Server/domain logic.
-- Route handler/API.
-- Dashboard/widget UI.
-- Query hooks/cache invalidation.
-- Verification: format, lint, typecheck, build, and manual smoke checks.
-- Docs or comments only where useful.
-
-Rules:
-
-- Keep DB queries workspace-scoped.
-- Use Zod at input boundaries.
-- No `any`.
-- No production-critical in-memory state.
-- Keep `Conversation.messages` JSON invariant.
-- Use existing `src/features/*` ownership boundaries.
-- Use TanStack Query/Table/Form patterns.
-- For Cloudflare jobs/actions, use idempotency keys.
-- For side-effecting AI tools, require approval until policy explicitly says safe.
-- Log domain events for support-relevant mutations.
-- Add project issue references in PR description.
-
-## References
-
-- Intercom: https://www.intercom.com/
-- Chatbase: https://www.chatbase.co/
-- Chatwoot: https://www.chatwoot.com/
-- Cossistant: https://cossistant.com/
-- Productlane: https://productlane.com/
-- AI SDK 7 announcement: https://vercel.com/blog/ai-sdk-7
-- Vercel AI SDK docs: https://ai-sdk.dev/docs
-- Chat SDK: https://chat-sdk.dev/
-- Streamdown: https://streamdown.ai/
-- Cloudflare Queues: https://developers.cloudflare.com/queues/
-- Cloudflare Workflows: https://developers.cloudflare.com/workflows/
-- Cloudflare Durable Objects: https://developers.cloudflare.com/durable-objects/
-- Cloudflare Email Sending Workers API: https://developers.cloudflare.com/email-service/api/send-emails/workers-api/
-- Composio: https://composio.dev/
+# Cogni product roadmap
+
+Updated: 2026-10-01. Target: **AI agent + shared support inbox**, confirmed by the owner.
+
+This replaces the July architecture/status snapshot. Implementation evidence is the local branch
+`agent/omnichannel-agent-platform` and [PR #48](https://github.com/FALAK097/cogni/pull/48). Code
+present is not evidence that provider setup, deployed behavior, concurrency safety, or customer
+acceptance is complete.
+
+## Product promise
+
+A business imports its knowledge, tests an AI support agent, installs a branded widget, and
+handles exceptions in a shared inbox. Every unsuccessful answer becomes a specific knowledge,
+policy, or integration improvement. One customer record and conversation history span AI and
+human support.
+
+Start with small SaaS support teams. The first sellable release must complete this journey:
+
+1. Sign in with Google and select a workspace.
+2. Import sources and understand whether each is ready or needs intervention.
+3. Configure instructions and handoff; test answers with visible source evidence.
+4. Authorize a website and install the loader.
+5. A visitor asks a question, receives a grounded answer, or requests a human.
+6. A teammate takes over, replies, and closes the conversation without competing AI replies.
+7. Review feedback, cost, unresolved questions, and the next source improvement.
+
+Use competitor interaction patterns and information architecture with Cogni's components and
+branding. Pixel parity with private competitor dashboards has not been established. Screenshots
+of public product illustrations are references, not executable proof of a complete application.
+
+## Reference evidence
+
+Inspected public pages and navigation on 2026-09-29:
+
+| Reference                                                          | What informs Cogni                                                                  | Evidence boundary                                                                         |
+| ------------------------------------------------------------------ | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| [Chatbase](https://www.chatbase.co/)                               | Build, test, deploy, optimize lifecycle; clear agent setup and product navigation   | Homepage browser screenshot and expanded Product menu                                     |
+| [Chatbase helpdesk](https://www.chatbase.co/features/helpdesk)     | Separate live handoff from async tickets; statuses, assignment, notes, custom views | Public feature page, narrow-width screenshot; private dashboard not accessed              |
+| [Chatbase procedures](https://www.chatbase.co/features/procedures) | Explicit multi-step business procedures with actions                                | Public feature description, not a workflow execution test                                 |
+| [Intercom inbox](https://www.intercom.com/helpdesk/inbox)          | Team inbox, configurable panes, keyboard navigation, human copilot                  | Public feature page and homepage product illustrations                                    |
+| [Fin](https://fin.ai/)                                             | Agent testing and continuous improvement, contextual actions, channel coverage      | Public capabilities/navigation; proprietary model performance is not a Cogni target claim |
+| [Chatwoot](https://github.com/chatwoot/chatwoot)                   | Support operations: notes, labels, teams, saved views, macros, routing, reports     | Repository README and dashboard route directory inspected via GitHub API                  |
+| [Chatwoot feature index](https://www.chatwoot.com/features)        | Breadth checklist for channels, productivity, customer data, reporting              | Public feature index; not a live signed-in workspace test                                 |
+
+Competitor numbers, testimonials, customer logos, and compliance claims must not become Cogni
+claims. Marketing should describe verified capability. Measure outcomes before publishing rates.
+
+## Current implementation and parity gaps
+
+| Area                         | Current evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Gap to a dependable product                                                                                                                                                                                                                                                                                                                               | Phase / existing issues                         |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| Auth / workspace             | Better Auth Google, membership, invitations, active workspace context                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Role capability matrix, two-tenant denial tests, local OAuth port setup                                                                                                                                                                                                                                                                                   | P0                                              |
+| Agent builder                | `/playground`, widget configuration and live preview, model/instructions/escalation                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Draft/publish versions, knowledge/source evidence, reusable test cases, deployment checklist                                                                                                                                                                                                                                                              | P1 / #40                                        |
+| Knowledge                    | Files, URLs, sitemap, pasted text; durable ingestion records, Cloudflare queue transport, and shared SSRF-aware HTTP(S) fetching                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Source health/resync, scheduled sync, Q&A, version rollback                                                                                                                                                                                                                                                                                               | P0 crawler fix in PR #48; then P2 / #24 #25 #28 |
+| Widget                       | Loader, origins, session tokens, messages, uploads, feedback, handoff; shared PostgreSQL IP, workspace, and visitor rate limits with fail-closed handling                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Signed customer identity, plan-aware spend budgets, reconnect/delivery guarantees, accessibility                                                                                                                                                                                                                                                          | P0–P1 / #40                                     |
+| Inbox                        | Assignment, public replies, internal notes, unread views, time-zone-aware snoozing, explicit unread/snoozed counts, message author/time metadata and clearly marked internal notes, AI-reply state and assignee in the list/detail, one-action human takeover that pauses AI and interrupts active generation, resume/pause controls, contact context, copilot, workspace-scoped visitor attachment links in Details, workspace-scoped atomic transcript appends, database cursor pagination and unread-count aggregates, shared saved views, conversation labels with list filtering and saved-view persistence, editable workspace-shared saved replies in the existing composer, and expandable evidence excerpts on AI reply sources | First-message creation is serialized per visitor session; append, feedback, labels, saved replies and read-state writes preserve concurrent updates. Shared views, labels, replies, and source retrieval are workspace scoped. Citation evidence is bounded and stored with the transcript; durable live updates and full mobile detail acceptance remain | P0–P2 / #20 #22 #40                             |
+| Channels                     | Chat SDK adapter code and provider-scoped webhook route; Composio actions                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Per-tenant provider credentials/account binding, verified inbound/outbound round trips, delivery states                                                                                                                                                                                                                                                   | P0 then P3 / #27                                |
+| Actions / booking            | Typed registry, approval token/expiry, action audit/idempotency, workflow steps; uncertain non-idempotent provider outcomes are stored as `UNKNOWN` and never replayed automatically                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Provider-specific reconciliation before retry, operator resolution with an audit trail, reservations/corrections and independent confirmation retries                                                                                                                                                                                                     | P0 then P2 / #23 #45 #46                        |
+| Contacts / leads             | Contact notes, identity links, lead capture, conversation context; contact tags are visible and manually editable from the Inbox Details card, with workspace-scoped serialized writes shared with AI tagging                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Searchable customer drawer, attribute schema, verified identity and segmentation                                                                                                                                                                                                                                                                          | P2 / #29 #30                                    |
+| Tickets / support operations | Conversation status; no dedicated ticket route                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Tickets, priority, snooze, SLAs, business hours, team/capacity routing, collision detection                                                                                                                                                                                                                                                               | P2 / #21                                        |
+| QA / optimization            | Feedback, citations/context, AI telemetry and copilot audit; owners can turn negative feedback into a manually verified Q&A source, keeping the old AI answer as context only                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Eval datasets, groundedness checks, unanswered-question triage, ignored/resolved gap tracking and trend reporting                                                                                                                                                                                                                                         | P1–P2 / #31 #32                                 |
+| Reporting                    | Dashboard analytics                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Metric definitions, denominator clarity, operational reports, filters, exports, saved reports                                                                                                                                                                                                                                                             | P2 / #36                                        |
+| Monetization / platform      | Plan-limit helpers and events                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Durable usage ledgers, enforced budgets, billing, API keys/webhooks, signed deliveries                                                                                                                                                                                                                                                                    | P1 budgets; P3 platform / #38 #39               |
+| Self-service / proactive     | No public help-center publishing flow                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Help center, custom domain, article lifecycle; later campaigns/tours                                                                                                                                                                                                                                                                                      | P3–P4 / #33                                     |
+| Product feedback             | No complete portal                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Feedback-to-roadmap and changelog                                                                                                                                                                                                                                                                                                                         | P4 / #34 #35                                    |
+
+Open issue numbers were read from GitHub. PR #48 proposes closing #24, #25, #27, but closure must
+follow their acceptance criteria; queue transport is not scheduled source sync, and an adapter is
+not a verified channel. Do not duplicate existing issues or equate PR prose with shipped behavior.
+
+## Architecture constraints
+
+Keep Next.js 16 on Vercel; PostgreSQL locally, Neon Postgres in production. Use pooled app
+connections and unpooled migration connections. R2 stores files, Cloudflare AI Search handles
+retrieval, and the deployed ingestion queue calls the authenticated Next.js worker endpoint.
+This is not a D1 application and does not need a second application runtime.
+
+Preserve AGENTS.md invariants:
+
+- `workspace_member` is the membership boundary. Membership first; scope all resource queries.
+- `widget.authorizedDomains` stays a JSON string array.
+- `conversation.messages` stays the JSON array string; do not introduce a Message table.
+- Attachments link to conversations directly.
+- Google remains the only login method. Enterprise organization controls must work within that
+  boundary; SAML login requires a separate explicit architecture decision.
+- No production-critical state in instance memory. Database/client connection caching is not
+  authoritative business state.
+- Schema changes go through `src/lib/db/schema.ts`, named Drizzle SQL generation and migrations.
+  Generate/check locally, apply locally, then apply to Neon only as an authorized release step.
+
+### Correctness before transport
+
+All transcript writers must share an atomic, tenant-scoped append/update path. A transaction at
+read-committed isolation does not by itself protect read/modify/write JSON arrays. Use row locks,
+atomic JSONB expressions cast back to text, or a consistent compare-and-swap revision with retry.
+Client message and external event deduplication must happen inside the same transaction. Protect
+first-conversation creation as well as updates. Preserve order and never discard a teammate note.
+
+Publish durable outbox events after committed changes. Choose one managed realtime transport
+compatible with Vercel after a latency/cost spike. Keep bounded polling as a reconnect fallback;
+do not hold a permanent Node process in a serverless request or label a no-op broadcast realtime.
+A future Durable Object may coordinate live presence, but Postgres remains the durable transcript.
+
+External side effects have at-least-once delivery and uncertain outcomes. An idempotent local
+record does not make a provider call exactly once. Pass provider-supported idempotency keys;
+otherwise reconcile using provider IDs/request references before retry. Separate calendar creation
+from confirmation delivery. A crash after sending must not automatically send again.
+
+## Security release blockers from source inspection
+
+These are evidence-backed risks, not a penetration test or a formal security certification.
+
+| Priority      | Location                                                                                       | Evidence / impact                                                                                                                                                                                                                                                                                                                                               | Required acceptance                                                                                                                                                                                                                                                                                                         |
+| ------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P0            | `src/lib/rate-limit/shared.ts`; chat/upload/identify/contact consumers                         | Shared PostgreSQL UPSERT counters now enforce HMAC-keyed IP, workspace, and visitor limits; expired buckets are pruned by the authenticated daily cron. Local PostgreSQL tests cover concurrency, reset, cleanup, and database outage.                                                                                                                          | Await CI and preview deployment; verify production proxy IP headers and tune per-workspace limits using observed demand                                                                                                                                                                                                     |
+| P0            | `src/features/knowledge/server/crawl.ts`; `extract.ts`                                         | Previously, host-string checks did not resolve DNS, redirects were followed, and direct URL extraction used global fetch. A shared guarded fetch is implemented in PR #48; focused tests pass locally.                                                                                                                                                          | Await CI and external-host runtime acceptance; retain HTTP(S)-only, DNS pinning, redirect revalidation, private/reserved IPv4/IPv6 denial, and time/byte/page limits                                                                                                                                                        |
+| P0            | `conversation-service.ts`; `queries.ts`; `omnichannel.ts`; `tool-executor.ts`                  | Common transcript appends use workspace-scoped atomic JSONB updates with client/reply dedupe. First-conversation creation locks the visitor-session row; AI feedback and read-state updates are atomic and tenant scoped. PostgreSQL tests cover concurrent appends during feedback/read updates, duplicate webhooks, AI takeover and foreign-workspace denial. | Verify channel takeover against live provider round trips; extend denial coverage to remaining mutation paths and keep one record for duplicate events                                                                                                                                                                      |
+| P0            | `src/features/integrations/server/chat-sdk.ts`; `omnichannel.ts`                               | Channel AI now checks pause/status before generation, before transcript append, and immediately before outbound send; provider round trips and takeover races still need runtime acceptance.                                                                                                                                                                    | Prove no AI post after human takeover across each connected channel and verify consistent handoff behavior                                                                                                                                                                                                                  |
+| P0            | `src/features/integrations/server/tool-executor.ts`; `action-recovery.ts`                      | Non-idempotent external failures and timeouts are stored as `UNKNOWN`; retry decisions block uncertain outcomes and allow retry only for idempotent or confirmed-not-sent actions. Pure recovery-state tests pass.                                                                                                                                              | Add provider-specific reconciliation before retry and prove no duplicate calendar event/message/email under timeout or crash                                                                                                                                                                                                |
+| P0 policy gap | Dashboard integration/action/workflow mutation routes                                          | Owner-only guards now protect connection management, approval, workflow creation/advancement, destructive actions, publish and actions that bypass approval. Tests deny member publish, integration create/disconnect, workflow create/advance, eval-case creation, and knowledge-source upload/add/retry/delete; upload denial precedes multipart parsing.     | Extend route-level denial tests across remaining privileged mutations and foreign workspace resources; keep member conversation work available                                                                                                                                                                              |
+| P1            | `src/app/api/dashboard/conversations/route.ts`; `src/features/conversations/server/queries.ts` | Previously loaded all workspace transcripts before slicing                                                                                                                                                                                                                                                                                                      | **Implemented in PR #48:** workspace-scoped keyset cursor query, unread-count aggregates, bounded pages, and validated filter/search/cursor inputs; local PostgreSQL integration tests cover stable ordering and workspace scope                                                                                            |
+| P0            | `src/features/knowledge/server/retrieval.ts`; `src/lib/search/cloudflare-search.ts`            | Previously used untyped database fallbacks and supplied the newest chunks when search found no evidence.                                                                                                                                                                                                                                                        | **Implemented in PR #48:** typed workspace/status-scoped retrieval, Cloudflare's documented 0.4 match threshold, bounded exact-phrase fallback only, and no evidence when neither path matches. Local PostgreSQL tests cover relevance misses, explicit empty selections, ready status and cross-workspace search metadata. |
+
+Additional threat-model work: signed visitor identity (an email claim is not account verification),
+attachment access/expiry and malware policy, prompt injection from retrieved files, secret/log
+redaction, webhook signature/replay windows, resource ownership after membership removal,
+CSRF/origin enforcement for dashboard mutations, deletion/export/retention, backup restore.
+Never let model instructions override authorization, recipient allowlists, approval policy, or cost
+budgets. No refund/account change based only on an unauthenticated visitor's stated email.
+
+## Delivery phases and acceptance gates
+
+Estimates are planning ranges for one experienced full-time engineer, excluding provider approval,
+compliance audits and enterprise procurement. They are not completion promises. Every phase
+ships complete flows, not navigation placeholders. Re-estimate after P0 and real usage.
+
+| Phase                                | Indicative effort                         | Deliverables                                                                                                                  | Exit gate                                                                                                                                                                 |
+| ------------------------------------ | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P0: reliable foundation              | 2–4 engineering weeks                     | Security blockers, atomic messages, shared budgets, role gates, auth setup, honest copy, critical regression harness          | Two-workspace denial matrix; concurrent-send/duplicate-event tests; crawler SSRF tests; AI pause and action timeout tests; widget-to-human browser round trip             |
+| P1: sellable support loop            | 3–5 weeks after P0                        | Setup checklist, agent Build/Test/Deploy tabs, tested widget, fast inbox, clear ownership/delivery states, basic evals/usage  | New workspace installs agent without developer help; ready source cited; no-evidence escalates; teammate takes over; feedback links to improvement; measured cost/latency |
+| P2: team support parity              | 5–8 weeks after P1                        | Saved views and labels, macros, snooze, tickets/priorities, business hours/SLAs, teams/routing, contact UI, sync/QA/reporting | Multi-agent support team handles a working day without spreadsheet workarounds; SLA timers correct across time zones; reports reconcile to transcripts and audit data     |
+| P3: channels and commercial platform | 6–10 weeks after P2, per-channel rollouts | Email first, then priority customer channels; help center; billing; API keys and signed webhooks; provider-health screens     | Each channel has inbound/reply/retry/handoff acceptance; signature and tenant-binding tests; billing reconciles; revoke key stops access                                  |
+| P4: broader suite                    | Separate investment                       | Campaigns/tours, advanced procedures, multilingual evaluation, voice, account segmentation, feedback/changelog                | Per-feature outcomes and customer demand justify launch; no parity claim from merely adding pages                                                                         |
+
+P0–P3 total is roughly 16–27 engineering weeks before external lead times; much can change after
+actual acceptance testing. Matching every mature competitor feature, ecosystem, compliance
+program and proprietary AI quality is an ongoing product program, not a single PR.
+
+### First ten implementation slices
+
+1. Safe crawler/extractor network boundary with redirect, DNS rebinding and byte-limit tests.
+2. Shared public-endpoint rate limiter and durable usage budgets before model/storage calls.
+3. Shared atomic transcript writes and dedupe, including session/bootstrap races.
+4. Server role permissions for manage-integrations, publish-agent, approve-actions, export/delete.
+5. Channel human takeover and AI pause guards; preserve reply ownership and delivery states.
+6. **Partially implemented in PR #48:** uncertain provider outcomes are stored as `UNKNOWN` and are never automatically replayed; idempotent retries remain safe. Add provider-specific reconciliation and actionable confirmation recovery.
+7. **Implemented in PR #48:** DB cursor inbox query and count aggregates; existing honest presence and connectivity UI. Local unit and PostgreSQL integration tests pass.
+8. **Partially implemented in PR #48:** workspace-shared filter views, conversation labels and editable saved replies inserted into the existing composer. Finish mobile detail acceptance and durable live updates.
+9. **Implemented in PR #48:** Agent draft/publish lifecycle with immutable, workspace-scoped versions,
+   owner-only publishing, published runtime snapshots, immediate domain/enable safety controls,
+   author/timestamp history and rollback-as-new-version. Repeatable grounded-answer/no-answer/handoff
+   cases are also available in Test; production model-quality evaluation remains a later gate.
+10. **Partially implemented in PR #48:** Insights groups unanswered questions, completed AI answers with no source match, and negative feedback; owners can create verified Q&A sources and track gap review state. Open unanswered questions appear after 24 hours without a public reply; closed conversations appear immediately. Add calibrated evaluation and quality trends; issue #32 remains open.
+
+Each slice includes domain/API/query/UI changes, permission checks, failure recovery, focused
+behavioral tests where risk warrants them, `pnpm lint`, `pnpm typecheck`, formatting and build,
+and browser acceptance. The previous roadmap's blanket exclusion of automated tests is removed:
+manual smoke checks cannot establish tenant isolation, race safety or idempotent side effects.
+
+## Navigation and screen contract
+
+See [product-design.md](./product-design.md) for dimensions, visual system and interaction states.
+
+The owner explicitly prefers fewer pages and low complexity. Launch with **three primary
+destinations: Inbox, Agent and Insights**, plus Settings at the bottom. Feature parity is a
+capability goal, not a requirement to copy competitors' navigation or create a page per feature.
+
+| Destination            | Main task                                   | Where related capabilities live                                                                                                                                                                    |
+| ---------------------- | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Inbox `/conversations` | Triage, reply, handoff, close               | Saved views and ticket queues in the list; contact history, attributes and linked tickets in the Details panel; approvals attached to their conversation                                           |
+| Agent `/playground`    | Build → Test → Deploy → Improve             | Knowledge and instructions in Build; repeatable evaluations in Test; widget/channels in Deploy; unanswered questions in Improve; actions configured alongside agent behavior                       |
+| Insights `/dashboard`  | Understand support quality, volume and cost | Existing overview and reports share one screen with filters and detail drill-downs; ranges, comparisons and daily buckets use the workspace timezone; setup checklist appears here until completed |
+| Settings               | Manage the workspace                        | Teammates/roles, connected business tools, business hours, usage/billing, developer and privacy grouped within one settings surface                                                                |
+
+Keep channels (message delivery) and business-tool connections (agent actions) clearly named
+inside these surfaces, without making them separate sidebar destinations. Help-center publishing
+belongs under Agent deployment; the public help center is a customer-facing destination.
+Campaigns, voice and other P4 capabilities stay out of the default navigation until customer
+demand establishes a coherent place for them.
+
+Existing Knowledge and Integrations routes remain functional during consolidation; preserve
+deep links when moving their content. The initial sidebar consolidation is implemented:
+Inbox, Agent and Insights, plus Settings (currently connections). Agent section navigation
+links configuration/testing and knowledge. The complete contextual feature contract above
+still requires the corresponding implementation phases. Do not show links to empty future routes.
+Selecting a workspace clears incompatible caches/selection and scopes every page.
+
+Add a new top-level destination only when an existing surface cannot support a recurring,
+distinct customer task. Prefer contextual drawers, detail views and a few named tabs; do not
+hide essential work behind nested menus. Validate the setup → test → inbox journey with a
+first-time user before expanding the shell.
+
+## Definition of readiness
+
+- Customer journey is complete with no fake controls, fabricated stats or unbacked certification.
+- Google-only auth and two-tenant authorization checks pass at every exposed boundary.
+- Visitor-to-AI-to-human flow works in browser; internal notes never appear to visitors.
+- Keyboard, screen-reader names, 320px, 200% zoom, long content and reduced motion pass.
+- Rendered text contrast meets its threshold in both themes; measurements stored in QA evidence.
+- Reconnect, duplicate delivery, provider outage, deploy interruption and unknown outcome recover.
+- A benchmark dataset measures answer grounding, fallback/handoff, latency and cost; product
+  resolution is not inferred simply from conversation closure or lack of a human reply.
+- Logs omit secrets/transcript PII, support has runbooks and alerts, restore is exercised.
+- Code present, locally validated, pushed, CI passed, deployed and accepted are separate states.
+
+## Status of this assessment
+
+The roadmap was rechecked on 2026-10-02. Live check and preview status belongs to PR #48 because
+each pushed head starts a new run. The current pass improves the responsive Insights charts,
+labels closed conversations accurately, and gives Inbox empty views a clear next step. Local
+`pnpm check`, `pnpm build`, and React Doctor (100/100) passed. Browser acceptance and remote
+checks remain separate gates. Provider setup remains a release dependency described in the PR.
+
+This pass updates the roadmap/design/evidence docs and begins public-flow/inbox UX corrections.
+Synthetic local testing exposed blank preview completion. Widget SSE framing, empty/aborted
+response recovery and five stream regression tests are now corrected locally; CI includes the
+stream tests. Knowledge ingestion reached READY for the named QA-only fixture. See
+[the assessment](product-assessment.md) for the exact validation boundary.
+Full competitor parity is not implemented. Authenticated browser acceptance and paid provider
+round trips must be recorded separately when actually completed.
+
+The latest PR #48 slice adds workspace-scoped, time-zone-aware inbox snoozing, unsnoozes on visitor
+replies and assignment, and replaces the cramped seven-tab strip with a compact view selector whose
+counts say `unread` or `snoozed`. The current head also raises mobile navigation controls to 44px.
+Local formatting, lint, typecheck, production build, snooze schedule tests and six PostgreSQL inbox
+tests pass. CI and the Vercel preview for each new head must be checked on the PR; authenticated
+browser acceptance remains outstanding.
+
+Transcript polish now shows each message author and local send time, visibly labels internal notes,
+and gives notes a distinct neutral surface. New teammate replies preserve the sender name in the
+transcript JSON; the PostgreSQL append suite verifies this metadata alongside concurrency and
+workspace-isolation behavior. The dashboard-only detail response now supplies note authors and
+merges internal notes into the transcript in chronological order, while public messages remain a
+separate filtered payload. Focused tests verify timeline ordering and stable same-time ordering;
+rendered note placement remains unverified because the local Inbox currently has no conversations.
+
+On 2026-10-03, the embedded widget chat gained safe Markdown link handling (only HTTP(S), mailto,
+and local paths; credentialed and unsafe schemes stay inert), wrapping for long text and code,
+accessible feedback names/pressed state/live status, 36px feedback targets, and reduced-motion
+support. The negative-feedback reason panel now has named controls, visible keyboard focus,
+Escape-to-dismiss with focus return, mutually exclusive reason state, and an honest retryable
+failure message when feedback cannot be saved. The public widget announces typing, completed
+responses, interruptions, and request failures without reading every stream chunk aloud. The
+focused widget suite passes six tests and the production build passes. The Codex in-app
+browser did not return a controllable preview tab, so visual acceptance remains unverified and
+issue #40 stays open for the remaining attachment, citation, and manual keyboard/mobile checks.

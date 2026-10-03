@@ -28,6 +28,20 @@ export function escapeHtml(text) {
   return div.innerHTML;
 }
 
+/** Accept only absolute HTTP(S) document URLs without embedded credentials. */
+export function getSafeDocumentHref(value) {
+  if (typeof value !== "string") return null;
+
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    if (url.username || url.password) return null;
+    return url.href;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Get current time formatted as HH:MM in IST
  */
@@ -176,10 +190,11 @@ export function formatBotMessage(text) {
   let formatted = normalized.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
 
   // Handle markdown links
-  formatted = formatted.replace(
-    /\[([^\]]+)\]\(([^)]+)\)/g,
-    '<a href="$2" target="_blank" rel="noopener noreferrer" class="oc-link">$1</a>',
-  );
+  formatted = formatted.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, label, destination) => {
+    const safeDestination = normalizeMessageHref(destination);
+    if (!safeDestination) return label;
+    return `<a href="${safeDestination}" target="_blank" rel="noopener noreferrer" class="oc-link">${label}</a>`;
+  });
 
   // Handle plain URLs
   formatted = formatted.replace(
@@ -250,6 +265,43 @@ export function formatBotMessage(text) {
     .join("");
 
   return result;
+}
+
+export function getAssistantAnnouncement(agentName, state = "complete") {
+  const name = agentName.trim() || "Assistant";
+  if (state === "typing") return `${name} is typing.`;
+  if (state === "interrupted") return `${name}'s response was interrupted.`;
+  if (state === "error") return `${name} couldn't respond. Please try again.`;
+  return `${name} has replied.`;
+}
+
+function normalizeMessageHref(destination) {
+  const value = destination.trim();
+  if (!value) return null;
+  for (const character of value) {
+    const code = character.charCodeAt(0);
+    if (code <= 31 || code === 127) return null;
+  }
+
+  try {
+    const baseOrigin = "https://cogni-widget.invalid";
+    const parsed = new URL(value, baseOrigin);
+    if (
+      !["http:", "https:", "mailto:"].includes(parsed.protocol) ||
+      parsed.username.length > 0 ||
+      parsed.password.length > 0
+    ) {
+      return null;
+    }
+    if (parsed.origin === baseOrigin) {
+      if (value.startsWith("#")) return parsed.hash;
+      if (value.startsWith("?")) return parsed.search;
+      return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    }
+    return parsed.href;
+  } catch {
+    return null;
+  }
 }
 
 /**

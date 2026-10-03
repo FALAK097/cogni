@@ -6,12 +6,14 @@ export const queryKeys = {
   workspaces: {
     all: ["workspaces"] as const,
     list: () => [...queryKeys.workspaces.all, "list"] as const,
+    members: (workspaceId: string) =>
+      [...queryKeys.workspaces.all, workspaceId, "members"] as const,
   },
   analytics: {
     all: ["analytics"] as const,
     widget: () => [...queryKeys.analytics.all, "widget"] as const,
-    dashboard: (startDate?: string, endDate?: string) =>
-      [...queryKeys.analytics.all, "dashboard", startDate, endDate] as const,
+    dashboard: (workspaceId: string, startDate?: string, endDate?: string) =>
+      [...queryKeys.analytics.all, "dashboard", workspaceId, startDate, endDate] as const,
   },
   documents: {
     all: ["documents"] as const,
@@ -19,14 +21,6 @@ export const queryKeys = {
   },
   knowledgeBase: {
     all: ["knowledge-base"] as const,
-    list: (workspaceId: string) => [...queryKeys.knowledgeBase.all, "list", workspaceId] as const,
-    detail: (workspaceId: string, knowledgeBaseId?: string | null) =>
-      [
-        ...queryKeys.knowledgeBase.all,
-        "detail",
-        workspaceId,
-        knowledgeBaseId ?? "default",
-      ] as const,
     sources: (workspaceId: string, knowledgeBaseId?: string | null) =>
       [
         ...queryKeys.knowledgeBase.all,
@@ -37,6 +31,8 @@ export const queryKeys = {
   },
   widget: {
     all: ["widget"] as const,
+    agentTests: (workspaceId: string) =>
+      [...queryKeys.widget.all, "agent-tests", workspaceId] as const,
     sessions: () => [...queryKeys.widget.all, "sessions"] as const,
     session: (id: string) => [...queryKeys.widget.all, "session", id] as const,
     config: (workspaceId: string) => [...queryKeys.widget.all, "config", workspaceId] as const,
@@ -47,10 +43,18 @@ export const queryKeys = {
     workspace: (workspaceId: string) =>
       [...queryKeys.integrations.all, "workspace", workspaceId] as const,
     detail: (slug: string) => [...queryKeys.integrations.all, "detail", slug] as const,
+    approvals: () => [...queryKeys.integrations.all, "approvals"] as const,
+    bookingSettings: () => [...queryKeys.integrations.all, "booking-settings"] as const,
   },
   conversations: {
     all: ["conversations"] as const,
-    list: () => [...queryKeys.conversations.all, "list"] as const,
-    detail: (id: string) => [...queryKeys.conversations.all, "detail", id] as const,
+    list: (workspaceId?: string) =>
+      [...queryKeys.conversations.all, "list", workspaceId ?? "all-workspaces"] as const,
+    detail: (workspaceId: string, id: string) =>
+      [...queryKeys.conversations.all, "detail", workspaceId, id] as const,
+    savedViews: (workspaceId: string) =>
+      [...queryKeys.conversations.all, "saved-views", workspaceId] as const,
+    macros: (workspaceId: string) =>
+      [...queryKeys.conversations.all, "macros", workspaceId] as const,
   },
 } as const;

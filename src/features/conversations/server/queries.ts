@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, isNull, like, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, like, lt, lte, ne, or, sql } from "drizzle-orm";
 
 import { getDb } from "@/lib/db/client";
 import {
@@ -15,10 +15,21 @@ import {
   type widget,
   type workspaceMember,
 } from "@/lib/db/schema";
-import type { MessageJson } from "./conversation-service";
+import {
+  appendConversationMessage,
+  markVisitorMessagesAsRead,
+  type MessageJson,
+} from "./conversation-service";
+import { encodeInboxCursor, type InboxChannel, type InboxCursor } from "../inbox-pagination";
+import { broadcastConversationEvent } from "@/lib/realtime/broadcast";
+import { parseConversationLabels } from "@/features/conversations/server/labels";
 
-function getWidgetConversationBaseCond(c: typeof conversationTable) {
-  return and(eq(c.channel, "WIDGET"), like(c.messages, '%"authorType":"VISITOR"%'));
+function getInboxConversationBaseCond(c: typeof conversationTable) {
+  return sql`EXISTS (
+    SELECT 1
+    FROM jsonb_array_elements(COALESCE(NULLIF(${c.messages}, '')::jsonb, '[]'::jsonb)) AS message(item)
+    WHERE message.item ->> 'authorType' = 'VISITOR'
+  )`;
 }
 
 function conversationFilterCond(
@@ -26,19 +37,26 @@ function conversationFilterCond(
   filter: string | undefined,
   membershipId: string | undefined,
 ) {
-  const base = getWidgetConversationBaseCond(c);
+  const base = getInboxConversationBaseCond(c);
+  const notSnoozed = or(isNull(c.snoozedUntil), lte(c.snoozedUntil, sql`CURRENT_TIMESTAMP`));
 
   switch (filter) {
+    case "unread":
+      return and(base, notSnoozed, hasUnreadVisitorMessagesSql(c));
     case "unassigned":
-      return and(base, isNull(c.assignedMemberId), ne(c.status, "CLOSED"));
+      return and(base, notSnoozed, isNull(c.assignedMemberId), ne(c.status, "CLOSED"));
     case "mine":
-      return membershipId ? and(base, eq(c.assignedMemberId, membershipId)) : sql`1 = 0`;
+      return membershipId
+        ? and(base, notSnoozed, eq(c.assignedMemberId, membershipId), ne(c.status, "CLOSED"))
+        : sql`1 = 0`;
     case "open":
-      return and(base, eq(c.status, "OPEN"));
+      return and(base, notSnoozed, ne(c.status, "CLOSED"));
     case "closed":
-      return and(base, eq(c.status, "CLOSED"));
+      return and(base, notSnoozed, eq(c.status, "CLOSED"));
+    case "snoozed":
+      return and(base, gt(c.snoozedUntil, sql`CURRENT_TIMESTAMP`), ne(c.status, "CLOSED"));
     default:
-      return base;
+      return and(base, notSnoozed);
   }
 }
 
@@ -48,9 +66,25 @@ function conversationWhereCond(
   query?: string,
   filter?: string,
   membershipId?: string,
+  channel?: InboxChannel,
+  assignee?: string,
+  label?: string,
 ) {
   const normalizedQuery = query?.trim();
   const conds = [eq(c.workspaceId, workspaceId), conversationFilterCond(c, filter, membershipId)];
+
+  if (channel) conds.push(eq(c.channel, channel));
+  if (assignee === "unassigned") conds.push(isNull(c.assignedMemberId));
+  else if (assignee) conds.push(eq(c.assignedMemberId, assignee));
+
+  if (label) {
+    conds.push(
+      sql`exists (
+        select 1 from jsonb_array_elements_text(${c.labels}::jsonb) as label(value)
+        where lower(label.value) = ${label.toLowerCase()}
+      )`,
+    );
+  }
 
   if (normalizedQuery) {
     const pattern = `%${normalizedQuery}%`;
@@ -144,92 +178,44 @@ function hasUnreadVisitorMessagesSql(c: typeof conversationTable) {
   )`;
 }
 
-function computeUnreadTabCounts(
-  conversations: Array<{
-    assignedMemberId: string | null;
-    status: string;
-    hasUnread: boolean;
-  }>,
-  membershipId?: string,
+export async function markConversationAsRead(
+  workspaceId: string,
+  conversationId: string,
+  throughMessageId: string,
 ) {
-  const withUnread = conversations.map((conversation) => ({
-    assignedMemberId: conversation.assignedMemberId,
-    status: conversation.status,
-    hasUnread: conversation.hasUnread,
-  }));
-
-  return {
-    all: withUnread.filter((conversation) => conversation.hasUnread).length,
-    unassigned: withUnread.filter(
-      (conversation) =>
-        conversation.hasUnread &&
-        !conversation.assignedMemberId &&
-        conversation.status !== "CLOSED",
-    ).length,
-    mine: membershipId
-      ? withUnread.filter(
-          (conversation) =>
-            conversation.hasUnread && conversation.assignedMemberId === membershipId,
-        ).length
-      : 0,
-    open: withUnread.filter(
-      (conversation) => conversation.hasUnread && conversation.status === "OPEN",
-    ).length,
-    closed: withUnread.filter(
-      (conversation) => conversation.hasUnread && conversation.status === "CLOSED",
-    ).length,
-  };
-}
-
-export async function markConversationAsRead(workspaceId: string, conversationId: string) {
   const db = getDb();
   const now = new Date().toISOString();
+  const updated = await markVisitorMessagesAsRead({
+    db,
+    workspaceId,
+    conversationId,
+    throughMessageId,
+    readAt: now,
+  });
 
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const conversation = await db.query.conversation.findFirst({
-      where: (fields, { eq, and }) =>
-        and(eq(fields.id, conversationId), eq(fields.workspaceId, workspaceId)),
-      columns: { messages: true, updatedAt: true },
+  if (updated) {
+    await broadcastConversationEvent({
+      type: "read",
+      conversationId,
+      actor: "TEAM",
     });
-
-    if (!conversation) return false;
-
-    const messages = parseMessages(conversation.messages);
-    let changed = false;
-    const updatedMessages = messages.map((message) => {
-      if (message.authorType === "VISITOR" && !message.readAt) {
-        changed = true;
-        return { ...message, readAt: now };
-      }
-      return message;
-    });
-
-    if (!changed) return true;
-
-    const result = await db
-      .update(conversationTable)
-      .set({
-        messages: JSON.stringify(updatedMessages),
-        updatedAt: now,
-      })
-      .where(
-        and(
-          eq(conversationTable.id, conversationId),
-          eq(conversationTable.updatedAt, conversation.updatedAt),
-        ),
-      )
-      .returning({ id: conversationTable.id });
-
-    if (result.length > 0) return true;
+    return true;
   }
 
-  return false;
+  return Boolean(
+    await db.query.conversation.findFirst({
+      where: (fields, { eq, and }) =>
+        and(eq(fields.id, conversationId), eq(fields.workspaceId, workspaceId)),
+      columns: { id: true },
+    }),
+  );
 }
 
 export async function appendTeamConversationMessage(
   workspaceId: string,
   conversationId: string,
-  message: Pick<MessageJson, "body" | "authorType" | "visibility">,
+  message: Pick<MessageJson, "body" | "authorType" | "visibility"> &
+    Partial<Pick<MessageJson, "authorName">>,
   options: { updateLastMessageAt: boolean },
 ): Promise<boolean> {
   const db = getDb();
@@ -238,41 +224,39 @@ export async function appendTeamConversationMessage(
     id: randomUUID(),
     body: message.body,
     authorType: message.authorType,
+    ...(message.authorName ? { authorName: message.authorName } : {}),
     visibility: message.visibility,
     createdAt: nowIso,
   };
 
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const conversation = await db.query.conversation.findFirst({
-      where: (fields, { eq, and }) =>
-        and(eq(fields.id, conversationId), eq(fields.workspaceId, workspaceId)),
-      columns: { messages: true, updatedAt: true },
-    });
+  const appended = await appendConversationMessage({
+    db,
+    workspaceId,
+    conversationId,
+    message: newMessage,
+    updateLastMessageAt: options.updateLastMessageAt,
+  });
+  if (!appended) return false;
 
-    if (!conversation) return false;
+  await broadcastConversationEvent({
+    type: "message",
+    conversationId,
+    messageId: appended.message.id,
+  });
+  return appended.inserted;
+}
 
-    const messagesList = parseMessages(conversation.messages);
-    const updatedMessages = [...messagesList, newMessage];
-
-    const result = await db
-      .update(conversationTable)
-      .set({
-        messages: JSON.stringify(updatedMessages),
-        updatedAt: nowIso,
-        ...(options.updateLastMessageAt ? { lastMessageAt: nowIso } : {}),
-      })
-      .where(
-        and(
-          eq(conversationTable.id, conversationId),
-          eq(conversationTable.updatedAt, conversation.updatedAt),
-        ),
-      )
-      .returning({ id: conversationTable.id });
-
-    if (result.length > 0) return true;
-  }
-
-  return false;
+export async function broadcastConversationChanged(
+  conversationId: string,
+  status: string,
+  assignedMemberId: string | null,
+) {
+  await broadcastConversationEvent({
+    type: "state",
+    conversationId,
+    status,
+    assignedMemberId,
+  });
 }
 
 function getLastPublicMessage(messages: MessageJson[]) {
@@ -282,38 +266,89 @@ function getLastPublicMessage(messages: MessageJson[]) {
   return publicMessages[publicMessages.length - 1] ?? null;
 }
 
-export async function getInboxSummary(
+export async function getInboxPage(
   workspaceId: string,
-  query?: string,
-  filter?: string,
-  membershipId?: string,
+  options: {
+    query?: string;
+    filter?: string;
+    membershipId: string;
+    channel?: InboxChannel;
+    assignee?: string;
+    label?: string;
+    limit: number;
+    cursor: InboxCursor | null;
+  },
 ) {
   const db = getDb();
+  const unread = hasUnreadVisitorMessagesSql(conversationTable);
+  const notSnoozed = or(
+    isNull(conversationTable.snoozedUntil),
+    lte(conversationTable.snoozedUntil, sql`CURRENT_TIMESTAMP`),
+  );
+  const baseWhere = and(
+    eq(conversationTable.workspaceId, workspaceId),
+    getInboxConversationBaseCond(conversationTable),
+  );
+  const cursorWhere = options.cursor
+    ? or(
+        lt(conversationTable.lastMessageAt, options.cursor.lastMessageAt),
+        and(
+          eq(conversationTable.lastMessageAt, options.cursor.lastMessageAt),
+          lt(conversationTable.id, options.cursor.id),
+        ),
+      )
+    : undefined;
 
-  const [countConversations, rawConversations] = await Promise.all([
+  const [countRows, fetchedConversations] = await Promise.all([
     db
       .select({
-        assignedMemberId: conversationTable.assignedMemberId,
-        status: conversationTable.status,
-        hasUnread: hasUnreadVisitorMessagesSql(conversationTable).mapWith(Boolean),
+        total: sql<number>`count(*)`.mapWith(Number),
+        all: sql<number>`count(*) filter (where ${unread} and ${notSnoozed})`.mapWith(Number),
+        unassigned: sql<number>`count(*) filter (
+          where ${unread}
+            and ${notSnoozed}
+            and ${conversationTable.assignedMemberId} is null
+            and ${conversationTable.status} <> 'CLOSED'
+        )`.mapWith(Number),
+        mine: options.membershipId
+          ? sql<number>`count(*) filter (
+              where ${unread}
+                and ${notSnoozed}
+                and ${conversationTable.assignedMemberId} = ${options.membershipId}
+                and ${conversationTable.status} <> 'CLOSED'
+            )`.mapWith(Number)
+          : sql<number>`0`.mapWith(Number),
+        open: sql<number>`count(*) filter (
+          where ${unread} and ${notSnoozed} and ${conversationTable.status} <> 'CLOSED'
+        )`.mapWith(Number),
+        closed: sql<number>`count(*) filter (
+          where ${unread} and ${notSnoozed} and ${conversationTable.status} = 'CLOSED'
+        )`.mapWith(Number),
+        snoozed: sql<number>`count(*) filter (
+          where ${getInboxConversationBaseCond(conversationTable)}
+            and ${conversationTable.snoozedUntil} > CURRENT_TIMESTAMP
+            and ${conversationTable.status} <> 'CLOSED'
+        )`.mapWith(Number),
       })
       .from(conversationTable)
-      .where(
-        and(
-          eq(conversationTable.workspaceId, workspaceId),
-          getWidgetConversationBaseCond(conversationTable),
-        ),
-      ),
+      .where(baseWhere),
     db.query.conversation.findMany({
       where: (fields) =>
-        conversationWhereCond(
-          fields as typeof conversationTable,
-          workspaceId,
-          query,
-          filter,
-          membershipId,
+        and(
+          conversationWhereCond(
+            fields as typeof conversationTable,
+            workspaceId,
+            options.query,
+            options.filter,
+            options.membershipId,
+            options.channel,
+            options.assignee,
+            options.label,
+          ),
+          cursorWhere,
         ),
-      orderBy: (fields, { desc }) => [desc(fields.lastMessageAt)],
+      orderBy: [desc(conversationTable.lastMessageAt), desc(conversationTable.id)],
+      limit: options.limit + 1,
       with: {
         contact: true,
         workspaceMember: {
@@ -324,16 +359,38 @@ export async function getInboxSummary(
     }),
   ]);
 
+  const hasMore = fetchedConversations.length > options.limit;
+  const rawConversations = hasMore
+    ? fetchedConversations.slice(0, options.limit)
+    : fetchedConversations;
   const conversations = rawConversations.map((conversation) =>
     mapConversationRow({
       ...conversation,
       contact: { ...conversation.contact, contactNotes: undefined },
     }),
   );
+  const lastConversation = rawConversations.at(-1);
+  const nextCursor =
+    hasMore && lastConversation
+      ? encodeInboxCursor({
+          lastMessageAt: new Date(lastConversation.lastMessageAt).toISOString(),
+          id: lastConversation.id,
+        })
+      : null;
+  const countRow = countRows[0] ?? {
+    total: 0,
+    all: 0,
+    unassigned: 0,
+    mine: 0,
+    open: 0,
+    closed: 0,
+    snoozed: 0,
+  };
 
   return {
-    counts: computeUnreadTabCounts(countConversations, membershipId),
+    counts: countRow,
     conversations,
+    pagination: { limit: options.limit, hasMore, nextCursor },
   };
 }
 
@@ -347,7 +404,7 @@ export async function getConversation(
       and(
         eq(fields.id, conversationId),
         eq(fields.workspaceId, workspaceId),
-        getWidgetConversationBaseCond(fields as typeof conversationTable),
+        getInboxConversationBaseCond(fields as typeof conversationTable),
       ),
     with: {
       contact: {
@@ -378,22 +435,31 @@ export async function getConversation(
 
 export function mapConversationToListItem(conversation: ParsedConversation) {
   const lastMessage = getLastPublicMessage(conversation.messages);
+  const lastUnreadVisitorMessage = conversation.messages.findLast(
+    (message) => message.authorType === "VISITOR" && !message.readAt,
+  );
 
   return {
     id: conversation.id,
+    snoozedUntil: conversation.snoozedUntil,
+    labels: parseConversationLabels(conversation.labels),
     visitorSessionId: conversation.visitorSessionId,
     visitorId: conversation.visitorSession?.visitorId ?? conversation.contactId,
     contactName: conversation.contact.name,
     contactEmail: conversation.contact.email,
     status: conversation.status,
+    aiPaused: conversation.aiPaused,
     assigneeName: conversation.assignedMember?.user.name ?? null,
     assigneeId: conversation.assignedMemberId,
     unreadCount: countUnreadMessages(conversation.messages),
+    lastUnreadVisitorMessageId: lastUnreadVisitorMessage?.id ?? null,
     preview: lastMessage?.body ?? conversation.subject,
     lastMessageAt: conversation.lastMessageAt
       ? new Date(conversation.lastMessageAt).toISOString()
       : new Date().toISOString(),
     country: conversation.visitorSession?.country ?? null,
     city: conversation.visitorSession?.city ?? null,
+    channel: conversation.channel,
+    subject: conversation.subject,
   };
 }

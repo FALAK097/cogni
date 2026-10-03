@@ -24,8 +24,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useKnowledgeBases } from "@/hooks/query";
-import { useSidebar } from "@/hooks/use-sidebar";
+import { useIsMobileSidebar, useSidebar } from "@/hooks/use-sidebar";
 import { cn } from "@/lib/utils";
 
 type AppTopbarProps = {
@@ -40,11 +39,13 @@ type AppTopbarProps = {
 const LABELS: Record<string, string> = {
   analytics: "Analytics",
   "knowledge-base": "Knowledge Base",
-  conversations: "Conversations",
+  conversations: "Inbox",
+  tickets: "Tickets",
 
-  dashboard: "Dashboard",
+  dashboard: "Insights",
+  playground: "Agent",
   widget: "Chat widget",
-  integrations: "Integrations",
+  integrations: "Settings · Connections",
   settings: "Settings",
   usage: "Usage",
   whatsapp: "WhatsApp",
@@ -75,22 +76,6 @@ function getFallbackLabel(segment: string, index: number, routeSegments: string[
   return formatSegment(segment);
 }
 
-function useBreadcrumbLabels(segments: string[]) {
-  const knowledgeBaseIndex = segments.indexOf("knowledge-base");
-  const knowledgeBaseId = knowledgeBaseIndex >= 0 ? (segments[knowledgeBaseIndex + 1] ?? "") : "";
-
-  const knowledgeBasesQuery = useKnowledgeBases();
-
-  const labels = new Map<string, string>();
-  const knowledgeBase = knowledgeBasesQuery.data?.knowledgeBases?.find(
-    (item) => item.id === knowledgeBaseId,
-  );
-
-  if (knowledgeBaseId) labels.set(knowledgeBaseId, knowledgeBase?.name ?? "Knowledge Base");
-
-  return labels;
-}
-
 function getVisibleCrumbs(crumbs: Crumb[]) {
   if (crumbs.length <= 4) return { visible: crumbs, hidden: [] };
   return {
@@ -106,7 +91,6 @@ function getBreadcrumbHref(routeSegments: string[], index: number) {
 function Breadcrumbs() {
   const pathname = usePathname();
   const segments = pathname.split("/").filter(Boolean);
-  const labels = useBreadcrumbLabels(segments);
 
   const routeSegments = segments.length > 0 ? segments : ["dashboard"];
   const routeCrumbs = routeSegments.map((segment, index) => {
@@ -114,7 +98,7 @@ function Breadcrumbs() {
 
     return {
       href: getBreadcrumbHref(routeSegments, index),
-      label: labels.get(segment) ?? getFallbackLabel(segment, index, routeSegments),
+      label: getFallbackLabel(segment, index, routeSegments),
       current: isCurrent,
     };
   });
@@ -207,6 +191,11 @@ function Breadcrumbs() {
 export function AppTopbar({ userData, className }: AppTopbarProps) {
   const toggleOpen = useSidebar((state) => state.toggleOpen);
   const sidebarDisabled = useSidebar((state) => state.settings.disabled);
+  const isMobile = useIsMobileSidebar();
+  const mobileDrawerOpen = useSidebar((state) => state.mobileDrawerOpen);
+  const isOpen = useSidebar((state) => state.isOpen);
+  const isHover = useSidebar((state) => state.isHover);
+  const isHoverOpen = useSidebar((state) => state.settings.isHoverOpen);
   const normalizedUserData = {
     avatar: userData?.avatar ?? "",
     name: userData?.name ?? "Unknown",
@@ -219,6 +208,16 @@ export function AppTopbar({ userData, className }: AppTopbarProps) {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (
+        sidebarDisabled ||
+        event.defaultPrevented ||
+        event.altKey ||
+        (event.target instanceof HTMLElement && event.target.isContentEditable) ||
+        (event.target instanceof Element &&
+          event.target.closest("input, textarea, select, [role='dialog'], [role='alertdialog']"))
+      ) {
+        return;
+      }
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "b") {
         event.preventDefault();
         toggleOpen();
@@ -227,7 +226,7 @@ export function AppTopbar({ userData, className }: AppTopbarProps) {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [toggleOpen]);
+  }, [toggleOpen, sidebarDisabled]);
 
   return (
     <header
@@ -250,6 +249,14 @@ export function AppTopbar({ userData, className }: AppTopbarProps) {
                       className="size-9 shrink-0"
                       onClick={() => toggleOpen()}
                       aria-label={`Toggle sidebar (${shortcutLabel})`}
+                      aria-expanded={
+                        isMobile ? mobileDrawerOpen : isOpen || (isHoverOpen && isHover)
+                      }
+                      {...(!isMobile
+                        ? { "aria-controls": "workspace-desktop-navigation" }
+                        : mobileDrawerOpen
+                          ? { "aria-controls": "workspace-mobile-navigation" }
+                          : {})}
                     >
                       <PanelLeft className="size-5" />
                     </Button>

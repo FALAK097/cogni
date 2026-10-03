@@ -12,6 +12,7 @@ export const state = {
   publicKey: "",
   sessionToken: null,
   preview: false,
+  previewMessagePending: false,
   isOpen: false,
   isInitialized: false,
   hasInteracted: false,
@@ -51,6 +52,7 @@ export const state = {
 // Helper to reset state for new chat
 export function resetChatState() {
   state.hasInteracted = false;
+  state.previewMessagePending = false;
   state.conversationHistory = [];
   state.leadCaptureStep = 0;
   state.pendingLeadInfo = { name: "", email: "", phone: "" };

@@ -1,131 +1,109 @@
 "use client";
+
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect } from "react";
 
 import { Menu } from "@/components/app-nav/menu";
 import { WorkspaceSwitcher } from "@/components/app-nav/workspace-switcher";
 import { ThemeLogo } from "@/components/theme-logo";
-import { closeMobileSidebar, useSidebar } from "@/hooks/use-sidebar";
+import { Settings } from "@/components/icons";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { closeMobileSidebar, useIsMobileSidebar, useSidebar } from "@/hooks/use-sidebar";
 import { SITE_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
+function SidebarContent({ expanded }: { expanded: boolean }) {
+  const pathname = usePathname();
+
+  return (
+    <div className="flex h-full min-h-0 flex-col items-stretch">
+      <div className="flex-none px-4 pt-4 pb-2">
+        <Link
+          href="/dashboard"
+          aria-label={`${SITE_NAME} home`}
+          onClick={closeMobileSidebar}
+          className={cn(
+            "flex items-center gap-2.5 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+            expanded ? "w-fit px-2.5" : "w-full justify-center",
+          )}
+        >
+          <ThemeLogo className="size-6 shrink-0" />
+          {expanded && <span className="whitespace-nowrap text-lg font-bold">{SITE_NAME}</span>}
+        </Link>
+      </div>
+      <div className={cn("flex-none pb-1", expanded ? "px-3" : "px-2")}>
+        <WorkspaceSwitcher isOpen={expanded} />
+      </div>
+      <div className="w-full min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <Menu isOpen={expanded} />
+      </div>
+      <div className={cn("flex-none border-t border-sidebar-border", expanded ? "p-3" : "p-2")}>
+        <Link
+          href="/integrations"
+          onClick={closeMobileSidebar}
+          aria-label="Settings: connections"
+          aria-current={pathname.startsWith("/integrations") ? "page" : false}
+          title={expanded ? "Workspace connections" : "Settings"}
+          className={cn(
+            "flex min-h-11 lg:min-h-10 items-center gap-4 rounded-md px-4 text-sm transition-colors duration-150 hover:bg-sidebar-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+            !expanded && "justify-center px-0",
+            pathname.startsWith("/integrations") && "bg-sidebar-accent font-medium",
+          )}
+        >
+          <Settings className="size-[18px] shrink-0" />
+          {expanded && <span>Settings</span>}
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 export function Sidebar({ initialOpen = true }: { initialOpen?: boolean }) {
   const pathname = usePathname();
+  const isMobile = useIsMobileSidebar();
   const isOpen = useSidebar((state) => state.isOpen);
   const mobileDrawerOpen = useSidebar((state) => state.mobileDrawerOpen);
+  const setMobileDrawerOpen = useSidebar((state) => state.setMobileDrawerOpen);
   const isHover = useSidebar((state) => state.isHover);
   const hasHydrated = useSidebar((state) => state.hasHydrated);
   const setIsHover = useSidebar((state) => state.setIsHover);
   const settings = useSidebar((state) => state.settings);
-  const [transitionsEnabled, setTransitionsEnabled] = useState(false);
-
   const desktopOpen = (hasHydrated ? isOpen : initialOpen) || (settings.isHoverOpen && isHover);
-  const sidebarExpanded = mobileDrawerOpen || desktopOpen;
-
-  useLayoutEffect(() => {
-    closeMobileSidebar();
-  }, []);
 
   useEffect(() => {
     closeMobileSidebar();
-  }, [pathname]);
+  }, [pathname, isMobile]);
 
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => {
-      setTransitionsEnabled(true);
-    });
-    return () => cancelAnimationFrame(frame);
-  }, []);
-
-  const appName = SITE_NAME;
+  if (settings.disabled) return null;
 
   return (
     <>
-      <button
-        type="button"
-        aria-label="Close navigation"
-        aria-hidden={!mobileDrawerOpen}
-        tabIndex={mobileDrawerOpen ? 0 : -1}
-        className={cn(
-          "fixed inset-0 z-30 bg-black/50 supports-backdrop-filter:backdrop-blur-sm lg:hidden",
-          transitionsEnabled && "transition-opacity duration-300",
-          mobileDrawerOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0",
-        )}
-        onClick={() => closeMobileSidebar()}
-      />
       <aside
+        id="workspace-desktop-navigation"
         className={cn(
-          "fixed top-0 left-0 z-40 h-screen bg-sidebar print:hidden",
-          "max-lg:w-56 max-lg:-translate-x-full",
-          mobileDrawerOpen && "max-lg:translate-x-0",
-          "lg:translate-x-0",
-          desktopOpen ? "lg:w-56" : "lg:w-[90px]",
-          transitionsEnabled && "transition-[transform,width] ease-in-out duration-300",
-          settings.disabled && "hidden",
+          "fixed top-0 left-0 z-40 hidden h-svh border-r border-sidebar-border bg-sidebar lg:block print:hidden motion-safe:transition-[width] motion-safe:duration-150",
+          desktopOpen ? "w-56" : "w-14",
         )}
       >
         <div
           onMouseEnter={() => setIsHover(true)}
           onMouseLeave={() => setIsHover(false)}
-          className="flex h-full flex-col items-stretch border-r border-sidebar-border"
+          className="h-full"
         >
-          {/* Header section */}
-          <div className="flex-none px-4 pt-4 pb-2">
-            <div className="flex items-center justify-between">
-              <Link
-                href="/dashboard"
-                onClick={() => closeMobileSidebar()}
-                className={cn(
-                  "flex items-center gap-2.5",
-                  sidebarExpanded ? "px-2.5" : "w-full justify-center",
-                )}
-              >
-                <ThemeLogo
-                  className={cn("flex-shrink-0", sidebarExpanded ? "w-6 h-6" : "w-8 h-8")}
-                />
-                <h1
-                  className={cn(
-                    "whitespace-nowrap text-lg font-bold",
-                    transitionsEnabled &&
-                      "transition-[transform,opacity,display] ease-in-out duration-300",
-                    !sidebarExpanded
-                      ? "-translate-x-96 hidden opacity-0"
-                      : "translate-x-0 opacity-100",
-                  )}
-                >
-                  <span className="text-base font-bold transition-[transform,opacity] sm:text-lg">
-                    {appName}
-                  </span>
-                </h1>
-              </Link>
-            </div>
-          </div>
-
-          {/* Workspace Switcher */}
-          <div className="flex-none px-3 pb-1">
-            <WorkspaceSwitcher isOpen={sidebarExpanded} />
-          </div>
-
-          <div
-            className="scrollbar-hide w-full flex-1 overflow-y-auto"
-            style={{
-              msOverflowStyle: "none",
-              scrollbarWidth: "none",
-            }}
-          >
-            <style>{`
-						/* Webkit browsers like Chrome/Safari */
-						.scrollbar-hide::-webkit-scrollbar {
-							display: none;
-						}
-					`}</style>
-            <Menu isOpen={sidebarExpanded} />
-          </div>
-
-          <div className="h-3 flex-none" />
+          <SidebarContent expanded={desktopOpen} />
         </div>
       </aside>
+      <Sheet open={isMobile && mobileDrawerOpen} onOpenChange={setMobileDrawerOpen}>
+        <SheetContent
+          id="workspace-mobile-navigation"
+          side="left"
+          className="w-56! max-w-[calc(100vw-3rem)] bg-sidebar text-sidebar-foreground overscroll-contain motion-reduce:transition-none motion-reduce:translate-none!"
+        >
+          <SheetTitle className="sr-only">Workspace navigation</SheetTitle>
+          <SidebarContent expanded />
+        </SheetContent>
+      </Sheet>
     </>
   );
 }

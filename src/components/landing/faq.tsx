@@ -1,95 +1,59 @@
-"use client";
-
-import { useState } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
-import { cn } from "@/lib/utils";
 import { SectionLayout, SectionHeader } from "./section-layout";
 
 const FAQS = [
   {
-    question: "How long does it take to train the AI?",
+    question: "How do I add knowledge for the AI?",
     answer:
-      "Less than 5 minutes. As soon as you connect your knowledge base (website, Help Center, or PDFs) our system processes and indexes everything automatically. You can start testing before the page even finishes loading.",
+      "Add website URLs, a sitemap, pasted text, or supported files in Knowledge Base. Sources show their processing status. Wait until a source is ready, then test its answers in the Playground.",
   },
   {
     question: "Can I customize the chat widget's appearance?",
     answer:
-      "Completely. You control colors, typography, launcher icon, avatar, border radius, welcome message, and conversation starters. The widget editor has a live preview so you see changes instantly.",
+      "You can customize colors, typography, avatar, welcome message, and conversation starters. The Playground includes a preview so you can check your changes before installing the widget.",
   },
   {
-    question: "What happens when the AI doesn't know the answer?",
+    question: "What happens when a customer needs a human?",
     answer:
-      "When the AI's confidence drops below your configured threshold, it routes the conversation to your team seamlessly, handing over the full chat history and context so the agent doesn't have to start from scratch.",
+      "Escalation rules can pause the widget's AI replies and flag the conversation for your team. A teammate can review the history, assign the conversation, and reply from the shared inbox.",
   },
   {
-    question: "Do you support multiple languages?",
+    question: "Can the AI answer in different languages?",
     answer:
-      "Yes. The AI auto-detects and responds in 90+ languages, even if your entire knowledge base is written in English.",
+      "Language support depends on the model you select and your source content. Test the languages your customers use in the Playground before deploying your agent.",
   },
   {
     question: "How is my data handled?",
     answer:
-      "We are SOC 2 Type II certified. All data is encrypted at rest and in transit. Your knowledge base and conversation data are never used to train foundational models.",
+      "Workspace membership controls dashboard access, and knowledge retrieval is scoped to the workspace. AI providers process content needed to generate answers. Contact us to discuss your data requirements before uploading sensitive information.",
   },
   {
-    question: "Can I connect my existing helpdesk?",
+    question: "Which integrations can I connect?",
     answer:
-      "Yes. We integrate with Zendesk, Intercom, HubSpot, Salesforce, and more. Human handoffs land directly in your existing queue so your workflow doesn't change.",
+      "The integration catalog includes Gmail, Google Calendar, Slack, Discord, Google Chat, WhatsApp, and Microsoft Teams. Available actions and inbound messaging require different provider setup. Review each integration's setup instructions before using it with customers.",
   },
 ];
 
 export function Faq() {
-  const [openIndex, setOpenIndex] = useState<number | null>(0);
-
   return (
     <SectionLayout id="faq">
-      {/* Header + accordion in a centered narrow column */}
       <div className="mx-auto max-w-3xl">
         <SectionHeader label="FAQ" heading={<>Common questions.</>} center />
-
-        <div className="divide-y divide-gray-100">
-          {FAQS.map((faq, index) => {
-            const isOpen = openIndex === index;
-            return (
-              <div key={index}>
-                <button
-                  type="button"
-                  onClick={() => setOpenIndex(isOpen ? null : index)}
-                  className="group flex w-full items-start justify-between gap-4 py-5 text-left focus:outline-none"
-                  aria-expanded={isOpen}
-                >
-                  <span
-                    className={cn(
-                      "text-[15px] font-semibold leading-snug transition-colors duration-150",
-                      isOpen ? "text-primary" : "text-gray-900 group-hover:text-primary",
-                    )}
-                  >
-                    {faq.question}
-                  </span>
-                  <HugeiconsIcon
-                    icon={ArrowDown01Icon}
-                    className={cn(
-                      "mt-0.5 size-4 shrink-0 text-gray-400 transition-transform duration-200 ease-out",
-                      isOpen && "rotate-180 text-primary",
-                    )}
-                  />
-                </button>
-
-                {/* Grid-row trick for smooth height animation — Emil principle */}
-                <div
-                  className={cn(
-                    "grid transition-[grid-template-rows,opacity] duration-200 ease-out",
-                    isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
-                  )}
-                >
-                  <div className="overflow-hidden">
-                    <p className="pb-5 text-[15px] leading-relaxed text-gray-500">{faq.answer}</p>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+        <div className="divide-y divide-gray-200">
+          {FAQS.map((faq) => (
+            <details key={faq.question} className="group">
+              <summary className="flex cursor-pointer list-none items-start justify-between gap-4 rounded-md py-5 text-left text-[15px] font-semibold leading-snug text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary [&::-webkit-details-marker]:hidden">
+                {faq.question}
+                <HugeiconsIcon
+                  icon={ArrowDown01Icon}
+                  aria-hidden="true"
+                  className="mt-0.5 size-4 shrink-0 text-gray-600 group-open:rotate-180"
+                />
+              </summary>
+              <p className="pb-5 text-[15px] leading-relaxed text-gray-600">{faq.answer}</p>
+            </details>
+          ))}
         </div>
       </div>
     </SectionLayout>

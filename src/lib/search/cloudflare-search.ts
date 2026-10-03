@@ -1,5 +1,7 @@
 import "server-only";
 
+import { z } from "zod";
+
 import { env } from "@/lib/env/server";
 
 type CloudflareSearchMetadata = Record<string, string | number | boolean>;
@@ -22,6 +24,26 @@ export type CloudflareSearchChunk = {
     metadata?: Record<string, unknown>;
   };
 };
+
+const cloudflareSearchChunkSchema = z.object({
+  id: z.string().min(1),
+  score: z.number().finite(),
+  text: z.string(),
+  item: z
+    .object({
+      key: z.string().optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
+    })
+    .optional(),
+});
+
+const cloudflareSearchResponseSchema = z.object({
+  result: z
+    .object({
+      chunks: z.array(z.unknown()).optional(),
+    })
+    .optional(),
+});
 
 const maxSearchTextCharacters = 3_500_000;
 
@@ -105,6 +127,7 @@ export async function searchCloudflareIndex({
   const searchOptions = {
     retrieval: {
       max_num_results: limit,
+      match_threshold: 0.4,
       filters,
     },
   };
@@ -130,9 +153,11 @@ export async function searchCloudflareIndex({
     return [];
   }
 
-  const payload = (await response.json()) as {
-    result?: { chunks?: CloudflareSearchChunk[] };
-  };
+  const payload = cloudflareSearchResponseSchema.safeParse(await response.json().catch(() => null));
+  if (!payload.success) return [];
 
-  return payload.result?.chunks ?? [];
+  return (payload.data.result?.chunks ?? []).flatMap((chunk) => {
+    const parsedChunk = cloudflareSearchChunkSchema.safeParse(chunk);
+    return parsedChunk.success ? [parsedChunk.data] : [];
+  });
 }

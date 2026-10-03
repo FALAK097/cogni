@@ -1,15 +1,22 @@
 import "server-only";
 
-import {
-  differenceInCalendarDays,
-  eachDayOfInterval,
-  endOfDay,
-  format,
-  startOfDay,
-  subDays,
-} from "date-fns";
+import { eachDayOfInterval, format, parseISO } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
+import { desc } from "drizzle-orm";
 
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
+import { aggregateSatisfactionByCohort } from "@/features/analytics/aggregation";
+import { collectAiResponseTimeSamplesMs } from "@/features/analytics/response-time";
+import { collectNegativeFeedbackItems } from "@/features/analytics/negative-feedback";
+import { collectUnansweredQuestions } from "@/features/analytics/unanswered-questions";
+import { collectNoSourceMatchQuestions } from "@/features/analytics/no-source-answers";
+import {
+  aggregateKnowledgeGaps,
+  buildKnowledgeGapSummary,
+  type KnowledgeGapObservation,
+} from "@/features/analytics/knowledge-gaps";
+import { resolveAnalyticsDateRange } from "@/features/analytics/date-range";
+import { normalizeTimezone } from "@/features/conversations/snooze-schedule";
 import { getWidgetConversationCond } from "@/features/widget/server/widget-data-filters";
 import type { Db } from "@/lib/db/client";
 import { conversation } from "@/lib/db/schema";
@@ -17,6 +24,7 @@ import type {
   BreakdownItem,
   DashboardAnalytics,
   MetricComparison,
+  NegativeFeedbackItem,
   SatisfactionPoint,
   TimeSeriesPoint,
   TopQuestion,
@@ -114,46 +122,21 @@ function normalizeQuestion(text: string): string {
   return text.trim().replace(/\s+/g, " ");
 }
 
-function computeAvgResponseTimeMs(messages: MessageJson[]): number | null {
-  const deltas: number[] = [];
-
-  for (let index = 0; index < messages.length; index++) {
-    const message = messages[index];
-    if (message.authorType !== "VISITOR") continue;
-
-    const visitorTime = new Date(message.createdAt).getTime();
-    if (Number.isNaN(visitorTime)) continue;
-
-    for (let nextIndex = index + 1; nextIndex < messages.length; nextIndex++) {
-      const nextMessage = messages[nextIndex];
-      if (nextMessage.authorType !== "AI") continue;
-
-      const aiTime = new Date(nextMessage.createdAt).getTime();
-      if (Number.isNaN(aiTime) || aiTime < visitorTime) continue;
-
-      deltas.push(aiTime - visitorTime);
-      break;
-    }
-  }
-
-  if (deltas.length === 0) return null;
-  return deltas.reduce((sum, delta) => sum + delta, 0) / deltas.length;
-}
-
-function aggregatePeriod(conversations: ConversationRow[]) {
+function aggregatePeriod(conversations: ConversationRow[], timezone: string) {
   const uniqueUsers = new Set<string>();
-  let resolvedConversations = 0;
+  let closedConversations = 0;
   let messagesSent = 0;
   let messagesReceived = 0;
   let engagedConversations = 0;
-  const responseTimes: number[] = [];
-  let feedbackPositive = 0;
-  let feedbackNegative = 0;
+  let responseTimeTotal = 0;
+  let aiResponseSamples = 0;
+  const satisfactionResponses: { cohortDate: string; rating: "positive" | "negative" }[] = [];
   const sourceCounts = new Map<string, number>();
   const statusCounts = new Map<string, number>();
-  const questionCounts = new Map<string, number>();
+  const questionCounts = new Map<string, { count: number; conversationId: string }>();
+  const negativeFeedback: NegativeFeedbackItem[] = [];
+  const knowledgeGapObservations: KnowledgeGapObservation[] = [];
   const dailyCounts = new Map<string, number>();
-  const dailySatisfaction = new Map<string, { positive: number; negative: number }>();
 
   for (const conversation of conversations) {
     const messages = parseMessages(conversation.messages);
@@ -169,7 +152,7 @@ function aggregatePeriod(conversations: ConversationRow[]) {
       uniqueUsers.add(conversation.visitorSessionId);
     }
 
-    if (conversation.status === "CLOSED") resolvedConversations++;
+    if (conversation.status === "CLOSED") closedConversations++;
 
     const source = categorizeSource(
       conversation.visitorSession?.referrer ?? null,
@@ -179,65 +162,72 @@ function aggregatePeriod(conversations: ConversationRow[]) {
 
     const statusLabel =
       conversation.status === "CLOSED"
-        ? "Resolved"
+        ? "Closed"
         : conversation.status === "OPEN" || conversation.status === "ASSIGNED"
           ? "In Progress"
           : "Unresolved";
     statusCounts.set(statusLabel, (statusCounts.get(statusLabel) ?? 0) + 1);
 
-    const dayKey = format(conversation.createdAt, "yyyy-MM-dd");
+    const dayKey = formatInTimeZone(conversation.createdAt, timezone, "yyyy-MM-dd");
     dailyCounts.set(dayKey, (dailyCounts.get(dayKey) ?? 0) + 1);
 
     const firstVisitorMessage = visitorMessages[0];
     if (firstVisitorMessage?.body) {
       const question = normalizeQuestion(firstVisitorMessage.body);
       if (question.length > 0) {
-        questionCounts.set(question, (questionCounts.get(question) ?? 0) + 1);
+        const current = questionCounts.get(question);
+        questionCounts.set(question, {
+          count: (current?.count ?? 0) + 1,
+          conversationId: current?.conversationId ?? conversation.id,
+        });
       }
     }
 
-    const responseTime = computeAvgResponseTimeMs(messages);
-    if (responseTime !== null) responseTimes.push(responseTime);
+    const responseTimes = collectAiResponseTimeSamplesMs(messages);
+    responseTimeTotal += responseTimes.reduce((sum, responseTime) => sum + responseTime, 0);
+    aiResponseSamples += responseTimes.length;
 
     for (const message of messages) {
-      if (message.feedback === "positive") feedbackPositive++;
-      if (message.feedback === "negative") feedbackNegative++;
-
-      if (message.feedback && message.feedbackAt) {
-        const feedbackDay = format(new Date(message.feedbackAt), "yyyy-MM-dd");
-        const entry = dailySatisfaction.get(feedbackDay) ?? { positive: 0, negative: 0 };
-        if (message.feedback === "positive") entry.positive++;
-        if (message.feedback === "negative") entry.negative++;
-        dailySatisfaction.set(feedbackDay, entry);
+      if (message.feedback === "positive" || message.feedback === "negative") {
+        satisfactionResponses.push({ cohortDate: dayKey, rating: message.feedback });
       }
     }
+
+    negativeFeedback.push(...collectNegativeFeedbackItems(conversation.id, messages));
+    knowledgeGapObservations.push(
+      ...collectUnansweredQuestions(conversation.id, conversation.status, messages).map((item) => ({
+        ...item,
+        signal: "UNANSWERED" as const,
+      })),
+      ...collectNoSourceMatchQuestions(conversation.id, messages),
+    );
   }
 
   const totalConversations = conversations.length;
   const uniqueUserCount = uniqueUsers.size;
-  const avgResponseTimeMs =
-    responseTimes.length > 0
-      ? responseTimes.reduce((sum, value) => sum + value, 0) / responseTimes.length
-      : 0;
+  const avgAiResponseTimeMs = aiResponseSamples > 0 ? responseTimeTotal / aiResponseSamples : 0;
+  const satisfaction = aggregateSatisfactionByCohort(satisfactionResponses);
 
-  const feedbackTotal = feedbackPositive + feedbackNegative;
-  const satisfactionScore = feedbackTotal > 0 ? (feedbackPositive / feedbackTotal) * 5 : 0;
+  const feedbackTotal = satisfaction.positive + satisfaction.negative;
+  const satisfactionScore = feedbackTotal > 0 ? (satisfaction.positive / feedbackTotal) * 5 : 0;
 
   const engagementRate =
     totalConversations > 0 ? (engagedConversations / totalConversations) * 100 : 0;
   const conversationsPerUser = uniqueUserCount > 0 ? totalConversations / uniqueUserCount : 0;
 
   const topQuestions: TopQuestion[] = [...questionCounts.entries()]
-    .sort((a, b) => b[1] - a[1])
+    .sort((a, b) => b[1].count - a[1].count)
     .slice(0, 5)
-    .map(([question, count]) => ({ question, count }));
+    .map(([question, value]) => ({ question, ...value }));
 
   return {
     totalConversations,
     uniqueUserCount,
-    resolvedConversations,
-    avgResponseTimeMs,
+    closedConversations,
+    avgAiResponseTimeMs,
+    aiResponseSamples,
     satisfactionScore,
+    feedbackTotal,
     messagesSent,
     messagesReceived,
     engagementRate,
@@ -245,8 +235,12 @@ function aggregatePeriod(conversations: ConversationRow[]) {
     sourceCounts,
     statusCounts,
     dailyCounts,
-    dailySatisfaction,
+    dailySatisfaction: satisfaction.daily,
     topQuestions,
+    negativeFeedback: negativeFeedback
+      .sort((a, b) => b.feedbackAt.localeCompare(a.feedbackAt))
+      .slice(0, 3),
+    unansweredQuestions: aggregateKnowledgeGaps(knowledgeGapObservations),
   };
 }
 
@@ -262,11 +256,11 @@ function toBreakdown(counts: Map<string, number>): BreakdownItem[] {
 }
 
 function buildTimeSeries(
-  start: Date,
-  end: Date,
+  startDate: string,
+  endDate: string,
   dailyCounts: Map<string, number>,
 ): TimeSeriesPoint[] {
-  return eachDayOfInterval({ start, end }).map((day) => {
+  return eachDayOfInterval({ start: parseISO(startDate), end: parseISO(endDate) }).map((day) => {
     const key = format(day, "yyyy-MM-dd");
     return {
       date: key,
@@ -276,11 +270,11 @@ function buildTimeSeries(
 }
 
 function buildSatisfactionSeries(
-  start: Date,
-  end: Date,
+  startDate: string,
+  endDate: string,
   dailySatisfaction: Map<string, { positive: number; negative: number }>,
 ): SatisfactionPoint[] {
-  return eachDayOfInterval({ start, end }).map((day) => {
+  return eachDayOfInterval({ start: parseISO(startDate), end: parseISO(endDate) }).map((day) => {
     const key = format(day, "yyyy-MM-dd");
     const entry = dailySatisfaction.get(key);
     if (!entry) return { date: key, score: null, responses: 0 };
@@ -298,17 +292,17 @@ async function fetchWidgetConversations(
   db: Db,
   workspaceId: string,
   start: Date,
-  end: Date,
+  endBefore: Date,
 ): Promise<ConversationRow[]> {
   const startIso = start.toISOString();
-  const endIso = end.toISOString();
+  const endBeforeIso = endBefore.toISOString();
 
   const rows = await db.query.conversation.findMany({
-    where: (fields, { and, gte, lte }) =>
+    where: (fields, { and, gte, lt }) =>
       and(
         getWidgetConversationCond(fields as typeof conversation, workspaceId),
         gte(fields.createdAt, startIso),
-        lte(fields.createdAt, endIso),
+        lt(fields.createdAt, endBeforeIso),
       ),
     columns: {
       id: true,
@@ -317,6 +311,7 @@ async function fetchWidgetConversations(
       visitorSessionId: true,
       messages: true,
     },
+    orderBy: [desc(conversation.createdAt), desc(conversation.id)],
     with: {
       visitorSession: {
         columns: {
@@ -342,52 +337,64 @@ export async function getDashboardAnalytics(
   workspaceId: string,
   startDateInput?: string | null,
   endDateInput?: string | null,
+  timezone?: string | null,
 ): Promise<DashboardAnalytics> {
-  const end = endDateInput ? endOfDay(new Date(endDateInput)) : endOfDay(new Date());
-  const start = startDateInput ? startOfDay(new Date(startDateInput)) : startOfDay(subDays(end, 6));
-
-  const rangeDays = Math.max(differenceInCalendarDays(end, start) + 1, 1);
-  const previousEnd = endOfDay(subDays(start, 1));
-  const previousStart = startOfDay(subDays(previousEnd, rangeDays - 1));
+  const validTimezone = normalizeTimezone(timezone);
+  const range = resolveAnalyticsDateRange(startDateInput, endDateInput, validTimezone);
 
   const [currentConversations, previousConversations] = await Promise.all([
-    fetchWidgetConversations(db, workspaceId, start, end),
-    fetchWidgetConversations(db, workspaceId, previousStart, previousEnd),
+    fetchWidgetConversations(db, workspaceId, range.startAt, range.endBefore),
+    fetchWidgetConversations(db, workspaceId, range.previousStartAt, range.previousEndBefore),
   ]);
 
-  const current = aggregatePeriod(currentConversations);
-  const previous = aggregatePeriod(previousConversations);
+  const current = aggregatePeriod(currentConversations, validTimezone);
+  const previous = aggregatePeriod(previousConversations, validTimezone);
+  const gapReviews = await db.query.knowledgeGapReview.findMany({
+    where: (fields, { eq }) => eq(fields.workspaceId, workspaceId),
+    columns: { questionHash: true, status: true, updatedAt: true },
+  });
+  const knowledgeGaps = buildKnowledgeGapSummary(current.unansweredQuestions, gapReviews);
 
   return {
     dateRange: {
-      start: start.toISOString(),
-      end: end.toISOString(),
+      start: range.startDate,
+      end: range.endDate,
     },
     previousDateRange: {
-      start: previousStart.toISOString(),
-      end: previousEnd.toISOString(),
+      start: range.previousStartDate,
+      end: range.previousEndDate,
     },
     kpis: {
       totalConversations: toMetric(current.totalConversations, previous.totalConversations),
       uniqueUsers: toMetric(current.uniqueUserCount, previous.uniqueUserCount),
-      resolvedConversations: toMetric(
-        current.resolvedConversations,
-        previous.resolvedConversations,
-      ),
-      avgResponseTime: {
-        ...toMetric(current.avgResponseTimeMs, previous.avgResponseTimeMs),
-        formatted: formatDuration(current.avgResponseTimeMs),
+      closedConversations: toMetric(current.closedConversations, previous.closedConversations),
+      avgAiResponseTime: {
+        ...toMetric(current.avgAiResponseTimeMs, previous.avgAiResponseTimeMs),
+        samples: current.aiResponseSamples,
+        formatted:
+          current.aiResponseSamples > 0 ? formatDuration(current.avgAiResponseTimeMs) : "—",
+        changePercent:
+          current.aiResponseSamples > 0 && previous.aiResponseSamples > 0
+            ? toMetric(current.avgAiResponseTimeMs, previous.avgAiResponseTimeMs).changePercent
+            : null,
       },
       satisfactionScore: {
         ...toMetric(current.satisfactionScore, previous.satisfactionScore),
-        formatted: formatDecimal(current.satisfactionScore, 1),
+        formatted: current.feedbackTotal > 0 ? formatDecimal(current.satisfactionScore, 1) : "—",
+        changePercent:
+          current.feedbackTotal > 0 && previous.feedbackTotal > 0
+            ? toMetric(current.satisfactionScore, previous.satisfactionScore).changePercent
+            : null,
         max: 5,
+        responses: current.feedbackTotal,
       },
     },
-    conversationsOverTime: buildTimeSeries(start, end, current.dailyCounts),
+    conversationsOverTime: buildTimeSeries(range.startDate, range.endDate, current.dailyCounts),
     conversationsBySource: toBreakdown(current.sourceCounts),
     conversationsByStatus: toBreakdown(current.statusCounts),
     topQuestions: current.topQuestions,
+    negativeFeedback: current.negativeFeedback,
+    knowledgeGaps,
     userEngagement: {
       messagesSent: toMetric(current.messagesSent, previous.messagesSent),
       messagesReceived: toMetric(current.messagesReceived, previous.messagesReceived),
@@ -400,6 +407,10 @@ export async function getDashboardAnalytics(
         formatted: formatDecimal(current.conversationsPerUser, 1),
       },
     },
-    satisfactionOverTime: buildSatisfactionSeries(start, end, current.dailySatisfaction),
+    satisfactionOverTime: buildSatisfactionSeries(
+      range.startDate,
+      range.endDate,
+      current.dailySatisfaction,
+    ),
   };
 }

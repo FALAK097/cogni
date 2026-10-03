@@ -1,10 +1,41 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useConversations } from "@/hooks/query";
-import type { ConversationFilter, ConversationSummary } from "@/hooks/query";
+import { MessageSquare, Trash2 } from "@/components/icons";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectLabel,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useConversations, useDeleteInboxSavedView, useInboxSavedViews } from "@/hooks/query";
+import type { ConversationFilter } from "@/hooks/query";
+import { useActiveWorkspaceId } from "@/hooks/use-auth";
+import type {
+  ConversationComposerDraft,
+  ConversationComposerDraftChange,
+} from "@/features/conversations/draft-state";
+import {
+  EMPTY_CONVERSATION_COMPOSER_DRAFT,
+  updateConversationComposerDrafts,
+} from "@/features/conversations/draft-state";
 import { cn } from "@/lib/utils";
 
 import { ConversationDetail } from "./conversation-detail";
@@ -13,57 +44,69 @@ import { detailsColumnClassName, panelBoxClassName } from "./conversation-layout
 
 interface WidgetConversationsProps {
   initialConversationId?: string | null;
+  canManage: boolean;
 }
 
-const FILTER_TABS: Array<{ value: ConversationFilter; label: string }> = [
-  { value: "all", label: "All" },
-  { value: "unassigned", label: "Unassigned" },
-  { value: "mine", label: "Mine" },
-  { value: "open", label: "Open" },
-  { value: "closed", label: "Closed" },
+const FILTER_TABS: Array<{
+  value: ConversationFilter;
+  label: string;
+  countKey: keyof typeof EMPTY_COUNTS;
+}> = [
+  { value: "all", label: "All", countKey: "all" },
+  { value: "unread", label: "Unread", countKey: "all" },
+  { value: "unassigned", label: "Unassigned", countKey: "unassigned" },
+  { value: "mine", label: "My inbox", countKey: "mine" },
+  { value: "open", label: "All open", countKey: "open" },
+  { value: "snoozed", label: "Snoozed", countKey: "snoozed" },
+  { value: "closed", label: "Closed", countKey: "closed" },
 ];
 
 const EMPTY_COUNTS = {
+  total: 0,
   all: 0,
   unassigned: 0,
   mine: 0,
   open: 0,
   closed: 0,
+  snoozed: 0,
 };
 
-function adjustUnreadTabCounts(
-  counts: typeof EMPTY_COUNTS,
-  selectedConversation: ConversationSummary | undefined,
-  currentMembershipId: string | null,
-) {
-  if (!selectedConversation || selectedConversation.unreadCount === 0) {
-    return counts;
-  }
-
-  const decrement = (value: number) => Math.max(0, value - 1);
-
-  return {
-    all: decrement(counts.all),
-    unassigned:
-      selectedConversation.status !== "CLOSED" && !selectedConversation.assigneeId
-        ? decrement(counts.unassigned)
-        : counts.unassigned,
-    mine:
-      currentMembershipId && selectedConversation.assigneeId === currentMembershipId
-        ? decrement(counts.mine)
-        : counts.mine,
-    open: selectedConversation.status === "OPEN" ? decrement(counts.open) : counts.open,
-    closed: selectedConversation.status === "CLOSED" ? decrement(counts.closed) : counts.closed,
-  };
-}
-
-export function WidgetConversations({ initialConversationId = null }: WidgetConversationsProps) {
+export function WidgetConversations({
+  initialConversationId = null,
+  canManage,
+}: WidgetConversationsProps) {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(
     initialConversationId,
   );
   const [filter, setFilter] = useState<ConversationFilter>("all");
+  const [selectedSavedViewId, setSelectedSavedViewId] = useState<string | null>(null);
+  const [viewSelectionRevision, setViewSelectionRevision] = useState(0);
+  const [deleteViewOpen, setDeleteViewOpen] = useState(false);
+  const [deleteViewError, setDeleteViewError] = useState<string | null>(null);
+  const [composerDrafts, setComposerDrafts] = useState<Record<string, ConversationComposerDraft>>(
+    {},
+  );
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  const previousWorkspaceId = useRef(workspaceId);
+  const {
+    data: savedViewsData,
+    isError: savedViewsError,
+    refetch: refetchSavedViews,
+  } = useInboxSavedViews();
+  const deleteSavedView = useDeleteInboxSavedView();
+  const savedViews = savedViewsData?.views ?? [];
+  const selectedSavedView = savedViews.find((view) => view.id === selectedSavedViewId) ?? null;
   const [prevInitialConversationId, setPrevInitialConversationId] = useState(initialConversationId);
   const [prevFilter, setPrevFilter] = useState(filter);
+
+  useEffect(() => {
+    if (previousWorkspaceId.current === workspaceId) return;
+    previousWorkspaceId.current = workspaceId;
+    setSelectedConversationId(null);
+    setSelectedSavedViewId(null);
+    setFilter("all");
+    setViewSelectionRevision((revision) => revision + 1);
+  }, [workspaceId]);
 
   if (initialConversationId !== prevInitialConversationId) {
     setPrevInitialConversationId(initialConversationId);
@@ -77,132 +120,291 @@ export function WidgetConversations({ initialConversationId = null }: WidgetConv
     setSelectedConversationId(null);
   }
 
-  const { data: conversationsData } = useConversations({ page: 1, limit: 20, filter });
+  const { data: conversationsData, isSuccess: conversationsLoaded } = useConversations({
+    limit: 20,
+    filter,
+  });
+  const canDeleteSavedView = Boolean(
+    selectedSavedView &&
+    (canManage ||
+      selectedSavedView.createdByMembershipId === conversationsData?.currentMembershipId),
+  );
 
-  const counts = useMemo(() => {
-    const baseCounts = conversationsData?.counts ?? EMPTY_COUNTS;
-    if (!selectedConversationId) return baseCounts;
-
-    const selectedConversation = conversationsData?.conversations.find(
-      (conversation) => conversation.id === selectedConversationId,
+  const counts = conversationsData?.counts ?? EMPTY_COUNTS;
+  const isWorkspaceInboxEmpty = conversationsLoaded && counts.total === 0;
+  const activeView = FILTER_TABS.find((tab) => tab.value === filter);
+  const activeViewCount = activeView ? counts[activeView.countKey] : 0;
+  const activeCountKind = filter === "snoozed" ? "snoozed" : "unread";
+  const composerDraftKey = `${workspaceId}:${selectedConversationId ?? ""}`;
+  const composerDraft = composerDrafts[composerDraftKey] ?? EMPTY_CONVERSATION_COMPOSER_DRAFT;
+  const backToConversationList = () => {
+    const conversationId = selectedConversationId;
+    setSelectedConversationId(null);
+    requestAnimationFrame(() => {
+      const options = document.querySelectorAll<HTMLButtonElement>("[data-conversation-option]");
+      const selectedOption = Array.from(options).find(
+        (option) => option.dataset.conversationId === conversationId,
+      );
+      (selectedOption ?? options[0])?.focus({ preventScroll: true });
+    });
+  };
+  const updateComposerDraft: ConversationComposerDraftChange = (update) => {
+    setComposerDrafts((current) =>
+      updateConversationComposerDrafts(current, composerDraftKey, update),
     );
-
-    return adjustUnreadTabCounts(
-      baseCounts,
-      selectedConversation,
-      conversationsData?.currentMembershipId ?? null,
-    );
-  }, [conversationsData, selectedConversationId]);
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-sidebar">
       <header className="shrink-0 bg-sidebar px-4 pt-3 sm:px-5 sm:pt-4 lg:pt-4">
         <h1 className="hidden text-xl font-semibold tracking-tight text-foreground lg:block">
-          Conversations
+          Inbox
         </h1>
 
-        <div className="mt-0 lg:mt-3">
-          <Tabs
-            value={filter}
-            onValueChange={(value) => setFilter(value as ConversationFilter)}
-            className="gap-0"
-          >
-            <TabsList
-              variant="line"
-              className="h-auto w-full justify-start gap-6 overflow-x-auto rounded-none bg-transparent p-0 pb-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        {!isWorkspaceInboxEmpty ? (
+          <div className="mt-2 flex gap-1.5 lg:mt-3">
+            <Select
+              value={selectedSavedView?.id ?? filter}
+              onValueChange={(value) => {
+                if (!value) return;
+                setSelectedConversationId(null);
+                const savedView = savedViews.find((view) => view.id === value);
+                if (savedView) {
+                  setSelectedSavedViewId(savedView.id);
+                  setFilter(savedView.filter);
+                } else {
+                  setSelectedSavedViewId(null);
+                  setFilter(value as ConversationFilter);
+                }
+                setViewSelectionRevision((revision) => revision + 1);
+              }}
             >
-              {FILTER_TABS.map((tab) => {
-                const active = filter === tab.value;
-                const count = counts[tab.value];
+              <SelectTrigger
+                aria-label="Inbox view"
+                className="h-11 min-w-0 flex-1 justify-between rounded-xl border-border/60 bg-background px-3 shadow-none sm:h-10"
+              >
+                <SelectValue placeholder="Choose an inbox view">
+                  {selectedSavedView?.name ?? activeView?.label ?? "Choose an inbox view"}
+                </SelectValue>
+                {!selectedSavedView && activeViewCount > 0 ? (
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                    {activeViewCount} {activeCountKind}
+                  </span>
+                ) : null}
+              </SelectTrigger>
+              <SelectContent align="start" alignItemWithTrigger={false} className="w-64 rounded-xl">
+                {FILTER_TABS.map((tab) => {
+                  const count = counts[tab.countKey];
+                  const countKind = tab.value === "snoozed" ? "snoozed" : "unread";
 
-                return (
-                  <TabsTrigger
-                    key={tab.value}
-                    value={tab.value}
-                    className={cn(
-                      "h-9 shrink-0 flex-none gap-2 rounded-none bg-transparent px-0 pb-2 text-sm font-medium shadow-none",
-                      "after:-bottom-px after:h-[2px] after:rounded-full after:bg-primary",
-                      "data-active:bg-transparent data-active:shadow-none",
-                      active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    {tab.label}
-                    {count > 0 ? (
-                      <span
-                        className={cn(
-                          "inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-medium",
-                          active
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground",
-                        )}
-                      >
-                        {count}
-                      </span>
-                    ) : null}
-                  </TabsTrigger>
-                );
-              })}
-            </TabsList>
-          </Tabs>
-        </div>
+                  return (
+                    <SelectItem key={tab.value} value={tab.value} className="min-h-10 rounded-lg">
+                      <span>{tab.label}</span>
+                      {count > 0 ? (
+                        <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                          {count} {countKind}
+                        </span>
+                      ) : null}
+                    </SelectItem>
+                  );
+                })}
+                {savedViews.length > 0 ? (
+                  <>
+                    <SelectSeparator />
+                    <SelectLabel>Shared views</SelectLabel>
+                  </>
+                ) : null}
+                {savedViews.map((view) => (
+                  <SelectItem key={view.id} value={view.id} className="min-h-10 rounded-lg">
+                    <span className="min-w-0 truncate">{view.name}</span>
+                    <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+                      Shared
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {canDeleteSavedView && selectedSavedView ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-11 shrink-0 rounded-xl text-muted-foreground hover:text-destructive sm:size-10"
+                aria-label={`Delete saved view ${selectedSavedView.name}`}
+                title="Delete saved view"
+                onClick={() => {
+                  setDeleteViewError(null);
+                  setDeleteViewOpen(true);
+                }}
+              >
+                <Trash2 className="size-4" aria-hidden="true" />
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+        {savedViewsError ? (
+          <p
+            role="alert"
+            className="mt-2 flex items-center justify-between gap-2 text-xs text-destructive"
+          >
+            Could not load shared views.
+            <button
+              type="button"
+              className="shrink-0 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-ring"
+              onClick={() => void refetchSavedViews()}
+            >
+              Retry
+            </button>
+          </p>
+        ) : null}
       </header>
 
-      <div className="flex min-h-0 flex-1 gap-2.5 p-2 sm:px-4 sm:pb-4">
-        <div
-          className={cn(
-            panelBoxClassName,
-            "w-full shrink-0 lg:w-[300px] xl:w-[320px]",
-            selectedConversationId ? "hidden lg:flex" : "flex",
-          )}
-        >
-          <ConversationsList
-            filter={filter}
-            selectedConversationId={selectedConversationId}
-            onSelectConversation={setSelectedConversationId}
-          />
-        </div>
-
-        <div
-          className={cn(
-            panelBoxClassName,
-            "min-w-0 flex-1",
-            !selectedConversationId && "hidden lg:flex",
-            selectedConversationId && "flex",
-          )}
-        >
-          {selectedConversationId ? (
-            <ConversationDetail
-              conversationId={selectedConversationId}
-              onBack={() => setSelectedConversationId(null)}
-              part="chat"
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center p-6">
-              <p className="text-sm text-muted-foreground">
-                Select a conversation to view messages
+      {isWorkspaceInboxEmpty ? (
+        <div className="flex min-h-0 flex-1 p-2 sm:px-4 sm:pb-4">
+          <section
+            className={cn(
+              panelBoxClassName,
+              "w-full items-center justify-center gap-3 p-6 text-center",
+            )}
+          >
+            <span className="flex size-11 items-center justify-center rounded-xl border border-border/60 bg-background text-muted-foreground">
+              <MessageSquare className="size-5" aria-hidden="true" />
+            </span>
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">Your inbox is ready</h2>
+              <p className="mt-1 max-w-sm text-sm leading-relaxed text-muted-foreground">
+                Set up your agent to start receiving website conversations here.
               </p>
             </div>
-          )}
-        </div>
-
-        <div
-          className={cn(detailsColumnClassName, "hidden w-[272px] shrink-0 lg:flex xl:w-[292px]")}
-        >
-          {selectedConversationId ? (
-            <ConversationDetail
-              conversationId={selectedConversationId}
-              onBack={() => {}}
-              part="details"
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center rounded-xl border border-border/60 bg-white p-4 dark:bg-zinc-950">
-              <p className="text-center text-xs text-muted-foreground">
-                Contact and conversation details will appear here
+            {canManage ? (
+              <Button
+                nativeButton={false}
+                render={<Link href="/playground" />}
+                variant="outline"
+                size="sm"
+                className="min-h-11 px-4"
+              >
+                Set up your agent
+              </Button>
+            ) : (
+              <p className="max-w-sm text-xs text-muted-foreground">
+                A workspace owner needs to finish setup before conversations can arrive.
               </p>
-            </div>
-          )}
+            )}
+          </section>
         </div>
-      </div>
+      ) : (
+        <div className="flex min-h-0 flex-1 gap-2.5 p-2 sm:px-4 sm:pb-4">
+          <div
+            className={cn(
+              panelBoxClassName,
+              "w-full shrink-0 lg:w-[300px] xl:w-[320px]",
+              selectedConversationId ? "hidden lg:flex" : "flex",
+            )}
+          >
+            <ConversationsList
+              key={viewSelectionRevision}
+              filter={filter}
+              selectedConversationId={selectedConversationId}
+              onSelectConversation={setSelectedConversationId}
+              onClearFilter={() => {
+                setSelectedSavedViewId(null);
+                setFilter("all");
+              }}
+              initialChannel={selectedSavedView?.channel ?? null}
+              initialAssignee={
+                selectedSavedView?.assigneeFilter === "all"
+                  ? null
+                  : (selectedSavedView?.assigneeFilter ?? null)
+              }
+              initialLabel={selectedSavedView?.labelFilter ?? null}
+              onFacetChange={() => setSelectedSavedViewId(null)}
+            />
+          </div>
+
+          <div
+            className={cn(
+              panelBoxClassName,
+              "min-w-0 flex-1",
+              !selectedConversationId && "hidden lg:flex",
+              selectedConversationId && "flex",
+            )}
+          >
+            {selectedConversationId ? (
+              <ConversationDetail
+                key={selectedConversationId}
+                conversationId={selectedConversationId}
+                canManage={canManage}
+                onBack={backToConversationList}
+                focusBackButtonOnMount
+                onSelectConversation={setSelectedConversationId}
+                part="chat"
+                composerDraft={composerDraft}
+                onComposerDraftChange={updateComposerDraft}
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center p-6">
+                <p className="text-sm text-muted-foreground">
+                  Select a conversation to view messages
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className={cn(detailsColumnClassName, "hidden w-[280px] shrink-0 xl:flex")}>
+            {selectedConversationId ? (
+              <ConversationDetail
+                key={selectedConversationId}
+                conversationId={selectedConversationId}
+                canManage={canManage}
+                onBack={() => {}}
+                onSelectConversation={setSelectedConversationId}
+                part="details"
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center rounded-xl border border-border/60 bg-card p-4">
+                <p className="text-center text-xs text-muted-foreground">
+                  Contact and conversation details will appear here
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      <AlertDialog open={deleteViewOpen} onOpenChange={setDeleteViewOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete “{selectedSavedView?.name}”?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This shared view will be removed for everyone in this workspace. Conversations are not
+              affected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deleteViewError ? <p className="text-sm text-destructive">{deleteViewError}</p> : null}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteSavedView.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!selectedSavedView || deleteSavedView.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 focus-visible:ring-destructive"
+              onClick={(event) => {
+                event.preventDefault();
+                if (!selectedSavedView) return;
+                deleteSavedView.mutate(selectedSavedView.id, {
+                  onSuccess: () => {
+                    setDeleteViewOpen(false);
+                    setSelectedSavedViewId(null);
+                    setFilter("all");
+                    setViewSelectionRevision((revision) => revision + 1);
+                  },
+                  onError: (error) => setDeleteViewError(error.message),
+                });
+              }}
+            >
+              {deleteSavedView.isPending ? "Deleting…" : "Delete view"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

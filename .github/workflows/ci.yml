@@ -10,8 +10,23 @@ jobs:
   quality:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: cogni_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cogni_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       SKIP_ENV_VALIDATION: "true"
+      DATABASE_URL: postgres://postgres@127.0.0.1:5432/cogni_test
 
     steps:
       - uses: actions/checkout@v4
@@ -26,6 +41,32 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+      - run: pnpm db:migrate
       - run: pnpm lint:github
       - run: pnpm typecheck
+      - run: pnpm test:widget-timeouts
+      - run: pnpm test:widget-preview-container
+      - run: pnpm test:widget-publication
+      - run: pnpm test:widget-publication-db
+      - run: pnpm test:widget-publish-route
+      - run: pnpm test:privileged-route-permissions
+      - run: pnpm test:agent-readiness
+      - run: pnpm test:agent-tests
+      - run: pnpm test:inbox-keyboard-navigation
+      - run: pnpm test:knowledge-source-type
+      - run: pnpm test:knowledge-source-sync
+      - run: pnpm test:widget-stream
+      - run: pnpm test:widget-message-rendering
+      - run: pnpm test:widget-settings
+      - run: pnpm test:conversation-append
+      - run: pnpm test:inbox-pagination
+      - run: pnpm test:inbox-pagination-db
+      - run: pnpm test:inbox-saved-views
+      - run: pnpm test:inbox-macros
+      - run: pnpm test:contact-tags
+      - run: pnpm test:integration-action-recovery
+      - run: pnpm test:workspace-permissions
+      - run: pnpm test:analytics-response-time
+      - run: pnpm test:rate-limit
+      - run: pnpm test:safe-fetch
       - run: pnpm fmt:check

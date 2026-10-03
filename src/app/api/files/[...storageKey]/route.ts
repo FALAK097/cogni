@@ -1,6 +1,8 @@
 import { getDb } from "@/lib/db/client";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { readObject } from "@/lib/storage/index";
+import { canVisitorAccessAttachment } from "@/features/conversations/attachment-access";
+import { and, eq } from "drizzle-orm";
 
 function bearerToken(request: Request) {
   const authorization = request.headers.get("authorization");
@@ -21,6 +23,7 @@ export async function GET(
       filename: true,
       mimeType: true,
       workspaceId: true,
+      conversationId: true,
     },
   });
 
@@ -42,7 +45,27 @@ export async function GET(
         },
       },
     });
-    authorized = Boolean(session && session.widget?.workspaceId === attachment.workspaceId);
+    if (session?.widget?.workspaceId === attachment.workspaceId) {
+      const conversation = await db.query.conversation.findFirst({
+        where: (fields) =>
+          and(
+            eq(fields.id, attachment.conversationId),
+            eq(fields.workspaceId, attachment.workspaceId),
+            eq(fields.visitorSessionId, session.id),
+          ),
+        columns: {
+          workspaceId: true,
+          visitorSessionId: true,
+        },
+      });
+      authorized = canVisitorAccessAttachment({
+        attachmentWorkspaceId: attachment.workspaceId,
+        sessionId: session.id,
+        sessionWorkspaceId: session.widget.workspaceId,
+        conversationWorkspaceId: conversation?.workspaceId ?? null,
+        conversationVisitorSessionId: conversation?.visitorSessionId ?? null,
+      });
+    }
   } else {
     try {
       const { workspace } = await requireDashboardContext();

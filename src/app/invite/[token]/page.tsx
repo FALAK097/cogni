@@ -19,6 +19,8 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
     }),
   ]);
   const invite = await getWorkspaceInviteByToken(getDb(), token);
+  // Invite validity is intentionally evaluated against this request's current time.
+  // oxlint-disable-next-line react/purity -- This server page is request-scoped and is not memoized.
   const now = new Date();
 
   return (

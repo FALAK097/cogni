@@ -1,8 +1,12 @@
 import {
   boolean,
+  check,
   index,
   integer,
+  jsonb,
   pgTable,
+  pgEnum,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -10,6 +14,7 @@ import {
 import { sql } from "drizzle-orm";
 
 import { BRAND_COLOR } from "@/lib/widget-accent";
+import type { WidgetPublicationSnapshot } from "@/features/widget/publication";
 
 const timestampString = () => timestamp({ mode: "string", withTimezone: true });
 const numeric = timestampString;
@@ -136,6 +141,10 @@ export const contact = pgTable(
     id: text().primaryKey().notNull(),
     name: text().notNull(),
     email: text(),
+    phone: text(),
+    source: text().default("WIDGET").notNull(),
+    capturedAt: numeric(),
+    captureContext: text().default("{}").notNull(),
     externalId: text(),
     avatarUrl: text(),
     tags: text().default("[]").notNull(),
@@ -182,7 +191,9 @@ export const conversation = pgTable(
     id: text().primaryKey().notNull(),
     subject: text().notNull(),
     status: text().default("OPEN").notNull(),
+    snoozedUntil: timestampString(),
     channel: text().default("WIDGET").notNull(),
+    externalThreadId: text(),
     aiPaused: boolean().default(false).notNull(),
     createdAt: numeric()
       .default(sql`(CURRENT_TIMESTAMP)`)
@@ -192,6 +203,7 @@ export const conversation = pgTable(
       .default(sql`(CURRENT_TIMESTAMP)`)
       .notNull(),
     messages: text().default("[]").notNull(),
+    labels: text().default("[]").notNull(),
     workspaceId: text()
       .notNull()
       .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
@@ -213,10 +225,145 @@ export const conversation = pgTable(
     index("conversation_widgetId_idx").on(table.widgetId),
     index("conversation_assignedMemberId_idx").on(table.assignedMemberId),
     index("conversation_workspaceId_contactId_idx").on(table.workspaceId, table.contactId),
+    uniqueIndex("conversation_workspaceId_channel_externalThreadId_key").on(
+      table.workspaceId,
+      table.channel,
+      table.externalThreadId,
+    ),
     index("conversation_workspaceId_status_lastMessageAt_idx").on(
       table.workspaceId,
       table.status,
       table.lastMessageAt,
+    ),
+    index("conversation_workspaceId_snoozedUntil_idx").on(table.workspaceId, table.snoozedUntil),
+    index("conversation_workspaceId_lastMessageAt_id_idx").on(
+      table.workspaceId,
+      table.lastMessageAt,
+      table.id,
+    ),
+  ],
+);
+
+export const inboxSavedView = pgTable(
+  "inbox_saved_view",
+  {
+    id: text().primaryKey().notNull(),
+    name: text().notNull(),
+    filter: text().default("all").notNull(),
+    channel: text(),
+    assigneeFilter: text().default("all").notNull(),
+    labelFilter: text(),
+    createdAt: timestampString()
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+    updatedAt: timestampString().notNull(),
+    workspaceId: text()
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    createdByMembershipId: text().references(() => workspaceMember.id, {
+      onDelete: "set null",
+      onUpdate: "cascade",
+    }),
+  },
+  (table) => [
+    uniqueIndex("inbox_saved_view_workspace_name_key").on(
+      table.workspaceId,
+      sql`lower(${table.name})`,
+    ),
+    index("inbox_saved_view_workspace_createdAt_idx").on(table.workspaceId, table.createdAt),
+  ],
+);
+
+export const inboxMacro = pgTable(
+  "inbox_macro",
+  {
+    id: text().primaryKey().notNull(),
+    name: text().notNull(),
+    content: text().notNull(),
+    createdAt: timestampString()
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+    updatedAt: timestampString().notNull(),
+    workspaceId: text()
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    createdByMembershipId: text().references(() => workspaceMember.id, {
+      onDelete: "set null",
+      onUpdate: "cascade",
+    }),
+  },
+  (table) => [
+    uniqueIndex("inbox_macro_workspace_name_key").on(table.workspaceId, sql`lower(${table.name})`),
+    index("inbox_macro_workspace_createdAt_idx").on(table.workspaceId, table.createdAt),
+  ],
+);
+
+export const agentTestExpectedOutcome = pgEnum("agent_test_expected_outcome", [
+  "grounded_answer",
+  "no_evidence",
+  "human_handoff",
+]);
+
+export const agentTestCase = pgTable(
+  "agent_test_case",
+  {
+    id: text().primaryKey().notNull(),
+    title: text().notNull(),
+    prompt: text().notNull(),
+    expectedOutcome: agentTestExpectedOutcome().notNull(),
+    createdAt: timestampString()
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+    updatedAt: timestampString().notNull(),
+    workspaceId: text()
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    createdByMembershipId: text().references(() => workspaceMember.id, {
+      onDelete: "set null",
+      onUpdate: "cascade",
+    }),
+  },
+  (table) => [
+    uniqueIndex("agent_test_case_workspace_title_key").on(
+      table.workspaceId,
+      sql`lower(${table.title})`,
+    ),
+    index("agent_test_case_workspace_createdAt_idx").on(table.workspaceId, table.createdAt),
+  ],
+);
+
+export const knowledgeGapReviewStatus = pgEnum("knowledge_gap_review_status", [
+  "OPEN",
+  "RESOLVED",
+  "IGNORED",
+]);
+
+export const knowledgeGapReview = pgTable(
+  "knowledge_gap_review",
+  {
+    workspaceId: text()
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    questionHash: text().notNull(),
+    status: knowledgeGapReviewStatus().default("OPEN").notNull(),
+    reviewedByUserId: text().references(() => user.id, {
+      onDelete: "set null",
+      onUpdate: "cascade",
+    }),
+    createdAt: timestampString()
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+    updatedAt: timestampString()
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.workspaceId, table.questionHash] }),
+    check("knowledge_gap_review_questionHash_check", sql`${table.questionHash} ~ '^[a-f0-9]{64}$'`),
+    index("knowledge_gap_review_workspace_status_updatedAt_idx").on(
+      table.workspaceId,
+      table.status,
+      table.updatedAt,
     ),
   ],
 );
@@ -250,6 +397,13 @@ export const widget = pgTable(
     escalationKeywords: text().default("human,agent,person,representative,support team").notNull(),
     modelProvider: text().default("OPENAI").notNull(),
     modelName: text().default("gpt-4o-mini").notNull(),
+    bookingEnabled: boolean().default(false).notNull(),
+    bookingTimezone: text().default("UTC").notNull(),
+    bookingDurationMinutes: integer().default(30).notNull(),
+    bookingMinimumNoticeMinutes: integer().default(60).notNull(),
+    bookingWorkingHours: text()
+      .default('{"start":"09:00","end":"17:00","weekdays":[1,2,3,4,5]}')
+      .notNull(),
     isEnabled: boolean().default(true).notNull(),
     theme: text().default("light").notNull(),
     userBubbleColor: text().default(BRAND_COLOR).notNull(),
@@ -278,6 +432,7 @@ export const widget = pgTable(
     enableBrochure: boolean().default(false).notNull(),
     brochureSuggestionText: text().default("Receive Brochure").notNull(),
     authorizedDomains: text().default("[]").notNull(),
+    publishedVersion: integer().default(0).notNull(),
     createdAt: numeric()
       .default(sql`(CURRENT_TIMESTAMP)`)
       .notNull(),
@@ -289,6 +444,29 @@ export const widget = pgTable(
   (table) => [
     uniqueIndex("widget_workspaceId_key").on(table.workspaceId),
     uniqueIndex("widget_publicKey_key").on(table.publicKey),
+  ],
+);
+
+export const widgetPublication = pgTable(
+  "widget_publication",
+  {
+    id: text().primaryKey().notNull(),
+    version: integer().notNull(),
+    config: jsonb().$type<WidgetPublicationSnapshot>().notNull(),
+    publishedAt: timestampString()
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+    widgetId: text()
+      .notNull()
+      .references(() => widget.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    createdByUserId: text().references(() => user.id, {
+      onDelete: "set null",
+      onUpdate: "cascade",
+    }),
+  },
+  (table) => [
+    uniqueIndex("widget_publication_widgetId_version_key").on(table.widgetId, table.version),
+    index("widget_publication_widgetId_publishedAt_idx").on(table.widgetId, table.publishedAt),
   ],
 );
 
@@ -340,62 +518,6 @@ export const visitorSession = pgTable(
     index("visitor_session_widgetId_visitorId_idx").on(table.widgetId, table.visitorId),
     index("visitor_session_widgetId_lastSeenAt_idx").on(table.widgetId, table.lastSeenAt),
     uniqueIndex("visitor_session_token_key").on(table.token),
-  ],
-);
-
-export const lead = pgTable(
-  "lead",
-  {
-    id: text().primaryKey().notNull(),
-    workspaceId: text()
-      .notNull()
-      .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
-    contactId: text().references(() => contact.id, { onDelete: "set null", onUpdate: "cascade" }),
-    name: text().notNull(),
-    email: text(),
-    phone: text(),
-    source: text().default("WIDGET").notNull(),
-    status: text().default("new").notNull(),
-    capturedFromChat: boolean().default(false).notNull(),
-    chatSessionId: text(),
-    chatSummary: text(),
-    createdAt: numeric()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
-    updatedAt: numeric().notNull(),
-  },
-  (table) => [
-    index("lead_workspaceId_phone_idx").on(table.workspaceId, table.phone),
-    index("lead_workspaceId_email_idx").on(table.workspaceId, table.email),
-  ],
-);
-
-export const widgetLeadCapture = pgTable(
-  "widget_lead_capture",
-  {
-    id: text().primaryKey().notNull(),
-    visitorSessionId: text()
-      .notNull()
-      .references(() => visitorSession.id, { onDelete: "cascade", onUpdate: "cascade" }),
-    leadId: text().references(() => lead.id, { onDelete: "set null", onUpdate: "cascade" }),
-    triggerType: text().notNull(),
-    triggerValue: text(),
-    formShownAt: numeric()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
-    formSubmittedAt: numeric(),
-    abandoned: boolean().default(false).notNull(),
-    messageCountAtCapture: integer().default(0).notNull(),
-    conversationSummary: text(),
-    createdAt: numeric()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
-    updatedAt: numeric().notNull(),
-  },
-  (table) => [
-    index("widget_lead_capture_leadId_idx").on(table.leadId),
-    uniqueIndex("widget_lead_capture_leadId_key").on(table.leadId),
-    uniqueIndex("widget_lead_capture_visitorSessionId_key").on(table.visitorSessionId),
   ],
 );
 
@@ -498,6 +620,13 @@ export const integration = pgTable(
     provider: text().notNull(),
     status: text().default("DISCONNECTED").notNull(),
     displayName: text(),
+    connectedAccountId: text(),
+    externalAccountId: text(),
+    toolkitVersion: text(),
+    config: text().default("{}").notNull(),
+    credentials: text(),
+    lastHealthCheckAt: numeric(),
+    lastError: text(),
     createdAt: numeric()
       .default(sql`(CURRENT_TIMESTAMP)`)
       .notNull(),
@@ -578,6 +707,10 @@ export const workflowRun = pgTable(
       .default(sql`(CURRENT_TIMESTAMP)`)
       .notNull(),
     finishedAt: numeric(),
+    conversationId: text().references(() => conversation.id, {
+      onDelete: "set null",
+      onUpdate: "cascade",
+    }),
     workspaceId: text()
       .notNull()
       .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
@@ -588,7 +721,10 @@ export const workflowRun = pgTable(
       table.status,
       table.startedAt,
     ),
-    uniqueIndex("workflow_run_idempotencyKey_key").on(table.idempotencyKey),
+    uniqueIndex("workflow_run_workspaceId_idempotencyKey_key").on(
+      table.workspaceId,
+      table.idempotencyKey,
+    ),
   ],
 );
 
@@ -664,6 +800,95 @@ export const integrationAction = pgTable(
       table.status,
       table.createdAt,
     ),
-    uniqueIndex("integration_action_idempotencyKey_key").on(table.idempotencyKey),
+    uniqueIndex("integration_action_workspaceId_idempotencyKey_key").on(
+      table.workspaceId,
+      table.idempotencyKey,
+    ),
   ],
+);
+
+export const workflowStep = pgTable(
+  "workflow_step",
+  {
+    id: text().primaryKey().notNull(),
+    position: integer().notNull(),
+    name: text().notNull(),
+    kind: text().notNull(),
+    status: text().default("PENDING").notNull(),
+    input: text().default("{}").notNull(),
+    output: text(),
+    errorMessage: text(),
+    startedAt: numeric(),
+    finishedAt: numeric(),
+    workflowRunId: text()
+      .notNull()
+      .references(() => workflowRun.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    workspaceId: text()
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
+  },
+  (table) => [
+    uniqueIndex("workflow_step_run_position_key").on(table.workflowRunId, table.position),
+    index("workflow_step_workspaceId_status_idx").on(table.workspaceId, table.status),
+  ],
+);
+
+export const approvalRequest = pgTable(
+  "approval_request",
+  {
+    id: text().primaryKey().notNull(),
+    status: text().default("PENDING").notNull(),
+    actionType: text().notNull(),
+    riskLevel: text().default("MEDIUM").notNull(),
+    summary: text().notNull(),
+    payload: text().default("{}").notNull(),
+    tokenHash: text().notNull(),
+    expiresAt: numeric().notNull(),
+    decidedAt: numeric(),
+    createdAt: numeric()
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+    workspaceId: text()
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    conversationId: text().references(() => conversation.id, {
+      onDelete: "set null",
+      onUpdate: "cascade",
+    }),
+    workflowRunId: text().references(() => workflowRun.id, {
+      onDelete: "cascade",
+      onUpdate: "cascade",
+    }),
+    workflowStepId: text().references(() => workflowStep.id, {
+      onDelete: "cascade",
+      onUpdate: "cascade",
+    }),
+    requestedByAgentRunId: text().references(() => agentRun.id, {
+      onDelete: "set null",
+      onUpdate: "cascade",
+    }),
+    decidedByUserId: text().references(() => user.id, {
+      onDelete: "set null",
+      onUpdate: "cascade",
+    }),
+  },
+  (table) => [
+    uniqueIndex("approval_request_tokenHash_key").on(table.tokenHash),
+    uniqueIndex("approval_request_workflowStepId_key").on(table.workflowStepId),
+    index("approval_request_workspaceId_status_createdAt_idx").on(
+      table.workspaceId,
+      table.status,
+      table.createdAt,
+    ),
+  ],
+);
+
+export const rateLimitBucket = pgTable(
+  "rate_limit_bucket",
+  {
+    keyHash: text().primaryKey().notNull(),
+    count: integer().notNull(),
+    resetAt: timestampString().notNull(),
+  },
+  (table) => [index("rate_limit_bucket_resetAt_idx").on(table.resetAt)],
 );

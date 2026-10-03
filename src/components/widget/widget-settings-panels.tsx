@@ -2,9 +2,19 @@
 
 import Image from "next/image";
 import type { ReactNode } from "react";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 
-import { Check, Copy, Moon, RotateCcw, Sun, Trash2 } from "@/components/icons";
+import { Check, Copy, Moon, RotateCcw, Shield, ShieldCheck, Sun, Trash2 } from "@/components/icons";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,7 +27,12 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import type { WidgetPosition, WidgetTheme, WidgetModelProvider } from "@/features/widget/domain";
+import type {
+  WidgetPosition,
+  WidgetTheme,
+  WidgetModelProvider,
+  WidgetPublicationVersion,
+} from "@/features/widget/domain";
 import { normalizeLogoUrl, widgetModelOptions } from "@/features/widget/domain";
 import { WIDGET_BRAND_COLOR } from "@/lib/widget-accent";
 import { cn } from "@/lib/utils";
@@ -141,18 +156,21 @@ function WidgetColorInput({
 }
 
 function WidgetSegmentedControl<T extends string>({
+  label,
   value,
   options,
   onChange,
   className,
 }: {
+  label: string;
   value: T;
   options: { value: T; label: string; icon?: ReactNode }[];
   onChange: (value: T) => void;
   className?: string;
 }) {
   return (
-    <div className={cn("flex gap-2", className)}>
+    <fieldset className={cn("flex gap-2", className)}>
+      <legend className="sr-only">{label}</legend>
       {options.map((option) => {
         const isActive = value === option.value;
         return (
@@ -160,8 +178,9 @@ function WidgetSegmentedControl<T extends string>({
             key={option.value}
             type="button"
             onClick={() => onChange(option.value)}
+            aria-pressed={isActive}
             className={cn(
-              "inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-medium transition-[background-color,border-color,color,box-shadow] duration-150",
+              "inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-medium transition-[background-color,border-color,color,box-shadow] duration-150 ease-out focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none",
               isActive
                 ? "border-[var(--widget-accent)] bg-[var(--widget-accent-muted)] text-[var(--widget-accent)] shadow-xs"
                 : "border-border bg-card text-foreground hover:bg-muted",
@@ -172,7 +191,7 @@ function WidgetSegmentedControl<T extends string>({
           </button>
         );
       })}
-    </div>
+    </fieldset>
   );
 }
 
@@ -329,10 +348,11 @@ export function WidgetAppearancePanel({
             }}
           />
 
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 @md:grid-cols-2">
             <div className="space-y-1.5">
               <Label className="text-sm font-medium text-foreground">Position on screen</Label>
               <WidgetSegmentedControl
+                label="Widget position"
                 value={config.position}
                 onChange={(value) => onUpdate("position", value)}
                 options={[
@@ -344,6 +364,7 @@ export function WidgetAppearancePanel({
             <div className="space-y-1.5">
               <Label className="text-sm font-medium text-foreground">Theme</Label>
               <WidgetSegmentedControl
+                label="Widget theme"
                 value={config.theme}
                 onChange={(value) => onUpdate("theme", value)}
                 options={[
@@ -462,10 +483,11 @@ export function WidgetAppearancePanel({
           <div>
             <p className="text-sm font-medium text-foreground">Remove branding</p>
             <p className="mt-0.5 text-sm text-muted-foreground">
-              Remove &apos;Powered by Acme&apos; from the widget
+              Remove &apos;Powered by cogni&apos; from the widget
             </p>
           </div>
           <Switch
+            aria-label="Remove branding"
             checked={!config.showBranding}
             onCheckedChange={(checked) => onUpdate("showBranding", !checked)}
             className="data-checked:bg-[var(--widget-accent)]"
@@ -491,7 +513,7 @@ export function WidgetAgentPanel({
   modelName: string | null;
   onUpdate: (
     key: "agentName" | "instructions" | "escalationKeywords" | "modelProvider" | "modelName",
-    value: any,
+    value: string,
   ) => void;
 }) {
   const provider = (modelProvider === "GOOGLE" ? "GOOGLE" : "OPENAI") as WidgetModelProvider;
@@ -504,7 +526,7 @@ export function WidgetAgentPanel({
         description="Configure your AI assistant's identity and behavior instructions."
       />
       <div className="space-y-6">
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-6 @md:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="model-provider" className="text-sm font-medium text-foreground">
               Model Provider
@@ -512,6 +534,7 @@ export function WidgetAgentPanel({
             <Select
               value={provider}
               onValueChange={(value) => {
+                if (value !== "OPENAI" && value !== "GOOGLE") return;
                 onUpdate("modelProvider", value);
                 const defaultModel =
                   widgetModelOptions[value as WidgetModelProvider][0]?.value ?? "";
@@ -519,7 +542,9 @@ export function WidgetAgentPanel({
               }}
             >
               <SelectTrigger id="model-provider" className={FIELD_CLASS}>
-                <SelectValue placeholder="Select provider" />
+                <SelectValue placeholder="Select provider">
+                  {provider === "GOOGLE" ? "Google Gemini" : "OpenAI"}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent className="rounded-lg">
                 <SelectItem value="OPENAI">OpenAI</SelectItem>
@@ -531,9 +556,18 @@ export function WidgetAgentPanel({
             <Label htmlFor="model-name" className="text-sm font-medium text-foreground">
               Model Name
             </Label>
-            <Select value={modelName} onValueChange={(value) => onUpdate("modelName", value)}>
+            <Select
+              value={modelName}
+              onValueChange={(value) => {
+                if (value !== null) onUpdate("modelName", value);
+              }}
+            >
               <SelectTrigger id="model-name" className={FIELD_CLASS}>
-                <SelectValue placeholder="Select model" />
+                <SelectValue placeholder="Select model">
+                  {models.find((model) => model.value === modelName)?.label ??
+                    modelName ??
+                    "Select model"}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent className="rounded-lg">
                 {models.map((model) => (
@@ -673,6 +707,7 @@ export function WidgetBehaviourPanel({
             </p>
           </div>
           <Switch
+            aria-label="Hide suggestions on interact"
             checked={hideSuggestionsOnInteract}
             onCheckedChange={(checked) => onUpdate("hideSuggestionsOnInteract", checked)}
             className="data-checked:bg-[var(--widget-accent)]"
@@ -686,6 +721,7 @@ export function WidgetBehaviourPanel({
             </p>
           </div>
           <Switch
+            aria-label="Enable lead capture"
             checked={enableLeadCapture}
             onCheckedChange={(checked) => onUpdate("enableLeadCapture", checked)}
             className="data-checked:bg-[var(--widget-accent)]"
@@ -742,6 +778,7 @@ export function WidgetBehaviourPanel({
             </p>
           </div>
           <Switch
+            aria-label="Enable brochure feature"
             checked={enableBrochure}
             onCheckedChange={(checked) => onUpdate("enableBrochure", checked)}
             className="data-checked:bg-[var(--widget-accent)]"
@@ -865,6 +902,8 @@ export function WidgetSuggestedQuestionsPanel({
 }
 
 export function WidgetInstallationPanel({
+  isEnabled,
+  currentPublication,
   allowedDomains,
   domainInput,
   copied,
@@ -873,7 +912,11 @@ export function WidgetInstallationPanel({
   onAddDomain,
   onRemoveDomain,
   onCopyScript,
+  onEnabledChange,
+  canManage,
 }: {
+  isEnabled: boolean;
+  currentPublication: WidgetPublicationVersion | null;
   allowedDomains: string[];
   domainInput: string;
   copied: boolean;
@@ -882,6 +925,8 @@ export function WidgetInstallationPanel({
   onAddDomain: () => void;
   onRemoveDomain: (domain: string) => void;
   onCopyScript: () => void;
+  onEnabledChange: (value: boolean) => void;
+  canManage: boolean;
 }) {
   return (
     <>
@@ -890,6 +935,92 @@ export function WidgetInstallationPanel({
         description="Authorize domains and copy the embed code to your website."
       />
       <div className="space-y-8">
+        <output
+          className="flex items-start gap-3 rounded-lg border border-border/70 bg-muted/30 p-3"
+          aria-label={
+            currentPublication
+              ? `Live agent version ${currentPublication.version}`
+              : "Agent is not published"
+          }
+        >
+          <Check
+            className={cn(
+              "mt-0.5 size-4 shrink-0",
+              currentPublication ? "text-primary" : "text-muted-foreground",
+            )}
+            aria-hidden="true"
+          />
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-foreground">
+              {currentPublication
+                ? `Live version ${currentPublication.version}`
+                : "No published version yet"}
+            </p>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {currentPublication ? (
+                <>
+                  Published{" "}
+                  <time dateTime={currentPublication.publishedAt}>
+                    {new Date(currentPublication.publishedAt).toLocaleString(undefined, {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    })}
+                  </time>
+                  {currentPublication.authorName
+                    ? ` by ${currentPublication.authorName}`
+                    : " · Existing setup"}
+                </>
+              ) : (
+                "Publish your agent before visitors can use the widget."
+              )}
+            </p>
+          </div>
+        </output>
+        <section className="flex items-start justify-between gap-4 rounded-lg border border-border bg-card p-4">
+          <div className="min-w-0">
+            <Label
+              htmlFor="widget-visitor-access"
+              className="text-sm font-semibold text-foreground"
+            >
+              Accept visitor conversations
+            </Label>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+              {isEnabled
+                ? "Your widget can serve visitors on authorized domains."
+                : "The widget is paused. Visitors cannot start or continue conversations."}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              This safety control applies to live traffic when saved. Agent content and appearance
+              change when you publish.
+            </p>
+          </div>
+          <Switch
+            id="widget-visitor-access"
+            checked={isEnabled}
+            onCheckedChange={onEnabledChange}
+            disabled={!canManage}
+            aria-label="Accept visitor conversations"
+          />
+        </section>
+        <output className="flex items-start gap-3 rounded-lg border border-border/70 bg-muted/30 p-3">
+          {allowedDomains.length > 0 ? (
+            <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+          ) : (
+            <Shield className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          )}
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-foreground">
+              {allowedDomains.length > 0
+                ? "Domain access is restricted"
+                : "Add your website domain first"}
+            </p>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {allowedDomains.length > 0
+                ? "Only authorized domains can load the widget."
+                : "Production widget requests are rejected until you authorize a domain."}
+            </p>
+          </div>
+        </output>
         <section className="space-y-4">
           <div>
             <h3 className="text-sm font-semibold text-foreground">Authorized domains</h3>
@@ -897,15 +1028,23 @@ export function WidgetInstallationPanel({
               Add each website domain where the widget is embedded (e.g.{" "}
               <code className="rounded bg-muted px-1 py-0.5 text-xs">acme.com</code>).
             </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Saved domain changes take effect for live traffic immediately.
+            </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-end gap-2">
             <div className="relative flex-1">
+              <Label htmlFor="authorized-domain" className="sr-only">
+                Website domain
+              </Label>
               <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground">
                 https://
               </span>
               <Input
+                id="authorized-domain"
                 value={domainInput}
                 onChange={(event) => onDomainInputChange(event.target.value)}
+                disabled={!canManage}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
                     event.preventDefault();
@@ -919,7 +1058,7 @@ export function WidgetInstallationPanel({
             <Button
               type="button"
               onClick={onAddDomain}
-              disabled={!domainInput.trim()}
+              disabled={!canManage || !domainInput.trim()}
               className="h-10 rounded-lg bg-[var(--widget-accent)] px-4 text-sm font-medium text-primary-foreground hover:bg-[var(--widget-accent-hover)]"
             >
               Add
@@ -937,6 +1076,7 @@ export function WidgetInstallationPanel({
                   variant="ghost"
                   size="icon-sm"
                   onClick={() => onRemoveDomain(domain)}
+                  disabled={!canManage}
                   className="size-8 text-muted-foreground hover:text-destructive"
                   aria-label={`Remove ${domain}`}
                 >
@@ -969,13 +1109,112 @@ export function WidgetInstallationPanel({
               variant="outline"
               onClick={onCopyScript}
               className="absolute top-2 right-2 size-8 rounded-lg border-border bg-card"
-              aria-label="Copy embed code"
+              aria-label={copied ? "Embed code copied" : "Copy embed code"}
             >
               {copied ? <Check className="size-4 text-primary" /> : <Copy className="size-4" />}
             </Button>
           </div>
         </section>
       </div>
+    </>
+  );
+}
+
+export function WidgetVersionHistory({
+  versions,
+  currentVersion,
+  canManage,
+  restoringVersion,
+  onRestore,
+}: {
+  versions: WidgetPublicationVersion[];
+  currentVersion: number | null;
+  canManage: boolean;
+  restoringVersion: number | null;
+  onRestore: (version: number) => Promise<void>;
+}) {
+  const [restoreTarget, setRestoreTarget] = useState<WidgetPublicationVersion | null>(null);
+  const historicalVersions = versions.filter((version) => version.version !== currentVersion);
+  if (historicalVersions.length === 0) return null;
+
+  const confirmRestore = async () => {
+    if (!restoreTarget) return;
+    await onRestore(restoreTarget.version);
+    setRestoreTarget(null);
+  };
+
+  return (
+    <>
+      <details className="rounded-xl border border-border bg-card">
+        <summary className="cursor-pointer rounded-xl px-4 py-3 text-sm font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+          Version history
+        </summary>
+        <ol className="divide-y divide-border border-t border-border">
+          {versions.map((version) => {
+            const isCurrent = version.version === currentVersion;
+            const date = new Date(version.publishedAt);
+            const dateLabel = Number.isNaN(date.getTime())
+              ? "Publication date unavailable"
+              : date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+            return (
+              <li
+                key={version.version}
+                className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">
+                    Version {version.version}
+                    {isCurrent ? " · Live" : ""}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {dateLabel} · {version.authorName ?? "Existing setup"}
+                  </p>
+                </div>
+                {!isCurrent && canManage ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={restoringVersion !== null}
+                    onClick={() => setRestoreTarget(version)}
+                    aria-label={`Restore version ${version.version}`}
+                  >
+                    {restoringVersion === version.version ? "Restoring…" : "Restore"}
+                  </Button>
+                ) : null}
+              </li>
+            );
+          })}
+        </ol>
+        <p className="px-4 pb-3 text-xs leading-relaxed text-muted-foreground">
+          Restoring a version replaces the current draft and publishes it immediately.
+        </p>
+      </details>
+      <AlertDialog
+        open={restoreTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && restoringVersion === null) setRestoreTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Restore version {restoreTarget?.version}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This replaces your current draft and immediately publishes the selected version for
+              visitors. You can restore another published version afterward.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={restoringVersion !== null}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={restoringVersion !== null}
+              onClick={() => void confirmRestore()}
+            >
+              {restoringVersion === restoreTarget?.version ? "Restoring…" : "Restore and publish"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

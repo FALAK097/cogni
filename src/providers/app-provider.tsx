@@ -14,7 +14,7 @@ import { getQueryClient } from "@/lib/query-client";
 
 const DASHBOARD_ROUTE_PREFIXES = [
   "/dashboard",
-  "/widget",
+  "/playground",
   "/conversations",
   "/knowledge-base",
   "/integrations",

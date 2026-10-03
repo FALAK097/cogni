@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import AdminPanelLayout from "@/components/app-nav/admin-panel-layout";
+import { DashboardShell } from "@/components/app-nav/dashboard-shell";
 import { generateUserAvatarUrl, getStableBackgroundColor } from "@/lib/avatar-generator";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { SITE_NAME } from "@/lib/constants";
@@ -29,7 +29,7 @@ export default async function DashboardShellLayout({ children }: { children: Rea
 
   return (
     <main className="flex w-full flex-1 flex-col overflow-hidden">
-      <AdminPanelLayout userData={userData}>{children}</AdminPanelLayout>
+      <DashboardShell userData={userData}>{children}</DashboardShell>
     </main>
   );
 }

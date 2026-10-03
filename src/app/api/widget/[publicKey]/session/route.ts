@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
 import { getVisitorConversationMessages } from "@/features/conversations/server/conversation-service";
-import { parseJsonArray } from "@/features/widget/domain";
 import { getHasWidgetConversationCond } from "@/features/widget/server/widget-data-filters";
 import { assertPublicWidgetAccess, bearerToken } from "@/features/widget/server/widget-public";
 import { createWidgetBootstrapToken } from "@/features/widget/server/widget-bootstrap";
@@ -61,47 +60,26 @@ export async function POST(
 
       const browserSessionId = parsed.data.sessionId ?? randomUUID();
       const visitorId = parsed.data.visitorId ?? randomUUID();
-      const nowIso = new Date().toISOString();
-      const visitorSession = await db.query.visitorSession.findFirst({
-        where: (fields, { eq, and, gt }) =>
-          and(
-            eq(fields.widgetId, widget.id),
-            eq(fields.browserSessionId, browserSessionId),
-            eq(fields.hostname, PREVIEW_HOSTNAME),
-            gt(fields.messageCount, 0),
-            gt(fields.expiresAt, nowIso),
-            getHasWidgetConversationCond(fields),
-          ),
-      });
-
-      const messages = visitorSession
-        ? await getVisitorConversationMessages({
-            db,
-            visitorSessionId: visitorSession.id,
-          })
-        : [];
 
       return Response.json({
-        sessionId: visitorSession?.id ?? null,
+        sessionId: null,
         browserSessionId,
-        token:
-          visitorSession?.token ??
-          createWidgetBootstrapToken({
-            widgetId: widget.id,
-            publicKey: widget.publicKey,
-            browserSessionId,
-            visitorId,
-            hostname: PREVIEW_HOSTNAME,
-          }),
+        token: createWidgetBootstrapToken({
+          widgetId: widget.id,
+          publicKey: widget.publicKey,
+          browserSessionId,
+          visitorId,
+          hostname: PREVIEW_HOSTNAME,
+        }),
         workspaceId: widget.workspaceId,
         publicKey: widget.publicKey,
-        isNew: visitorSession === null,
+        isNew: true,
         preview: true,
         enableLeadCapture: false,
         leadCaptureKeywords: [],
         enableBrochure: widget.enableBrochure,
         brochureSuggestionText: widget.brochureSuggestionText,
-        messages: toWidgetHistoryMessages(messages),
+        messages: [],
       });
     } catch {
       return Response.json({ error: "Preview access denied." }, { status: 403 });
@@ -111,7 +89,7 @@ export async function POST(
   const access = await assertPublicWidgetAccess(db, publicKey, request);
   if ("error" in access) return access.error;
 
-  const { widget, origin, allowedDomains } = access;
+  const { widget, origin, allowedDomains, settings } = access;
   const token = bearerToken(request);
   const nowIso = new Date().toISOString();
 
@@ -174,10 +152,10 @@ export async function POST(
     publicKey: widget.publicKey,
     isNew: visitorSession === null,
     preview: false,
-    enableLeadCapture: widget.enableLeadCapture,
-    leadCaptureKeywords: parseJsonArray(widget.leadCaptureKeywords),
-    enableBrochure: widget.enableBrochure,
-    brochureSuggestionText: widget.brochureSuggestionText,
+    enableLeadCapture: settings.enableLeadCapture,
+    leadCaptureKeywords: settings.leadCaptureKeywords,
+    enableBrochure: settings.enableBrochure,
+    brochureSuggestionText: settings.brochureSuggestionText,
     visitor: visitorSession
       ? {
           name: visitorSession.name,

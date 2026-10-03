@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { runDbWriteOperation, type Db } from "@/lib/db/client";
 import { conversation, visitorSession as visitorSessionTable, contact } from "@/lib/db/schema";
 import type { widget as widgetTable } from "@/lib/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 
 const visitorSessionDurationMs = 1000 * 60 * 60 * 24 * 90;
 
@@ -51,6 +51,7 @@ export type MessageJson = {
   id: string;
   body: string;
   authorType: "VISITOR" | "AI" | "TEAM";
+  authorName?: string | null;
   visibility?: "PUBLIC" | "INTERNAL";
   clientId?: string | null;
   replyToMessageId?: string | null;
@@ -59,7 +60,135 @@ export type MessageJson = {
   feedback?: "positive" | "negative" | null;
   feedbackReason?: string | null;
   feedbackAt?: string | null;
+  citations?: MessageCitation[];
+  retrievalOutcome?: "SOURCES_FOUND" | "NO_MATCH";
 };
+
+export type MessageCitation = {
+  documentId: string;
+  title: string;
+  excerpt: string;
+};
+
+/**
+ * Serialize an AI channel delivery with human takeover. The row lock is held
+ * only for the external send and transcript write, never while generating.
+ */
+export async function deliverAiReplyIfActive({
+  db,
+  workspaceId,
+  conversationId,
+  message,
+  deliver,
+}: {
+  db: Db;
+  workspaceId: string;
+  conversationId: string;
+  message: MessageJson;
+  deliver: () => Promise<void>;
+}) {
+  return runDbWriteOperation(db, async (transaction) => {
+    const locked = await transaction.execute(sql`
+      SELECT "id"
+      FROM "conversation"
+      WHERE "id" = ${conversationId} AND "workspaceId" = ${workspaceId}
+      FOR UPDATE
+    `);
+    if (locked.length === 0) return false;
+
+    const [current] = await transaction
+      .select({ aiPaused: conversation.aiPaused, status: conversation.status })
+      .from(conversation)
+      .where(and(eq(conversation.id, conversationId), eq(conversation.workspaceId, workspaceId)))
+      .limit(1);
+    if (!current || current.aiPaused || current.status === "CLOSED") return false;
+
+    const appended = await appendConversationMessage({
+      db: transaction,
+      workspaceId,
+      conversationId,
+      message,
+      requireAiActive: true,
+    });
+    if (!appended || !appended.inserted) return false;
+    await deliver();
+    return true;
+  });
+}
+
+/**
+ * Append against the current JSON array in one PostgreSQL UPDATE. The row lock
+ * acquired by UPDATE serializes concurrent writers, so no message is lost when
+ * a visitor, teammate, agent, or channel webhook writes at the same time.
+ */
+export async function appendConversationMessage({
+  db,
+  workspaceId,
+  conversationId,
+  message,
+  updateLastMessageAt = true,
+  requireAiActive = false,
+}: {
+  db: Db;
+  workspaceId: string;
+  conversationId: string;
+  message: MessageJson;
+  updateLastMessageAt?: boolean;
+  requireAiActive?: boolean;
+}) {
+  const messages = sql`COALESCE(NULLIF(${conversation.messages}, '')::jsonb, '[]'::jsonb)`;
+  const duplicate = message.clientId
+    ? sql`EXISTS (
+        SELECT 1
+        FROM jsonb_array_elements(${messages}) AS existing(item)
+        WHERE existing.item ->> 'clientId' = ${message.clientId}
+      )`
+    : message.replyToMessageId
+      ? sql`EXISTS (
+          SELECT 1
+          FROM jsonb_array_elements(${messages}) AS existing(item)
+          WHERE existing.item ->> 'replyToMessageId' = ${message.replyToMessageId}
+        )`
+      : null;
+  const appendedMessages = sql`(${messages} || ${JSON.stringify([message])}::jsonb)::text`;
+
+  const conditions = [
+    eq(conversation.id, conversationId),
+    eq(conversation.workspaceId, workspaceId),
+  ];
+  if (requireAiActive) {
+    conditions.push(eq(conversation.aiPaused, false), ne(conversation.status, "CLOSED"));
+  }
+
+  const [updatedConversation] = await db
+    .update(conversation)
+    .set({
+      messages: duplicate
+        ? sql`CASE WHEN ${duplicate} THEN ${conversation.messages} ELSE ${appendedMessages} END`
+        : appendedMessages,
+      updatedAt: message.createdAt,
+      ...(message.authorType === "VISITOR" ? { snoozedUntil: null } : {}),
+      ...(updateLastMessageAt ? { lastMessageAt: message.createdAt } : {}),
+    })
+    .where(and(...conditions))
+    .returning();
+
+  if (!updatedConversation) return null;
+
+  const persistedMessages = JSON.parse(updatedConversation.messages || "[]") as MessageJson[];
+  const persistedMessage = persistedMessages.find(
+    (candidate) =>
+      candidate.id === message.id ||
+      (message.clientId && candidate.clientId === message.clientId) ||
+      (message.replyToMessageId && candidate.replyToMessageId === message.replyToMessageId),
+  );
+
+  return {
+    conversation: updatedConversation,
+    message: persistedMessage ?? message,
+    inserted: persistedMessage?.id === message.id,
+  };
+}
 
 async function appendVisitorMessage(
   db: Db,
@@ -70,10 +199,22 @@ async function appendVisitorMessage(
   const now = new Date();
   const nowIso = now.toISOString();
 
+  // Serialize first-message creation per visitor session. Without locking the
+  // parent row, simultaneous requests can both observe no active conversation.
+  await db.execute(sql`
+    SELECT id
+    FROM ${visitorSessionTable}
+    WHERE ${visitorSessionTable.id} = ${visitorSession.id}
+      AND ${visitorSessionTable.widgetId} = ${visitorSession.widget.id}
+    FOR UPDATE
+  `);
+
   const existingConversation = await db.query.conversation.findFirst({
     where: (convo, { eq, and, ne }) =>
       and(
         eq(convo.visitorSessionId, visitorSession.id),
+        eq(convo.workspaceId, visitorSession.widget.workspace.id),
+        eq(convo.widgetId, visitorSession.widget.id),
         ne(convo.status, "CLOSED"),
         eq(convo.channel, "WIDGET"),
       ),
@@ -81,16 +222,6 @@ async function appendVisitorMessage(
   });
 
   if (existingConversation) {
-    const messagesList = JSON.parse(existingConversation.messages || "[]") as MessageJson[];
-    const replayed = messagesList.find((m) => m.clientId === clientMessageId);
-    if (replayed) {
-      return {
-        conversation: existingConversation,
-        visitorMessageId: replayed.id,
-        replayed: true,
-      };
-    }
-
     const newMessage: MessageJson = {
       id: randomUUID(),
       body: text,
@@ -100,32 +231,34 @@ async function appendVisitorMessage(
       createdAt: nowIso,
     };
 
-    const updatedMessages = [...messagesList, newMessage];
-    const results = await db
-      .update(conversation)
-      .set({
-        lastMessageAt: nowIso,
-        messages: JSON.stringify(updatedMessages),
-        updatedAt: nowIso,
-      })
-      .where(eq(conversation.id, existingConversation.id))
-      .returning();
+    const appended = await appendConversationMessage({
+      db,
+      workspaceId: visitorSession.widget.workspace.id,
+      conversationId: existingConversation.id,
+      message: newMessage,
+    });
+    if (!appended) throw new Error("Conversation not found.");
 
-    const updatedConvo = results[0];
-
-    await db
-      .update(visitorSessionTable)
-      .set({
-        lastSeenAt: nowIso,
-        expiresAt: new Date(now.getTime() + visitorSessionDurationMs).toISOString(),
-        messageCount: sql`${visitorSessionTable.messageCount} + 1`,
-      })
-      .where(eq(visitorSessionTable.id, visitorSession.id));
+    if (appended.inserted) {
+      await db
+        .update(visitorSessionTable)
+        .set({
+          lastSeenAt: nowIso,
+          expiresAt: new Date(now.getTime() + visitorSessionDurationMs).toISOString(),
+          messageCount: sql`${visitorSessionTable.messageCount} + 1`,
+        })
+        .where(
+          and(
+            eq(visitorSessionTable.id, visitorSession.id),
+            eq(visitorSessionTable.widgetId, visitorSession.widget.id),
+          ),
+        );
+    }
 
     return {
-      conversation: updatedConvo,
-      visitorMessageId: newMessage.id,
-      replayed: false,
+      conversation: appended.conversation,
+      visitorMessageId: appended.message.id,
+      replayed: !appended.inserted,
     };
   }
 
@@ -145,7 +278,12 @@ async function appendVisitorMessage(
     await db
       .update(visitorSessionTable)
       .set({ contactId })
-      .where(eq(visitorSessionTable.id, visitorSession.id));
+      .where(
+        and(
+          eq(visitorSessionTable.id, visitorSession.id),
+          eq(visitorSessionTable.widgetId, visitorSession.widget.id),
+        ),
+      );
   }
 
   const newMessage: MessageJson = {
@@ -180,7 +318,12 @@ async function appendVisitorMessage(
       expiresAt: new Date(now.getTime() + visitorSessionDurationMs).toISOString(),
       messageCount: sql`${visitorSessionTable.messageCount} + 1`,
     })
-    .where(eq(visitorSessionTable.id, visitorSession.id));
+    .where(
+      and(
+        eq(visitorSessionTable.id, visitorSession.id),
+        eq(visitorSessionTable.widgetId, visitorSession.widget.id),
+      ),
+    );
 
   console.info("conversation.created", {
     workspaceId: visitorSession.widget.workspace.id,
@@ -210,6 +353,162 @@ export async function recordVisitorMessage({
   return runDbWriteOperation(db, (executor) =>
     appendVisitorMessage(executor, visitorSession, text, clientMessageId),
   );
+}
+
+export async function setAiMessageFeedback({
+  db,
+  conversationId,
+  workspaceId,
+  visitorSessionId,
+  messageId,
+  feedback,
+  reason,
+  feedbackAt,
+}: {
+  db: Db;
+  conversationId: string;
+  workspaceId: string;
+  visitorSessionId: string;
+  messageId: string;
+  feedback: "positive" | "negative";
+  reason: string | null;
+  feedbackAt: string;
+}) {
+  const messages = sql`COALESCE(NULLIF(${conversation.messages}, '')::jsonb, '[]'::jsonb)`;
+  const matchingAiMessage = sql`EXISTS (
+    SELECT 1
+    FROM jsonb_array_elements(${messages}) AS candidate(item)
+    WHERE candidate.item ->> 'id' = ${messageId}
+      AND candidate.item ->> 'authorType' = 'AI'
+  )`;
+  const updatedMessages = sql`(
+    SELECT COALESCE(
+      jsonb_agg(
+        CASE
+          WHEN entry.item ->> 'id' = ${messageId}
+            AND entry.item ->> 'authorType' = 'AI'
+          THEN jsonb_set(
+            jsonb_set(
+              jsonb_set(entry.item, '{feedback}', to_jsonb(${feedback}::text), true),
+              '{feedbackReason}', COALESCE(to_jsonb(${reason}::text), 'null'::jsonb), true
+            ),
+            '{feedbackAt}', to_jsonb(${feedbackAt}::text), true
+          )
+          ELSE entry.item
+        END
+        ORDER BY entry.ordinality
+      ),
+      '[]'::jsonb
+    )::text
+    FROM jsonb_array_elements(${messages}) WITH ORDINALITY AS entry(item, ordinality)
+  )`;
+
+  const updated = await db
+    .update(conversation)
+    .set({ messages: updatedMessages, updatedAt: feedbackAt })
+    .where(
+      and(
+        eq(conversation.id, conversationId),
+        eq(conversation.workspaceId, workspaceId),
+        eq(conversation.visitorSessionId, visitorSessionId),
+        ne(conversation.status, "CLOSED"),
+        matchingAiMessage,
+      ),
+    )
+    .returning({ id: conversation.id });
+
+  return updated.length > 0;
+}
+
+export async function markVisitorMessagesAsRead({
+  db,
+  workspaceId,
+  conversationId,
+  throughMessageId,
+  readAt,
+}: {
+  db: Db;
+  workspaceId: string;
+  conversationId: string;
+  throughMessageId: string;
+  readAt: string;
+}) {
+  const messages = sql`COALESCE(NULLIF(${conversation.messages}, '')::jsonb, '[]'::jsonb)`;
+  const throughMessageOrdinality = sql`(
+    SELECT max(entry.ordinality)
+    FROM jsonb_array_elements(${messages}) WITH ORDINALITY AS entry(item, ordinality)
+    WHERE entry.item ->> 'id' = ${throughMessageId}
+      AND entry.item ->> 'authorType' = 'VISITOR'
+  )`;
+  const hasUnreadVisitorMessage = sql`EXISTS (
+    SELECT 1
+    FROM jsonb_array_elements(${messages}) WITH ORDINALITY AS candidate(item, ordinality)
+    WHERE candidate.item ->> 'authorType' = 'VISITOR'
+      AND candidate.item ->> 'readAt' IS NULL
+      AND candidate.ordinality <= ${throughMessageOrdinality}
+  )`;
+  const updatedMessages = sql`(
+    SELECT COALESCE(
+      jsonb_agg(
+        CASE
+          WHEN entry.item ->> 'authorType' = 'VISITOR'
+            AND entry.item ->> 'readAt' IS NULL
+            AND entry.ordinality <= ${throughMessageOrdinality}
+          THEN jsonb_set(entry.item, '{readAt}', to_jsonb(${readAt}::text), true)
+          ELSE entry.item
+        END
+        ORDER BY entry.ordinality
+      ),
+      '[]'::jsonb
+    )::text
+    FROM jsonb_array_elements(${messages}) WITH ORDINALITY AS entry(item, ordinality)
+  )`;
+
+  const updated = await db
+    .update(conversation)
+    .set({ messages: updatedMessages, updatedAt: readAt })
+    .where(
+      and(
+        eq(conversation.id, conversationId),
+        eq(conversation.workspaceId, workspaceId),
+        hasUnreadVisitorMessage,
+      ),
+    )
+    .returning({ id: conversation.id });
+
+  return updated.length > 0;
+}
+
+export async function setConversationStatus({
+  db,
+  workspaceId,
+  conversationId,
+  status: targetStatus,
+}: {
+  db: Db;
+  workspaceId: string;
+  conversationId: string;
+  status: "CLOSED" | "OPEN";
+}) {
+  const status =
+    targetStatus === "CLOSED"
+      ? "CLOSED"
+      : sql<string>`case when ${conversation.assignedMemberId} is null then 'OPEN' else 'ASSIGNED' end`;
+  const [updated] = await db
+    .update(conversation)
+    .set({
+      status,
+      snoozedUntil: null,
+      updatedAt: new Date().toISOString(),
+    })
+    .where(and(eq(conversation.id, conversationId), eq(conversation.workspaceId, workspaceId)))
+    .returning({
+      id: conversation.id,
+      status: conversation.status,
+      assignedMemberId: conversation.assignedMemberId,
+    });
+
+  return updated ?? null;
 }
 
 export async function startVisitorConversation({
@@ -365,11 +664,15 @@ export async function recordAiMessage({
   conversationId,
   text,
   replyToMessageId,
+  citations,
+  retrievalOutcome,
 }: {
   db: Db;
   conversationId: string;
   text: string;
   replyToMessageId: string;
+  citations?: MessageCitation[];
+  retrievalOutcome?: "SOURCES_FOUND" | "NO_MATCH";
 }) {
   return runDbWriteOperation(db, async (tx) => {
     const conversationData = await tx.query.conversation.findFirst({
@@ -381,12 +684,13 @@ export async function recordAiMessage({
     }
 
     const now = new Date();
-    const list = JSON.parse(conversationData.messages || "[]") as MessageJson[];
-    const existing = list.find((m) => m.replyToMessageId === replyToMessageId);
-    if (existing) {
-      return existing;
-    }
-
+    const seenCitationIds = new Set<string>();
+    const uniqueCitations =
+      citations?.filter((citation) => {
+        if (seenCitationIds.has(citation.documentId)) return false;
+        seenCitationIds.add(citation.documentId);
+        return true;
+      }) ?? [];
     const aiMessage: MessageJson = {
       id: randomUUID(),
       body: text,
@@ -394,18 +698,27 @@ export async function recordAiMessage({
       visibility: "PUBLIC",
       replyToMessageId,
       createdAt: now.toISOString(),
+      ...(retrievalOutcome ? { retrievalOutcome } : {}),
+      ...(uniqueCitations.length > 0
+        ? {
+            citations: uniqueCitations.slice(0, 4).map((citation) => ({
+              documentId: citation.documentId,
+              title: citation.title.slice(0, 160),
+              excerpt: citation.excerpt.trim().slice(0, 360),
+            })),
+          }
+        : {}),
     };
 
-    const updatedMessages = [...list, aiMessage];
-    await tx
-      .update(conversation)
-      .set({
-        lastMessageAt: now.toISOString(),
-        messages: JSON.stringify(updatedMessages),
-        updatedAt: now.toISOString(),
-      })
-      .where(eq(conversation.id, conversationId));
+    const appended = await appendConversationMessage({
+      db: tx,
+      workspaceId: conversationData.workspaceId,
+      conversationId,
+      message: aiMessage,
+      requireAiActive: true,
+    });
 
-    return aiMessage;
+    if (!appended) return null;
+    return appended.message;
   });
 }

@@ -6,10 +6,14 @@ import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { eq, and } from "drizzle-orm";
 import { document as documentTable } from "@/lib/db/schema";
-import { processDocument } from "@/features/knowledge/server/process-document";
-import { emitDomainEvent } from "@/lib/events/domain-events";
+import { enqueueDocumentProcessing } from "@/lib/jobs/ingestion";
 import { requireAuth, requireDashboardContext } from "@/lib/auth/dashboard-context";
+import { canManageWorkspace } from "@/lib/auth/permissions";
 import { deleteObject, isAllowedKnowledgeUpload, saveObject } from "@/lib/storage/index";
+import {
+  inferKnowledgeMimeType,
+  knowledgeSourceTypeFromMime,
+} from "@/features/knowledge/server/mime";
 
 export type KnowledgeActionState = {
   error?: string;
@@ -36,7 +40,10 @@ export async function addUrlSourceAction(
   formData: FormData,
 ): Promise<KnowledgeActionState> {
   await requireAuth();
-  const { db, workspace } = await requireDashboardContext();
+  const { db, workspace, membership } = await requireDashboardContext();
+  if (!canManageWorkspace(membership.role)) {
+    return { error: "Only workspace owners can change knowledge sources." };
+  }
 
   const parsed = urlSchema.safeParse({
     title: formData.get("title"),
@@ -61,17 +68,11 @@ export async function addUrlSourceAction(
     .returning();
 
   try {
-    await processDocument({
+    await enqueueDocumentProcessing({
       db,
       workspaceId: workspace.id,
       documentId: document.id,
       idempotencyKey: `document:url:${document.id}`,
-    });
-    await emitDomainEvent({
-      db,
-      workspaceId: workspace.id,
-      type: "document.ready",
-      entityId: document.id,
     });
   } catch {
     return { error: "Could not process that URL." };
@@ -83,26 +84,31 @@ export async function addUrlSourceAction(
 
 export async function uploadDocumentAction(formData: FormData) {
   await requireAuth();
-  const { db, workspace } = await requireDashboardContext();
+  const { db, workspace, membership } = await requireDashboardContext();
+  if (!canManageWorkspace(membership.role)) {
+    return { error: "Only workspace owners can change knowledge sources." };
+  }
 
-  const title = formData.get("title");
+  const rawTitle = formData.get("title");
   const file = formData.get("file");
 
-  if (typeof title !== "string" || !title.trim() || !(file instanceof File)) {
+  if (!(file instanceof File) || file.size === 0) {
+    return;
+  }
+
+  const title =
+    typeof rawTitle === "string" && rawTitle.trim() ? rawTitle.trim() : file.name.trim() || null;
+
+  if (!title) {
     return;
   }
 
   const bytes = Buffer.from(await file.arrayBuffer());
-  const mimeType = file.type || "application/octet-stream";
+  const mimeType = inferKnowledgeMimeType(file.name, file.type || "application/octet-stream");
   if (!isAllowedKnowledgeUpload(mimeType, bytes.length)) {
     return;
   }
-  const sourceType =
-    mimeType === "application/pdf"
-      ? "PDF"
-      : mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        ? "DOCX"
-        : "TXT";
+  const sourceType = knowledgeSourceTypeFromMime(mimeType);
 
   const saved = await saveObject({
     workspaceId: workspace.id,
@@ -116,7 +122,7 @@ export async function uploadDocumentAction(formData: FormData) {
     .values({
       id: randomUUID(),
       workspaceId: workspace.id,
-      title: title.trim(),
+      title,
       sourceType,
       storageKey: saved.storageKey,
       mimeType,
@@ -126,17 +132,11 @@ export async function uploadDocumentAction(formData: FormData) {
     .returning();
 
   try {
-    await processDocument({
+    await enqueueDocumentProcessing({
       db,
       workspaceId: workspace.id,
       documentId: document.id,
       idempotencyKey: `document:upload:${document.id}`,
-    });
-    await emitDomainEvent({
-      db,
-      workspaceId: workspace.id,
-      type: "document.ready",
-      entityId: document.id,
     });
   } catch {
     // Status updated inside processDocument.
@@ -150,7 +150,10 @@ export async function addManualTextSourceAction(
   formData: FormData,
 ): Promise<KnowledgeActionState> {
   await requireAuth();
-  const { db, workspace } = await requireDashboardContext();
+  const { db, workspace, membership } = await requireDashboardContext();
+  if (!canManageWorkspace(membership.role)) {
+    return { error: "Only workspace owners can change knowledge sources." };
+  }
 
   const parsed = manualTextSchema.safeParse({
     title: formData.get("title"),
@@ -184,17 +187,11 @@ export async function addManualTextSourceAction(
     .returning();
 
   try {
-    await processDocument({
+    await enqueueDocumentProcessing({
       db,
       workspaceId: workspace.id,
       documentId: document.id,
       idempotencyKey: `document:manual:${document.id}`,
-    });
-    await emitDomainEvent({
-      db,
-      workspaceId: workspace.id,
-      type: "document.ready",
-      entityId: document.id,
     });
   } catch {
     return { error: "Could not process that text." };
@@ -209,7 +206,10 @@ export async function importSitemapSourceAction(
   formData: FormData,
 ): Promise<KnowledgeActionState> {
   await requireAuth();
-  const { db, workspace } = await requireDashboardContext();
+  const { db, workspace, membership } = await requireDashboardContext();
+  if (!canManageWorkspace(membership.role)) {
+    return { error: "Only workspace owners can change knowledge sources." };
+  }
 
   const parsed = sitemapSchema.safeParse({
     title: formData.get("title"),
@@ -234,17 +234,11 @@ export async function importSitemapSourceAction(
     .returning();
 
   try {
-    await processDocument({
+    await enqueueDocumentProcessing({
       db,
       workspaceId: workspace.id,
       documentId: document.id,
       idempotencyKey: `document:sitemap:${document.id}`,
-    });
-    await emitDomainEvent({
-      db,
-      workspaceId: workspace.id,
-      type: "document.ready",
-      entityId: document.id,
     });
   } catch {
     return { error: "Could not process that sitemap." };
@@ -256,7 +250,10 @@ export async function importSitemapSourceAction(
 
 export async function deleteDocumentAction(formData: FormData) {
   await requireAuth();
-  const { db, workspace } = await requireDashboardContext();
+  const { db, workspace, membership } = await requireDashboardContext();
+  if (!canManageWorkspace(membership.role)) {
+    return { error: "Only workspace owners can change knowledge sources." };
+  }
 
   const documentId = formData.get("documentId");
   if (typeof documentId !== "string") return;
