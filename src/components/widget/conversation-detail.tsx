@@ -1458,7 +1458,7 @@ function MessageBubble({
                       aria-hidden="true"
                     />
                   </summary>
-                  <p className="border-t border-border/50 px-2.5 py-2 text-xs leading-relaxed text-muted-foreground">
+                  <p className="whitespace-pre-wrap border-t border-border/50 px-2.5 py-2 text-xs leading-relaxed break-words text-muted-foreground [overflow-wrap:anywhere]">
                     {citation.excerpt}
                   </p>
                 </details>
