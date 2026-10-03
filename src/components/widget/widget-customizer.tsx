@@ -12,6 +12,7 @@ import { isValidDomain, sanitizeDomain } from "@/lib/domain-validation";
 import { getWidgetAccentVars, WIDGET_BRAND_COLOR } from "@/lib/widget-accent";
 import { normalizeFontFamily, normalizeFontSize, normalizeLogoUrl } from "@/features/widget/domain";
 import { BookingSettingsCard } from "@/features/integrations/components/booking-settings-card";
+import { WidgetKnowledgeManager } from "@/components/workspace/widget-knowledge-manager";
 import { cn } from "@/lib/utils";
 
 import { toSavePayload, type WidgetCustomizerConfig } from "./widget-settings-payload";
@@ -659,6 +660,9 @@ export function WidgetCustomizer({
       style={getWidgetAccentVars(WIDGET_BRAND_COLOR)}
     >
       <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <h1 className="hidden text-xl font-semibold tracking-tight text-foreground lg:block">
+          Agent
+        </h1>
         <button
           type="button"
           onClick={() => setShowMobilePreview((open) => !open)}
@@ -782,6 +786,21 @@ export function WidgetCustomizer({
                   />
                   <BookingSettingsCard />
                 </fieldset>
+                <section
+                  id="knowledge"
+                  aria-labelledby="knowledge-heading"
+                  className="scroll-mt-4 space-y-3"
+                >
+                  <div>
+                    <h2 id="knowledge-heading" className="text-base font-semibold tracking-tight">
+                      Knowledge sources
+                    </h2>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Give your agent trusted information to use when answering customers.
+                    </p>
+                  </div>
+                  <WidgetKnowledgeManager canManage={canManage} />
+                </section>
               </TabsContent>
 
               <TabsContent value="test" keepMounted={false}>
