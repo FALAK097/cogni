@@ -4,7 +4,7 @@ import { format, isToday, isYesterday } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { FormEvent } from "react";
+import type { FormEvent, KeyboardEvent as ReactKeyboardEvent } from "react";
 import {
   AlertCircle,
   Bot,
@@ -52,6 +52,7 @@ import {
   CONVERSATION_CHANNELS,
   getConversationChannelLabel,
 } from "@/features/conversations/channel-label";
+import { getConversationTargetIndex } from "@/features/conversations/list-keyboard-navigation";
 import type { InboxChannel } from "@/features/conversations/inbox-pagination";
 import { normalizeTimezone } from "@/features/conversations/snooze-schedule";
 import { cn } from "@/lib/utils";
@@ -276,6 +277,29 @@ export function ConversationsList({
                 : filter === "snoozed"
                   ? "Nothing snoozed"
                   : "No closed conversations";
+  const hasVisibleSelection = conversations.some(
+    (conversation) => conversation.id === selectedConversationId,
+  );
+
+  const handleConversationListKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
+    const list = event.currentTarget.closest("ul");
+    if (!list) return;
+    const options = Array.from(
+      list.querySelectorAll<HTMLButtonElement>("[data-conversation-option]"),
+    );
+    const focusedIndex = options.findIndex((option) => option === document.activeElement);
+    const selectedIndex = options.findIndex((option) => option.dataset.selected === "true");
+    const currentIndex = focusedIndex >= 0 ? focusedIndex : Math.max(selectedIndex, 0);
+    const targetIndex = getConversationTargetIndex(event.key, currentIndex, options.length);
+    if (targetIndex === null) return;
+
+    event.preventDefault();
+    const target = options[targetIndex];
+    const conversation = conversations[targetIndex];
+    if (!target || !conversation) return;
+    target.focus();
+    onSelectConversation(conversation.id);
+  };
 
   return (
     <div className="flex h-full flex-col">
@@ -689,120 +713,134 @@ export function ConversationsList({
             )}
           </div>
         ) : (
-          <div className="px-2 pb-2">
-            {conversations.map((conversation) => {
+          <ul
+            aria-label="Conversations"
+            aria-describedby="conversation-list-keyboard-help"
+            className="m-0 list-none px-2 pb-2"
+          >
+            <p id="conversation-list-keyboard-help" className="sr-only">
+              Use the up and down arrow keys to move between conversations. Home and End move to the
+              first and last conversation.
+            </p>
+            {conversations.map((conversation, index) => {
               const displayName = getDisplayName(conversation);
               const selected = selectedConversationId === conversation.id;
               const unreadCount = conversation.unreadCount;
 
               return (
-                <button
-                  key={conversation.id}
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => onSelectConversation(conversation.id)}
-                  className={cn(
-                    "relative flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
-                    selected
-                      ? "bg-primary/5 before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full before:bg-primary"
-                      : "hover:bg-muted/40",
-                  )}
-                >
-                  <Avatar className="h-10 w-10">
-                    <AvatarImage src={generateAvatarUrl(conversation.visitorId)} alt="" />
-                    <AvatarFallback className="bg-primary/10 text-xs font-medium text-primary">
-                      {getInitials(displayName)}
-                    </AvatarFallback>
-                  </Avatar>
+                <li key={conversation.id}>
+                  <button
+                    type="button"
+                    data-conversation-option
+                    data-selected={selected ? "true" : undefined}
+                    aria-pressed={selected}
+                    tabIndex={selected || (!hasVisibleSelection && index === 0) ? 0 : -1}
+                    aria-label={`${displayName}, ${conversation.preview}, ${formatListTime(conversation.lastMessageAt)}${unreadCount > 0 ? `, ${unreadCount} unread` : ""}`}
+                    onKeyDown={handleConversationListKeyDown}
+                    onClick={() => onSelectConversation(conversation.id)}
+                    className={cn(
+                      "relative flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
+                      selected
+                        ? "bg-primary/5 before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full before:bg-primary"
+                        : "hover:bg-muted/40",
+                    )}
+                  >
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={generateAvatarUrl(conversation.visitorId)} alt="" />
+                      <AvatarFallback className="bg-primary/10 text-xs font-medium text-primary">
+                        {getInitials(displayName)}
+                      </AvatarFallback>
+                    </Avatar>
 
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="truncate text-sm font-semibold text-foreground">
-                        {displayName}
-                      </span>
-                      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                        {formatListTime(conversation.lastMessageAt)}
-                      </span>
-                    </div>
-                    <div className="mt-0.5 flex items-end justify-between gap-2">
-                      <p className="line-clamp-1 text-sm text-muted-foreground">
-                        {conversation.preview}
-                      </p>
-                      {unreadCount > 0 ? (
-                        <span className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-semibold tabular-nums text-primary-foreground">
-                          {unreadCount}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="truncate text-sm font-semibold text-foreground">
+                          {displayName}
                         </span>
-                      ) : null}
-                    </div>
-                    <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                      <span className="inline-flex rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
-                        {getConversationChannelLabel(conversation.channel)}
-                      </span>
-                      {conversation.labels.slice(0, 2).map((label) => (
+                        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                          {formatListTime(conversation.lastMessageAt)}
+                        </span>
+                      </div>
+                      <div className="mt-0.5 flex items-end justify-between gap-2">
+                        <p className="line-clamp-1 text-sm text-muted-foreground">
+                          {conversation.preview}
+                        </p>
+                        {unreadCount > 0 ? (
+                          <span className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-semibold tabular-nums text-primary-foreground">
+                            {unreadCount}
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                        <span className="inline-flex rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
+                          {getConversationChannelLabel(conversation.channel)}
+                        </span>
+                        {conversation.labels.slice(0, 2).map((label) => (
+                          <span
+                            key={label}
+                            className="inline-flex max-w-24 truncate rounded border border-border/70 bg-background px-1.5 py-0.5 text-xs text-muted-foreground"
+                            title={label}
+                          >
+                            {label}
+                          </span>
+                        ))}
+                        {conversation.labels.length > 2 ? (
+                          <span className="text-xs text-muted-foreground">
+                            +{conversation.labels.length - 2}
+                          </span>
+                        ) : null}
+                        {conversation.snoozedUntil &&
+                        currentTimestamp !== null &&
+                        Date.parse(conversation.snoozedUntil) > currentTimestamp ? (
+                          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                            <Clock className="size-3.5 shrink-0" aria-hidden="true" />
+                            Until{" "}
+                            {formatInTimeZone(
+                              conversation.snoozedUntil,
+                              normalizeTimezone(conversationsData?.workspaceTimezone),
+                              "MMM d, h:mm a",
+                            )}
+                          </span>
+                        ) : null}
+                        {conversation.status === "CLOSED" ? (
+                          <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
+                            <CheckCircle2 className="size-3 shrink-0" aria-hidden="true" />
+                            Closed
+                          </span>
+                        ) : conversation.status === "ESCALATED" ? (
+                          <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
+                            <AlertCircle className="size-3 shrink-0" aria-hidden="true" />
+                            Escalated
+                          </span>
+                        ) : null}
                         <span
-                          key={label}
-                          className="inline-flex max-w-24 truncate rounded border border-border/70 bg-background px-1.5 py-0.5 text-xs text-muted-foreground"
-                          title={label}
-                        >
-                          {label}
-                        </span>
-                      ))}
-                      {conversation.labels.length > 2 ? (
-                        <span className="text-xs text-muted-foreground">
-                          +{conversation.labels.length - 2}
-                        </span>
-                      ) : null}
-                      {conversation.snoozedUntil &&
-                      currentTimestamp !== null &&
-                      Date.parse(conversation.snoozedUntil) > currentTimestamp ? (
-                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                          <Clock className="size-3.5 shrink-0" aria-hidden="true" />
-                          Until{" "}
-                          {formatInTimeZone(
-                            conversation.snoozedUntil,
-                            normalizeTimezone(conversationsData?.workspaceTimezone),
-                            "MMM d, h:mm a",
+                          className={cn(
+                            "inline-flex items-center gap-1 text-xs font-medium",
+                            conversation.aiPaused
+                              ? "text-amber-700 dark:text-amber-400"
+                              : "text-muted-foreground",
                           )}
+                        >
+                          {conversation.aiPaused ? (
+                            <Pause className="size-3.5 shrink-0" aria-hidden="true" />
+                          ) : (
+                            <Bot className="size-3.5 shrink-0" aria-hidden="true" />
+                          )}
+                          {conversation.aiPaused ? "AI paused" : "AI enabled"}
                         </span>
-                      ) : null}
-                      {conversation.status === "CLOSED" ? (
-                        <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
-                          <CheckCircle2 className="size-3 shrink-0" aria-hidden="true" />
-                          Closed
+                        <span className="inline-flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                          <User className="size-3.5 shrink-0" aria-hidden="true" />
+                          <span className="truncate">
+                            {conversation.assigneeName ?? "Unassigned"}
+                          </span>
                         </span>
-                      ) : conversation.status === "ESCALATED" ? (
-                        <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
-                          <AlertCircle className="size-3 shrink-0" aria-hidden="true" />
-                          Escalated
-                        </span>
-                      ) : null}
-                      <span
-                        className={cn(
-                          "inline-flex items-center gap-1 text-xs font-medium",
-                          conversation.aiPaused
-                            ? "text-amber-700 dark:text-amber-400"
-                            : "text-muted-foreground",
-                        )}
-                      >
-                        {conversation.aiPaused ? (
-                          <Pause className="size-3.5 shrink-0" aria-hidden="true" />
-                        ) : (
-                          <Bot className="size-3.5 shrink-0" aria-hidden="true" />
-                        )}
-                        {conversation.aiPaused ? "AI paused" : "AI enabled"}
-                      </span>
-                      <span className="inline-flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-                        <User className="size-3.5 shrink-0" aria-hidden="true" />
-                        <span className="truncate">
-                          {conversation.assigneeName ?? "Unassigned"}
-                        </span>
-                      </span>
+                      </div>
                     </div>
-                  </div>
-                </button>
+                  </button>
+                </li>
               );
             })}
-          </div>
+          </ul>
         )}
       </div>
 
