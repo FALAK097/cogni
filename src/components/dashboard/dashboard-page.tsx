@@ -21,10 +21,15 @@ import {
 } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { useMemo, useState } from "react";
 
-import type { DashboardAnalytics, MetricComparison, TopQuestion } from "@/features/analytics/types";
+import type {
+  DashboardAnalytics,
+  MetricComparison,
+  NegativeFeedbackItem,
+  TopQuestion,
+} from "@/features/analytics/types";
 import {
   aggregateWeeklyCounts,
   aggregateWeeklySatisfaction,
@@ -34,6 +39,15 @@ import { EvilPieChart } from "@/components/evilcharts/charts/recharts-pie-chart"
 import type { ChartConfig } from "@/components/evilcharts/ui/recharts-chart";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -44,6 +58,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -54,13 +69,18 @@ import {
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useDashboardAnalytics } from "@/hooks/query";
-import { useKnowledgeBaseSources } from "@/hooks/query/use-knowledge-base";
+import { useAddManualTextSource, useKnowledgeBaseSources } from "@/hooks/query/use-knowledge-base";
 import { useWidgetConfig } from "@/hooks/query/use-widget";
 import { useActiveWorkspaceId } from "@/hooks/use-auth";
+import {
+  buildVerifiedAnswerSource,
+  buildVerifiedAnswerTitle,
+} from "@/features/knowledge/feedback-answer";
 import { normalizeTimezone } from "@/features/conversations/snooze-schedule";
 import { getAgentPublicationReadiness } from "@/features/widget/agent-readiness";
 import { cn } from "@/lib/utils";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { useToast } from "@/components/ui/use-toast";
 import {
   ArrowDown01Icon,
   ArrowLeft01Icon,
@@ -1102,6 +1122,7 @@ export function DashboardPage({
   const [dateRange, setDateRange] = useState<DateRangeValue>(() =>
     getDefaultDateRange(workspaceTimezone),
   );
+  const [feedbackToImprove, setFeedbackToImprove] = useState<NegativeFeedbackItem | null>(null);
   const [convGranularity, setConvGranularity] = useState<Granularity>("daily");
   const [satGranularity, setSatGranularity] = useState<Granularity>("daily");
 
@@ -1568,26 +1589,40 @@ export function DashboardPage({
             <ul className="mt-4 divide-y divide-border/50">
               {(analytics?.negativeFeedback ?? []).map((item, index) => (
                 <li key={`${item.conversationId}-${item.feedbackAt}-${index}`}>
-                  <Link
-                    href={{
-                      pathname: "/conversations",
-                      query: { conversationId: item.conversationId },
-                    }}
-                    aria-label={`Review AI answer. Visitor asked: ${item.question}. AI replied: ${item.response}`}
-                    className="-mx-2 block rounded-lg px-2 py-3 outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                  >
-                    <span className="block truncate text-xs font-medium text-muted-foreground">
-                      {item.question}
-                    </span>
-                    <span className="mt-1 block line-clamp-2 text-sm leading-relaxed text-foreground">
-                      {item.response}
-                    </span>
-                    {item.reason ? (
-                      <span className="mt-1.5 block line-clamp-1 text-xs text-muted-foreground">
-                        Feedback: {item.reason}
+                  <div className="flex items-start gap-2 py-3">
+                    <Link
+                      href={{
+                        pathname: "/conversations",
+                        query: { conversationId: item.conversationId },
+                      }}
+                      aria-label={`Review AI answer. Visitor asked: ${item.question}. AI replied: ${item.response}`}
+                      className="-mx-2 min-h-11 min-w-0 flex-1 rounded-lg px-2 py-1 outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    >
+                      <span className="block truncate text-xs font-medium text-muted-foreground">
+                        {item.question}
                       </span>
+                      <span className="mt-1 block line-clamp-2 text-sm leading-relaxed text-foreground">
+                        {item.response}
+                      </span>
+                      {item.reason ? (
+                        <span className="mt-1.5 block line-clamp-1 text-xs text-muted-foreground">
+                          Feedback: {item.reason}
+                        </span>
+                      ) : null}
+                    </Link>
+                    {canManage ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-1 min-h-11 shrink-0 px-3"
+                        onClick={() => setFeedbackToImprove(item)}
+                        aria-label={`Write a verified answer for: ${item.question}`}
+                      >
+                        Add answer
+                      </Button>
                     ) : null}
-                  </Link>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -1687,6 +1722,123 @@ export function DashboardPage({
           </Button>
         </output>
       ) : null}
+      {feedbackToImprove ? (
+        <FeedbackKnowledgeDialog
+          feedback={feedbackToImprove}
+          onOpenChange={(open) => {
+            if (!open) setFeedbackToImprove(null);
+          }}
+        />
+      ) : null}
     </div>
+  );
+}
+
+function FeedbackKnowledgeDialog({
+  feedback,
+  onOpenChange,
+}: {
+  feedback: NegativeFeedbackItem;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [title, setTitle] = useState(buildVerifiedAnswerTitle(feedback.question));
+  const [answer, setAnswer] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const addSource = useAddManualTextSource();
+  const { toast } = useToast();
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    try {
+      const source = buildVerifiedAnswerSource(feedback.question, answer);
+      await addSource.mutateAsync({ title: title.trim(), content: source.content });
+      toast.success("Answer added to knowledge", {
+        description: "It will be available to the agent after indexing finishes.",
+      });
+      onOpenChange(false);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to add this answer.");
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Add a verified answer</DialogTitle>
+          <DialogDescription>
+            Review the customer question and write the answer your agent should use. The current AI
+            answer will not be added.
+          </DialogDescription>
+        </DialogHeader>
+        <form className="space-y-4" onSubmit={(event) => void handleSubmit(event)}>
+          <section className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
+            <div>
+              <h3 className="text-xs font-medium text-muted-foreground">Customer question</h3>
+              <p className="mt-1 max-h-24 overflow-y-auto whitespace-pre-wrap break-words text-sm text-foreground">
+                {feedback.question}
+              </p>
+            </div>
+            <div>
+              <h3 className="text-xs font-medium text-muted-foreground">Current AI answer</h3>
+              <p className="mt-1 max-h-24 overflow-y-auto whitespace-pre-wrap break-words text-sm text-foreground">
+                {feedback.response}
+              </p>
+            </div>
+            {feedback.reason ? (
+              <p className="border-t border-border/70 pt-2 text-xs text-muted-foreground">
+                Visitor feedback: {feedback.reason}
+              </p>
+            ) : null}
+          </section>
+          <div className="space-y-2">
+            <Label htmlFor="feedback-answer-title">Source title</Label>
+            <Input
+              id="feedback-answer-title"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              maxLength={120}
+              required
+              autoComplete="off"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="feedback-verified-answer">Verified answer</Label>
+            <Textarea
+              id="feedback-verified-answer"
+              value={answer}
+              onChange={(event) => setAnswer(event.target.value)}
+              placeholder="Write the answer you want the agent to give."
+              maxLength={50_000}
+              rows={5}
+              required
+              aria-describedby="feedback-answer-hint"
+            />
+            <p id="feedback-answer-hint" className="text-xs text-muted-foreground">
+              Only your verified answer is added to the knowledge base.
+            </p>
+          </div>
+          {error ? (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          ) : null}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={addSource.isPending}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={addSource.isPending || !answer.trim() || !title.trim()}>
+              {addSource.isPending ? "Adding…" : "Add to knowledge"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
