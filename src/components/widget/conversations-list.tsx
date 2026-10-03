@@ -718,10 +718,10 @@ export function ConversationsList({
             aria-describedby="conversation-list-keyboard-help"
             className="m-0 list-none px-2 pb-2"
           >
-            <p id="conversation-list-keyboard-help" className="sr-only">
+            <li id="conversation-list-keyboard-help" className="sr-only">
               Use the up and down arrow keys to move between conversations. Home and End move to the
               first and last conversation.
-            </p>
+            </li>
             {conversations.map((conversation, index) => {
               const displayName = getDisplayName(conversation);
               const selected = selectedConversationId === conversation.id;
