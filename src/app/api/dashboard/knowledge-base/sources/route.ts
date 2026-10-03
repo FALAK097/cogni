@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
 
 import { listDocuments } from "@/features/knowledge/queries";
+import { toKnowledgeSourceDisplayType } from "@/features/knowledge/source-type";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 
 const DEFAULT_KB_ID = "default";
 
 function mapDocumentToSource(document: Awaited<ReturnType<typeof listDocuments>>[number]) {
-  const sourceType = document.sourceUrl ? "website" : "file";
   return {
     id: document.id,
     knowledgeBaseId: DEFAULT_KB_ID,
-    sourceType,
+    sourceType: toKnowledgeSourceDisplayType(document.sourceType),
     displayName: document.title,
     canonicalUrl: document.sourceUrl,
     previewUrl: document.sourceUrl,
