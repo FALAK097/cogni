@@ -105,6 +105,7 @@ export async function ingestOmnichannelMessage({
       })
       .returning();
     current = created;
+    if (!current) throw new Error("Conversation could not be created.");
   } else {
     const appended = await appendConversationMessage({
       db,
@@ -154,7 +155,7 @@ export async function answerOmnichannelMessage({
   conversationId: string;
   replyToMessageId: string;
   text: string;
-}) {
+}): Promise<MessageJson | null> {
   const activeConversation = await db.query.conversation.findFirst({
     where: (fields, { eq, and }) =>
       and(eq(fields.id, conversationId), eq(fields.workspaceId, workspaceId)),
@@ -188,7 +189,7 @@ export async function answerOmnichannelMessage({
   });
   if (!current) throw new Error("Conversation not found.");
   if (current.aiPaused || current.status === "CLOSED") return null;
-  const response: MessageJson = {
+  return {
     id: crypto.randomUUID(),
     body: result.text,
     authorType: "AI",
@@ -196,20 +197,4 @@ export async function answerOmnichannelMessage({
     replyToMessageId,
     createdAt: new Date().toISOString(),
   };
-  const appended = await appendConversationMessage({
-    db,
-    workspaceId,
-    conversationId,
-    message: response,
-    requireAiActive: true,
-  });
-  if (!appended) return null;
-  if (appended.inserted) {
-    await broadcastConversationEvent({
-      type: "message",
-      conversationId,
-      messageId: appended.message.id,
-    });
-  }
-  return appended.message.body;
 }

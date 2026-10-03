@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import "dotenv/config";
-import { mkdir } from "node:fs/promises";
+import { mkdtemp, rm, symlink } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { after, before, test } from "node:test";
@@ -15,15 +16,16 @@ if (!databaseUrl || !["localhost", "127.0.0.1", "::1"].includes(new URL(database
   throw new Error("Conversation append integration tests require a local DATABASE_URL.");
 }
 
-const outputDirectory = join(process.cwd(), "node_modules", ".cache", "cogni-conversation-test");
+const outputDirectory = await mkdtemp(join(tmpdir(), "cogni-conversation-test-"));
 const outputFile = join(outputDirectory, "conversation.mjs");
-await mkdir(outputDirectory, { recursive: true });
+await symlink(join(process.cwd(), "node_modules"), join(outputDirectory, "node_modules"), "dir");
 
 await build({
   stdin: {
     contents: `
       export {
         appendConversationMessage,
+        deliverAiReplyIfActive,
         getVisitorConversationMessages,
         markVisitorMessagesAsRead,
         recordVisitorMessage,
@@ -64,6 +66,7 @@ await build({
 
 const {
   appendConversationMessage,
+  deliverAiReplyIfActive,
   getVisitorConversationMessages,
   markVisitorMessagesAsRead,
   recordVisitorMessage,
@@ -100,6 +103,7 @@ after(async () => {
   await raw`DELETE FROM "user" WHERE "id" = ${userId}`;
   await Promise.all(appClients.map((client) => client.end({ timeout: 5 })));
   await raw.end({ timeout: 5 });
+  await rm(outputDirectory, { recursive: true, force: true });
 });
 
 test("concurrent transcript appends preserve every message", async () => {
@@ -280,6 +284,124 @@ test("AI appends are denied after takeover and all appends stay workspace scoped
     },
   });
   assert.equal(foreignWorkspace, null);
+});
+
+test("channel AI delivery waits behind an in-flight reply before takeover commits", async () => {
+  await raw`UPDATE "conversation" SET "aiPaused" = false, "status" = 'OPEN' WHERE "id" = ${conversationId}`;
+  let enterDelivery;
+  let releaseDelivery;
+  const deliveryEntered = new Promise((resolve) => {
+    enterDelivery = resolve;
+  });
+  const deliveryGate = new Promise((resolve) => {
+    releaseDelivery = resolve;
+  });
+  const deliveryOrder = [];
+  const message = {
+    id: randomUUID(),
+    body: "A reply sent through the channel",
+    authorType: "AI",
+    visibility: "PUBLIC",
+    replyToMessageId: randomUUID(),
+    createdAt: new Date().toISOString(),
+  };
+
+  const delivery = deliverAiReplyIfActive({
+    db: appDatabases[0],
+    workspaceId,
+    conversationId,
+    message,
+    deliver: async () => {
+      deliveryOrder.push("send-started");
+      enterDelivery();
+      await deliveryGate;
+      deliveryOrder.push("send-finished");
+    },
+  });
+  await deliveryEntered;
+
+  const takeover =
+    appClients[1]`UPDATE "conversation" SET "aiPaused" = true, "status" = 'ASSIGNED' WHERE "id" = ${conversationId}`.then(
+      () => deliveryOrder.push("takeover-committed"),
+    );
+  const lockDeadline = Date.now() + 3_000;
+  let takeoverBlocked = false;
+  while (!takeoverBlocked && Date.now() < lockDeadline) {
+    const [activity] = await raw`
+      SELECT "wait_event_type"
+      FROM pg_stat_activity
+      WHERE "wait_event_type" = 'Lock'
+        AND "query" LIKE 'UPDATE "conversation" SET "aiPaused"%'
+      LIMIT 1
+    `;
+    takeoverBlocked = Boolean(activity);
+    if (!takeoverBlocked) await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  assert.equal(takeoverBlocked, true, "takeover update must wait on the outbound send row lock");
+  assert.deepEqual(deliveryOrder, ["send-started"]);
+
+  releaseDelivery();
+  assert.equal(await delivery, true);
+  await takeover;
+  assert.deepEqual(deliveryOrder, ["send-started", "send-finished", "takeover-committed"]);
+  const persisted = await raw`SELECT "messages" FROM "conversation" WHERE "id" = ${conversationId}`;
+  assert.equal(
+    JSON.parse(persisted[0].messages).some((entry) => entry.id === message.id),
+    true,
+  );
+});
+
+test("channel AI delivery is suppressed when takeover commits first", async () => {
+  await raw`UPDATE "conversation" SET "aiPaused" = true, "status" = 'ASSIGNED' WHERE "id" = ${conversationId}`;
+  let deliveryCalled = false;
+  const delivered = await deliverAiReplyIfActive({
+    db: appDatabases[0],
+    workspaceId,
+    conversationId,
+    message: {
+      id: randomUUID(),
+      body: "This must not send",
+      authorType: "AI",
+      visibility: "PUBLIC",
+      replyToMessageId: randomUUID(),
+      createdAt: new Date().toISOString(),
+    },
+    deliver: async () => {
+      deliveryCalled = true;
+    },
+  });
+  assert.equal(delivered, false);
+  assert.equal(deliveryCalled, false);
+});
+
+test("channel AI delivery rolls back its transcript write when provider delivery fails", async () => {
+  await raw`UPDATE "conversation" SET "aiPaused" = false, "status" = 'OPEN' WHERE "id" = ${conversationId}`;
+  const message = {
+    id: randomUUID(),
+    body: "A provider rejected this reply",
+    authorType: "AI",
+    visibility: "PUBLIC",
+    replyToMessageId: randomUUID(),
+    createdAt: new Date().toISOString(),
+  };
+  await assert.rejects(
+    deliverAiReplyIfActive({
+      db: appDatabases[0],
+      workspaceId,
+      conversationId,
+      message,
+      deliver: async () => {
+        throw new Error("Provider rejected the reply");
+      },
+    }),
+    /Provider rejected the reply/,
+  );
+  const [persisted] =
+    await raw`SELECT "messages" FROM "conversation" WHERE "id" = ${conversationId}`;
+  assert.equal(
+    JSON.parse(persisted.messages).some((entry) => entry.id === message.id),
+    false,
+  );
 });
 
 test("simultaneous first visitor messages create one conversation and preserve every message", async () => {

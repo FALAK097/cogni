@@ -71,6 +71,52 @@ export type MessageCitation = {
 };
 
 /**
+ * Serialize an AI channel delivery with human takeover. The row lock is held
+ * only for the external send and transcript write, never while generating.
+ */
+export async function deliverAiReplyIfActive({
+  db,
+  workspaceId,
+  conversationId,
+  message,
+  deliver,
+}: {
+  db: Db;
+  workspaceId: string;
+  conversationId: string;
+  message: MessageJson;
+  deliver: () => Promise<void>;
+}) {
+  return runDbWriteOperation(db, async (transaction) => {
+    const locked = await transaction.execute(sql`
+      SELECT "id"
+      FROM "conversation"
+      WHERE "id" = ${conversationId} AND "workspaceId" = ${workspaceId}
+      FOR UPDATE
+    `);
+    if (locked.length === 0) return false;
+
+    const [current] = await transaction
+      .select({ aiPaused: conversation.aiPaused, status: conversation.status })
+      .from(conversation)
+      .where(and(eq(conversation.id, conversationId), eq(conversation.workspaceId, workspaceId)))
+      .limit(1);
+    if (!current || current.aiPaused || current.status === "CLOSED") return false;
+
+    const appended = await appendConversationMessage({
+      db: transaction,
+      workspaceId,
+      conversationId,
+      message,
+      requireAiActive: true,
+    });
+    if (!appended || !appended.inserted) return false;
+    await deliver();
+    return true;
+  });
+}
+
+/**
  * Append against the current JSON array in one PostgreSQL UPDATE. The row lock
  * acquired by UPDATE serializes concurrent writers, so no message is lost when
  * a visitor, teammate, agent, or channel webhook writes at the same time.
