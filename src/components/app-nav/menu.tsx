@@ -25,7 +25,6 @@ const getHrefPathname = (href: string) => {
 
 const isMenuActive = (pathname: string, href: string) => {
   const hrefPathname = getHrefPathname(href);
-  if (hrefPathname === "/playground" && pathname === "/knowledge-base") return true;
   if (hrefPathname === "/") return pathname === "/" || pathname === "/dashboard";
   return pathname === hrefPathname || pathname.startsWith(`${hrefPathname}/`);
 };
