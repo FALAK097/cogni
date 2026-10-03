@@ -24,6 +24,7 @@
     "test:widget-publication-db": "node --import dotenv/config --test scripts/test-widget-publication-db.mjs",
     "test:widget-settings": "node --test scripts/test-widget-settings.mjs",
     "test:agent-tests": "node --test scripts/test-agent-tests.mjs",
+    "test:agent-readiness": "node --test scripts/test-agent-readiness.mjs",
     "test:conversation-append": "node --test scripts/test-conversation-append.mjs",
     "test:conversation-draft": "node --test scripts/test-conversation-draft.mjs",
     "test:conversation-scroll": "node --test scripts/test-conversation-scroll.mjs",

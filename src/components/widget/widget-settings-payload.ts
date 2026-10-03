@@ -35,6 +35,7 @@ export type WidgetCustomizerConfig = Pick<
   | "enableBrochure"
   | "brochureSuggestionText"
   | "allowedDomains"
+  | "isEnabled"
   | "instructions"
   | "escalationKeywords"
   | "borderColor"
@@ -83,6 +84,7 @@ export function toSavePayload(config: WidgetCustomizerConfig) {
     enableBrochure: config.enableBrochure,
     brochureSuggestionText: config.brochureSuggestionText,
     allowedDomains: config.allowedDomains || [],
+    isEnabled: config.isEnabled,
     instructions: config.instructions,
     escalationKeywords: config.escalationKeywords,
     borderColor: config.borderColor,

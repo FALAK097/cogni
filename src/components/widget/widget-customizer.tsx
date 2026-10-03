@@ -770,6 +770,8 @@ export function WidgetCustomizer({
 
               <TabsContent value="deploy" keepMounted={false}>
                 <WidgetInstallationPanel
+                  isEnabled={config.isEnabled}
+                  currentPublication={publication?.current ?? null}
                   allowedDomains={config.allowedDomains}
                   domainInput={domainInput}
                   copied={copied}
@@ -778,6 +780,7 @@ export function WidgetCustomizer({
                   onAddDomain={handleAddDomain}
                   onRemoveDomain={handleRemoveDomain}
                   onCopyScript={copyScript}
+                  onEnabledChange={(value) => updateConfig("isEnabled", value)}
                   canManage={canManage}
                 />
                 <WidgetVersionHistory

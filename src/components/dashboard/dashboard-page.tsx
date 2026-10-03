@@ -58,6 +58,7 @@ import { useKnowledgeBaseSources } from "@/hooks/query/use-knowledge-base";
 import { useWidgetConfig } from "@/hooks/query/use-widget";
 import { useActiveWorkspaceId } from "@/hooks/use-auth";
 import { normalizeTimezone } from "@/features/conversations/snooze-schedule";
+import { getAgentPublicationReadiness } from "@/features/widget/agent-readiness";
 import { cn } from "@/lib/utils";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -175,6 +176,11 @@ function AgentSetupChecklist({ canManage }: { canManage: boolean }) {
   const sourceReady = sources.some((source) => source.status === "ready" && source.chunkCount > 0);
   const instructionsReady = Boolean(config.instructions.trim());
   const domainReady = config.allowedDomains.length > 0;
+  const publicationReadiness = getAgentPublicationReadiness({
+    isEnabled: config.isEnabled,
+    hasPublishedVersion: config.publication.current !== null,
+    hasUnpublishedChanges: config.publication.hasUnpublishedChanges,
+  });
   const steps = [
     {
       title: "Add a knowledge source",
@@ -205,6 +211,13 @@ function AgentSetupChecklist({ canManage }: { canManage: boolean }) {
       href: "/playground?subtab=deploy",
       action: domainReady ? "Review installation" : "Set up installation",
     },
+    {
+      title: publicationReadiness.title,
+      description: publicationReadiness.description,
+      complete: publicationReadiness.complete,
+      href: "/playground?subtab=deploy",
+      action: publicationReadiness.action,
+    },
   ];
   const completedCount = steps.filter((step) => step.complete).length;
   if (completedCount === steps.length) return null;
@@ -228,7 +241,7 @@ function AgentSetupChecklist({ canManage }: { canManage: boolean }) {
         value={completedCount}
         className="mt-4 block h-1.5 w-full overflow-hidden rounded-full [appearance:none] [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-primary [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-bar]:bg-muted [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-primary"
       />
-      <ol className="mt-4 grid gap-3 md:grid-cols-3">
+      <ol className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {steps.map((step, index) => (
           <li
             key={step.title}

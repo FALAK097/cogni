@@ -892,6 +892,8 @@ export function WidgetSuggestedQuestionsPanel({
 }
 
 export function WidgetInstallationPanel({
+  isEnabled,
+  currentPublication,
   allowedDomains,
   domainInput,
   copied,
@@ -900,8 +902,11 @@ export function WidgetInstallationPanel({
   onAddDomain,
   onRemoveDomain,
   onCopyScript,
+  onEnabledChange,
   canManage,
 }: {
+  isEnabled: boolean;
+  currentPublication: WidgetPublicationVersion | null;
   allowedDomains: string[];
   domainInput: string;
   copied: boolean;
@@ -910,6 +915,7 @@ export function WidgetInstallationPanel({
   onAddDomain: () => void;
   onRemoveDomain: (domain: string) => void;
   onCopyScript: () => void;
+  onEnabledChange: (value: boolean) => void;
   canManage: boolean;
 }) {
   return (
@@ -919,6 +925,73 @@ export function WidgetInstallationPanel({
         description="Authorize domains and copy the embed code to your website."
       />
       <div className="space-y-8">
+        <output
+          className="flex items-start gap-3 rounded-lg border border-border/70 bg-muted/30 p-3"
+          aria-label={
+            currentPublication
+              ? `Live agent version ${currentPublication.version}`
+              : "Agent is not published"
+          }
+        >
+          <Check
+            className={cn(
+              "mt-0.5 size-4 shrink-0",
+              currentPublication ? "text-primary" : "text-muted-foreground",
+            )}
+            aria-hidden="true"
+          />
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-foreground">
+              {currentPublication
+                ? `Live version ${currentPublication.version}`
+                : "No published version yet"}
+            </p>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {currentPublication ? (
+                <>
+                  Published{" "}
+                  <time dateTime={currentPublication.publishedAt}>
+                    {new Date(currentPublication.publishedAt).toLocaleString(undefined, {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    })}
+                  </time>
+                  {currentPublication.authorName
+                    ? ` by ${currentPublication.authorName}`
+                    : " by a previous teammate"}
+                </>
+              ) : (
+                "Publish your agent before visitors can use the widget."
+              )}
+            </p>
+          </div>
+        </output>
+        <section className="flex items-start justify-between gap-4 rounded-lg border border-border bg-card p-4">
+          <div className="min-w-0">
+            <Label
+              htmlFor="widget-visitor-access"
+              className="text-sm font-semibold text-foreground"
+            >
+              Accept visitor conversations
+            </Label>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+              {isEnabled
+                ? "Your widget can serve visitors on authorized domains."
+                : "The widget is paused. Visitors cannot start or continue conversations."}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              This safety control applies to live traffic when saved. Agent content and appearance
+              change when you publish.
+            </p>
+          </div>
+          <Switch
+            id="widget-visitor-access"
+            checked={isEnabled}
+            onCheckedChange={onEnabledChange}
+            disabled={!canManage}
+            aria-label="Accept visitor conversations"
+          />
+        </section>
         <output className="flex items-start gap-3 rounded-lg border border-border/70 bg-muted/30 p-3">
           {allowedDomains.length > 0 ? (
             <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
@@ -944,6 +1017,9 @@ export function WidgetInstallationPanel({
             <p className="mt-1 text-sm text-muted-foreground">
               Add each website domain where the widget is embedded (e.g.{" "}
               <code className="rounded bg-muted px-1 py-0.5 text-xs">acme.com</code>).
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Saved domain changes take effect for live traffic immediately.
             </p>
           </div>
           <div className="flex items-end gap-2">

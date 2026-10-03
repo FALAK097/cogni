@@ -50,6 +50,7 @@ const configuration = {
   enableBrochure: false,
   brochureSuggestionText: "",
   allowedDomains: ["example.test"],
+  isEnabled: true,
   borderColor: "#eaecf0",
   fontFamily: "Inter",
   fontSize: "14px",
@@ -71,7 +72,14 @@ for (const [provider, model] of [
     assert.equal(requestBody.instructions, configuration.instructions);
     assert.equal(requestBody.agentName, configuration.agentName);
     assert.equal(requestBody.escalationKeywords, configuration.escalationKeywords);
+    assert.equal(requestBody.isEnabled, configuration.isEnabled);
     assert.equal(Object.hasOwn(requestBody, "workspaceId"), false);
     assert.equal(Object.hasOwn(requestBody, "publicKey"), false);
   });
 }
+
+test("visitor access switch persists false without requiring a publication", () => {
+  const requestBody = toSavePayload({ ...configuration, isEnabled: false });
+  assert.equal(requestBody.isEnabled, false);
+  assert.equal(Object.hasOwn(requestBody, "publication"), false);
+});

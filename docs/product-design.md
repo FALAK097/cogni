@@ -140,8 +140,10 @@ The target lifecycle remains:
 3. **Deploy**: authorized domains, copy loader, installation verification, channels and readiness
    checklist. Draft saves stay private to preview; public requests resolve an immutable published
    version. Publishing records version, timestamp and author, and restoring a version creates a new
-   publication. Domain authorization and the enable switch remain immediate safety controls. Explain
-   each missing prerequisite beside its action.
+   publication. Show the current live version's author and publish time without hiding it in history.
+   Domain authorization and the enable switch remain immediate safety controls; state that clearly
+   beside each control. The setup checklist only reports ready when a version is published, current,
+   and enabled. Explain each missing prerequisite beside its action.
 4. **Optimize**: unanswered questions, negative feedback, eval results and source/policy gaps;
    one suggested next step, reviewed and accepted by a person.
 
