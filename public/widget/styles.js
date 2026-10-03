@@ -792,13 +792,14 @@ export function injectStyles() {
 			border: 1px solid ${config.theme === "dark" ? "#3f3f46" : "#e4e4e7"};
 			background: ${config.theme === "dark" ? "linear-gradient(135deg, #1f1f23, #18181b)" : "linear-gradient(135deg, #ffffff, #fafafa)"};
 			box-shadow: ${config.theme === "dark" ? "0 2px 8px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.06)"};
-			transition: all 0.2s ease;
+			transition: border-color 150ms ease, box-shadow 150ms ease;
 		}
 
-		.oc-document-card:hover {
-			border-color: ${config.primaryColor}50;
-			box-shadow: ${config.theme === "dark" ? `0 4px 16px rgba(0,0,0,0.4), 0 0 0 1px ${config.primaryColor}30` : `0 4px 16px rgba(0,0,0,0.1), 0 0 0 1px ${config.primaryColor}20`};
-			transform: translateY(-2px);
+		@media (hover: hover) and (pointer: fine) {
+			.oc-document-card:hover {
+				border-color: ${config.primaryColor}50;
+				box-shadow: ${config.theme === "dark" ? `0 4px 16px rgba(0,0,0,0.4), 0 0 0 1px ${config.primaryColor}30` : `0 4px 16px rgba(0,0,0,0.1), 0 0 0 1px ${config.primaryColor}20`};
+			}
 		}
 
 		.oc-document-icon {
@@ -856,27 +857,38 @@ export function injectStyles() {
 			display: flex;
 			align-items: center;
 			justify-content: center;
-			width: 36px;
-			height: 36px;
+			width: 44px;
+			height: 44px;
 			border-radius: 10px;
 			border: none;
 			background: linear-gradient(135deg, ${config.primaryColor}, ${config.primaryColor}dd);
 			color: white;
 			cursor: pointer;
-			transition: all 0.2s ease;
+			transition: background 150ms ease, box-shadow 150ms ease;
 			flex-shrink: 0;
 			box-shadow: 0 2px 6px ${config.primaryColor}30;
 		}
 
 		.oc-document-download:hover {
 			background: linear-gradient(135deg, ${config.primaryColor}ee, ${config.primaryColor}cc);
-			transform: scale(1.08);
 			box-shadow: 0 4px 12px ${config.primaryColor}40;
+		}
+
+		.oc-document-download:focus-visible {
+			outline: 2px solid ${config.primaryColor};
+			outline-offset: 2px;
 		}
 
 		.oc-document-download svg {
 			width: 18px;
 			height: 18px;
+		}
+
+		@media (prefers-reduced-motion: reduce) {
+			.oc-document-card,
+			.oc-document-download {
+				transition: none;
+			}
 		}
 
 		.oc-footer {
