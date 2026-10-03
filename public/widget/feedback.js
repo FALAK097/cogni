@@ -25,6 +25,59 @@ export function createFeedbackButtons(messageId, existingFeedback = null) {
   return feedbackHtml;
 }
 
+export function createFeedbackReasonMarkup() {
+  return `
+		<div class="oc-feedback-modal" role="group" aria-label="Tell us how this response could improve">
+			<div class="oc-feedback-modal-title">What went wrong?</div>
+			<div class="oc-feedback-modal-options">
+				${FEEDBACK_REASONS.map((reason) => `<button type="button" class="oc-feedback-option" data-reason="${reason}" aria-pressed="false">${reason}</button>`).join("")}
+			</div>
+			<label class="oc-feedback-input-label">Anything else? <span>(optional)</span>
+				<textarea class="oc-feedback-textarea" aria-label="Additional feedback details" rows="2"></textarea>
+			</label>
+			<div class="oc-feedback-modal-actions">
+				<button type="button" class="oc-feedback-modal-btn cancel">Skip details</button>
+				<button type="button" class="oc-feedback-modal-btn submit">Submit feedback</button>
+			</div>
+		</div>
+	`;
+}
+
+function setFeedbackStatus(feedbackContainer, message, isError = false) {
+  const status = feedbackContainer.querySelector(".oc-feedback-thanks");
+  if (!status) return;
+  status.textContent = message;
+  status.classList.toggle("error", isError);
+  status.classList.add("show");
+}
+
+function resetFeedbackSelection(feedbackContainer) {
+  feedbackContainer.classList.remove("has-feedback");
+  feedbackContainer.querySelectorAll(".oc-feedback-btn").forEach((button) => {
+    button.classList.remove("active");
+    button.setAttribute("aria-pressed", "false");
+  });
+}
+
+async function submitFeedbackSelection(messageId, feedbackContainer, feedback, reason = null) {
+  const buttons = [...feedbackContainer.querySelectorAll(".oc-feedback-btn")];
+  buttons.forEach((button) => {
+    button.disabled = true;
+  });
+  const saved = await submitFeedback(messageId, feedback, reason);
+  buttons.forEach((button) => {
+    button.disabled = false;
+  });
+
+  if (saved) {
+    setFeedbackStatus(feedbackContainer, "Thanks for your feedback.");
+    return true;
+  }
+
+  setFeedbackStatus(feedbackContainer, "Feedback couldn't be saved. Please try again.", true);
+  return false;
+}
+
 /**
  * Show feedback reason modal for negative feedback
  */
@@ -33,31 +86,30 @@ export function showFeedbackReasonModal(messageId, feedbackContainer) {
   const existingModal = feedbackContainer.querySelector(".oc-feedback-modal");
   if (existingModal) existingModal.remove();
 
-  const modalHtml = `
-		<div class="oc-feedback-modal">
-			<div class="oc-feedback-modal-title">What went wrong?</div>
-			<div class="oc-feedback-modal-options">
-				${FEEDBACK_REASONS.map((r) => `<button class="oc-feedback-option" data-reason="${r}">${r}</button>`).join("")}
-			</div>
-			<textarea class="oc-feedback-textarea" placeholder="Tell us more (optional)..." rows="2"></textarea>
-			<div class="oc-feedback-modal-actions">
-				<button class="oc-feedback-modal-btn cancel">Skip</button>
-				<button class="oc-feedback-modal-btn submit">Submit</button>
-			</div>
-		</div>
-	`;
-
   feedbackContainer.style.position = "relative";
-  feedbackContainer.insertAdjacentHTML("beforeend", modalHtml);
+  feedbackContainer.insertAdjacentHTML("beforeend", createFeedbackReasonMarkup());
 
   const modal = feedbackContainer.querySelector(".oc-feedback-modal");
   let selectedReason = "";
+  const negativeButton = feedbackContainer.querySelector('[data-feedback="negative"]');
+  modal.querySelector(".oc-feedback-option")?.focus();
+  modal.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    event.preventDefault();
+    modal.remove();
+    resetFeedbackSelection(feedbackContainer);
+    negativeButton?.focus();
+  });
 
   // Handle option clicks
   modal.querySelectorAll(".oc-feedback-option").forEach((opt) => {
     opt.addEventListener("click", () => {
-      modal.querySelectorAll(".oc-feedback-option").forEach((o) => o.classList.remove("selected"));
+      modal.querySelectorAll(".oc-feedback-option").forEach((option) => {
+        option.classList.remove("selected");
+        option.setAttribute("aria-pressed", "false");
+      });
       opt.classList.add("selected");
+      opt.setAttribute("aria-pressed", "true");
       selectedReason = opt.dataset.reason;
     });
   });
@@ -65,8 +117,9 @@ export function showFeedbackReasonModal(messageId, feedbackContainer) {
   // Handle skip
   modal.querySelector(".cancel").addEventListener("click", async () => {
     modal.remove();
-    await submitFeedback(messageId, "negative");
-    showFeedbackThanks(feedbackContainer);
+    const saved = await submitFeedbackSelection(messageId, feedbackContainer, "negative");
+    if (!saved) resetFeedbackSelection(feedbackContainer);
+    negativeButton?.focus();
   });
 
   // Handle submit
@@ -74,9 +127,21 @@ export function showFeedbackReasonModal(messageId, feedbackContainer) {
     const textarea = modal.querySelector(".oc-feedback-textarea");
     const additionalText = textarea.value.trim();
     const fullReason = selectedReason + (additionalText ? `: ${additionalText}` : "");
-    modal.remove();
-    await submitFeedback(messageId, "negative", fullReason || null);
-    showFeedbackThanks(feedbackContainer);
+    const submitButton = modal.querySelector(".submit");
+    submitButton.disabled = true;
+    const saved = await submitFeedbackSelection(
+      messageId,
+      feedbackContainer,
+      "negative",
+      fullReason || null,
+    );
+    submitButton.disabled = false;
+    if (saved) {
+      modal.remove();
+      negativeButton?.focus();
+    } else {
+      modal.querySelector(".oc-feedback-textarea")?.focus();
+    }
   });
 }
 
@@ -84,12 +149,7 @@ export function showFeedbackReasonModal(messageId, feedbackContainer) {
  * Show thanks message after feedback
  */
 export function showFeedbackThanks(feedbackContainer) {
-  const thanks = feedbackContainer.querySelector(".oc-feedback-thanks");
-  if (thanks) {
-    thanks.textContent = "Thanks for your feedback.";
-    thanks.classList.add("show");
-    setTimeout(() => thanks.classList.remove("show"), 2000);
-  }
+  setFeedbackStatus(feedbackContainer, "Thanks for your feedback.");
 }
 
 /**
@@ -113,6 +173,12 @@ export function attachFeedbackListeners() {
     // Don't re-submit if already active with same feedback
     if (btn.classList.contains("active")) return;
 
+    const status = feedbackContainer.querySelector(".oc-feedback-thanks");
+    if (status) {
+      status.textContent = "";
+      status.classList.remove("show", "error");
+    }
+
     // Remove any existing modal
     const existingModal = feedbackContainer.querySelector(".oc-feedback-modal");
     if (existingModal) existingModal.remove();
@@ -133,8 +199,8 @@ export function attachFeedbackListeners() {
       showFeedbackReasonModal(messageId, feedbackContainer);
     } else {
       // For positive feedback, submit immediately
-      await submitFeedback(messageId, feedback);
-      showFeedbackThanks(feedbackContainer);
+      const saved = await submitFeedbackSelection(messageId, feedbackContainer, feedback);
+      if (!saved) resetFeedbackSelection(feedbackContainer);
     }
   });
 }

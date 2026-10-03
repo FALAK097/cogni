@@ -537,6 +537,19 @@ export function injectStyles() {
 			color: ${config.theme === "dark" ? "#a1a1aa" : "#71717a"};
 		}
 
+		.oc-feedback-btn:focus-visible,
+		.oc-feedback-option:focus-visible,
+		.oc-feedback-modal-btn:focus-visible {
+			outline: 2px solid ${config.primaryColor};
+			outline-offset: 2px;
+		}
+
+		.oc-feedback-btn:disabled,
+		.oc-feedback-modal-btn:disabled {
+			cursor: wait;
+			opacity: 0.6;
+		}
+
 		.oc-feedback-btn.active {
 			animation: oc-feedbackPulse 0.3s ease;
 		}
@@ -570,6 +583,10 @@ export function injectStyles() {
 			margin-left: 8px;
 			opacity: 0;
 			transition: opacity 0.2s ease;
+		}
+
+		.oc-feedback-thanks.error {
+			color: ${config.theme === "dark" ? "#fca5a5" : "#b91c1c"};
 		}
 
 		.oc-feedback-thanks.show {
@@ -610,6 +627,19 @@ export function injectStyles() {
 			margin-bottom: 8px;
 		}
 
+		.oc-feedback-input-label {
+			display: block;
+			margin: 4px 0 8px;
+			font-size: 11px;
+			font-weight: 500;
+			color: ${config.theme === "dark" ? "#d4d4d8" : "#52525b"};
+		}
+
+		.oc-feedback-input-label span {
+			font-weight: 400;
+			color: ${config.theme === "dark" ? "#a1a1aa" : "#71717a"};
+		}
+
 		.oc-feedback-modal-options {
 			display: flex;
 			flex-wrap: wrap;
@@ -618,6 +648,7 @@ export function injectStyles() {
 		}
 
 		.oc-feedback-option {
+			min-height: 32px;
 			padding: 6px 10px;
 			font-size: 11px;
 			border: 1px solid ${config.theme === "dark" ? "#3f3f46" : "#e4e4e7"};
@@ -625,7 +656,7 @@ export function injectStyles() {
 			background: transparent;
 			color: ${config.theme === "dark" ? "#a1a1aa" : "#71717a"};
 			cursor: pointer;
-			transition: all 0.15s ease;
+			transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
 		}
 
 		.oc-feedback-option:hover,
@@ -649,8 +680,9 @@ export function injectStyles() {
 		}
 
 		.oc-feedback-textarea:focus {
-			outline: none;
 			border-color: ${config.primaryColor};
+			outline: 2px solid ${config.primaryColor};
+			outline-offset: 1px;
 		}
 
 		.oc-feedback-modal-actions {
@@ -660,11 +692,12 @@ export function injectStyles() {
 		}
 
 		.oc-feedback-modal-btn {
+			min-height: 36px;
 			padding: 6px 12px;
 			font-size: 11px;
 			border-radius: 6px;
 			cursor: pointer;
-			transition: all 0.15s ease;
+			transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, opacity 150ms ease;
 		}
 
 		.oc-feedback-modal-btn.cancel {

@@ -244,6 +244,8 @@ rendered note placement remains unverified because the local Inbox currently has
 On 2026-10-03, the embedded widget chat gained safe Markdown link handling (only HTTP(S), mailto,
 and local paths; credentialed and unsafe schemes stay inert), wrapping for long text and code,
 accessible feedback names/pressed state/live status, 36px feedback targets, and reduced-motion
-support. The full local suite passes 124 tests and the production build passes. The Codex in-app
+support. The negative-feedback reason panel now has named controls, visible keyboard focus,
+Escape-to-dismiss with focus return, mutually exclusive reason state, and an honest retryable
+failure message when feedback cannot be saved. The full local suite passes 124 tests and the production build passes. The Codex in-app
 browser did not return a controllable preview tab, so visual acceptance remains unverified and
 issue #40 stays open for the remaining attachment, citation, and manual keyboard/mobile checks.

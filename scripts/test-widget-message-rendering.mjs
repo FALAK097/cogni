@@ -69,7 +69,7 @@ const feedbackCompiled = await build({
     },
   ],
 });
-const { createFeedbackButtons } = await import(
+const { createFeedbackButtons, createFeedbackReasonMarkup } = await import(
   `data:text/javascript;base64,${Buffer.from(feedbackCompiled.outputFiles[0].text).toString("base64")}`
 );
 
@@ -116,4 +116,16 @@ test("feedback controls expose names, toggle state, and an announcement region",
       'oc-feedback-positive active" aria-label="Mark response as helpful" aria-pressed="true"',
     ),
   );
+});
+
+test("negative feedback reasons expose keyboard and screen-reader semantics", () => {
+  const markup = createFeedbackReasonMarkup();
+
+  assert.ok(markup.includes('role="group" aria-label="Tell us how this response could improve"'));
+  assert.ok(markup.includes('<button type="button" class="oc-feedback-option"'));
+  assert.ok(markup.includes('aria-pressed="false"'));
+  assert.ok(markup.includes("Anything else? <span>(optional)</span>"));
+  assert.ok(markup.includes('aria-label="Additional feedback details"'));
+  assert.ok(markup.includes(">Skip details</button>"));
+  assert.ok(markup.includes(">Submit feedback</button>"));
 });
