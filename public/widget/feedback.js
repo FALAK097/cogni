@@ -13,13 +13,13 @@ import { state } from "./state.js";
 export function createFeedbackButtons(messageId, existingFeedback = null) {
   const feedbackHtml = `
 		<div class="oc-feedback${existingFeedback ? " has-feedback" : ""}" data-message-id="${messageId}">
-			<button class="oc-feedback-btn oc-feedback-positive${existingFeedback === "positive" ? " active" : ""}" title="Helpful response" data-feedback="positive">
+			<button type="button" class="oc-feedback-btn oc-feedback-positive${existingFeedback === "positive" ? " active" : ""}" aria-label="Mark response as helpful" aria-pressed="${existingFeedback === "positive"}" title="Helpful response" data-feedback="positive">
 				${ICONS.thumbsUp}
 			</button>
-			<button class="oc-feedback-btn oc-feedback-negative${existingFeedback === "negative" ? " active" : ""}" title="Not helpful" data-feedback="negative">
+			<button type="button" class="oc-feedback-btn oc-feedback-negative${existingFeedback === "negative" ? " active" : ""}" aria-label="Mark response as not helpful" aria-pressed="${existingFeedback === "negative"}" title="Not helpful" data-feedback="negative">
 				${ICONS.thumbsDown}
 			</button>
-			<span class="oc-feedback-thanks${existingFeedback ? " show" : ""}">Thanks!</span>
+			<span class="oc-feedback-thanks${existingFeedback ? " show" : ""}" role="status" aria-live="polite">${existingFeedback ? "Thanks for your feedback." : ""}</span>
 		</div>
 	`;
   return feedbackHtml;
@@ -86,6 +86,7 @@ export function showFeedbackReasonModal(messageId, feedbackContainer) {
 export function showFeedbackThanks(feedbackContainer) {
   const thanks = feedbackContainer.querySelector(".oc-feedback-thanks");
   if (thanks) {
+    thanks.textContent = "Thanks for your feedback.";
     thanks.classList.add("show");
     setTimeout(() => thanks.classList.remove("show"), 2000);
   }
@@ -119,10 +120,12 @@ export function attachFeedbackListeners() {
     // Remove active from all buttons in this container
     feedbackContainer.querySelectorAll(".oc-feedback-btn").forEach((b) => {
       b.classList.remove("active");
+      b.setAttribute("aria-pressed", "false");
     });
 
     // Add active to clicked button
     btn.classList.add("active");
+    btn.setAttribute("aria-pressed", "true");
     feedbackContainer.classList.add("has-feedback");
 
     if (feedback === "negative") {

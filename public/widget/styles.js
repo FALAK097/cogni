@@ -329,7 +329,8 @@ export function injectStyles() {
 			display: flex;
 			flex-direction: column;
 			gap: 4px;
-			max-width: 85%;
+			min-width: 0;
+			max-width: min(85%, 100%);
 		}
 
 		.oc-message.user {
@@ -341,12 +342,24 @@ export function injectStyles() {
 		}
 
 		.oc-bubble {
+			min-width: 0;
+			max-width: 100%;
 			padding: 12px 16px;
 			border-radius: 12px;
 			font-family: inherit;
 			font-size: 1em;
 			line-height: 1.625;
 			box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+			overflow-wrap: anywhere;
+			word-break: normal;
+		}
+
+		.oc-bubble pre,
+		.oc-bubble code {
+			max-width: 100%;
+			white-space: pre-wrap;
+			overflow-wrap: anywhere;
+			word-break: normal;
 		}
 
 		.oc-message.user .oc-bubble {
@@ -505,7 +518,7 @@ export function injectStyles() {
 		}
 
 		.oc-feedback-btn {
-			padding: 4px 6px;
+			padding: 6px;
 			border: 1px solid ${config.theme === "dark" ? "#3f3f46" : "#e4e4e7"};
 			border-radius: 6px;
 			background: transparent;
@@ -514,9 +527,9 @@ export function injectStyles() {
 			align-items: center;
 			justify-content: center;
 			color: ${config.theme === "dark" ? "#71717a" : "#a1a1aa"};
-			transition: all 0.15s ease;
-			min-width: 28px;
-			min-height: 28px;
+			transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+			min-width: 36px;
+			min-height: 36px;
 		}
 
 		.oc-feedback-btn:hover {
@@ -561,6 +574,17 @@ export function injectStyles() {
 
 		.oc-feedback-thanks.show {
 			opacity: 1;
+		}
+
+		@media (prefers-reduced-motion: reduce) {
+			#widget-container *,
+			#widget-container *::before,
+			#widget-container *::after {
+				animation-duration: 0.01ms !important;
+				animation-iteration-count: 1 !important;
+				scroll-behavior: auto !important;
+				transition-duration: 0.01ms !important;
+			}
 		}
 
 		/* Feedback Reason Modal */
