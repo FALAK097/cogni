@@ -12,7 +12,7 @@ import { state } from "./state.js";
  */
 export function createFeedbackButtons(messageId, existingFeedback = null) {
   const feedbackHtml = `
-		<div class="oc-feedback${existingFeedback ? " has-feedback" : ""}" data-message-id="${messageId}">
+		<div class="oc-feedback${existingFeedback ? " has-feedback" : ""}" data-message-id="${messageId}" role="group" aria-label="Rate this response">
 			<button type="button" class="oc-feedback-btn oc-feedback-positive${existingFeedback === "positive" ? " active" : ""}" aria-label="Mark response as helpful" aria-pressed="${existingFeedback === "positive"}" title="Helpful response" data-feedback="positive">
 				${ICONS.thumbsUp}
 			</button>

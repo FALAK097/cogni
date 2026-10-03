@@ -108,6 +108,7 @@ test("feedback controls expose names, toggle state, and an announcement region",
   const initial = createFeedbackButtons("message-id");
   const submitted = createFeedbackButtons("message-id", "positive");
 
+  assert.ok(initial.includes('role="group" aria-label="Rate this response"'));
   assert.ok(initial.includes('aria-label="Mark response as helpful" aria-pressed="false"'));
   assert.ok(initial.includes('aria-label="Mark response as not helpful" aria-pressed="false"'));
   assert.ok(initial.includes('role="status" aria-live="polite"'));
