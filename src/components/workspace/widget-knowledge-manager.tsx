@@ -3,12 +3,13 @@
 import { formatDistanceToNow } from "date-fns";
 import { parseAsStringLiteral, useQueryState } from "nuqs";
 import {
+  createSortedRowModel,
+  rowSortingFeature,
   type ColumnDef,
   flexRender,
-  getCoreRowModel,
-  getSortedRowModel,
+  tableFeatures,
   type Header,
-  useReactTable,
+  useTable,
   type SortingState,
 } from "@tanstack/react-table";
 import { type ComponentType, type FormEvent, type RefObject, useRef, useState } from "react";
@@ -86,6 +87,11 @@ const SORT_VALUES = [
   "updatedAt.asc",
   "updatedAt.desc",
 ] as const;
+
+const knowledgeTableFeatures = tableFeatures({
+  rowSortingFeature,
+  sortedRowModel: createSortedRowModel(),
+});
 
 type SortValue = (typeof SORT_VALUES)[number];
 type SortColumn = "displayName" | "sourceType" | "status" | "chunkCount" | "updatedAt";
@@ -572,7 +578,7 @@ function KnowledgeSourcesTable({
 }) {
   "use no memo";
 
-  const columns: ColumnDef<KnowledgeBaseSource>[] = [
+  const columns: ColumnDef<typeof knowledgeTableFeatures, KnowledgeBaseSource>[] = [
     {
       id: "displayName",
       accessorKey: "displayName",
@@ -628,17 +634,13 @@ function KnowledgeSourcesTable({
     });
   }
 
-  /* oxlint-disable react/incompatible-library -- This is the single isolated TanStack Table v8 integration. */
-  // react-doctor-disable-next-line react-hooks-js/incompatible-library -- The table adapter intentionally owns its non-memoizable model callbacks.
-  const table = useReactTable({
+  const table = useTable({
+    features: knowledgeTableFeatures,
     data: sources,
     columns,
     state: { sorting },
     onSortingChange: onSortChange,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
   });
-  /* oxlint-enable react/incompatible-library */
   const rows = table.getRowModel().rows;
 
   return (
@@ -689,7 +691,7 @@ function KnowledgeSourcesTable({
           ) : (
             rows.map((row) => (
               <TableRow key={row.id} className="border-border/60 hover:bg-muted/30">
-                {row.getVisibleCells().map((cell) => (
+                {row.getAllCells().map((cell) => (
                   <TableCell
                     key={cell.id}
                     className={cn(
@@ -709,7 +711,11 @@ function KnowledgeSourcesTable({
   );
 }
 
-function SortHeader({ header }: { header: Header<KnowledgeBaseSource, unknown> }) {
+function SortHeader({
+  header,
+}: {
+  header: Header<typeof knowledgeTableFeatures, KnowledgeBaseSource, unknown>;
+}) {
   const sortDirection = header.column.getIsSorted();
 
   return (
