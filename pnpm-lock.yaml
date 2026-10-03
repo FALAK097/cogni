@@ -18,35 +18,35 @@ importers:
         specifier: 4.0.83
         version: 4.0.83(zod@4.6.5)
       '@aws-sdk/client-s3':
-        specifier: ^3.1144.0
-        version: 3.1144.0
+        specifier: ^3.1145.0
+        version: 3.1145.0
       '@base-ui/react':
         specifier: ^1.8.0
         version: 1.8.0(@types/react@19.3.0)(date-fns@4.4.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@chat-adapter/discord':
         specifier: ^4.41.1
-        version: 4.41.1(ai@7.0.126(zod@4.6.5))(zod@4.6.5)
+        version: 4.41.1(ai@7.0.127(zod@4.6.5))(zod@4.6.5)
       '@chat-adapter/gchat':
         specifier: ^4.41.1
-        version: 4.41.1(ai@7.0.126(zod@4.6.5))(zod@4.6.5)
+        version: 4.41.1(ai@7.0.127(zod@4.6.5))(zod@4.6.5)
       '@chat-adapter/slack':
         specifier: ^4.41.1
-        version: 4.41.1(ai@7.0.126(zod@4.6.5))(zod@4.6.5)
+        version: 4.41.1(ai@7.0.127(zod@4.6.5))(zod@4.6.5)
       '@chat-adapter/state-pg':
         specifier: ^4.41.1
-        version: 4.41.1(ai@7.0.126(zod@4.6.5))(zod@4.6.5)
+        version: 4.41.1(ai@7.0.127(zod@4.6.5))(zod@4.6.5)
       '@chat-adapter/teams':
         specifier: 4.41.1
-        version: 4.41.1(ai@7.0.126(zod@4.6.5))(zod@4.6.5)
+        version: 4.41.1(ai@7.0.127(zod@4.6.5))(zod@4.6.5)
       '@chat-adapter/whatsapp':
         specifier: ^4.41.1
-        version: 4.41.1(ai@7.0.126(zod@4.6.5))(zod@4.6.5)
+        version: 4.41.1(ai@7.0.127(zod@4.6.5))(zod@4.6.5)
       '@composio/core':
         specifier: ^0.14.1
         version: 0.14.1(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(ws@8.22.0)(zod@4.6.5)
       '@composio/vercel':
         specifier: ^0.11.2
-        version: 0.11.2(@composio/core@0.14.1(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(ws@8.22.0)(zod@4.6.5))(ai@7.0.126(zod@4.6.5))
+        version: 0.11.2(@composio/core@0.14.1(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(ws@8.22.0)(zod@4.6.5))(ai@7.0.127(zod@4.6.5))
       '@hookform/resolvers':
         specifier: ^5.9.1
         version: 5.9.1(@standard-schema/spec@1.1.0)(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(react-hook-form@7.89.0(@types/react@19.3.0)(react@19.3.0))(zod@4.6.5)
@@ -69,14 +69,14 @@ importers:
         specifier: ^8.21.3
         version: 8.21.3(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       ai:
-        specifier: 7.0.126
-        version: 7.0.126(zod@4.6.5)
+        specifier: 7.0.127
+        version: 7.0.127(zod@4.6.5)
       better-auth:
         specifier: ^1.7.7
         version: 1.7.7(@opentelemetry/api@1.9.1)(drizzle-kit@0.31.11)(drizzle-orm@0.45.3(@opentelemetry/api@1.9.1)(kysely@0.29.6)(pg@8.23.1)(postgres@3.4.9))(next@16.3.8(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@types/node@24.19.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(pg@8.23.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       chat:
         specifier: ^4.41.1
-        version: 4.41.1(ai@7.0.126(zod@4.6.5))(zod@4.6.5)
+        version: 4.41.1(ai@7.0.127(zod@4.6.5))(zod@4.6.5)
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -129,8 +129,8 @@ importers:
         specifier: ^3.10.1
         version: 3.10.1(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react-is@19.3.0)(react@19.3.0)(redux@5.0.1)
       resend:
-        specifier: ^6.31.0
-        version: 6.31.0
+        specifier: ^6.32.0
+        version: 6.32.0
       shadcn:
         specifier: ^4.21.1
         version: 4.21.1(typescript@5.9.3)
@@ -205,13 +205,13 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
       wrangler:
-        specifier: ^4.145.0
-        version: 4.145.0(@types/node@24.19.0)
+        specifier: ^4.146.0
+        version: 4.146.0(@types/node@24.19.0)
 
 packages:
 
-  '@ai-sdk/gateway@4.0.102':
-    resolution: {integrity: sha512-kAVldt8D2AVSs7BjBZTRWHcFF71lPH8ouS6/QVlFCnKcUsShjXMdRwW6es5BfxyGewHbXfSirSc8j6efKSkIdA==}
+  '@ai-sdk/gateway@4.0.103':
+    resolution: {integrity: sha512-nnGTUHzPRQ14jhv9CL4OQrzcRBIFTBMIPKGIi9Z9u/4GtwSRxa/nxUX6np2Iwp5phOzO0a0njj/j9Jolf5AEaA==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -246,8 +246,8 @@ packages:
     resolution: {integrity: sha512-x12Q17KYlJAd3nKf8LV5LV0vt8sh8/6YfQLGPtrGnQf/tW4jqxPGq5GPpuVitpQYM3eUR4XB7CbxZf751NMbLw==}
     engines: {node: '>=20.0.0'}
 
-  '@aws-sdk/client-s3@3.1144.0':
-    resolution: {integrity: sha512-CAicFlKAuCAUEU1tIptCTh6Eikr4rig9CWYwofZdEuJm9i24XNclgCspV4DKXlOY2nK2AMGHRt88oxmwDdNW7w==}
+  '@aws-sdk/client-s3@3.1145.0':
+    resolution: {integrity: sha512-MPKAQdx8qCZW1/ChDPILNehtAn/BMP4GNTnaH/xhGCWg3v50ADVq1K2WzxIrFfeANdWUyjwiY0CXDBhclsNWgQ==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/core@3.978.1':
@@ -602,32 +602,32 @@ packages:
       workerd:
         optional: true
 
-  '@cloudflare/workerd-darwin-64@1.20260930.2':
-    resolution: {integrity: sha512-wxKsfekWeev6xkjHEMx3x7nz6WfWOn1/scQ8geqWQhUm8qRl1ZRZhjnj+rucIMLhLhP9RGSYMZIjEm3AV0zwVQ==}
+  '@cloudflare/workerd-darwin-64@1.20261001.1':
+    resolution: {integrity: sha512-4cgSgDf28JSw/P5Dj5GCS59hzVqS5XnmGAWNkvYHLI6ODU9idGaMMNEuhJXDkEG/lsABmlVlnCgsdh2VbKWepw==}
     engines: {node: '>=16'}
     cpu: [x64]
     os: [darwin]
 
-  '@cloudflare/workerd-darwin-arm64@1.20260930.2':
-    resolution: {integrity: sha512-cviPpheZGQ2H5X+Ctxd3wfxhksNrdyoNprjSgg3br2+psetKacjdEvK8CILdN/2GF+u1KOExvr45amSL6lgzGA==}
+  '@cloudflare/workerd-darwin-arm64@1.20261001.1':
+    resolution: {integrity: sha512-8ulAWruEVouNmEIsQsy9WSSCS9zkLu93W2MTwp5esiFyoPp05BNSVFIFsYSPi1pkFmBBd7fsnwMpbLkaJLaVPQ==}
     engines: {node: '>=16'}
     cpu: [arm64]
     os: [darwin]
 
-  '@cloudflare/workerd-linux-64@1.20260930.2':
-    resolution: {integrity: sha512-cwrJAC5y/avPd1OzGyhc5OvUUfPXBFc065TY5CjXp7Hb3dhiTx6JeB5Pc8L3G8L8M44HyAfRHSpoLtRr+SR3cQ==}
+  '@cloudflare/workerd-linux-64@1.20261001.1':
+    resolution: {integrity: sha512-kZbTZJGrhsMOdqZ2BIybjaBRLZjYsRLWj7mcNw/6Y3hodOhp5MrNzcz4iWGwNVWwyIV+7Pl+/LX5VcgnRqdHOg==}
     engines: {node: '>=16'}
     cpu: [x64]
     os: [linux]
 
-  '@cloudflare/workerd-linux-arm64@1.20260930.2':
-    resolution: {integrity: sha512-FHucB4gak1IuT+IxLx3KbtMBMapZhcqD9EdhHvBxk1FpHwD2QU5x26MRRVN53jIKG/O25HUmE9yffb3cMANQgw==}
+  '@cloudflare/workerd-linux-arm64@1.20261001.1':
+    resolution: {integrity: sha512-oOk3Zj6k/8oP0FJgZBWDn7+BqbsqIMEMaV95pulHPVbwVu4wYoLfQq2hp0vkbCNsCFLqZb7cqixXdrwD54ZIow==}
     engines: {node: '>=16'}
     cpu: [arm64]
     os: [linux]
 
-  '@cloudflare/workerd-windows-64@1.20260930.2':
-    resolution: {integrity: sha512-JHFMdGFMqP+M2QiVzZq1S8Ie66Gvxo7Og5EYz/KtmDvGCqge5L3lK+ksZxAhF3j/tpSLqdvlUvcTKoR9PkwTTQ==}
+  '@cloudflare/workerd-windows-64@1.20261001.1':
+    resolution: {integrity: sha512-uRxm5W4VyBkoSaoP1BfOuH0873tE+vxsknF4sab6/5YIRvIAufChq3QDp+zlAn67PuGPGcn7W8QraA0t4ucmOQ==}
     engines: {node: '>=16'}
     cpu: [x64]
     os: [win32]
@@ -2407,8 +2407,8 @@ packages:
       react-dom:
         optional: true
 
-  ai@7.0.126:
-    resolution: {integrity: sha512-7egcwpnVR2xn3YlJYEX2y15X7Bv7Rc8U2h4YjCOnj5KZL6Pr/BQFzJuF+9fkm3SefmpgkaYRXzrvhafVjxGZww==}
+  ai@7.0.127:
+    resolution: {integrity: sha512-JNsNPk4ZvRGEJuqdVo2lYFkm7uAuf3p/RwKFWn1Wh/+IK3U1RyFWw2GXoFnhzqNfxEuj7XJB4WpIUhl1sHToWg==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -4024,8 +4024,8 @@ packages:
     resolution: {integrity: sha512-VP79XUPxV2CigYP3jWwAUFSku2aKqBH7uTAapFWCBqutsbmDo96KY5o8uh6U+/YSIn5OxJnXp73beVkpqMIGhA==}
     engines: {node: '>=18'}
 
-  miniflare@5.20260930.0-alpha:
-    resolution: {integrity: sha512-vZljfRtOEeynbhJtuvYsnCU8t6zF5wIUm9ql4YFHB7zvYw2+F2tpT0BzXjzaa++eiUIml1gsODCf02qShBmJdg==}
+  miniflare@5.20261001.0-alpha:
+    resolution: {integrity: sha512-GaimS5mSIOMyvd16ga+e1/QkI8cmp3z35QPHFex0DktqNQf2RVZQwMPQXdyoUreUiFP/0Gpe2MoQInTyMAD5xA==}
     engines: {node: '>=22.0.0'}
 
   minimatch@10.2.6:
@@ -4555,8 +4555,8 @@ packages:
   reselect@5.3.0:
     resolution: {integrity: sha512-XGoLeRAVzUTcJ1qkxPQhDJyIZ5d6zzZD9nT7AEZOaaU9UbWclhycElmhO+VD5bFeLuzhPBaOV2oXC8uG35ZSpg==}
 
-  resend@6.31.0:
-    resolution: {integrity: sha512-E9Ekrm888UKKCIY61UmDkgRVd2Q9OwihimgStrWJ4olNsjFYM25F4X8QbzrLuZz6W9iS7eLMS7MLbRBNqnlI/Q==}
+  resend@6.32.0:
+    resolution: {integrity: sha512-bZZUeKlpKINFT+zGG2iIzfDewkyEHRaE7Xk1haseVz3Gfw6ekkizN6KdKgZSMjt5ywE8vMwr3wTdenlF8P475Q==}
     engines: {node: '>=20'}
     peerDependencies:
       '@react-email/render': '*'
@@ -5006,17 +5006,17 @@ packages:
     engines: {node: ^16.13.0 || >=18.0.0}
     hasBin: true
 
-  workerd@1.20260930.2:
-    resolution: {integrity: sha512-k1lQzEiGyCDqaRsR5+o9PBT5wVU5omtas6hXx3spbEHHMFo8a7tkAixVCMsWFeiT7xhrmg21Hd6a9jLNrkcUMg==}
+  workerd@1.20261001.1:
+    resolution: {integrity: sha512-d/SIYHFO0PT/wiFZg8in4NpRIxYuFwslX1HdylOtWkBIIUmSpkGFhK820cV84XACFylwJ48xuRoWW/8DWDPsPQ==}
     engines: {node: '>=16'}
     hasBin: true
 
-  wrangler@4.145.0:
-    resolution: {integrity: sha512-TdO9l7RNqM2Kb5/AynhlRPF9WPhaI0W4Gcpq2FkyU1iZ+xPW25sfV8Yc48PsI1GsNEFOfdh2RTOIpW8U22AqHw==}
+  wrangler@4.146.0:
+    resolution: {integrity: sha512-c27eHUH0Isr8HTmgZ6cLtLr/0cxtiBoLren6ywBeTW8ZIzj/dINVNBcqsbZc+iETnI5jrzO7E7Z8mLgLZ/l9iw==}
     engines: {node: '>=22.0.0'}
     hasBin: true
     peerDependencies:
-      '@cloudflare/workers-types': ^5.20260930.2
+      '@cloudflare/workers-types': ^5.20261001.1
     peerDependenciesMeta:
       '@cloudflare/workers-types':
         optional: true
@@ -5140,7 +5140,7 @@ packages:
 
 snapshots:
 
-  '@ai-sdk/gateway@4.0.102(zod@4.6.5)':
+  '@ai-sdk/gateway@4.0.103(zod@4.6.5)':
     dependencies:
       '@ai-sdk/provider': 4.0.21
       '@ai-sdk/provider-utils': 5.0.53(zod@4.6.5)
@@ -5182,7 +5182,7 @@ snapshots:
       '@smithy/types': 4.19.0
       tslib: 2.8.1
 
-  '@aws-sdk/client-s3@3.1144.0':
+  '@aws-sdk/client-s3@3.1145.0':
     dependencies:
       '@aws-sdk/checksums': 3.1001.1
       '@aws-sdk/core': 3.978.1
@@ -5617,10 +5617,10 @@ snapshots:
 
   '@better-fetch/fetch@1.3.2': {}
 
-  '@chat-adapter/discord@4.41.1(ai@7.0.126(zod@4.6.5))(zod@4.6.5)':
+  '@chat-adapter/discord@4.41.1(ai@7.0.127(zod@4.6.5))(zod@4.6.5)':
     dependencies:
-      '@chat-adapter/shared': 4.41.1(ai@7.0.126(zod@4.6.5))(zod@4.6.5)
-      chat: 4.41.1(ai@7.0.126(zod@4.6.5))(zod@4.6.5)
+      '@chat-adapter/shared': 4.41.1(ai@7.0.127(zod@4.6.5))(zod@4.6.5)
+      chat: 4.41.1(ai@7.0.127(zod@4.6.5))(zod@4.6.5)
       discord-api-types: 0.38.56
       discord-interactions: 4.4.0
       discord.js: 14.27.0
@@ -5632,33 +5632,33 @@ snapshots:
       - workflow
       - zod
 
-  '@chat-adapter/gchat@4.41.1(ai@7.0.126(zod@4.6.5))(zod@4.6.5)':
+  '@chat-adapter/gchat@4.41.1(ai@7.0.127(zod@4.6.5))(zod@4.6.5)':
     dependencies:
-      '@chat-adapter/shared': 4.41.1(ai@7.0.126(zod@4.6.5))(zod@4.6.5)
+      '@chat-adapter/shared': 4.41.1(ai@7.0.127(zod@4.6.5))(zod@4.6.5)
       '@googleapis/chat': 44.7.0
       '@googleapis/workspaceevents': 9.2.0
-      chat: 4.41.1(ai@7.0.126(zod@4.6.5))(zod@4.6.5)
+      chat: 4.41.1(ai@7.0.127(zod@4.6.5))(zod@4.6.5)
     transitivePeerDependencies:
       - ai
       - supports-color
       - workflow
       - zod
 
-  '@chat-adapter/shared@4.41.1(ai@7.0.126(zod@4.6.5))(zod@4.6.5)':
+  '@chat-adapter/shared@4.41.1(ai@7.0.127(zod@4.6.5))(zod@4.6.5)':
     dependencies:
-      chat: 4.41.1(ai@7.0.126(zod@4.6.5))(zod@4.6.5)
+      chat: 4.41.1(ai@7.0.127(zod@4.6.5))(zod@4.6.5)
     transitivePeerDependencies:
       - ai
       - supports-color
       - workflow
       - zod
 
-  '@chat-adapter/slack@4.41.1(ai@7.0.126(zod@4.6.5))(zod@4.6.5)':
+  '@chat-adapter/slack@4.41.1(ai@7.0.127(zod@4.6.5))(zod@4.6.5)':
     dependencies:
-      '@chat-adapter/shared': 4.41.1(ai@7.0.126(zod@4.6.5))(zod@4.6.5)
+      '@chat-adapter/shared': 4.41.1(ai@7.0.127(zod@4.6.5))(zod@4.6.5)
       '@slack/socket-mode': 2.0.7
       '@slack/web-api': 7.19.0
-      chat: 4.41.1(ai@7.0.126(zod@4.6.5))(zod@4.6.5)
+      chat: 4.41.1(ai@7.0.127(zod@4.6.5))(zod@4.6.5)
     transitivePeerDependencies:
       - ai
       - bufferutil
@@ -5668,9 +5668,9 @@ snapshots:
       - workflow
       - zod
 
-  '@chat-adapter/state-pg@4.41.1(ai@7.0.126(zod@4.6.5))(zod@4.6.5)':
+  '@chat-adapter/state-pg@4.41.1(ai@7.0.127(zod@4.6.5))(zod@4.6.5)':
     dependencies:
-      chat: 4.41.1(ai@7.0.126(zod@4.6.5))(zod@4.6.5)
+      chat: 4.41.1(ai@7.0.127(zod@4.6.5))(zod@4.6.5)
       pg: 8.23.1
     transitivePeerDependencies:
       - ai
@@ -5679,14 +5679,14 @@ snapshots:
       - workflow
       - zod
 
-  '@chat-adapter/teams@4.41.1(ai@7.0.126(zod@4.6.5))(zod@4.6.5)':
+  '@chat-adapter/teams@4.41.1(ai@7.0.127(zod@4.6.5))(zod@4.6.5)':
     dependencies:
-      '@chat-adapter/shared': 4.41.1(ai@7.0.126(zod@4.6.5))(zod@4.6.5)
+      '@chat-adapter/shared': 4.41.1(ai@7.0.127(zod@4.6.5))(zod@4.6.5)
       '@microsoft/teams.api': 2.1.0
       '@microsoft/teams.apps': 2.1.0
       '@microsoft/teams.cards': 2.1.0
       '@microsoft/teams.graph-endpoints': 2.1.0
-      chat: 4.41.1(ai@7.0.126(zod@4.6.5))(zod@4.6.5)
+      chat: 4.41.1(ai@7.0.127(zod@4.6.5))(zod@4.6.5)
     transitivePeerDependencies:
       - ai
       - debug
@@ -5694,10 +5694,10 @@ snapshots:
       - workflow
       - zod
 
-  '@chat-adapter/whatsapp@4.41.1(ai@7.0.126(zod@4.6.5))(zod@4.6.5)':
+  '@chat-adapter/whatsapp@4.41.1(ai@7.0.127(zod@4.6.5))(zod@4.6.5)':
     dependencies:
-      '@chat-adapter/shared': 4.41.1(ai@7.0.126(zod@4.6.5))(zod@4.6.5)
-      chat: 4.41.1(ai@7.0.126(zod@4.6.5))(zod@4.6.5)
+      '@chat-adapter/shared': 4.41.1(ai@7.0.127(zod@4.6.5))(zod@4.6.5)
+      chat: 4.41.1(ai@7.0.127(zod@4.6.5))(zod@4.6.5)
     transitivePeerDependencies:
       - ai
       - supports-color
@@ -5706,25 +5706,25 @@ snapshots:
 
   '@cloudflare/kv-asset-handler@0.5.0': {}
 
-  '@cloudflare/unenv-preset@2.16.2(unenv@2.0.0-rc.24)(workerd@1.20260930.2)':
+  '@cloudflare/unenv-preset@2.16.2(unenv@2.0.0-rc.24)(workerd@1.20261001.1)':
     dependencies:
       unenv: 2.0.0-rc.24
     optionalDependencies:
-      workerd: 1.20260930.2
+      workerd: 1.20261001.1
 
-  '@cloudflare/workerd-darwin-64@1.20260930.2':
+  '@cloudflare/workerd-darwin-64@1.20261001.1':
     optional: true
 
-  '@cloudflare/workerd-darwin-arm64@1.20260930.2':
+  '@cloudflare/workerd-darwin-arm64@1.20261001.1':
     optional: true
 
-  '@cloudflare/workerd-linux-64@1.20260930.2':
+  '@cloudflare/workerd-linux-64@1.20261001.1':
     optional: true
 
-  '@cloudflare/workerd-linux-arm64@1.20260930.2':
+  '@cloudflare/workerd-linux-arm64@1.20261001.1':
     optional: true
 
-  '@cloudflare/workerd-windows-64@1.20260930.2':
+  '@cloudflare/workerd-windows-64@1.20261001.1':
     optional: true
 
   '@commitlint/cli@21.2.3(@types/node@24.19.0)(conventional-commits-parser@7.1.2)(typescript@5.9.3)':
@@ -5859,10 +5859,10 @@ snapshots:
     dependencies:
       zod: 4.6.5
 
-  '@composio/vercel@0.11.2(@composio/core@0.14.1(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(ws@8.22.0)(zod@4.6.5))(ai@7.0.126(zod@4.6.5))':
+  '@composio/vercel@0.11.2(@composio/core@0.14.1(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(ws@8.22.0)(zod@4.6.5))(ai@7.0.127(zod@4.6.5))':
     dependencies:
       '@composio/core': 0.14.1(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(ws@8.22.0)(zod@4.6.5)
-      ai: 7.0.126(zod@4.6.5)
+      ai: 7.0.127(zod@4.6.5)
 
   '@conventional-changelog/git-client@3.1.2(conventional-commits-parser@7.1.2)':
     dependencies:
@@ -7060,9 +7060,9 @@ snapshots:
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
 
-  ai@7.0.126(zod@4.6.5):
+  ai@7.0.127(zod@4.6.5):
     dependencies:
-      '@ai-sdk/gateway': 4.0.102(zod@4.6.5)
+      '@ai-sdk/gateway': 4.0.103(zod@4.6.5)
       '@ai-sdk/provider': 4.0.21
       '@ai-sdk/provider-utils': 5.0.53(zod@4.6.5)
       zod: 4.6.5
@@ -7248,7 +7248,7 @@ snapshots:
 
   character-reference-invalid@2.0.1: {}
 
-  chat@4.41.1(ai@7.0.126(zod@4.6.5))(zod@4.6.5):
+  chat@4.41.1(ai@7.0.127(zod@4.6.5))(zod@4.6.5):
     dependencies:
       '@workflow/serde': 4.1.0-beta.2
       mdast-util-to-string: 4.0.0
@@ -7258,7 +7258,7 @@ snapshots:
       remend: 1.4.0
       unified: 11.0.5
     optionalDependencies:
-      ai: 7.0.126(zod@4.6.5)
+      ai: 7.0.127(zod@4.6.5)
       zod: 4.6.5
     transitivePeerDependencies:
       - supports-color
@@ -8795,12 +8795,12 @@ snapshots:
 
   mimic-function@5.0.1: {}
 
-  miniflare@5.20260930.0-alpha(@types/node@24.19.0):
+  miniflare@5.20261001.0-alpha(@types/node@24.19.0):
     dependencies:
       '@cspotcode/source-map-support': 0.8.1
       sharp: 0.35.4(@types/node@24.19.0)
       undici: 7.29.1
-      workerd: 1.20260930.2
+      workerd: 1.20261001.1
       ws: 8.21.0
       youch: 4.1.0-beta.10
     transitivePeerDependencies:
@@ -9340,7 +9340,7 @@ snapshots:
 
   reselect@5.3.0: {}
 
-  resend@6.31.0:
+  resend@6.32.0:
     dependencies:
       postal-mime: 2.7.6
       standardwebhooks: 1.1.1
@@ -9847,24 +9847,24 @@ snapshots:
     dependencies:
       isexe: 3.1.5
 
-  workerd@1.20260930.2:
+  workerd@1.20261001.1:
     optionalDependencies:
-      '@cloudflare/workerd-darwin-64': 1.20260930.2
-      '@cloudflare/workerd-darwin-arm64': 1.20260930.2
-      '@cloudflare/workerd-linux-64': 1.20260930.2
-      '@cloudflare/workerd-linux-arm64': 1.20260930.2
-      '@cloudflare/workerd-windows-64': 1.20260930.2
+      '@cloudflare/workerd-darwin-64': 1.20261001.1
+      '@cloudflare/workerd-darwin-arm64': 1.20261001.1
+      '@cloudflare/workerd-linux-64': 1.20261001.1
+      '@cloudflare/workerd-linux-arm64': 1.20261001.1
+      '@cloudflare/workerd-windows-64': 1.20261001.1
 
-  wrangler@4.145.0(@types/node@24.19.0):
+  wrangler@4.146.0(@types/node@24.19.0):
     dependencies:
       '@cloudflare/kv-asset-handler': 0.5.0
-      '@cloudflare/unenv-preset': 2.16.2(unenv@2.0.0-rc.24)(workerd@1.20260930.2)
+      '@cloudflare/unenv-preset': 2.16.2(unenv@2.0.0-rc.24)(workerd@1.20261001.1)
       blake3-wasm: 2.1.5
       esbuild: 0.28.1
-      miniflare: 5.20260930.0-alpha(@types/node@24.19.0)
+      miniflare: 5.20261001.0-alpha(@types/node@24.19.0)
       path-to-regexp: 6.3.0
       unenv: 2.0.0-rc.24
-      workerd: 1.20260930.2
+      workerd: 1.20261001.1
     optionalDependencies:
       fsevents: 2.3.3
     transitivePeerDependencies:
