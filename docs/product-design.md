@@ -128,7 +128,8 @@ out of Inbox and Insights, and a reset starts a fresh preview session. Show retr
 for groundedness review and configured keyword matches for handoff review. Saved evaluation cases
 and no-evidence prompt guidance are implemented; tool proposals and latency/cost measurements remain
 future work. Insights now connects negative feedback and recurring older unanswered questions to an
-owner-written verified source; ignore/resolve state and quality trends remain future work before
+owner-written verified source, with owner-managed open/resolved/ignored states on the same review card.
+Weak-confidence and grounding signals plus a repeatable quality trend remain future work before
 Optimize is considered complete.
 
 The target lifecycle remains:

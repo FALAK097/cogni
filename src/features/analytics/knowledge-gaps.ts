@@ -1,4 +1,25 @@
+import { createHash } from "node:crypto";
+
 import type { UnansweredQuestionItem } from "@/features/analytics/types";
+
+export type KnowledgeGapReview = {
+  questionHash: string;
+  status: "OPEN" | "RESOLVED" | "IGNORED";
+  updatedAt: string;
+};
+
+export function normalizeKnowledgeGapQuestion(question: string): string {
+  return question
+    .normalize("NFKC")
+    .toLocaleLowerCase("en-US")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/gu, " ")
+    .trim();
+}
+
+export function hashKnowledgeGapQuestion(question: string): string {
+  return createHash("sha256").update(normalizeKnowledgeGapQuestion(question)).digest("hex");
+}
 
 /** Group exact repeat questions while ignoring case, spacing, and punctuation. */
 export function aggregateKnowledgeGaps(
@@ -7,12 +28,7 @@ export function aggregateKnowledgeGaps(
   const grouped = new Map<string, UnansweredQuestionItem>();
 
   for (const item of items) {
-    const key = item.question
-      .normalize("NFKC")
-      .toLocaleLowerCase("en-US")
-      .replace(/[^\p{L}\p{N}\s]/gu, " ")
-      .replace(/\s+/gu, " ")
-      .trim();
+    const key = normalizeKnowledgeGapQuestion(item.question);
     if (!key) continue;
 
     const existing = grouped.get(key);
@@ -37,4 +53,49 @@ export function aggregateKnowledgeGaps(
   return [...grouped.values()].sort(
     (a, b) => b.count - a.count || b.askedAt.localeCompare(a.askedAt),
   );
+}
+
+export function buildKnowledgeGapSummary(
+  items: UnansweredQuestionItem[],
+  reviews: KnowledgeGapReview[],
+  limit = 3,
+) {
+  const reviewByHash = new Map(reviews.map((review) => [review.questionHash, review]));
+  const mutable = {
+    OPEN: [] as (UnansweredQuestionItem & { status: "OPEN" })[],
+    RESOLVED: [] as (UnansweredQuestionItem & { status: "RESOLVED" })[],
+    IGNORED: [] as (UnansweredQuestionItem & { status: "IGNORED" })[],
+  };
+
+  for (const item of items) {
+    const review = reviewByHash.get(hashKnowledgeGapQuestion(item.question));
+    let status = review?.status ?? "OPEN";
+    if (
+      review &&
+      status === "RESOLVED" &&
+      Date.parse(item.askedAt) > Date.parse(review.updatedAt)
+    ) {
+      status = "OPEN";
+    }
+    if (status === "OPEN") mutable.OPEN.push({ ...item, status: "OPEN" });
+    else if (status === "RESOLVED") mutable.RESOLVED.push({ ...item, status: "RESOLVED" });
+    else mutable.IGNORED.push({ ...item, status: "IGNORED" });
+  }
+
+  const counts = {
+    OPEN: mutable.OPEN.length,
+    RESOLVED: mutable.RESOLVED.length,
+    IGNORED: mutable.IGNORED.length,
+  };
+
+  return {
+    open: mutable.OPEN.slice(0, limit),
+    resolved: mutable.RESOLVED.slice(0, limit),
+    ignored: mutable.IGNORED.slice(0, limit),
+    counts: {
+      open: counts.OPEN,
+      resolved: counts.RESOLVED,
+      ignored: counts.IGNORED,
+    },
+  };
 }

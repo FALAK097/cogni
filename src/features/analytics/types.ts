@@ -52,6 +52,19 @@ export type UnansweredQuestionItem = {
   count: number;
 };
 
+export type KnowledgeGapReviewStatus = "OPEN" | "RESOLVED" | "IGNORED";
+
+export type KnowledgeGapItem = UnansweredQuestionItem & {
+  status: KnowledgeGapReviewStatus;
+};
+
+export type KnowledgeGapSummary = {
+  open: KnowledgeGapItem[];
+  resolved: KnowledgeGapItem[];
+  ignored: KnowledgeGapItem[];
+  counts: { open: number; resolved: number; ignored: number };
+};
+
 export type DashboardAnalytics = {
   dateRange: DashboardDateRange;
   previousDateRange: DashboardDateRange;
@@ -67,7 +80,7 @@ export type DashboardAnalytics = {
   conversationsByStatus: BreakdownItem[];
   topQuestions: TopQuestion[];
   negativeFeedback: NegativeFeedbackItem[];
-  unansweredQuestions: UnansweredQuestionItem[];
+  knowledgeGaps: KnowledgeGapSummary;
   userEngagement: {
     messagesSent: MetricComparison;
     messagesReceived: MetricComparison;

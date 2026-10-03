@@ -1,10 +1,12 @@
 import {
   boolean,
+  check,
   index,
   integer,
   jsonb,
   pgTable,
   pgEnum,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -327,6 +329,42 @@ export const agentTestCase = pgTable(
       sql`lower(${table.title})`,
     ),
     index("agent_test_case_workspace_createdAt_idx").on(table.workspaceId, table.createdAt),
+  ],
+);
+
+export const knowledgeGapReviewStatus = pgEnum("knowledge_gap_review_status", [
+  "OPEN",
+  "RESOLVED",
+  "IGNORED",
+]);
+
+export const knowledgeGapReview = pgTable(
+  "knowledge_gap_review",
+  {
+    workspaceId: text()
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    questionHash: text().notNull(),
+    status: knowledgeGapReviewStatus().default("OPEN").notNull(),
+    reviewedByUserId: text().references(() => user.id, {
+      onDelete: "set null",
+      onUpdate: "cascade",
+    }),
+    createdAt: timestampString()
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+    updatedAt: timestampString()
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.workspaceId, table.questionHash] }),
+    check("knowledge_gap_review_questionHash_check", sql`${table.questionHash} ~ '^[a-f0-9]{64}$'`),
+    index("knowledge_gap_review_workspace_status_updatedAt_idx").on(
+      table.workspaceId,
+      table.status,
+      table.updatedAt,
+    ),
   ],
 );
 

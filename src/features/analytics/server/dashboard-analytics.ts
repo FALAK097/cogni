@@ -9,7 +9,10 @@ import { aggregateSatisfactionByCohort } from "@/features/analytics/aggregation"
 import { collectAiResponseTimeSamplesMs } from "@/features/analytics/response-time";
 import { collectNegativeFeedbackItems } from "@/features/analytics/negative-feedback";
 import { collectUnansweredQuestions } from "@/features/analytics/unanswered-questions";
-import { aggregateKnowledgeGaps } from "@/features/analytics/knowledge-gaps";
+import {
+  aggregateKnowledgeGaps,
+  buildKnowledgeGapSummary,
+} from "@/features/analytics/knowledge-gaps";
 import { resolveAnalyticsDateRange } from "@/features/analytics/date-range";
 import { normalizeTimezone } from "@/features/conversations/snooze-schedule";
 import { getWidgetConversationCond } from "@/features/widget/server/widget-data-filters";
@@ -232,7 +235,7 @@ function aggregatePeriod(conversations: ConversationRow[], timezone: string) {
     negativeFeedback: negativeFeedback
       .sort((a, b) => b.feedbackAt.localeCompare(a.feedbackAt))
       .slice(0, 3),
-    unansweredQuestions: aggregateKnowledgeGaps(unansweredQuestions).slice(0, 3),
+    unansweredQuestions: aggregateKnowledgeGaps(unansweredQuestions),
   };
 }
 
@@ -341,6 +344,11 @@ export async function getDashboardAnalytics(
 
   const current = aggregatePeriod(currentConversations, validTimezone);
   const previous = aggregatePeriod(previousConversations, validTimezone);
+  const gapReviews = await db.query.knowledgeGapReview.findMany({
+    where: (fields, { eq }) => eq(fields.workspaceId, workspaceId),
+    columns: { questionHash: true, status: true, updatedAt: true },
+  });
+  const knowledgeGaps = buildKnowledgeGapSummary(current.unansweredQuestions, gapReviews);
 
   return {
     dateRange: {
@@ -380,7 +388,7 @@ export async function getDashboardAnalytics(
     conversationsByStatus: toBreakdown(current.statusCounts),
     topQuestions: current.topQuestions,
     negativeFeedback: current.negativeFeedback,
-    unansweredQuestions: current.unansweredQuestions,
+    knowledgeGaps,
     userEngagement: {
       messagesSent: toMetric(current.messagesSent, previous.messagesSent),
       messagesReceived: toMetric(current.messagesReceived, previous.messagesReceived),

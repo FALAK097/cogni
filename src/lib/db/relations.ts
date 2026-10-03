@@ -20,6 +20,7 @@ import {
   workflowRun,
   agentRun,
   integrationAction,
+  knowledgeGapReview,
 } from "./schema";
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -35,6 +36,7 @@ export const userRelations = relations(user, ({ many }) => ({
   workspaceMembers: many(workspaceMember),
   contactNotes: many(contactNote),
   notifications: many(notification),
+  knowledgeGapReviews: many(knowledgeGapReview),
 }));
 
 export const accountRelations = relations(account, ({ one }) => ({
@@ -70,6 +72,18 @@ export const workspaceRelations = relations(workspace, ({ many }) => ({
   workflowRuns: many(workflowRun),
   agentRuns: many(agentRun),
   integrationActions: many(integrationAction),
+  knowledgeGapReviews: many(knowledgeGapReview),
+}));
+
+export const knowledgeGapReviewRelations = relations(knowledgeGapReview, ({ one }) => ({
+  workspace: one(workspace, {
+    fields: [knowledgeGapReview.workspaceId],
+    references: [workspace.id],
+  }),
+  reviewedBy: one(user, {
+    fields: [knowledgeGapReview.reviewedByUserId],
+    references: [user.id],
+  }),
 }));
 
 export const contactRelations = relations(contact, ({ one, many }) => ({

@@ -63,7 +63,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useDashboardAnalytics } from "@/hooks/query";
+import { useDashboardAnalytics, useReviewKnowledgeGap } from "@/hooks/query";
 import { useAddManualTextSource, useKnowledgeBaseSources } from "@/hooks/query/use-knowledge-base";
 import { useWidgetConfig } from "@/hooks/query/use-widget";
 import { useActiveWorkspaceId } from "@/hooks/use-auth";
@@ -1119,6 +1119,7 @@ export function DashboardPage({
   );
   const [feedbackToImprove, setFeedbackToImprove] = useState<ReviewKnowledgeItem | null>(null);
   const [reviewFilter, setReviewFilter] = useState<"negative" | "unanswered">("negative");
+  const [gapFilter, setGapFilter] = useState<"OPEN" | "RESOLVED" | "IGNORED">("OPEN");
   const [convGranularity, setConvGranularity] = useState<Granularity>("daily");
   const [satGranularity, setSatGranularity] = useState<Granularity>("daily");
 
@@ -1131,8 +1132,32 @@ export function DashboardPage({
   );
 
   const analyticsQuery = useDashboardAnalytics(queryParams);
+  const reviewKnowledgeGap = useReviewKnowledgeGap();
+  const { toast } = useToast();
   const analytics = analyticsQuery.data;
   const isLoading = analyticsQuery.isLoading;
+  const gapItems = analytics
+    ? {
+        OPEN: analytics.knowledgeGaps.open,
+        RESOLVED: analytics.knowledgeGaps.resolved,
+        IGNORED: analytics.knowledgeGaps.ignored,
+      }[gapFilter]
+    : [];
+
+  async function setKnowledgeGapStatus(question: string, status: "OPEN" | "RESOLVED" | "IGNORED") {
+    try {
+      await reviewKnowledgeGap.mutateAsync({ question, status });
+      toast.success(
+        status === "OPEN"
+          ? "Question moved back to open"
+          : status === "RESOLVED"
+            ? "Question marked resolved"
+            : "Question ignored",
+      );
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not update this question.");
+    }
+  }
   const hasInitialError = analyticsQuery.isError && !analytics;
 
   const convChartData = useMemo(() => {
@@ -1563,7 +1588,7 @@ export function DashboardPage({
               <p className="mt-1 text-xs text-muted-foreground">
                 {reviewFilter === "negative"
                   ? "Recent AI answers rated negatively"
-                  : "Visitor questions with no public reply"}
+                  : "Questions without a public reply · open threads after 24h"}
               </p>
             </div>
             <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
@@ -1594,6 +1619,34 @@ export function DashboardPage({
               No public reply
             </button>
           </fieldset>
+          {reviewFilter === "unanswered" ? (
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <p className="text-xs text-muted-foreground">Question status in this date range</p>
+              <Select
+                value={gapFilter}
+                onValueChange={(value) => {
+                  if (value === "OPEN" || value === "RESOLVED" || value === "IGNORED") {
+                    setGapFilter(value);
+                  }
+                }}
+              >
+                <SelectTrigger className="h-9 max-w-[190px] rounded-lg border-border/70 bg-background text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="OPEN">
+                    Open ({analytics?.knowledgeGaps.counts.open ?? 0})
+                  </SelectItem>
+                  <SelectItem value="RESOLVED">
+                    Resolved ({analytics?.knowledgeGaps.counts.resolved ?? 0})
+                  </SelectItem>
+                  <SelectItem value="IGNORED">
+                    Ignored ({analytics?.knowledgeGaps.counts.ignored ?? 0})
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
           {isLoading ? (
             <div className="mt-4 space-y-2">
               {Array.from({ length: 3 }).map((_, index) => (
@@ -1607,10 +1660,13 @@ export function DashboardPage({
             <p className="mt-4 flex min-h-36 flex-1 items-center justify-center rounded-lg border border-dashed border-border/60 px-5 text-center text-sm text-muted-foreground">
               No negative feedback from conversations in this period.
             </p>
-          ) : reviewFilter === "unanswered" &&
-            (analytics?.unansweredQuestions ?? []).length === 0 ? (
+          ) : reviewFilter === "unanswered" && gapItems.length === 0 ? (
             <p className="mt-4 flex min-h-36 flex-1 items-center justify-center rounded-lg border border-dashed border-border/60 px-5 text-center text-sm text-muted-foreground">
-              No older unanswered questions in this period.
+              {gapFilter === "OPEN"
+                ? "No open unanswered questions in this period."
+                : gapFilter === "RESOLVED"
+                  ? "No resolved questions in this period."
+                  : "No ignored questions in this period."}
             </p>
           ) : reviewFilter === "negative" ? (
             <ul className="mt-4 divide-y divide-border/50">
@@ -1655,7 +1711,7 @@ export function DashboardPage({
             </ul>
           ) : (
             <ul className="mt-4 divide-y divide-border/50">
-              {(analytics?.unansweredQuestions ?? []).map((item, index) => (
+              {gapItems.map((item, index) => (
                 <li key={`${item.conversationId}-${item.askedAt}-${index}`}>
                   <div className="flex items-start gap-2 py-3">
                     <Link
@@ -1668,20 +1724,51 @@ export function DashboardPage({
                     >
                       <span className="line-clamp-3">{item.question}</span>
                       <span className="mt-1 block text-xs text-muted-foreground">
-                        No public reply · asked {item.count} {item.count === 1 ? "time" : "times"}
+                        {item.count > 1
+                          ? `No public reply · asked ${item.count} times`
+                          : "No public reply"}
                       </span>
                     </Link>
                     {canManage ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="mt-1 min-h-11 shrink-0 px-3"
-                        onClick={() => setFeedbackToImprove(item)}
-                        aria-label={`Write a verified answer for: ${item.question}`}
-                      >
-                        Add answer
-                      </Button>
+                      <div className="mt-1 flex shrink-0 flex-col items-end gap-1">
+                        {gapFilter === "OPEN" ? (
+                          <>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="min-h-11 px-3"
+                              onClick={() => setFeedbackToImprove(item)}
+                              aria-label={`Write a verified answer for: ${item.question}`}
+                            >
+                              Add answer
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="min-h-11 px-3 text-muted-foreground"
+                              disabled={reviewKnowledgeGap.isPending}
+                              onClick={() => void setKnowledgeGapStatus(item.question, "IGNORED")}
+                              aria-label={`Ignore knowledge gap: ${item.question}`}
+                            >
+                              Ignore
+                            </Button>
+                          </>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="min-h-11 px-3"
+                            disabled={reviewKnowledgeGap.isPending}
+                            onClick={() => void setKnowledgeGapStatus(item.question, "OPEN")}
+                            aria-label={`Reopen knowledge gap: ${item.question}`}
+                          >
+                            Reopen
+                          </Button>
+                        )}
+                      </div>
                     ) : null}
                   </div>
                 </li>
@@ -1786,6 +1873,9 @@ export function DashboardPage({
       {feedbackToImprove ? (
         <FeedbackKnowledgeDialog
           feedback={feedbackToImprove}
+          onAnswerAdded={async (question) => {
+            await reviewKnowledgeGap.mutateAsync({ question, status: "RESOLVED" });
+          }}
           onOpenChange={(open) => {
             if (!open) setFeedbackToImprove(null);
           }}
@@ -1797,9 +1887,11 @@ export function DashboardPage({
 
 function FeedbackKnowledgeDialog({
   feedback,
+  onAnswerAdded,
   onOpenChange,
 }: {
   feedback: ReviewKnowledgeItem;
+  onAnswerAdded: (question: string) => Promise<void>;
   onOpenChange: (open: boolean) => void;
 }) {
   const [title, setTitle] = useState(buildVerifiedAnswerTitle(feedback.question));
@@ -1814,6 +1906,17 @@ function FeedbackKnowledgeDialog({
     try {
       const source = buildVerifiedAnswerSource(feedback.question, answer);
       await addSource.mutateAsync({ title: title.trim(), content: source.content });
+      if (feedback.status === "OPEN") {
+        try {
+          await onAnswerAdded(feedback.question);
+        } catch {
+          toast.success("Answer added to knowledge", {
+            description: "It still appears as open. Refresh Insights to update its review status.",
+          });
+          onOpenChange(false);
+          return;
+        }
+      }
       toast.success("Answer added to knowledge", {
         description: "It will be available to the agent after indexing finishes.",
       });
@@ -1909,4 +2012,5 @@ type ReviewKnowledgeItem = {
   response?: string | null;
   reason?: string | null;
   askedAt?: string;
+  status?: "OPEN" | "RESOLVED" | "IGNORED";
 };

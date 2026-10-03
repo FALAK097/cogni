@@ -76,3 +76,61 @@ test("keeps distinct questions separate and skips empty normalized questions", (
 
   assert.equal(result.length, 2);
 });
+
+test("hashes normalized question text consistently", () => {
+  const first = analyticsModule.hashKnowledgeGapQuestion("How do I reset my password?");
+  const repeated = analyticsModule.hashKnowledgeGapQuestion(" HOW do I reset my password! ");
+  assert.equal(first, repeated);
+  assert.match(first, /^[a-f0-9]{64}$/u);
+});
+
+test("keeps ignored gaps out of open work and reopens resolved gaps only for newer asks", () => {
+  const items = [
+    {
+      conversationId: "resolved",
+      question: "Where is my invoice?",
+      askedAt: "2026-10-02T10:00:00.000Z",
+      count: 2,
+    },
+    {
+      conversationId: "ignored",
+      question: "Can I change my email?",
+      askedAt: "2026-10-03T10:00:00.000Z",
+      count: 4,
+    },
+  ];
+  const reviews = [
+    {
+      questionHash: analyticsModule.hashKnowledgeGapQuestion("Where is my invoice?"),
+      status: "RESOLVED",
+      updatedAt: "2026-10-02T12:00:00.000Z",
+    },
+    {
+      questionHash: analyticsModule.hashKnowledgeGapQuestion("Can I change my email?"),
+      status: "IGNORED",
+      updatedAt: "2026-10-01T12:00:00.000Z",
+    },
+  ];
+  const summary = analyticsModule.buildKnowledgeGapSummary(items, reviews);
+  assert.deepEqual(summary.counts, { open: 0, resolved: 1, ignored: 1 });
+  assert.equal(summary.resolved[0].status, "RESOLVED");
+  assert.equal(summary.ignored[0].status, "IGNORED");
+
+  const reopened = analyticsModule.buildKnowledgeGapSummary(
+    [{ ...items[0], askedAt: "2026-10-03T12:00:00.000Z" }],
+    reviews.slice(0, 1),
+  );
+  assert.deepEqual(reopened.counts, { open: 1, resolved: 0, ignored: 0 });
+});
+
+test("counts all gaps while limiting each review list", () => {
+  const items = Array.from({ length: 5 }, (_, index) => ({
+    conversationId: `conversation-${index}`,
+    question: `Question ${index}?`,
+    askedAt: `2026-10-0${index + 1}T10:00:00.000Z`,
+    count: 1,
+  }));
+  const summary = analyticsModule.buildKnowledgeGapSummary(items, [], 2);
+  assert.equal(summary.counts.open, 5);
+  assert.equal(summary.open.length, 2);
+});
