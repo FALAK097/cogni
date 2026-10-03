@@ -54,6 +54,7 @@ export function WidgetTestPanel({
   onTryPrompt: (prompt: string) => Promise<boolean>;
 }) {
   const [tryError, setTryError] = useState<string | null>(null);
+  const [noEvidencePrompt, setNoEvidencePrompt] = useState("");
   const [editingCase, setEditingCase] = useState<AgentTestCase | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
@@ -79,6 +80,13 @@ export function WidgetTestPanel({
     } catch {
       setTryError("Couldn't send that test. Retry the preview and try again.");
     }
+  };
+
+  const submitNoEvidencePrompt = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmedPrompt = noEvidencePrompt.trim();
+    if (!trimmedPrompt || sendingPrompt !== null) return;
+    void tryPrompt(trimmedPrompt);
   };
 
   const openCreate = () => {
@@ -186,9 +194,32 @@ export function WidgetTestPanel({
           <div>
             <p className="text-sm font-medium">Check the no-evidence response</p>
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              Ask about something outside your sources and confirm the agent says when it does not
-              know.
+              Ask about something your sources do not cover, then check whether the answer is
+              grounded.
             </p>
+            <form
+              className="mt-3 flex flex-col gap-2 sm:flex-row"
+              onSubmit={submitNoEvidencePrompt}
+              aria-label="Test a question outside your knowledge sources"
+            >
+              <Input
+                value={noEvidencePrompt}
+                onChange={(event) => setNoEvidencePrompt(event.target.value)}
+                maxLength={500}
+                disabled={sendingPrompt !== null}
+                aria-label="Question your sources do not cover"
+                placeholder="Type a question missing from your sources"
+                className="min-w-0"
+              />
+              <Button
+                type="submit"
+                variant="outline"
+                className="h-10 shrink-0 rounded-lg"
+                disabled={sendingPrompt !== null || noEvidencePrompt.trim().length === 0}
+              >
+                {sendingPrompt !== null ? "Sending…" : "Try in preview"}
+              </Button>
+            </form>
           </div>
         </li>
         <li className="flex items-start gap-3 rounded-lg border border-border/60 p-3.5">
