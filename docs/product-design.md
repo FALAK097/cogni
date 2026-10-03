@@ -127,9 +127,9 @@ Test uses the authenticated preview sandbox: external actions stay disabled, pre
 out of Inbox and Insights, and a reset starts a fresh preview session. Show retrieved source titles
 for groundedness review and configured keyword matches for handoff review. Saved evaluation cases
 and no-evidence prompt guidance are implemented; tool proposals and latency/cost measurements remain
-future work. Insights now connects negative feedback and older unanswered questions to an owner-
-written verified source; unanswered-question deduplication, ignore/resolve state, and quality trends
-remain future work before Optimize is considered complete.
+future work. Insights now connects negative feedback and recurring older unanswered questions to an
+owner-written verified source; ignore/resolve state and quality trends remain future work before
+Optimize is considered complete.
 
 The target lifecycle remains:
 

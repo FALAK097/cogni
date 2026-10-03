@@ -1567,7 +1567,12 @@ export function DashboardPage({
               </p>
             </div>
             <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-              <HugeiconsIcon icon={ThumbsDownIcon} strokeWidth={1.8} className="size-4" />
+              <HugeiconsIcon
+                icon={reviewFilter === "negative" ? ThumbsDownIcon : Message01Icon}
+                strokeWidth={1.8}
+                className="size-4"
+                aria-hidden="true"
+              />
             </span>
           </div>
           <fieldset className="mt-4 flex w-fit rounded-lg bg-muted p-1">
@@ -1663,7 +1668,7 @@ export function DashboardPage({
                     >
                       <span className="line-clamp-3">{item.question}</span>
                       <span className="mt-1 block text-xs text-muted-foreground">
-                        No public AI or teammate reply
+                        No public reply · asked {item.count} {item.count === 1 ? "time" : "times"}
                       </span>
                     </Link>
                     {canManage ? (

@@ -44,6 +44,7 @@
     "test:analytics-response-time": "node --test scripts/test-analytics-response-time.mjs",
     "test:analytics-negative-feedback": "node --test scripts/test-analytics-negative-feedback.mjs",
     "test:analytics-unanswered-questions": "node --test scripts/test-analytics-unanswered-questions.mjs",
+    "test:analytics-knowledge-gaps": "node --test scripts/test-analytics-knowledge-gaps.mjs",
     "test:analytics-aggregation": "node --test scripts/test-analytics-aggregation.mjs",
     "test:analytics-date-range": "node --test scripts/test-analytics-date-range.mjs",
     "test:workflow-progression": "node --test scripts/test-workflow-progression.mjs",

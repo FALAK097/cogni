@@ -49,6 +49,7 @@ export type UnansweredQuestionItem = {
   conversationId: string;
   question: string;
   askedAt: string;
+  count: number;
 };
 
 export type DashboardAnalytics = {

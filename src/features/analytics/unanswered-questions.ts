@@ -13,8 +13,8 @@ export function collectUnansweredQuestions(
   status: string,
   messages: MessageJson[],
   now = Date.now(),
-): UnansweredQuestionItem[] {
-  const result: UnansweredQuestionItem[] = [];
+): Omit<UnansweredQuestionItem, "count">[] {
+  const result: Omit<UnansweredQuestionItem, "count">[] = [];
   let pending: MessageJson | null = null;
 
   for (const message of messages) {
@@ -40,10 +40,8 @@ export function collectUnansweredQuestions(
   function addIfUnanswered(question: MessageJson) {
     const askedAt = question.createdAt;
     const timestamp = Date.parse(askedAt);
-    if (
-      status !== "CLOSED" &&
-      (!Number.isFinite(timestamp) || now - timestamp < OPEN_QUESTION_AGE_MS)
-    ) {
+    if (!Number.isFinite(timestamp)) return;
+    if (status !== "CLOSED" && now - timestamp < OPEN_QUESTION_AGE_MS) {
       return;
     }
     result.push({ conversationId, question: question.body.trim().slice(0, 500), askedAt });

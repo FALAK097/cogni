@@ -9,6 +9,7 @@ import { aggregateSatisfactionByCohort } from "@/features/analytics/aggregation"
 import { collectAiResponseTimeSamplesMs } from "@/features/analytics/response-time";
 import { collectNegativeFeedbackItems } from "@/features/analytics/negative-feedback";
 import { collectUnansweredQuestions } from "@/features/analytics/unanswered-questions";
+import { aggregateKnowledgeGaps } from "@/features/analytics/knowledge-gaps";
 import { resolveAnalyticsDateRange } from "@/features/analytics/date-range";
 import { normalizeTimezone } from "@/features/conversations/snooze-schedule";
 import { getWidgetConversationCond } from "@/features/widget/server/widget-data-filters";
@@ -130,7 +131,7 @@ function aggregatePeriod(conversations: ConversationRow[], timezone: string) {
   const statusCounts = new Map<string, number>();
   const questionCounts = new Map<string, { count: number; conversationId: string }>();
   const negativeFeedback: NegativeFeedbackItem[] = [];
-  const unansweredQuestions: UnansweredQuestionItem[] = [];
+  const unansweredQuestions: Omit<UnansweredQuestionItem, "count">[] = [];
   const dailyCounts = new Map<string, number>();
 
   for (const conversation of conversations) {
@@ -231,9 +232,7 @@ function aggregatePeriod(conversations: ConversationRow[], timezone: string) {
     negativeFeedback: negativeFeedback
       .sort((a, b) => b.feedbackAt.localeCompare(a.feedbackAt))
       .slice(0, 3),
-    unansweredQuestions: unansweredQuestions
-      .sort((a, b) => b.askedAt.localeCompare(a.askedAt))
-      .slice(0, 3),
+    unansweredQuestions: aggregateKnowledgeGaps(unansweredQuestions).slice(0, 3),
   };
 }
 
