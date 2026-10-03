@@ -118,6 +118,7 @@ interface ConversationDetailProps {
   conversationId: string;
   canManage: boolean;
   onBack: () => void;
+  focusBackButtonOnMount?: boolean;
   onSelectConversation: (conversationId: string) => void;
   part?: "chat" | "details";
   composerDraft?: ConversationComposerDraft;
@@ -250,6 +251,7 @@ export function ConversationDetail({
   conversationId,
   canManage,
   onBack,
+  focusBackButtonOnMount = false,
   onSelectConversation,
   part = "chat",
   composerDraft,
@@ -269,6 +271,8 @@ export function ConversationDetail({
   const [showDetailsSheet, setShowDetailsSheet] = useState(false);
   const [composerMode, setComposerMode] = useState<"reply" | "note">("reply");
   const replyTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const backButtonRef = useRef<HTMLButtonElement>(null);
+  const focusedBackButtonRef = useRef(false);
   const replyText = composerDraft?.reply ?? "";
   const noteText = composerDraft?.note ?? "";
   const setReplyText: Dispatch<SetStateAction<string>> = (value) => {
@@ -298,6 +302,12 @@ export function ConversationDetail({
     isError,
     refetch,
   } = useConversation(conversationId);
+  useEffect(() => {
+    if (!focusBackButtonOnMount || isLoading || focusedBackButtonRef.current) return;
+    if (!window.matchMedia("(max-width: 1023px)").matches) return;
+    backButtonRef.current?.focus({ preventScroll: true });
+    focusedBackButtonRef.current = true;
+  }, [focusBackButtonOnMount, isLoading]);
   const deleteConversationMutation = useDeleteConversation();
   const takeOverMutation = useTakeOverConversation();
   const aiPausedMutation = useSetConversationAiPaused();
@@ -567,6 +577,7 @@ export function ConversationDetail({
             <Button
               variant="ghost"
               size="icon"
+              ref={backButtonRef}
               onClick={onBack}
               className="h-11 w-11 lg:hidden sm:h-9 sm:w-9"
               aria-label="Back to conversations"
@@ -723,6 +734,7 @@ export function ConversationDetail({
             <Button
               variant="ghost"
               size="icon"
+              ref={backButtonRef}
               onClick={onBack}
               className="h-11 w-11 shrink-0 lg:hidden sm:h-9 sm:w-9"
               aria-label="Back to conversations"

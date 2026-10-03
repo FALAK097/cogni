@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AlertCircle, Loader2, RefreshCw } from "@/components/icons";
 import { Button } from "@/components/ui/button";
+import { waitForPreviewContainer } from "@/features/widget/wait-for-preview-container";
 import { getBackendOrigin } from "@/lib/api/client";
 
 const WIDGET_SCRIPT_ID = "widget-widget-preview";
@@ -148,31 +149,10 @@ async function ensureWidgetInitialized(config: Record<string, unknown>) {
 }
 
 function waitForWidgetContainer() {
-  return new Promise<HTMLElement>((resolve) => {
-    const existing = document.getElementById("widget-container");
-    if (existing) {
-      resolve(existing);
-      return;
-    }
-
-    let attempts = 0;
-    const check = () => {
-      const container = document.getElementById("widget-container");
-      if (container) {
-        resolve(container);
-        return;
-      }
-
-      attempts += 1;
-      if (attempts >= 60) {
-        throw new Error("Widget preview container was not created");
-      }
-
-      window.requestAnimationFrame(check);
-    };
-
-    check();
-  });
+  return waitForPreviewContainer(
+    () => document.getElementById("widget-container"),
+    (callback) => window.requestAnimationFrame(callback),
+  );
 }
 
 export function WidgetLiveWidgetPreview({

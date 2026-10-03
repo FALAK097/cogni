@@ -1,2 +1,37 @@
-§'§½Æ§ž‹kz¬‡õ,z»?}©Z’¥kúrz{ÿ²¦²+'·
-âµ¦åy¥µÁ½ÉÐ…ÍÍ•ÉÐ™É½´€‰¹½‘”é…ÍÍ•ÉÐ½ÍÑÉ¥Ðˆì)¥µÁ½ÉÐìÑ•ÍÐô™É½´€‰¹½‘”éÑ•ÍÐˆì)¥µÁ½ÉÐì‰Õ¥±ô™É½´€‰•Í‰Õ¥±ˆì()½¹ÍÐ½µÁ¥±•€ô…Ý…¥Ð‰Õ¥±¡ì(€•¹ÑÉåA½¥¹ÑÌèl‰ÍÉŒ½™•…ÑÕÉ•Ì½½¹Ù•ÉÍ…Ñ¥½¹Ì½±¥ÍÐµ­•å‰½…Éµ¹…Ù¥…Ñ¥½¸¹ÑÌ‰t°(€‰Õ¹‘±”èÑÉÕ”°(€ÝÉ¥Ñ”è™…±Í”°(€™½Éµ…Ðè€‰•Í´ˆ°(€Á±…Ñ™½É´è€‰¹½‘”ˆ°)ô¤ì)½¹ÍÐ¹…Ù¥…Ñ¥½¸€ô…Ý…¥Ð¥µÁ½ÉÐ (€‘…Ñ„éÑ•áÐ½©…Ù…ÍÉ¥ÁÐí‰…Í”ØÐ°‘í	Õ™™•È¹™É½´¡½µÁ¥±•¹½ÕÑÁÕÑ¥±•ÍlÁt¹Ñ•áÐ¤¹Ñ½MÑÉ¥¹œ ‰‰…Í”ØÐˆ¥õ€(¤ì)½¹ÍÐì•Ñ½¹Ù•ÉÍ…Ñ¥½¹Q…É•Ñ%¹‘•àô€ô¹…Ù¥…Ñ¥½¸ì()Ñ•ÍÐ ‰…ÉÉ½Ü­•åÌµ½Ù”Ý¥Ñ¡¥¸Ñ¡”±¥ÍÐ…¹ÍÑ½À…Ð¥ÑÌ‰½Õ¹‘…É¥•Ìˆ°€ ¤€ôøì(€…ÍÍ•ÉÐ¹•ÅÕ…°¡•Ñ½¹Ù•ÉÍ…Ñ¥½¹Q…É•Ñ%¹‘•à ‰ÉÉ½Ý½Ý¸ˆ°€À°€Ì¤°€Ä¤ì(€…ÍÍ•ÉÐ¹•ÅÕ…°¡•Ñ½¹Ù•ÉÍ…Ñ¥½¹Q…É•Ñ%¹‘•à ‰ÉÉ½ÝUÀˆ°€È°€Ì¤°€Ä¤ì(€…ÍÍ•ÉÐ¹•ÅÕ…°¡•Ñ½¹Ù•ÉÍ…Ñ¥½¹Q…É•Ñ%¹‘•à ‰ÉÉ½ÝUÀˆ°€À°€Ì¤°€À¤ì(€…ÍÍ•ÉÐ¹•ÅÕ…°¡•Ñ½¹Ù•ÉÍ…Ñ¥½¹Q…É•Ñ%¹‘•à ‰ÉÉ½Ý½Ý¸ˆ°€È°€Ì¤°€È¤ì)ô¤ì()Ñ•ÍÐ ‰!½µ”…¹¹µ½Ù”Ñ¼Ñ¡”™¥ÉÍÐ…¹±…ÍÐ½¹Ù•ÉÍ…Ñ¥½¸ˆ°€ ¤€ôøì(€…ÍÍ•ÉÐ¹•ÅÕ…°¡•Ñ½¹Ù•ÉÍ…Ñ¥½¹Q…É•Ñ%¹‘•à ‰!½µ”ˆ°€Ä°€Ì¤°€À¤ì(€…ÍÍ•ÉÐ¹•ÅÕ…°¡•Ñ½¹Ù•ÉÍ…Ñ¥½¹Q…É•Ñ%¹‘•à ‰¹ˆ°€Ä°€Ì¤°€È¤ì)ô¤ì()Ñ•ÍÐ ‰Õ¹É•±…Ñ•­•åÌ…¹•µÁÑä±¥ÍÑÌ‘¼¹½Ðµ½Ù”Í•±•Ñ¥½¸ˆ°€ ¤€ôøì(€…ÍÍ•ÉÐ¹•ÅÕ…°¡•Ñ½¹Ù•ÉÍ…Ñ¥½¹Q…É•Ñ%¹‘•à ‰¹Ñ•Èˆ°€Ä°€Ì¤°¹Õ±°¤ì(€…ÍÍ•ÉÐ¹•ÅÕ…°¡•Ñ½¹Ù•ÉÍ…Ñ¥½¹Q…É•Ñ%¹‘•à ‰ÉÉ½Ý½Ý¸ˆ°€À°€À¤°¹Õ±°¤ì)ô¤ì()Ñ•ÍÐ ‰…ÉÉ½Ü¹…Ù¥…Ñ¥½¸É•½Ù•ÉÌÍ…™•±ä™É½´„ÍÑ…±”™½ÕÍ•¥¹‘•àˆ°€ ¤€ôøì(€…ÍÍ•ÉÐ¹•ÅÕ…°¡•Ñ½¹Ù•ÉÍ…Ñ¥½¹Q…É•Ñ%¹‘•à ‰ÉÉ½Ý½Ý¸ˆ°€´Ä°€Ì¤°€Ä¤ì(€…ÍÍ•ÉÐ¹•ÅÕ…°¡•Ñ½¹Ù•ÉÍ…Ñ¥½¹Q…É•Ñ%¹‘•à ‰ÉÉ½ÝUÀˆ°€Ô°€Ì¤°€Ä¤ì)ô¤ì(
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { build } from "esbuild";
+
+const compiled = await build({
+  entryPoints: ["src/features/conversations/list-keyboard-navigation.ts"],
+  bundle: true,
+  write: false,
+  format: "esm",
+  platform: "node",
+});
+const navigation = await import(
+  `data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString("base64")}`
+);
+const { getConversationTargetIndex } = navigation;
+
+test("arrow keys move within the list and stop at its boundaries", () => {
+  assert.equal(getConversationTargetIndex("ArrowDown", 0, 3), 1);
+  assert.equal(getConversationTargetIndex("ArrowUp", 2, 3), 1);
+  assert.equal(getConversationTargetIndex("ArrowUp", 0, 3), 0);
+  assert.equal(getConversationTargetIndex("ArrowDown", 2, 3), 2);
+});
+
+test("Home and End move to the first and last conversation", () => {
+  assert.equal(getConversationTargetIndex("Home", 1, 3), 0);
+  assert.equal(getConversationTargetIndex("End", 1, 3), 2);
+});
+
+test("unrelated keys and empty lists do not move selection", () => {
+  assert.equal(getConversationTargetIndex("Enter", 1, 3), null);
+  assert.equal(getConversationTargetIndex("ArrowDown", 0, 0), null);
+});
+
+test("arrow navigation recovers safely from a stale focused index", () => {
+  assert.equal(getConversationTargetIndex("ArrowDown", -1, 3), 1);
+  assert.equal(getConversationTargetIndex("ArrowUp", 5, 3), 1);
+});

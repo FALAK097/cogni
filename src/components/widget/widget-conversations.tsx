@@ -136,6 +136,17 @@ export function WidgetConversations({
   const activeCountKind = filter === "snoozed" ? "snoozed" : "unread";
   const composerDraftKey = `${workspaceId}:${selectedConversationId ?? ""}`;
   const composerDraft = composerDrafts[composerDraftKey] ?? EMPTY_CONVERSATION_COMPOSER_DRAFT;
+  const backToConversationList = () => {
+    const conversationId = selectedConversationId;
+    setSelectedConversationId(null);
+    requestAnimationFrame(() => {
+      const options = document.querySelectorAll<HTMLButtonElement>("[data-conversation-option]");
+      const selectedOption = Array.from(options).find(
+        (option) => option.dataset.conversationId === conversationId,
+      );
+      (selectedOption ?? options[0])?.focus({ preventScroll: true });
+    });
+  };
   const updateComposerDraft: ConversationComposerDraftChange = (update) => {
     setComposerDrafts((current) =>
       updateConversationComposerDrafts(current, composerDraftKey, update),
@@ -323,7 +334,8 @@ export function WidgetConversations({
                 key={selectedConversationId}
                 conversationId={selectedConversationId}
                 canManage={canManage}
-                onBack={() => setSelectedConversationId(null)}
+                onBack={backToConversationList}
+                focusBackButtonOnMount
                 onSelectConversation={setSelectedConversationId}
                 part="chat"
                 composerDraft={composerDraft}

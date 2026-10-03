@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useId, useMemo } from "react";
 import { EvilAreaChart } from "@/components/evilcharts/charts/recharts-area-chart";
 import type { ChartConfig } from "@/components/evilcharts/ui/recharts-chart";
 import { cn } from "@/lib/utils";
@@ -25,6 +25,7 @@ export function InsightsTrendChart({
   seriesLabel = ariaLabel,
   yAxisDomain = [0, "auto"],
   showResponseCount = false,
+  allowDecimals = true,
 }: {
   data: TrendPoint[];
   className?: string;
@@ -36,8 +37,10 @@ export function InsightsTrendChart({
   seriesLabel?: string;
   yAxisDomain?: YAxisDomain;
   showResponseCount?: boolean;
+  allowDecimals?: boolean;
   ariaLabel: string;
 }) {
+  const captionId = useId();
   const chartConfig = useMemo(
     () =>
       ({
@@ -56,28 +59,19 @@ export function InsightsTrendChart({
     [data, labelFormatter],
   );
 
-  if (data.length === 0) {
-    return (
-      <div
-        className={cn(
-          "flex h-60 items-center justify-center text-sm text-muted-foreground",
-          className,
-        )}
-      >
-        {emptyMessage}
-      </div>
-    );
-  }
-
   return (
-    <figure className={cn("min-w-0 w-full", className)} aria-label={ariaLabel}>
-      {empty ? (
-        <div
+    <figure className={cn("min-w-0 w-full", className)} aria-labelledby={captionId}>
+      <figcaption id={captionId} className="sr-only">
+        {ariaLabel}
+      </figcaption>
+      {empty || data.length === 0 ? (
+        <output
           style={{ height }}
-          className="flex items-center justify-center text-sm text-muted-foreground"
+          aria-live="polite"
+          className="flex items-center justify-center px-4 text-center text-sm text-muted-foreground"
         >
           {emptyMessage}
-        </div>
+        </output>
       ) : (
         <div style={{ height }}>
           <EvilAreaChart
@@ -103,6 +97,7 @@ export function InsightsTrendChart({
               width={42}
               tickMargin={8}
               domain={yAxisDomain}
+              allowDecimals={allowDecimals}
               tick={{ fill: "var(--muted-foreground)", fontSize: 12 }}
               tickFormatter={valueFormatter}
             />
@@ -136,46 +131,48 @@ export function InsightsTrendChart({
           </EvilAreaChart>
         </div>
       )}
-      <details className="mt-2 text-xs text-muted-foreground">
-        <summary className="w-fit cursor-pointer rounded-sm py-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
-          View data
-        </summary>
-        <div className="mt-2 max-h-48 overflow-auto rounded-md border border-border">
-          <table className="w-full text-left tabular-nums">
-            <caption className="sr-only">{ariaLabel}</caption>
-            <thead>
-              <tr className="border-b border-border">
-                <th scope="col" className="px-3 py-2">
-                  {showResponseCount ? "Conversation start" : "Date"}
-                </th>
-                <th scope="col" className="px-3 py-2">
-                  Value
-                </th>
-                {showResponseCount ? (
-                  <th scope="col" className="px-3 py-2 text-right">
-                    Responses
+      {data.length > 0 ? (
+        <details className="mt-2 text-xs text-muted-foreground">
+          <summary className="inline-flex min-h-11 cursor-pointer items-center rounded-sm py-1 pr-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+            View data
+          </summary>
+          <div className="mt-2 max-h-48 overflow-auto rounded-md border border-border">
+            <table className="w-full text-left tabular-nums">
+              <caption className="sr-only">{ariaLabel} data</caption>
+              <thead>
+                <tr className="border-b border-border">
+                  <th scope="col" className="px-3 py-2">
+                    {showResponseCount ? "Conversation start" : "Date"}
                   </th>
-                ) : null}
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((point) => (
-                <tr key={point.label} className="border-b border-border last:border-0">
-                  <th scope="row" className="px-3 py-2 font-normal">
-                    {labelFormatter(point.label)}
+                  <th scope="col" className="px-3 py-2">
+                    {seriesLabel}
                   </th>
-                  <td className="px-3 py-2">
-                    {point.value === null ? "—" : valueFormatter(point.value)}
-                  </td>
                   {showResponseCount ? (
-                    <td className="px-3 py-2 text-right tabular-nums">{point.responses ?? 0}</td>
+                    <th scope="col" className="px-3 py-2 text-right">
+                      Responses
+                    </th>
                   ) : null}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </details>
+              </thead>
+              <tbody>
+                {data.map((point) => (
+                  <tr key={point.label} className="border-b border-border last:border-0">
+                    <th scope="row" className="px-3 py-2 font-normal">
+                      {labelFormatter(point.label)}
+                    </th>
+                    <td className="px-3 py-2">
+                      {point.value === null ? "—" : valueFormatter(point.value)}
+                    </td>
+                    {showResponseCount ? (
+                      <td className="px-3 py-2 text-right tabular-nums">{point.responses ?? 0}</td>
+                    ) : null}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      ) : null}
     </figure>
   );
 }
