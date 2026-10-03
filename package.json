@@ -63,7 +63,7 @@
   "dependencies": {
     "@ai-sdk/google": "4.0.87",
     "@ai-sdk/openai": "4.0.83",
-    "@aws-sdk/client-s3": "^3.1144.0",
+    "@aws-sdk/client-s3": "^3.1145.0",
     "@base-ui/react": "^1.8.0",
     "@chat-adapter/discord": "^4.41.1",
     "@chat-adapter/gchat": "^4.41.1",
@@ -80,7 +80,7 @@
     "@tanstack/react-form": "^1.33.5",
     "@tanstack/react-query": "^5.104.0",
     "@tanstack/react-table": "^8.21.3",
-    "ai": "7.0.126",
+    "ai": "7.0.127",
     "better-auth": "^1.7.7",
     "chat": "^4.41.1",
     "class-variance-authority": "^0.7.1",
@@ -100,7 +100,7 @@
     "react-dom": "19.3.0",
     "react-hook-form": "^7.89.0",
     "recharts": "^3.10.1",
-    "resend": "^6.31.0",
+    "resend": "^6.32.0",
     "shadcn": "^4.21.1",
     "sonner": "^2.0.8",
     "streamdown": "^2.7.0",
@@ -127,7 +127,7 @@
     "oxlint": "^1.86.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3",
-    "wrangler": "^4.145.0"
+    "wrangler": "^4.146.0"
   },
   "lint-staged": {
     "*": "oxfmt --no-error-on-unmatched-pattern",
