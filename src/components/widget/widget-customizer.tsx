@@ -7,7 +7,7 @@ import { Bot, Code, Eye, MessageCircle, Sparkles } from "@/components/icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/use-toast";
 import type { DashboardWidgetConfig } from "@/hooks/query";
-import { useWidgetConfig, useSaveWidgetConfig } from "@/hooks/query";
+import { useWidgetConfig, useSaveWidgetConfig, usePublishWidgetConfig } from "@/hooks/query";
 import { isValidDomain, sanitizeDomain } from "@/lib/domain-validation";
 import { getWidgetAccentVars, WIDGET_BRAND_COLOR } from "@/lib/widget-accent";
 import { normalizeFontFamily, normalizeFontSize, normalizeLogoUrl } from "@/features/widget/domain";
@@ -28,6 +28,7 @@ import {
   WidgetBehaviourPanel,
   WidgetConversationStarterPanel,
   WidgetInstallationPanel,
+  WidgetVersionHistory,
   WidgetSuggestedQuestionsPanel,
   type AppearanceConfig,
 } from "./widget-settings-panels";
@@ -193,6 +194,7 @@ export function WidgetCustomizer({
   const [previewEvidence, setPreviewEvidence] = useState<WidgetPreviewEvidence | null>(null);
   const [sendingTestPrompt, setSendingTestPrompt] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [publicationError, setPublicationError] = useState<string | null>(null);
   const [domainInput, setDomainInput] = useState("");
   const [configOverrides, setConfigOverrides] = useState<Partial<WidgetCustomizerConfig>>({});
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -209,7 +211,16 @@ export function WidgetCustomizer({
   const widgetConfigQuery = useWidgetConfig(activeWorkspaceId);
   const { data: widgetConfigData, isLoading } = widgetConfigQuery;
   const saveWidgetConfigMutation = useSaveWidgetConfig();
+  const publishWidgetConfigMutation = usePublishWidgetConfig();
   const saveWidgetConfig = saveWidgetConfigMutation.mutateAsync;
+  const publication = widgetConfigData?.publication;
+  const hasLocalDraftChanges = Object.keys(configOverrides).length > 0;
+  const isSavingDraft = saveWidgetConfigMutation.isPending || hasLocalDraftChanges;
+  const canPublishChanges =
+    canManage &&
+    Boolean(publication?.hasUnpublishedChanges) &&
+    !isSavingDraft &&
+    !publishWidgetConfigMutation.isPending;
 
   const tryPreviewPrompt = useCallback((prompt: string) => {
     setPreviewEvidence(null);
@@ -534,6 +545,21 @@ export function WidgetCustomizer({
     }
   };
 
+  const publishChanges = (restoreVersion?: number) => {
+    if (!activeWorkspaceId) return;
+    setPublicationError(null);
+    void publishWidgetConfigMutation
+      .mutateAsync({
+        workspaceId: activeWorkspaceId,
+        ...(restoreVersion ? { restoreVersion } : {}),
+      })
+      .catch((error: unknown) => {
+        setPublicationError(
+          error instanceof Error ? error.message : "Couldn't publish these agent changes.",
+        );
+      });
+  };
+
   const appearanceConfig: AppearanceConfig = {
     logoUrl: config.logoUrl ?? "",
     primaryColor: config.primaryColor,
@@ -600,15 +626,20 @@ export function WidgetCustomizer({
         <output
           className="ml-auto flex min-w-0 items-center gap-2 text-xs text-muted-foreground"
           aria-live="polite"
+          aria-busy={isSavingDraft || publishWidgetConfigMutation.isPending}
         >
           <span>
             {saveWidgetConfigMutation.isPending
-              ? "Saving…"
+              ? "Saving draft…"
               : saveWidgetConfigMutation.isError
-                ? "Changes not saved"
-                : Object.keys(configOverrides).length > 0
-                  ? "Unsaved changes"
-                  : "Saved"}
+                ? "Draft not saved"
+                : hasLocalDraftChanges
+                  ? "Unsaved draft changes"
+                  : publication?.current
+                    ? publication.hasUnpublishedChanges
+                      ? `Draft changes · live v${publication.current.version}`
+                      : `Live · v${publication.current.version}`
+                    : "Not published"}
           </span>
           {saveWidgetConfigMutation.isError && (
             <Button
@@ -621,7 +652,27 @@ export function WidgetCustomizer({
             </Button>
           )}
         </output>
+        {canManage ? (
+          <Button
+            type="button"
+            className="min-h-10 rounded-lg"
+            disabled={!canPublishChanges}
+            onClick={() => publishChanges()}
+          >
+            {publishWidgetConfigMutation.isPending &&
+            !publishWidgetConfigMutation.variables?.restoreVersion
+              ? "Publishing…"
+              : publication?.current
+                ? "Publish changes"
+                : "Publish agent"}
+          </Button>
+        ) : null}
       </div>
+      {publicationError ? (
+        <p role="alert" className="shrink-0 text-sm text-destructive">
+          {publicationError} The live version is unchanged.
+        </p>
+      ) : null}
       {!canManage ? (
         <output className="shrink-0 rounded-lg border border-border/70 bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
           You can preview the agent. Only workspace owners can change settings or authorized
@@ -728,6 +779,17 @@ export function WidgetCustomizer({
                   onRemoveDomain={handleRemoveDomain}
                   onCopyScript={copyScript}
                   canManage={canManage}
+                />
+                <WidgetVersionHistory
+                  versions={publication?.versions ?? []}
+                  currentVersion={publication?.current?.version ?? null}
+                  canManage={canManage}
+                  restoringVersion={
+                    publishWidgetConfigMutation.isPending
+                      ? (publishWidgetConfigMutation.variables?.restoreVersion ?? null)
+                      : null
+                  }
+                  onRestore={publishChanges}
                 />
               </TabsContent>
             </div>

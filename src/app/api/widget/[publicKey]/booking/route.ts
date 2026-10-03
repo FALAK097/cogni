@@ -40,17 +40,10 @@ async function getBookingContext(request: Request, publicKey: string) {
   if ("error" in access) return { error: access.error };
   const visitor = await requireAuthorizedVisitorSession(db, publicKey, request);
   if ("error" in visitor) return { error: visitor.error };
-  const saved = access.widget;
-  if (!saved.bookingEnabled) {
+  const settings = bookingSettingsInputSchema.parse(access.bookingSettings);
+  if (!settings.enabled) {
     return { error: Response.json({ error: "Booking is unavailable." }, { status: 404 }) };
   }
-  const settings = bookingSettingsInputSchema.parse({
-    enabled: saved.bookingEnabled,
-    timezone: saved.bookingTimezone,
-    durationMinutes: saved.bookingDurationMinutes,
-    minimumNoticeMinutes: saved.bookingMinimumNoticeMinutes,
-    workingHours: JSON.parse(saved.bookingWorkingHours) as unknown,
-  });
   return { db, access, visitor, settings };
 }
 

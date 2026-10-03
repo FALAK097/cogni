@@ -2,6 +2,7 @@ import {
   boolean,
   index,
   integer,
+  jsonb,
   pgTable,
   pgEnum,
   text,
@@ -11,6 +12,7 @@ import {
 import { sql } from "drizzle-orm";
 
 import { BRAND_COLOR } from "@/lib/widget-accent";
+import type { WidgetPublicationSnapshot } from "@/features/widget/publication";
 
 const timestampString = () => timestamp({ mode: "string", withTimezone: true });
 const numeric = timestampString;
@@ -392,6 +394,7 @@ export const widget = pgTable(
     enableBrochure: boolean().default(false).notNull(),
     brochureSuggestionText: text().default("Receive Brochure").notNull(),
     authorizedDomains: text().default("[]").notNull(),
+    publishedVersion: integer().default(0).notNull(),
     createdAt: numeric()
       .default(sql`(CURRENT_TIMESTAMP)`)
       .notNull(),
@@ -403,6 +406,29 @@ export const widget = pgTable(
   (table) => [
     uniqueIndex("widget_workspaceId_key").on(table.workspaceId),
     uniqueIndex("widget_publicKey_key").on(table.publicKey),
+  ],
+);
+
+export const widgetPublication = pgTable(
+  "widget_publication",
+  {
+    id: text().primaryKey().notNull(),
+    version: integer().notNull(),
+    config: jsonb().$type<WidgetPublicationSnapshot>().notNull(),
+    publishedAt: timestampString()
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+    widgetId: text()
+      .notNull()
+      .references(() => widget.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    createdByUserId: text().references(() => user.id, {
+      onDelete: "set null",
+      onUpdate: "cascade",
+    }),
+  },
+  (table) => [
+    uniqueIndex("widget_publication_widgetId_version_key").on(table.widgetId, table.version),
+    index("widget_publication_widgetId_publishedAt_idx").on(table.widgetId, table.publishedAt),
   ],
 );
 

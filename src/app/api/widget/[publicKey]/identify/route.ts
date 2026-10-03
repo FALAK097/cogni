@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { widgetPreflightResponse } from "@/features/widget/server/widget-utils";
+import { getAuthorizedVisitorSession } from "@/features/widget/server/widget-public";
 import { getDb } from "@/lib/db/client";
 import { checkRateLimits, getTrustedClientIp } from "@/lib/rate-limit/shared";
 import { visitorSession as visitorSessionTable } from "@/lib/db/schema";
@@ -11,11 +12,6 @@ const identifySchema = z.object({
   phone: z.string().trim().min(3).max(30).optional(),
 });
 
-function bearerToken(request: Request) {
-  const authorization = request.headers.get("authorization");
-  return authorization?.startsWith("Bearer ") ? authorization.slice(7) : null;
-}
-
 export function OPTIONS(request: Request) {
   return widgetPreflightResponse(request);
 }
@@ -24,7 +20,8 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ publicKey: string }> },
 ) {
-  const token = bearerToken(request);
+  const authorization = request.headers.get("authorization");
+  const token = authorization?.startsWith("Bearer ") ? authorization.slice(7) : null;
   if (!token) {
     return Response.json({ error: "Widget session is required." }, { status: 401 });
   }
@@ -37,18 +34,8 @@ export async function POST(
   const { publicKey } = await params;
   const db = getDb();
   const nowIso = new Date().toISOString();
-
-  const visitorSession = await db.query.visitorSession.findFirst({
-    where: (fields, { eq, and, gt }) => and(eq(fields.token, token), gt(fields.expiresAt, nowIso)),
-    with: { widget: true },
-  });
-
-  if (
-    !visitorSession ||
-    !visitorSession.widget ||
-    visitorSession.widget.publicKey !== publicKey ||
-    !visitorSession.widget.isEnabled
-  ) {
+  const visitorSession = await getAuthorizedVisitorSession(db, publicKey, token);
+  if (!visitorSession) {
     return Response.json({ error: "Widget session is invalid or expired." }, { status: 401 });
   }
 

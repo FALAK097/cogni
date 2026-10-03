@@ -20,6 +20,8 @@
     "test:widget-preview-isolation": "node --test scripts/test-widget-preview-isolation.mjs",
     "test:widget-preview-evidence": "node --test scripts/test-widget-preview-evidence.mjs",
     "test:widget-preview-message": "node --test scripts/test-widget-preview-message.mjs",
+    "test:widget-publication": "node --test scripts/test-widget-publication.mjs",
+    "test:widget-publication-db": "node --import dotenv/config --test scripts/test-widget-publication-db.mjs",
     "test:widget-settings": "node --test scripts/test-widget-settings.mjs",
     "test:agent-tests": "node --test scripts/test-agent-tests.mjs",
     "test:conversation-append": "node --test scripts/test-conversation-append.mjs",

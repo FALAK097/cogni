@@ -15,6 +15,7 @@ import {
 } from "@/features/widget/domain";
 import { ensureWorkspaceWidget } from "@/features/widget/server/widget-service";
 import { requireAuth, requireDashboardContext } from "@/lib/auth/dashboard-context";
+import { canManageWorkspace } from "@/lib/auth/permissions";
 
 export type WidgetActionState = {
   error?: string;
@@ -79,7 +80,10 @@ export async function saveWidgetWidgetSettingsAction(
   formData: FormData,
 ): Promise<WidgetActionState> {
   await requireAuth();
-  const { db, workspace } = await requireDashboardContext();
+  const { db, workspace, membership } = await requireDashboardContext();
+  if (!canManageWorkspace(membership.role)) {
+    return { error: "Only workspace owners can change agent settings." };
+  }
 
   const parsed = widgetWidgetSettingsSchema.safeParse({
     displayName: formData.get("displayName"),

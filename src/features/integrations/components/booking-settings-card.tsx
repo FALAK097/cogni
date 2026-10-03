@@ -1,13 +1,14 @@
 "use client";
 
 import { useForm } from "@tanstack/react-form";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { queryKeys } from "@/lib/query-keys";
+import { useActiveWorkspaceId } from "@/hooks/use-auth";
 
 type BookingSettings = {
   enabled: boolean;
@@ -18,6 +19,7 @@ type BookingSettings = {
 };
 
 export function BookingSettingsCard() {
+  const workspaceId = useActiveWorkspaceId();
   const query = useQuery<{ settings: BookingSettings }>({
     queryKey: queryKeys.integrations.bookingSettings(),
     queryFn: async () => {
@@ -29,10 +31,23 @@ export function BookingSettingsCard() {
   if (query.isLoading) return <div className="h-48 animate-pulse rounded-2xl border bg-muted/30" />;
   if (!query.data)
     return <p className="text-sm text-destructive">Could not load booking settings.</p>;
-  return <BookingForm key={JSON.stringify(query.data.settings)} initial={query.data.settings} />;
+  return (
+    <BookingForm
+      key={JSON.stringify(query.data.settings)}
+      initial={query.data.settings}
+      workspaceId={workspaceId}
+    />
+  );
 }
 
-function BookingForm({ initial }: { initial: BookingSettings }) {
+function BookingForm({
+  initial,
+  workspaceId,
+}: {
+  initial: BookingSettings;
+  workspaceId: string | null;
+}) {
+  const queryClient = useQueryClient();
   const mutation = useMutation({
     mutationFn: async (settings: BookingSettings) => {
       const response = await fetch("/api/dashboard/booking", {
@@ -43,6 +58,11 @@ function BookingForm({ initial }: { initial: BookingSettings }) {
       const body = (await response.json().catch(() => ({}))) as { error?: string };
       if (!response.ok) throw new Error(body.error ?? "Could not save booking settings.");
       return body;
+    },
+    onSuccess: () => {
+      if (workspaceId) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.widget.config(workspaceId) });
+      }
     },
   });
   const form = useForm({

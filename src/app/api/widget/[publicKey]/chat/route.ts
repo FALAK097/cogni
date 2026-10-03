@@ -9,7 +9,7 @@ import {
   type MessageJson,
 } from "@/features/conversations/server/conversation-service";
 import { handoffReply, matchesEscalationKeywords } from "@/features/conversations/server/handoff";
-import type { WidgetModelProvider } from "@/features/widget/domain";
+import type { WidgetModelProvider, WidgetWidgetConfig } from "@/features/widget/domain";
 import {
   assertPublicWidgetAccess,
   bearerToken,
@@ -17,7 +17,11 @@ import {
 } from "@/features/widget/server/widget-public";
 import { verifyWidgetBootstrapToken } from "@/features/widget/server/widget-bootstrap";
 import { streamWidgetAgent } from "@/features/widget/server/widget-agent";
-import { getPublicWidget, validateEmbedOrigin } from "@/features/widget/server/widget-service";
+import {
+  getPublicWidget,
+  toWidgetWidgetConfig,
+  validateEmbedOrigin,
+} from "@/features/widget/server/widget-service";
 import {
   createWidgetSseStream,
   interruptWidgetTextStream,
@@ -167,6 +171,7 @@ export async function POST(
   let access:
     | {
         widget: NonNullable<Awaited<ReturnType<typeof getPublicWidget>>>;
+        settings: WidgetWidgetConfig;
         origin: string | null;
         allowedDomains: string[];
       }
@@ -204,6 +209,7 @@ export async function POST(
 
       access = {
         widget,
+        settings: toWidgetWidgetConfig(widget),
         origin: getRequestOrigin(request),
         allowedDomains: JSON.parse(widget.authorizedDomains || "[]") as string[],
       };
@@ -336,6 +342,7 @@ export async function POST(
   const visitorMessageId = started?.visitorMessageId ?? body.interactionId;
   const replayed = started?.replayed ?? false;
   const widget = access.widget;
+  const settings = access.settings;
   if (replayed && conversation) {
     const conv = await db.query.conversation.findFirst({
       where: (fields, { eq, and }) =>
@@ -368,7 +375,7 @@ export async function POST(
           and(eq(fields.id, conversationId), eq(fields.workspaceId, widget.workspace.id)),
         columns: { aiPaused: true, status: true },
       });
-  const shouldEscalate = matchesEscalationKeywords(body.message, widget.escalationKeywords);
+  const shouldEscalate = matchesEscalationKeywords(body.message, settings.escalationKeywords);
 
   if (!isPreview && shouldEscalate && activeConversation?.status !== "ESCALATED") {
     await db
@@ -477,8 +484,8 @@ export async function POST(
     });
 
     const resolvedModelProvider =
-      env.WIDGET_MODEL_PROVIDER ?? (widget.modelProvider as WidgetModelProvider);
-    const resolvedModelName = env.WIDGET_MODEL_NAME ?? widget.modelName;
+      env.WIDGET_MODEL_PROVIDER ?? (settings.modelProvider as WidgetModelProvider);
+    const resolvedModelName = env.WIDGET_MODEL_NAME ?? settings.modelName;
 
     run = isPreview
       ? null
@@ -490,9 +497,9 @@ export async function POST(
         });
     const result = await streamWidgetAgent({
       config: {
-        displayName: widget.displayName,
-        instructions: widget.instructions,
-        escalationKeywords: widget.escalationKeywords,
+        displayName: settings.displayName,
+        instructions: settings.instructions,
+        escalationKeywords: settings.escalationKeywords,
         modelProvider: resolvedModelProvider,
         modelName: resolvedModelName,
         workspaceName: widget.workspace.name,

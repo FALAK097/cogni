@@ -17,7 +17,12 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import type { WidgetPosition, WidgetTheme, WidgetModelProvider } from "@/features/widget/domain";
+import type {
+  WidgetPosition,
+  WidgetTheme,
+  WidgetModelProvider,
+  WidgetPublicationVersion,
+} from "@/features/widget/domain";
 import { normalizeLogoUrl, widgetModelOptions } from "@/features/widget/domain";
 import { WIDGET_BRAND_COLOR } from "@/lib/widget-accent";
 import { cn } from "@/lib/utils";
@@ -1026,5 +1031,70 @@ export function WidgetInstallationPanel({
         </section>
       </div>
     </>
+  );
+}
+
+export function WidgetVersionHistory({
+  versions,
+  currentVersion,
+  canManage,
+  restoringVersion,
+  onRestore,
+}: {
+  versions: WidgetPublicationVersion[];
+  currentVersion: number | null;
+  canManage: boolean;
+  restoringVersion: number | null;
+  onRestore: (version: number) => void;
+}) {
+  const historicalVersions = versions.filter((version) => version.version !== currentVersion);
+  if (historicalVersions.length === 0) return null;
+
+  return (
+    <details className="rounded-xl border border-border bg-card">
+      <summary className="cursor-pointer rounded-xl px-4 py-3 text-sm font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+        Version history
+      </summary>
+      <ol className="divide-y divide-border border-t border-border">
+        {versions.map((version) => {
+          const isCurrent = version.version === currentVersion;
+          const date = new Date(version.publishedAt);
+          const dateLabel = Number.isNaN(date.getTime())
+            ? "Publication date unavailable"
+            : date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+          return (
+            <li
+              key={version.version}
+              className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+            >
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">
+                  Version {version.version}
+                  {isCurrent ? " · Live" : ""}
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {dateLabel} · {version.authorName ?? "Previous setup"}
+                </p>
+              </div>
+              {!isCurrent && canManage ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={restoringVersion !== null}
+                  onClick={() => onRestore(version.version)}
+                  aria-label={`Restore and publish version ${version.version}`}
+                >
+                  {restoringVersion === version.version ? "Restoring…" : "Restore"}
+                </Button>
+              ) : null}
+            </li>
+          );
+        })}
+      </ol>
+      <p className="px-4 pb-3 text-xs leading-relaxed text-muted-foreground">
+        Restoring a version replaces the current draft and publishes it immediately.
+      </p>
+    </details>
   );
 }

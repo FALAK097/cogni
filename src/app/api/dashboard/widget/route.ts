@@ -11,7 +11,11 @@ import {
   normalizeLogoUrl,
   stringifyJsonArray,
 } from "@/features/widget/domain";
-import { ensureWorkspaceWidget, toWidgetSettings } from "@/features/widget/server/widget-service";
+import {
+  ensureWorkspaceWidget,
+  getWidgetPublicationStatus,
+  toWidgetSettings,
+} from "@/features/widget/server/widget-service";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { widget as widgetTable } from "@/lib/db/schema";
 
@@ -160,12 +164,14 @@ async function saveWidgetConfig(body: Record<string, unknown>) {
 
   const updated = results[0];
   const settings = toWidgetSettings(updated);
+  const publication = await getWidgetPublicationStatus(db, updated);
   return {
     ...settings,
     workspaceId: workspace.id,
     agentName: settings.displayName,
     allowedDomains: settings.authorizedDomains,
     borderRadius: settings.borderRadiusStyle,
+    publication,
   };
 }
 
@@ -173,6 +179,7 @@ export async function GET() {
   const { db, workspace } = await requireDashboardContext();
   const widget = await ensureWorkspaceWidget(db, workspace.id);
   const settings = toWidgetSettings(widget);
+  const publication = await getWidgetPublicationStatus(db, widget);
 
   return NextResponse.json({
     ...settings,
@@ -180,6 +187,7 @@ export async function GET() {
     agentName: settings.displayName,
     allowedDomains: settings.authorizedDomains,
     borderRadius: settings.borderRadiusStyle,
+    publication,
   });
 }
 

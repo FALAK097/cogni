@@ -125,10 +125,10 @@ live widget preview beside these steps. Legacy `subtab` URLs resolve to the matc
 
 Test uses the authenticated preview sandbox: external actions stay disabled, preview messages stay
 out of Inbox and Insights, and a reset starts a fresh preview session. Show retrieved source titles
-for groundedness review and configured keyword matches for handoff review. Saved evaluation cases,
-tool proposals, and latency/cost measurements remain future work; do not imply that the current test
-step provides them. Keep **Optimize** deferred until unanswered-question and feedback signals can
-lead to a reviewed source or policy change.
+for groundedness review and configured keyword matches for handoff review. Saved evaluation cases
+and no-evidence prompt guidance are implemented; tool proposals and latency/cost measurements remain
+future work. Keep **Optimize** deferred until unanswered-question and feedback signals can lead to a
+reviewed source or policy change.
 
 The target lifecycle remains:
 
@@ -138,8 +138,10 @@ The target lifecycle remains:
    latency/cost and failure explanation. Test actions use sandbox/preview and do not execute live
    side effects by default. Save cases and expected outcomes.
 3. **Deploy**: authorized domains, copy loader, installation verification, channels and readiness
-   checklist. Draft → published version with timestamp/author and rollback. No enabled publication
-   with missing critical configuration. Explain each missing prerequisite beside its action.
+   checklist. Draft saves stay private to preview; public requests resolve an immutable published
+   version. Publishing records version, timestamp and author, and restoring a version creates a new
+   publication. Domain authorization and the enable switch remain immediate safety controls. Explain
+   each missing prerequisite beside its action.
 4. **Optimize**: unanswered questions, negative feedback, eval results and source/policy gaps;
    one suggested next step, reviewed and accepted by a person.
 

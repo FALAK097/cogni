@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
 import { getVisitorConversationMessages } from "@/features/conversations/server/conversation-service";
-import { parseJsonArray } from "@/features/widget/domain";
 import { getHasWidgetConversationCond } from "@/features/widget/server/widget-data-filters";
 import { assertPublicWidgetAccess, bearerToken } from "@/features/widget/server/widget-public";
 import { createWidgetBootstrapToken } from "@/features/widget/server/widget-bootstrap";
@@ -90,7 +89,7 @@ export async function POST(
   const access = await assertPublicWidgetAccess(db, publicKey, request);
   if ("error" in access) return access.error;
 
-  const { widget, origin, allowedDomains } = access;
+  const { widget, origin, allowedDomains, settings } = access;
   const token = bearerToken(request);
   const nowIso = new Date().toISOString();
 
@@ -153,10 +152,10 @@ export async function POST(
     publicKey: widget.publicKey,
     isNew: visitorSession === null,
     preview: false,
-    enableLeadCapture: widget.enableLeadCapture,
-    leadCaptureKeywords: parseJsonArray(widget.leadCaptureKeywords),
-    enableBrochure: widget.enableBrochure,
-    brochureSuggestionText: widget.brochureSuggestionText,
+    enableLeadCapture: settings.enableLeadCapture,
+    leadCaptureKeywords: settings.leadCaptureKeywords,
+    enableBrochure: settings.enableBrochure,
+    brochureSuggestionText: settings.brochureSuggestionText,
     visitor: visitorSession
       ? {
           name: visitorSession.name,

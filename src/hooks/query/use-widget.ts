@@ -6,7 +6,11 @@ import { api, requireData } from "@/lib/api/client";
 import { queryKeys } from "@/lib/query-keys";
 import { useActiveWorkspaceId } from "@/hooks/use-auth";
 import type { InboxChannel } from "@/features/conversations/inbox-pagination";
-import type { WidgetWidgetConfig, WidgetBorderRadiusStyle } from "@/features/widget/domain";
+import type {
+  WidgetWidgetConfig,
+  WidgetBorderRadiusStyle,
+  WidgetPublicationStatus,
+} from "@/features/widget/domain";
 import { toast } from "@/components/ui/use-toast";
 import type { AgentTestCaseInput } from "@/features/agent-tests/input";
 
@@ -14,6 +18,7 @@ export type DashboardWidgetConfig = Omit<WidgetWidgetConfig, "borderRadius"> & {
   agentName: string;
   allowedDomains: string[];
   borderRadius: WidgetBorderRadiusStyle;
+  publication: WidgetPublicationStatus;
 };
 
 export type AgentTestCase = AgentTestCaseInput & {
@@ -253,6 +258,41 @@ export function useSaveWidgetConfig() {
     },
     onSuccess: (data, variables) => {
       queryClient.setQueryData(queryKeys.widget.config(variables.workspaceId), data);
+    },
+  });
+}
+
+export function usePublishWidgetConfig() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      workspaceId,
+      restoreVersion,
+    }: {
+      workspaceId: string;
+      restoreVersion?: number;
+    }) => {
+      const response = await fetch("/api/dashboard/widget/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(restoreVersion ? { restoreVersion } : {}),
+      });
+      const result: unknown = await response.json().catch(() => null);
+      if (!response.ok) {
+        const message =
+          typeof result === "object" &&
+          result !== null &&
+          "error" in result &&
+          typeof result.error === "string"
+            ? result.error
+            : "Could not publish agent changes.";
+        throw new Error(message);
+      }
+      return { workspaceId, config: result as DashboardWidgetConfig };
+    },
+    onSuccess: ({ workspaceId, config }) => {
+      queryClient.setQueryData(queryKeys.widget.config(workspaceId), config);
     },
   });
 }
