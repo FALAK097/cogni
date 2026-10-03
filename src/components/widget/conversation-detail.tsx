@@ -18,6 +18,7 @@ import {
   Download,
   FileText,
   Image,
+  Info,
   Loader2,
   MoreVertical,
   Pencil,
@@ -786,9 +787,12 @@ export function ConversationDetail({
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-11 rounded-md border-border/60 px-3 text-xs shadow-none sm:h-9 sm:px-2.5 sm:text-xs xl:hidden"
+                    className="h-11 w-11 justify-center rounded-md border-border/60 px-0 text-xs shadow-none sm:h-9 sm:w-auto sm:px-2.5 sm:text-xs xl:hidden"
+                    aria-label={`Conversation details for ${displayName}`}
+                    title="Conversation details"
                   >
-                    Details
+                    <Info className="size-4" aria-hidden="true" />
+                    <span className="hidden sm:inline">Details</span>
                   </Button>
                 }
               />
