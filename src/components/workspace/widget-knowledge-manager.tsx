@@ -276,7 +276,7 @@ export function WidgetKnowledgeManager({ canManage }: { canManage: boolean }) {
   }
 
   return (
-    <div className="space-y-6 pb-10">
+    <div className="space-y-6">
       <KnowledgeToolbar
         canManage={canManage}
         addMenuOpen={addMenuOpen}
