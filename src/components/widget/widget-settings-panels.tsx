@@ -958,7 +958,7 @@ export function WidgetInstallationPanel({
                   </time>
                   {currentPublication.authorName
                     ? ` by ${currentPublication.authorName}`
-                    : " by a previous teammate"}
+                    : " · Existing setup"}
                 </>
               ) : (
                 "Publish your agent before visitors can use the widget."
@@ -1149,7 +1149,7 @@ export function WidgetVersionHistory({
                   {isCurrent ? " · Live" : ""}
                 </p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  {dateLabel} · {version.authorName ?? "Previous setup"}
+                  {dateLabel} · {version.authorName ?? "Existing setup"}
                 </p>
               </div>
               {!isCurrent && canManage ? (
