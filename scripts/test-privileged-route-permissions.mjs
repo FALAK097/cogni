@@ -22,10 +22,14 @@ const stubs = {
   "@/features/integrations/server/approval-service": `export const createApprovalRequest = () => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; };`,
   "@/features/agent-tests/input": `export const agentTestCaseInputSchema = { safeParse: (value) => ({ success: true, data: value }) };`,
   "@/features/agent-tests/server/cases": `export const createAgentTestCase = () => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; }; export const listAgentTestCases = () => []; export class AgentTestCaseTitleConflictError extends Error {}`,
+  "@/lib/jobs/ingestion": `export const enqueueDocumentProcessing = () => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; };`,
+  "@/features/knowledge/server/mime": `export const inferKnowledgeMimeType = () => "text/plain"; export const knowledgeSourceTypeFromMime = () => "TEXT";`,
+  "@/lib/storage/index": `export const isAllowedKnowledgeUpload = () => true; export const saveObject = () => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; };`,
+  "@/lib/storage": `export const deleteObject = () => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; };`,
   "@/features/integrations/server/composio-connections": `export const COMPOSIO_PROVIDER_SLUGS = {}; export const COMPOSIO_TOOLKITS = {}; export const createComposioClient = () => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; }; export const getComposioProviderBySlug = () => null; export const getOrCreateAuthConfig = () => {};`,
-  "@/lib/db/schema": `export const integration = { workspaceId: "workspaceId", provider: "provider" }; export const workflowRun = { id: "id", workspaceId: "workspaceId" };`,
+  "@/lib/db/schema": `export const integration = { workspaceId: "workspaceId", provider: "provider" }; export const workflowRun = { id: "id", workspaceId: "workspaceId", name: "name", idempotencyKey: "idempotencyKey", status: "status" }; export const document = { id: "id", workspaceId: "workspaceId" };`,
   "@/lib/env/server": `export const env = {};`,
-  "drizzle-orm": `export const and = (...args) => args; export const eq = (...args) => args;`,
+  "drizzle-orm": `export const and = (...args) => args; export const eq = (...args) => args; export const like = (...args) => args; export const inArray = (...args) => args;`,
   "@/features/workflows/progression": `export const getWorkflowProgression = () => ({ kind: "complete" });`,
 };
 
@@ -65,6 +69,15 @@ const advanceWorkflowRoute = await loadRoute(
   "src/app/api/dashboard/workflows/[workflow_id]/advance/route.ts",
 );
 const agentTestRoutes = await loadRoute("src/app/api/dashboard/agent-test-cases/route.ts");
+const knowledgeUploadRoute = await loadRoute(
+  "src/app/api/dashboard/knowledge-base/upload/route.ts",
+);
+const knowledgeWebsiteRoute = await loadRoute(
+  "src/app/api/dashboard/knowledge-base/sources/website/route.ts",
+);
+const knowledgeSourceRoute = await loadRoute(
+  "src/app/api/dashboard/knowledge-base/sources/[source_id]/route.ts",
+);
 
 const request = new Request("https://cogni.test/api/dashboard/mutation", {
   method: "POST",
@@ -99,4 +112,26 @@ test("members cannot create or advance workflows", async () => {
 
 test("members cannot create agent evaluation cases", async () => {
   await expectMemberDenied(agentTestRoutes.POST);
+});
+
+test("members cannot upload, add, retry, or delete knowledge sources", async () => {
+  const uploadRequest = new Request("https://cogni.test/api/dashboard/knowledge-base/upload", {
+    method: "POST",
+    body: "not multipart",
+  });
+  uploadRequest.formData = async () => {
+    state.sideEffects += 1;
+    throw new Error("A denied upload request must not be parsed.");
+  };
+
+  await expectMemberDenied(knowledgeUploadRoute.POST, [uploadRequest]);
+  await expectMemberDenied(knowledgeWebsiteRoute.POST);
+  await expectMemberDenied(knowledgeSourceRoute.PATCH, [
+    request,
+    { params: Promise.resolve({ source_id: "source-1" }) },
+  ]);
+  await expectMemberDenied(knowledgeSourceRoute.DELETE, [
+    request,
+    { params: Promise.resolve({ source_id: "source-1" }) },
+  ]);
 });
