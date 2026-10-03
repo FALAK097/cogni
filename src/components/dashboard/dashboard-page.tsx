@@ -134,9 +134,9 @@ const EXPORT_SECTIONS = [
   { id: "kpis", label: "Key metrics (KPIs)" },
   { id: "conversationsOverTime", label: "Conversations over time" },
   { id: "conversationsBySource", label: "Conversations by source" },
-  { id: "conversationsByStatus", label: "Conversations by status" },
+  { id: "conversationsByStatus", label: "Current conversation status" },
   { id: "topQuestions", label: "Top questions" },
-  { id: "userEngagement", label: "User engagement" },
+  { id: "userEngagement", label: "Conversation activity" },
   { id: "satisfactionOverTime", label: "Satisfaction over time" },
 ] as const;
 
@@ -430,13 +430,13 @@ function buildExportSections(
           pct(analytics.kpis.totalConversations.changePercent),
         ],
         [
-          "Unique Users",
+          "Visitor Sessions",
           String(analytics.kpis.uniqueUsers.value),
           String(analytics.kpis.uniqueUsers.previousValue),
           pct(analytics.kpis.uniqueUsers.changePercent),
         ],
         [
-          "Closed Conversations",
+          "Currently Closed Conversations",
           String(analytics.kpis.closedConversations.value),
           String(analytics.kpis.closedConversations.previousValue),
           pct(analytics.kpis.closedConversations.changePercent),
@@ -447,6 +447,7 @@ function buildExportSections(
           String(analytics.kpis.avgAiResponseTime.previousValue),
           pct(analytics.kpis.avgAiResponseTime.changePercent),
         ],
+        ["AI Response Time Samples", String(analytics.kpis.avgAiResponseTime.samples), "—", "—"],
         [
           "Satisfaction Score",
           analytics.kpis.satisfactionScore.formatted,
@@ -480,7 +481,7 @@ function buildExportSections(
 
   if (selected.has("conversationsByStatus")) {
     sections.push({
-      title: "Conversations by Status",
+      title: "Current Status of Conversations Started in Selected Period",
       headers: ["Status", "Count", "Percentage"],
       rows: analytics.conversationsByStatus.map((item) => [
         item.label,
@@ -501,29 +502,29 @@ function buildExportSections(
   if (selected.has("userEngagement")) {
     const e = analytics.userEngagement;
     sections.push({
-      title: "User Engagement",
+      title: "Conversation Activity",
       headers: ["Metric", "Value", "Previous", "Change %"],
       rows: [
         [
-          "Messages Sent",
+          "Visitor Messages",
           String(e.messagesSent.value),
           String(e.messagesSent.previousValue),
           pct(e.messagesSent.changePercent),
         ],
         [
-          "Messages Received",
+          "AI Replies",
           String(e.messagesReceived.value),
           String(e.messagesReceived.previousValue),
           pct(e.messagesReceived.changePercent),
         ],
         [
-          "Engagement Rate",
+          "Repeat Visitor Rate",
           e.engagementRate.formatted,
           String(e.engagementRate.previousValue),
           pct(e.engagementRate.changePercent),
         ],
         [
-          "Conversations / User",
+          "Conversations / Session",
           e.conversationsPerUser.formatted,
           String(e.conversationsPerUser.previousValue),
           pct(e.conversationsPerUser.changePercent),
@@ -1234,25 +1235,25 @@ export function DashboardPage({
   const engagementTiles = engagement
     ? [
         {
-          label: "Messages Sent",
+          label: "Visitor messages",
           value: formatNumber(engagement.messagesSent.value),
           change: engagement.messagesSent.changePercent,
           icon: Message01Icon,
         },
         {
-          label: "Messages Received",
+          label: "AI replies",
           value: formatNumber(engagement.messagesReceived.value),
           change: engagement.messagesReceived.changePercent,
           icon: Message01Icon,
         },
         {
-          label: "Engagement Rate",
+          label: "Repeat visitor rate",
           value: engagement.engagementRate.formatted,
           change: engagement.engagementRate.changePercent,
           icon: Chart01Icon,
         },
         {
-          label: "Conversations / User",
+          label: "Conversations / Session",
           value: engagement.conversationsPerUser.formatted,
           change: engagement.conversationsPerUser.changePercent,
           icon: UserMultiple02Icon,
@@ -1391,7 +1392,7 @@ export function DashboardPage({
               icon={<HugeiconsIcon icon={Message01Icon} strokeWidth={2} className="size-[18px]" />}
             />
             <MetricCard
-              label="Unique Users"
+              label="Visitor sessions"
               value={analytics.kpis.uniqueUsers.value.toLocaleString()}
               metric={analytics.kpis.uniqueUsers}
               previousRange={analytics.previousDateRange}
@@ -1400,11 +1401,34 @@ export function DashboardPage({
               }
             />
             <MetricCard
-              label="Closed Conversations"
+              label="Currently closed"
               value={analytics.kpis.closedConversations.value.toLocaleString()}
               metric={analytics.kpis.closedConversations}
               previousRange={analytics.previousDateRange}
               icon={<HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="size-[18px]" />}
+              info={
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <button
+                        type="button"
+                        className="text-muted-foreground transition-colors hover:text-foreground"
+                        aria-label="Currently closed conversation count information"
+                      />
+                    }
+                  >
+                    <HugeiconsIcon
+                      icon={InformationCircleIcon}
+                      strokeWidth={2}
+                      className="size-4"
+                    />
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs">
+                    These conversations started in the selected period and are closed now. This is
+                    their current status, not a count of conversations closed during that period.
+                  </TooltipContent>
+                </Tooltip>
+              }
             />
             <MetricCard
               label="Avg. AI Response Time"
@@ -1434,8 +1458,10 @@ export function DashboardPage({
                     />
                   </TooltipTrigger>
                   <TooltipContent side="top" className="max-w-xs">
-                    Time from the first visitor message in a turn to the next public AI reply.
-                    Human-only replies and unanswered turns are excluded.
+                    Average time from the first visitor message in a turn to the next public AI
+                    reply. Human-only replies and unanswered turns are excluded. Based on{" "}
+                    {analytics.kpis.avgAiResponseTime.samples} answered AI{" "}
+                    {analytics.kpis.avgAiResponseTime.samples === 1 ? " turn." : " turns."}
                   </TooltipContent>
                 </Tooltip>
               }
@@ -1469,10 +1495,10 @@ export function DashboardPage({
                     />
                   </TooltipTrigger>
                   <TooltipContent side="top" className="max-w-xs">
-                    Average of visitor feedback on AI responses in conversations started during the
-                    selected period. Each rating is counted on its conversation&apos;s start date,
-                    even if the visitor rated it later. Scores range from 0 to 5. Based on{" "}
-                    {analytics.kpis.satisfactionScore.responses}{" "}
+                    Average of thumbs feedback on AI responses in conversations started during the
+                    selected period: thumbs-up counts as 5 and thumbs-down as 0. Each rating is
+                    counted on its conversation&apos;s start date, even if the visitor rated it
+                    later. Based on {analytics.kpis.satisfactionScore.responses}{" "}
                     {analytics.kpis.satisfactionScore.responses === 1 ? "response." : "responses."}
                   </TooltipContent>
                 </Tooltip>
@@ -1524,7 +1550,12 @@ export function DashboardPage({
         </DashboardCard>
 
         <DashboardCard className="flex min-h-[320px] flex-1 flex-col p-6 xl:col-span-1">
-          <h3 className="mb-5 text-sm font-semibold tracking-tight">Conversations by Status</h3>
+          <div className="mb-5">
+            <h3 className="text-sm font-semibold tracking-tight">Current conversation status</h3>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              Current status of conversations started in the selected period.
+            </p>
+          </div>
           {isLoading ? (
             <Skeleton className="mx-auto size-[180px] rounded-full border border-border/50 bg-transparent" />
           ) : (
@@ -1826,7 +1857,12 @@ export function DashboardPage({
         </DashboardCard>
 
         <DashboardCard className="flex h-full flex-col p-6 xl:col-span-2">
-          <h3 className="text-sm font-semibold tracking-tight">User Engagement</h3>
+          <div>
+            <h3 className="text-sm font-semibold tracking-tight">Conversation activity</h3>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              Repeat visitor rate means conversations with at least two visitor messages.
+            </p>
+          </div>
           <div className="mt-4 grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2">
             {isLoading || !engagement
               ? Array.from({ length: 4 }).map((_, i) => (

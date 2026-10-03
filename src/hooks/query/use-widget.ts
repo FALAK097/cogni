@@ -450,6 +450,7 @@ export type ConversationDetail = WidgetSessionDetail;
 export interface ConversationsResponse {
   conversations: ConversationSummary[];
   counts: {
+    total: number;
     all: number;
     unassigned: number;
     mine: number;

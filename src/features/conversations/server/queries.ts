@@ -302,6 +302,7 @@ export async function getInboxPage(
   const [countRows, fetchedConversations] = await Promise.all([
     db
       .select({
+        total: sql<number>`count(*)`.mapWith(Number),
         all: sql<number>`count(*) filter (where ${unread} and ${notSnoozed})`.mapWith(Number),
         unassigned: sql<number>`count(*) filter (
           where ${unread}
@@ -377,6 +378,7 @@ export async function getInboxPage(
         })
       : null;
   const countRow = countRows[0] ?? {
+    total: 0,
     all: 0,
     unassigned: 0,
     mine: 0,

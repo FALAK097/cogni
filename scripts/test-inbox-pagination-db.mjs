@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { mkdir } from "node:fs/promises";
+import { mkdtemp, rm, symlink } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { after, before, test } from "node:test";
@@ -15,9 +16,9 @@ if (!databaseUrl || !["localhost", "127.0.0.1", "::1"].includes(new URL(database
   throw new Error("Inbox pagination integration tests require a local DATABASE_URL.");
 }
 
-const outputDirectory = join(process.cwd(), "node_modules", ".cache", "cogni-inbox-test");
+const outputDirectory = await mkdtemp(join(tmpdir(), "cogni-inbox-test-"));
 const outputFile = join(outputDirectory, "queries.mjs");
-await mkdir(outputDirectory, { recursive: true });
+await symlink(join(process.cwd(), "node_modules"), join(outputDirectory, "node_modules"), "dir");
 
 await build({
   stdin: {
@@ -138,6 +139,7 @@ after(async () => {
   await raw`DELETE FROM "user" WHERE "id" = ${userId}`;
   await getDb().$client.end({ timeout: 5 });
   await raw.end({ timeout: 5 });
+  await rm(outputDirectory, { recursive: true, force: true });
 });
 
 test("inbox cursors return complete, stable pages and correct unread view counts", async () => {
@@ -155,6 +157,7 @@ test("inbox cursors return complete, stable pages and correct unread view counts
   assert.equal(firstPage.pagination.hasMore, true);
   assert.ok(firstPage.pagination.nextCursor);
   assert.deepEqual(firstPage.counts, {
+    total: 3,
     all: 2,
     unassigned: 0,
     mine: 1,
@@ -239,6 +242,30 @@ test("unread view only includes conversations with an unread visitor message", a
       conversation.messages.some((message) => message.authorType === "VISITOR" && !message.readAt),
     ),
   );
+});
+
+test("total inbox count stays nonzero when every visitor message is read", async () => {
+  await raw`
+    UPDATE "conversation"
+    SET "messages" = (
+      SELECT COALESCE(
+        jsonb_agg(item.value || jsonb_build_object('readAt', ${now}::text)),
+        '[]'::jsonb
+      )::text
+      FROM jsonb_array_elements("conversation"."messages"::jsonb) AS item(value)
+    )
+    WHERE "workspaceId" = ${workspaceId}
+  `;
+
+  const result = await getInboxPage(workspaceId, {
+    membershipId: memberId,
+    limit: 20,
+    cursor: null,
+  });
+
+  assert.equal(result.counts.all, 0);
+  assert.equal(result.counts.total, 3);
+  assert.equal(result.conversations.length, 3);
 });
 
 test("conversation labels normalize concurrent updates and remain workspace scoped", async () => {

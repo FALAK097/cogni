@@ -62,6 +62,7 @@ const FILTER_TABS: Array<{
 ];
 
 const EMPTY_COUNTS = {
+  total: 0,
   all: 0,
   unassigned: 0,
   mine: 0,
@@ -130,7 +131,7 @@ export function WidgetConversations({
   );
 
   const counts = conversationsData?.counts ?? EMPTY_COUNTS;
-  const isWorkspaceInboxEmpty = conversationsLoaded && counts.all === 0;
+  const isWorkspaceInboxEmpty = conversationsLoaded && counts.total === 0;
   const activeView = FILTER_TABS.find((tab) => tab.value === filter);
   const activeViewCount = activeView ? counts[activeView.countKey] : 0;
   const activeCountKind = filter === "snoozed" ? "snoozed" : "unread";

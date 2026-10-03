@@ -39,6 +39,114 @@ function getHandoffTerms(value: string) {
     .filter(Boolean);
 }
 
+function WidgetTestResult({
+  evidence,
+  error,
+  retryPrompt,
+  busy,
+  onRetry,
+}: {
+  evidence: WidgetPreviewEvidence | null;
+  error: string | null;
+  retryPrompt: string | null;
+  busy: boolean;
+  onRetry: (prompt: string) => void;
+}) {
+  return (
+    <>
+      {error ? (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/20 bg-destructive/5 px-3.5 py-3"
+        >
+          <p className="min-w-0 flex-1 text-sm text-destructive">{error}</p>
+          {retryPrompt ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-10 shrink-0"
+              disabled={busy}
+              onClick={() => onRetry(retryPrompt)}
+            >
+              Retry preview
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+
+      <section
+        aria-labelledby="preview-evidence-heading"
+        aria-live="polite"
+        className="rounded-xl border border-border/70 bg-card p-4"
+      >
+        <div className="flex items-center gap-2">
+          <MessageCircle className="size-4 text-muted-foreground" aria-hidden="true" />
+          <h3 id="preview-evidence-heading" className="text-sm font-semibold">
+            Latest test result
+          </h3>
+        </div>
+        {!evidence ? (
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+            Send a message in the preview to see its source or handoff evidence here.
+          </p>
+        ) : evidence.outcome === "handoff" ? (
+          <div className="mt-3 rounded-lg border border-border/60 bg-muted/30 p-3">
+            <p className="text-sm font-medium">Handoff rule matched</p>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+              The preview returned the configured human-handoff response. No customer conversation
+              was created.
+            </p>
+          </div>
+        ) : evidence.outcome === "error" ? (
+          <div className="mt-3 rounded-lg border border-destructive/20 bg-destructive/5 p-3">
+            <p className="text-sm font-medium">The agent couldn&apos;t complete this test</p>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+              The preview didn&apos;t receive an answer. Check the model connection and try again.
+            </p>
+            {evidence.prompt ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-3 min-h-10"
+                disabled={busy}
+                onClick={() => onRetry(evidence.prompt ?? "")}
+              >
+                Retry this question
+              </Button>
+            ) : null}
+          </div>
+        ) : evidence.grounded && evidence.sources.length > 0 ? (
+          <div className="mt-3">
+            <p className="flex items-center gap-2 text-sm font-medium">
+              <CheckCircle2 className="size-4 text-primary" aria-hidden="true" />
+              Knowledge sources retrieved
+            </p>
+            <ul className="mt-2 space-y-2">
+              {evidence.sources.map((source) => (
+                <li
+                  key={source.title}
+                  className="flex items-start gap-2 text-sm leading-relaxed text-muted-foreground"
+                >
+                  <BookOpen className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                  <span className="break-words">{source.title}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <div className="mt-3 rounded-lg border border-border/60 bg-muted/30 p-3">
+            <p className="text-sm font-medium">No matching knowledge source</p>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+              Review this answer as ungrounded. Check your source coverage and fallback instructions
+              before deploying.
+            </p>
+          </div>
+        )}
+      </section>
+    </>
+  );
+}
+
 export function WidgetTestPanel({
   escalationKeywords,
   suggestions,
@@ -243,8 +351,8 @@ export function WidgetTestPanel({
         <div className="rounded-lg bg-muted/40 px-3 py-2.5">
           <p className="text-xs font-medium text-foreground">No-evidence check</p>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            In the preview composer, ask about a topic your sources do not cover. Preview messages
-            stay out of Inbox and Insights, and external actions are disabled.
+            Ask about a topic your sources do not cover to check how the agent handles missing
+            evidence.
           </p>
         </div>
 
@@ -279,6 +387,13 @@ export function WidgetTestPanel({
           )}
         </div>
       </section>
+      <WidgetTestResult
+        evidence={evidence}
+        error={tryError}
+        retryPrompt={retryPrompt}
+        busy={isBusy}
+        onRetry={(prompt) => void tryPrompt(prompt)}
+      />
       {sendingPrompt ? (
         <output
           className="flex items-center gap-2 text-sm text-muted-foreground"
@@ -513,96 +628,6 @@ export function WidgetTestPanel({
             </div>
           </form>
         ) : null}
-      </section>
-
-      {tryError ? (
-        <div
-          role="alert"
-          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/20 bg-destructive/5 px-3.5 py-3"
-        >
-          <p className="min-w-0 flex-1 text-sm text-destructive">{tryError}</p>
-          {retryPrompt ? (
-            <Button
-              type="button"
-              variant="outline"
-              className="min-h-10 shrink-0"
-              disabled={isBusy}
-              onClick={() => void tryPrompt(retryPrompt)}
-            >
-              Retry preview
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
-
-      <section
-        aria-labelledby="preview-evidence-heading"
-        aria-live="polite"
-        className="rounded-xl border border-border/70 bg-card p-4"
-      >
-        <div className="flex items-center gap-2">
-          <MessageCircle className="size-4 text-muted-foreground" aria-hidden="true" />
-          <h3 id="preview-evidence-heading" className="text-sm font-semibold">
-            Latest test result
-          </h3>
-        </div>
-        {!evidence ? (
-          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-            Send a message in the preview to see its source or handoff evidence here.
-          </p>
-        ) : evidence.outcome === "handoff" ? (
-          <div className="mt-3 rounded-lg border border-border/60 bg-muted/30 p-3">
-            <p className="text-sm font-medium">Handoff rule matched</p>
-            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              The preview returned the configured human-handoff response. No customer conversation
-              was created.
-            </p>
-          </div>
-        ) : evidence.outcome === "error" ? (
-          <div className="mt-3 rounded-lg border border-destructive/20 bg-destructive/5 p-3">
-            <p className="text-sm font-medium">The agent couldn&apos;t complete this test</p>
-            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              The preview didn&apos;t receive an answer. Check the model connection and try again.
-            </p>
-            {evidence.prompt ? (
-              <Button
-                type="button"
-                variant="outline"
-                className="mt-3 min-h-10"
-                disabled={isBusy}
-                onClick={() => void tryPrompt(evidence.prompt ?? "")}
-              >
-                Retry this question
-              </Button>
-            ) : null}
-          </div>
-        ) : evidence.grounded && evidence.sources.length > 0 ? (
-          <div className="mt-3">
-            <p className="flex items-center gap-2 text-sm font-medium">
-              <CheckCircle2 className="size-4 text-primary" aria-hidden="true" />
-              Knowledge sources retrieved
-            </p>
-            <ul className="mt-2 space-y-2">
-              {evidence.sources.map((source) => (
-                <li
-                  key={source.title}
-                  className="flex items-start gap-2 text-sm leading-relaxed text-muted-foreground"
-                >
-                  <BookOpen className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                  <span className="break-words">{source.title}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : (
-          <div className="mt-3 rounded-lg border border-border/60 bg-muted/30 p-3">
-            <p className="text-sm font-medium">No matching knowledge source</p>
-            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              Review this answer as ungrounded. Check your source coverage and fallback instructions
-              before deploying.
-            </p>
-          </div>
-        )}
       </section>
     </div>
   );

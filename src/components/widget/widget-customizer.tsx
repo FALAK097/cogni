@@ -234,6 +234,9 @@ export function WidgetCustomizer({
   const [showMobilePreview, setShowMobilePreview] = useState(false);
   const [previewEvidence, setPreviewEvidence] = useState<WidgetPreviewEvidence | null>(null);
   const [sendingTestPrompt, setSendingTestPrompt] = useState<string | null>(null);
+  const [previewTestFailed, setPreviewTestFailed] = useState(false);
+  const [lastPreviewPrompt, setLastPreviewPrompt] = useState<string | null>(null);
+  const mobileTestResultRef = useRef<HTMLElement | null>(null);
   const [copied, setCopied] = useState(false);
   const [publicationError, setPublicationError] = useState<string | null>(null);
   const [domainInput, setDomainInput] = useState("");
@@ -276,13 +279,27 @@ export function WidgetCustomizer({
 
   const tryPreviewPrompt = useCallback((prompt: string) => {
     setPreviewEvidence(null);
+    setPreviewTestFailed(false);
+    setLastPreviewPrompt(prompt);
     setSendingTestPrompt(prompt);
     setShowMobilePreview(true);
-    return waitForPreviewWidget(prompt).finally(() => setSendingTestPrompt(null));
+    return waitForPreviewWidget(prompt)
+      .then((evidence) => {
+        setPreviewTestFailed(evidence === null);
+        if (window.matchMedia("(max-width: 1023px)").matches) {
+          window.requestAnimationFrame(() =>
+            mobileTestResultRef.current?.focus({ preventScroll: true }),
+          );
+        }
+        return evidence;
+      })
+      .finally(() => setSendingTestPrompt(null));
   }, []);
 
   const resetPreview = useCallback(async () => {
     setPreviewEvidence(null);
+    setPreviewTestFailed(false);
+    setLastPreviewPrompt(null);
     try {
       return Boolean(await window.Widget?.resetPreview?.());
     } catch {
@@ -681,11 +698,17 @@ export function WidgetCustomizer({
             "inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-sm font-medium text-muted-foreground shadow-xs transition-[transform,color,background-color] duration-150 active:scale-[0.96] hover:bg-muted hover:text-foreground motion-reduce:transition-none motion-reduce:active:scale-100 lg:hidden",
             showMobilePreview && "border-[var(--widget-accent)] text-[var(--widget-accent)]",
           )}
-          aria-label={showMobilePreview ? "Hide preview" : "Show preview"}
+          aria-label={
+            showMobilePreview && activeSection === "test"
+              ? "Return to test scenarios"
+              : showMobilePreview
+                ? "Hide preview"
+                : "Show preview"
+          }
           aria-pressed={showMobilePreview}
         >
           <Eye className="size-4" strokeWidth={2} />
-          Preview
+          {showMobilePreview && activeSection === "test" ? "Back to tests" : "Preview"}
         </button>
         <output
           className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2 text-xs text-muted-foreground"
@@ -876,17 +899,92 @@ export function WidgetCustomizer({
         <div
           className={cn(
             WIDGET_CARD_CLASS,
-            "flex min-h-0 w-full shrink-0 flex-col overflow-hidden",
-            showMobilePreview
-              ? "h-[min(70vh,520px)] flex-1 lg:h-full lg:flex-1 lg:w-[380px] xl:w-[420px]"
-              : "hidden lg:flex lg:h-full lg:w-[380px] xl:w-[420px]",
+            "flex min-h-0 w-full shrink-0 flex-col",
+            showMobilePreview && activeSection === "test"
+              ? "flex-1 overflow-y-auto lg:overflow-hidden lg:h-full lg:w-[380px] xl:w-[420px]"
+              : showMobilePreview
+                ? "h-[min(70vh,520px)] flex-1 overflow-hidden lg:h-full lg:w-[380px] xl:w-[420px]"
+                : "hidden overflow-hidden lg:flex lg:h-full lg:w-[380px] xl:w-[420px]",
           )}
         >
-          <WidgetPreviewPanel
-            liveConfig={liveConfig}
-            testMode={activeSection === "test"}
-            onEvidenceChange={setPreviewEvidence}
-          />
+          <div
+            className={cn(
+              "min-h-0 flex-1",
+              showMobilePreview && activeSection === "test"
+                ? "h-[min(58vh,460px)] min-h-[320px] shrink-0 lg:h-full lg:min-h-0 lg:shrink"
+                : "h-full",
+            )}
+          >
+            <WidgetPreviewPanel
+              liveConfig={liveConfig}
+              testMode={activeSection === "test"}
+              onEvidenceChange={setPreviewEvidence}
+            />
+          </div>
+          {showMobilePreview && activeSection === "test" ? (
+            <section
+              ref={mobileTestResultRef}
+              tabIndex={-1}
+              aria-labelledby="mobile-latest-test-result"
+              aria-live="polite"
+              aria-busy={sendingTestPrompt !== null}
+              className="shrink-0 border-t border-border/60 bg-card p-4 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset lg:hidden"
+            >
+              <h2 id="mobile-latest-test-result" className="text-sm font-semibold">
+                Latest test result
+              </h2>
+              {sendingTestPrompt ? (
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Checking “{sendingTestPrompt}”…
+                </p>
+              ) : previewTestFailed ? (
+                <div
+                  role="alert"
+                  className="mt-1 flex flex-wrap items-center justify-between gap-2"
+                >
+                  <p className="text-sm text-destructive">
+                    No result arrived. Check the preview and model connection, then retry.
+                  </p>
+                  {lastPreviewPrompt ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="min-h-10"
+                      onClick={() => void tryPreviewPrompt(lastPreviewPrompt)}
+                    >
+                      Retry test
+                    </Button>
+                  ) : null}
+                </div>
+              ) : previewEvidence ? (
+                <div className="mt-1 space-y-1">
+                  <p className="text-sm text-foreground">
+                    {previewEvidence.outcome === "handoff"
+                      ? "A handoff rule matched."
+                      : previewEvidence.outcome === "error"
+                        ? "The agent could not complete this test."
+                        : previewEvidence.grounded && previewEvidence.sources.length > 0
+                          ? "Knowledge sources were retrieved."
+                          : "No matching knowledge source was found."}
+                  </p>
+                  {previewEvidence.sources.length > 0 ? (
+                    <ul className="space-y-1 text-xs text-muted-foreground">
+                      {previewEvidence.sources.map((source) => (
+                        <li key={source.title} className="break-words">
+                          {source.title}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+              ) : (
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Send a message in the preview to review its sources or handoff result.
+                </p>
+              )}
+            </section>
+          ) : null}
         </div>
       </div>
     </div>

@@ -370,6 +370,7 @@ export async function getDashboardAnalytics(
       closedConversations: toMetric(current.closedConversations, previous.closedConversations),
       avgAiResponseTime: {
         ...toMetric(current.avgAiResponseTimeMs, previous.avgAiResponseTimeMs),
+        samples: current.aiResponseSamples,
         formatted:
           current.aiResponseSamples > 0 ? formatDuration(current.avgAiResponseTimeMs) : "—",
         changePercent:
