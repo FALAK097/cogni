@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 
-import { Trash2 } from "@/components/icons";
+import { MessageSquare, Trash2 } from "@/components/icons";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -118,7 +119,10 @@ export function WidgetConversations({
     setSelectedConversationId(null);
   }
 
-  const { data: conversationsData } = useConversations({ limit: 20, filter });
+  const { data: conversationsData, isSuccess: conversationsLoaded } = useConversations({
+    limit: 20,
+    filter,
+  });
   const canDeleteSavedView = Boolean(
     selectedSavedView &&
     (canManage ||
@@ -126,6 +130,7 @@ export function WidgetConversations({
   );
 
   const counts = conversationsData?.counts ?? EMPTY_COUNTS;
+  const isWorkspaceInboxEmpty = conversationsLoaded && counts.all === 0;
   const activeView = FILTER_TABS.find((tab) => tab.value === filter);
   const activeViewCount = activeView ? counts[activeView.countKey] : 0;
   const activeCountKind = filter === "snoozed" ? "snoozed" : "unread";
@@ -144,85 +149,87 @@ export function WidgetConversations({
           Inbox
         </h1>
 
-        <div className="mt-2 flex gap-1.5 lg:mt-3">
-          <Select
-            value={selectedSavedView?.id ?? filter}
-            onValueChange={(value) => {
-              if (!value) return;
-              setSelectedConversationId(null);
-              const savedView = savedViews.find((view) => view.id === value);
-              if (savedView) {
-                setSelectedSavedViewId(savedView.id);
-                setFilter(savedView.filter);
-              } else {
-                setSelectedSavedViewId(null);
-                setFilter(value as ConversationFilter);
-              }
-              setViewSelectionRevision((revision) => revision + 1);
-            }}
-          >
-            <SelectTrigger
-              aria-label="Inbox view"
-              className="h-11 min-w-0 flex-1 justify-between rounded-xl border-border/60 bg-background px-3 shadow-none sm:h-10"
-            >
-              <SelectValue placeholder="Choose an inbox view">
-                {selectedSavedView?.name ?? activeView?.label ?? "Choose an inbox view"}
-              </SelectValue>
-              {!selectedSavedView && activeViewCount > 0 ? (
-                <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                  {activeViewCount} {activeCountKind}
-                </span>
-              ) : null}
-            </SelectTrigger>
-            <SelectContent align="start" alignItemWithTrigger={false} className="w-64 rounded-xl">
-              {FILTER_TABS.map((tab) => {
-                const count = counts[tab.countKey];
-                const countKind = tab.value === "snoozed" ? "snoozed" : "unread";
-
-                return (
-                  <SelectItem key={tab.value} value={tab.value} className="min-h-10 rounded-lg">
-                    <span>{tab.label}</span>
-                    {count > 0 ? (
-                      <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                        {count} {countKind}
-                      </span>
-                    ) : null}
-                  </SelectItem>
-                );
-              })}
-              {savedViews.length > 0 ? (
-                <>
-                  <SelectSeparator />
-                  <SelectLabel>Shared views</SelectLabel>
-                </>
-              ) : null}
-              {savedViews.map((view) => (
-                <SelectItem key={view.id} value={view.id} className="min-h-10 rounded-lg">
-                  <span className="min-w-0 truncate">{view.name}</span>
-                  <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
-                    Shared
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {canDeleteSavedView && selectedSavedView ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="size-11 shrink-0 rounded-xl text-muted-foreground hover:text-destructive sm:size-10"
-              aria-label={`Delete saved view ${selectedSavedView.name}`}
-              title="Delete saved view"
-              onClick={() => {
-                setDeleteViewError(null);
-                setDeleteViewOpen(true);
+        {!isWorkspaceInboxEmpty ? (
+          <div className="mt-2 flex gap-1.5 lg:mt-3">
+            <Select
+              value={selectedSavedView?.id ?? filter}
+              onValueChange={(value) => {
+                if (!value) return;
+                setSelectedConversationId(null);
+                const savedView = savedViews.find((view) => view.id === value);
+                if (savedView) {
+                  setSelectedSavedViewId(savedView.id);
+                  setFilter(savedView.filter);
+                } else {
+                  setSelectedSavedViewId(null);
+                  setFilter(value as ConversationFilter);
+                }
+                setViewSelectionRevision((revision) => revision + 1);
               }}
             >
-              <Trash2 className="size-4" aria-hidden="true" />
-            </Button>
-          ) : null}
-        </div>
+              <SelectTrigger
+                aria-label="Inbox view"
+                className="h-11 min-w-0 flex-1 justify-between rounded-xl border-border/60 bg-background px-3 shadow-none sm:h-10"
+              >
+                <SelectValue placeholder="Choose an inbox view">
+                  {selectedSavedView?.name ?? activeView?.label ?? "Choose an inbox view"}
+                </SelectValue>
+                {!selectedSavedView && activeViewCount > 0 ? (
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                    {activeViewCount} {activeCountKind}
+                  </span>
+                ) : null}
+              </SelectTrigger>
+              <SelectContent align="start" alignItemWithTrigger={false} className="w-64 rounded-xl">
+                {FILTER_TABS.map((tab) => {
+                  const count = counts[tab.countKey];
+                  const countKind = tab.value === "snoozed" ? "snoozed" : "unread";
+
+                  return (
+                    <SelectItem key={tab.value} value={tab.value} className="min-h-10 rounded-lg">
+                      <span>{tab.label}</span>
+                      {count > 0 ? (
+                        <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                          {count} {countKind}
+                        </span>
+                      ) : null}
+                    </SelectItem>
+                  );
+                })}
+                {savedViews.length > 0 ? (
+                  <>
+                    <SelectSeparator />
+                    <SelectLabel>Shared views</SelectLabel>
+                  </>
+                ) : null}
+                {savedViews.map((view) => (
+                  <SelectItem key={view.id} value={view.id} className="min-h-10 rounded-lg">
+                    <span className="min-w-0 truncate">{view.name}</span>
+                    <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+                      Shared
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {canDeleteSavedView && selectedSavedView ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-11 shrink-0 rounded-xl text-muted-foreground hover:text-destructive sm:size-10"
+                aria-label={`Delete saved view ${selectedSavedView.name}`}
+                title="Delete saved view"
+                onClick={() => {
+                  setDeleteViewError(null);
+                  setDeleteViewOpen(true);
+                }}
+              >
+                <Trash2 className="size-4" aria-hidden="true" />
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
         {savedViewsError ? (
           <p
             role="alert"
@@ -240,81 +247,117 @@ export function WidgetConversations({
         ) : null}
       </header>
 
-      <div className="flex min-h-0 flex-1 gap-2.5 p-2 sm:px-4 sm:pb-4">
-        <div
-          className={cn(
-            panelBoxClassName,
-            "w-full shrink-0 lg:w-[300px] xl:w-[320px]",
-            selectedConversationId ? "hidden lg:flex" : "flex",
-          )}
-        >
-          <ConversationsList
-            key={viewSelectionRevision}
-            filter={filter}
-            selectedConversationId={selectedConversationId}
-            onSelectConversation={setSelectedConversationId}
-            onClearFilter={() => {
-              setSelectedSavedViewId(null);
-              setFilter("all");
-            }}
-            initialChannel={selectedSavedView?.channel ?? null}
-            initialAssignee={
-              selectedSavedView?.assigneeFilter === "all"
-                ? null
-                : (selectedSavedView?.assigneeFilter ?? null)
-            }
-            initialLabel={selectedSavedView?.labelFilter ?? null}
-            onFacetChange={() => setSelectedSavedViewId(null)}
-          />
-        </div>
-
-        <div
-          className={cn(
-            panelBoxClassName,
-            "min-w-0 flex-1",
-            !selectedConversationId && "hidden lg:flex",
-            selectedConversationId && "flex",
-          )}
-        >
-          {selectedConversationId ? (
-            <ConversationDetail
-              key={selectedConversationId}
-              conversationId={selectedConversationId}
-              canManage={canManage}
-              onBack={() => setSelectedConversationId(null)}
-              onSelectConversation={setSelectedConversationId}
-              part="chat"
-              composerDraft={composerDraft}
-              onComposerDraftChange={updateComposerDraft}
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center p-6">
-              <p className="text-sm text-muted-foreground">
-                Select a conversation to view messages
+      {isWorkspaceInboxEmpty ? (
+        <div className="flex min-h-0 flex-1 p-2 sm:px-4 sm:pb-4">
+          <section
+            className={cn(
+              panelBoxClassName,
+              "w-full items-center justify-center gap-3 p-6 text-center",
+            )}
+          >
+            <span className="flex size-11 items-center justify-center rounded-xl border border-border/60 bg-background text-muted-foreground">
+              <MessageSquare className="size-5" aria-hidden="true" />
+            </span>
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">Your inbox is ready</h2>
+              <p className="mt-1 max-w-sm text-sm leading-relaxed text-muted-foreground">
+                Set up your agent to start receiving website conversations here.
               </p>
             </div>
-          )}
-        </div>
-
-        <div className={cn(detailsColumnClassName, "hidden w-[280px] shrink-0 xl:flex")}>
-          {selectedConversationId ? (
-            <ConversationDetail
-              key={selectedConversationId}
-              conversationId={selectedConversationId}
-              canManage={canManage}
-              onBack={() => {}}
-              onSelectConversation={setSelectedConversationId}
-              part="details"
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center rounded-xl border border-border/60 bg-card p-4">
-              <p className="text-center text-xs text-muted-foreground">
-                Contact and conversation details will appear here
+            {canManage ? (
+              <Button
+                nativeButton={false}
+                render={<Link href="/playground" />}
+                variant="outline"
+                size="sm"
+                className="min-h-11 px-4"
+              >
+                Set up your agent
+              </Button>
+            ) : (
+              <p className="max-w-sm text-xs text-muted-foreground">
+                A workspace owner needs to finish setup before conversations can arrive.
               </p>
-            </div>
-          )}
+            )}
+          </section>
         </div>
-      </div>
+      ) : (
+        <div className="flex min-h-0 flex-1 gap-2.5 p-2 sm:px-4 sm:pb-4">
+          <div
+            className={cn(
+              panelBoxClassName,
+              "w-full shrink-0 lg:w-[300px] xl:w-[320px]",
+              selectedConversationId ? "hidden lg:flex" : "flex",
+            )}
+          >
+            <ConversationsList
+              key={viewSelectionRevision}
+              filter={filter}
+              selectedConversationId={selectedConversationId}
+              onSelectConversation={setSelectedConversationId}
+              onClearFilter={() => {
+                setSelectedSavedViewId(null);
+                setFilter("all");
+              }}
+              initialChannel={selectedSavedView?.channel ?? null}
+              initialAssignee={
+                selectedSavedView?.assigneeFilter === "all"
+                  ? null
+                  : (selectedSavedView?.assigneeFilter ?? null)
+              }
+              initialLabel={selectedSavedView?.labelFilter ?? null}
+              onFacetChange={() => setSelectedSavedViewId(null)}
+            />
+          </div>
+
+          <div
+            className={cn(
+              panelBoxClassName,
+              "min-w-0 flex-1",
+              !selectedConversationId && "hidden lg:flex",
+              selectedConversationId && "flex",
+            )}
+          >
+            {selectedConversationId ? (
+              <ConversationDetail
+                key={selectedConversationId}
+                conversationId={selectedConversationId}
+                canManage={canManage}
+                onBack={() => setSelectedConversationId(null)}
+                onSelectConversation={setSelectedConversationId}
+                part="chat"
+                composerDraft={composerDraft}
+                onComposerDraftChange={updateComposerDraft}
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center p-6">
+                <p className="text-sm text-muted-foreground">
+                  Select a conversation to view messages
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className={cn(detailsColumnClassName, "hidden w-[280px] shrink-0 xl:flex")}>
+            {selectedConversationId ? (
+              <ConversationDetail
+                key={selectedConversationId}
+                conversationId={selectedConversationId}
+                canManage={canManage}
+                onBack={() => {}}
+                onSelectConversation={setSelectedConversationId}
+                part="details"
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center rounded-xl border border-border/60 bg-card p-4">
+                <p className="text-center text-xs text-muted-foreground">
+                  Contact and conversation details will appear here
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       <AlertDialog open={deleteViewOpen} onOpenChange={setDeleteViewOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
