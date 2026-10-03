@@ -41,6 +41,7 @@
     "test:analytics-date-range": "node --test scripts/test-analytics-date-range.mjs",
     "test:workflow-progression": "node --test scripts/test-workflow-progression.mjs",
     "test:rate-limit": "node --test scripts/test-rate-limit.mjs",
+    "test:dashboard-origin": "node --test scripts/test-dashboard-origin.mjs",
     "test:safe-fetch": "node --test scripts/test-safe-fetch.mjs",
     "test:knowledge-retrieval": "node --test scripts/test-knowledge-retrieval.mjs",
     "check": "pnpm lint && pnpm typecheck && pnpm fmt:check",
