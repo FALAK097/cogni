@@ -160,7 +160,7 @@ program and proprietary AI quality is an ongoing product program, not a single P
    owner-only publishing, published runtime snapshots, immediate domain/enable safety controls,
    author/timestamp history and rollback-as-new-version. Repeatable grounded-answer/no-answer/handoff
    cases are also available in Test; production model-quality evaluation remains a later gate.
-10. **Partially implemented in PR #48:** owners can create verified Q&A sources from negative feedback and recurring older unanswered questions in Insights. Open questions only appear after 24 hours without a public reply; closed conversations can appear immediately. Finish ignored/resolved tracking and the first evaluation dataset; issue #32 remains open.
+10. **Partially implemented in PR #48:** Insights groups unanswered questions, completed AI answers with no source match, and negative feedback; owners can create verified Q&A sources and track gap review state. Open unanswered questions appear after 24 hours without a public reply; closed conversations appear immediately. Add calibrated evaluation and quality trends; issue #32 remains open.
 
 Each slice includes domain/API/query/UI changes, permission checks, failure recovery, focused
 behavioral tests where risk warrants them, `pnpm lint`, `pnpm typecheck`, formatting and build,

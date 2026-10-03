@@ -61,6 +61,7 @@ export type MessageJson = {
   feedbackReason?: string | null;
   feedbackAt?: string | null;
   citations?: MessageCitation[];
+  retrievalOutcome?: "SOURCES_FOUND" | "NO_MATCH";
 };
 
 export type MessageCitation = {
@@ -618,12 +619,14 @@ export async function recordAiMessage({
   text,
   replyToMessageId,
   citations,
+  retrievalOutcome,
 }: {
   db: Db;
   conversationId: string;
   text: string;
   replyToMessageId: string;
   citations?: MessageCitation[];
+  retrievalOutcome?: "SOURCES_FOUND" | "NO_MATCH";
 }) {
   return runDbWriteOperation(db, async (tx) => {
     const conversationData = await tx.query.conversation.findFirst({
@@ -649,6 +652,7 @@ export async function recordAiMessage({
       visibility: "PUBLIC",
       replyToMessageId,
       createdAt: now.toISOString(),
+      ...(retrievalOutcome ? { retrievalOutcome } : {}),
       ...(uniqueCitations.length > 0
         ? {
             citations: uniqueCitations.slice(0, 4).map((citation) => ({

@@ -215,6 +215,7 @@ test("AI citation metadata is persisted with bounded, deduplicated source eviden
     conversationId,
     text: "The return window is 30 days.\n\nSources:\n- Returns policy",
     replyToMessageId,
+    retrievalOutcome: "SOURCES_FOUND",
     citations: [
       {
         documentId: "returns-policy",
@@ -234,6 +235,7 @@ test("AI citation metadata is persisted with bounded, deduplicated source eviden
   });
 
   assert.ok(persisted);
+  assert.equal(persisted.retrievalOutcome, "SOURCES_FOUND");
   assert.equal(persisted.citations?.length, 4);
   assert.equal(persisted.citations?.[0]?.title.length, 160);
   assert.equal(persisted.citations?.[0]?.excerpt.length, 360);

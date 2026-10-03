@@ -54,8 +54,11 @@ export type UnansweredQuestionItem = {
 
 export type KnowledgeGapReviewStatus = "OPEN" | "RESOLVED" | "IGNORED";
 
+export type KnowledgeGapSignal = "UNANSWERED" | "NO_SOURCE_MATCH";
+
 export type KnowledgeGapItem = UnansweredQuestionItem & {
   status: KnowledgeGapReviewStatus;
+  signals: KnowledgeGapSignal[];
 };
 
 export type KnowledgeGapSummary = {

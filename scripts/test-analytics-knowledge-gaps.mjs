@@ -34,8 +34,31 @@ test("groups repeats despite capitalization, punctuation, and whitespace", () =>
       question: "HOW do I reset my password!",
       askedAt: "2026-10-03T10:00:00.000Z",
       count: 2,
+      signals: ["UNANSWERED"],
     },
   ]);
+});
+
+test("combines separate question signals without duplicating a knowledge gap", () => {
+  const result = aggregateKnowledgeGaps([
+    {
+      conversationId: "unanswered",
+      question: "Where is my invoice?",
+      askedAt: "2026-10-01T10:00:00.000Z",
+      signal: "UNANSWERED",
+    },
+    {
+      conversationId: "no-source",
+      question: "WHERE is my invoice!",
+      askedAt: "2026-10-03T10:00:00.000Z",
+      signal: "NO_SOURCE_MATCH",
+    },
+  ]);
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].count, 2);
+  assert.deepEqual(result[0].signals, ["UNANSWERED", "NO_SOURCE_MATCH"]);
+  assert.equal(result[0].conversationId, "no-source");
 });
 
 test("orders recurring gaps before newer one-off questions", () => {

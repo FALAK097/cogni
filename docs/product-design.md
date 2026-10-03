@@ -129,8 +129,9 @@ for groundedness review and configured keyword matches for handoff review. Saved
 and no-evidence prompt guidance are implemented; tool proposals and latency/cost measurements remain
 future work. Insights now connects negative feedback and recurring older unanswered questions to an
 owner-written verified source, with owner-managed open/resolved/ignored states on the same review card.
-Weak-confidence and grounding signals plus a repeatable quality trend remain future work before
-Optimize is considered complete.
+Insights also records completed answers whose retrieval matched no source, tied to the exact visitor
+question. This is a retrieval signal, not a confidence or factual-correctness score. Calibrated
+confidence and repeatable quality trends remain future work before Optimize is considered complete.
 
 The target lifecycle remains:
 

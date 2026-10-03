@@ -522,6 +522,7 @@ export async function POST(
         finishReason,
         sources,
         citations,
+        retrievalOutcome,
       }) => {
         if (!text.trim()) {
           if (run) {
@@ -544,6 +545,7 @@ export async function POST(
               text,
               replyToMessageId: visitorMessageId,
               citations,
+              retrievalOutcome,
             });
         if (run) {
           await completeAgentRun({

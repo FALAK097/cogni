@@ -1,12 +1,18 @@
 import { createHash } from "node:crypto";
 
-import type { UnansweredQuestionItem } from "@/features/analytics/types";
+import type { KnowledgeGapSignal, UnansweredQuestionItem } from "@/features/analytics/types";
 
 export type KnowledgeGapReview = {
   questionHash: string;
   status: "OPEN" | "RESOLVED" | "IGNORED";
   updatedAt: string;
 };
+
+export type KnowledgeGapObservation = Omit<UnansweredQuestionItem, "count"> & {
+  signal: KnowledgeGapSignal;
+};
+
+type AggregatedKnowledgeGap = UnansweredQuestionItem & { signals: KnowledgeGapSignal[] };
 
 export function normalizeKnowledgeGapQuestion(question: string): string {
   return question
@@ -23,22 +29,30 @@ export function hashKnowledgeGapQuestion(question: string): string {
 
 /** Group exact repeat questions while ignoring case, spacing, and punctuation. */
 export function aggregateKnowledgeGaps(
-  items: Omit<UnansweredQuestionItem, "count">[],
-): UnansweredQuestionItem[] {
-  const grouped = new Map<string, UnansweredQuestionItem>();
+  items: (Omit<KnowledgeGapObservation, "signal"> & { signal?: KnowledgeGapSignal })[],
+): AggregatedKnowledgeGap[] {
+  const grouped = new Map<string, AggregatedKnowledgeGap>();
 
   for (const item of items) {
+    const signal = item.signal ?? "UNANSWERED";
     const key = normalizeKnowledgeGapQuestion(item.question);
     if (!key) continue;
 
     const existing = grouped.get(key);
     if (!existing) {
-      grouped.set(key, { ...item, question: item.question.trim(), count: 1 });
+      grouped.set(key, {
+        conversationId: item.conversationId,
+        question: item.question.trim(),
+        askedAt: item.askedAt,
+        count: 1,
+        signals: [signal],
+      });
       continue;
     }
 
     grouped.set(key, {
       ...existing,
+      signals: [...new Set([...existing.signals, signal])],
       ...(item.askedAt.localeCompare(existing.askedAt) > 0
         ? {
             conversationId: item.conversationId,
@@ -56,15 +70,15 @@ export function aggregateKnowledgeGaps(
 }
 
 export function buildKnowledgeGapSummary(
-  items: UnansweredQuestionItem[],
+  items: AggregatedKnowledgeGap[],
   reviews: KnowledgeGapReview[],
   limit = 3,
 ) {
   const reviewByHash = new Map(reviews.map((review) => [review.questionHash, review]));
   const mutable = {
-    OPEN: [] as (UnansweredQuestionItem & { status: "OPEN" })[],
-    RESOLVED: [] as (UnansweredQuestionItem & { status: "RESOLVED" })[],
-    IGNORED: [] as (UnansweredQuestionItem & { status: "IGNORED" })[],
+    OPEN: [] as (AggregatedKnowledgeGap & { status: "OPEN" })[],
+    RESOLVED: [] as (AggregatedKnowledgeGap & { status: "RESOLVED" })[],
+    IGNORED: [] as (AggregatedKnowledgeGap & { status: "IGNORED" })[],
   };
 
   for (const item of items) {

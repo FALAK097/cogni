@@ -42,6 +42,7 @@ export async function streamWidgetAgent({
     finishReason: string | null;
     sources: { documentId: string; title: string }[];
     citations: { documentId: string; title: string; excerpt: string }[];
+    retrievalOutcome: "SOURCES_FOUND" | "NO_MATCH";
   }) => Promise<void>;
 }) {
   const sources = await retrieveKnowledgeContext(
@@ -134,6 +135,7 @@ export async function streamWidgetAgent({
               ]),
             ).values(),
           ],
+          retrievalOutcome: sources.length > 0 ? "SOURCES_FOUND" : "NO_MATCH",
         });
         completion.succeed();
       } catch (error) {

@@ -1588,7 +1588,7 @@ export function DashboardPage({
               <p className="mt-1 text-xs text-muted-foreground">
                 {reviewFilter === "negative"
                   ? "Recent AI answers rated negatively"
-                  : "Questions without a public reply · open threads after 24h"}
+                  : "No public reply or no knowledge source matched"}
               </p>
             </div>
             <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
@@ -1616,12 +1616,12 @@ export function DashboardPage({
               onClick={() => setReviewFilter("unanswered")}
               className="min-h-10 rounded-md px-3 text-xs font-medium transition-colors hover:bg-background/70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-sm"
             >
-              No public reply
+              Knowledge gaps
             </button>
           </fieldset>
           {reviewFilter === "unanswered" ? (
             <div className="mt-3 flex items-center justify-between gap-3">
-              <p className="text-xs text-muted-foreground">Question status in this date range</p>
+              <p className="text-xs text-muted-foreground">Review questions and source misses</p>
               <Select
                 value={gapFilter}
                 onValueChange={(value) => {
@@ -1663,10 +1663,10 @@ export function DashboardPage({
           ) : reviewFilter === "unanswered" && gapItems.length === 0 ? (
             <p className="mt-4 flex min-h-36 flex-1 items-center justify-center rounded-lg border border-dashed border-border/60 px-5 text-center text-sm text-muted-foreground">
               {gapFilter === "OPEN"
-                ? "No open unanswered questions in this period."
+                ? "No open knowledge gaps in this period."
                 : gapFilter === "RESOLVED"
-                  ? "No resolved questions in this period."
-                  : "No ignored questions in this period."}
+                  ? "No resolved knowledge gaps in this period."
+                  : "No ignored knowledge gaps in this period."}
             </p>
           ) : reviewFilter === "negative" ? (
             <ul className="mt-4 divide-y divide-border/50">
@@ -1719,14 +1719,17 @@ export function DashboardPage({
                         pathname: "/conversations",
                         query: { conversationId: item.conversationId },
                       }}
-                      aria-label={`Review unanswered visitor question: ${item.question}`}
+                      aria-label={`Review knowledge gap: ${item.question}`}
                       className="-mx-2 min-h-11 min-w-0 flex-1 rounded-lg px-2 py-2 text-sm leading-relaxed outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                     >
                       <span className="line-clamp-3">{item.question}</span>
                       <span className="mt-1 block text-xs text-muted-foreground">
-                        {item.count > 1
-                          ? `No public reply · asked ${item.count} times`
-                          : "No public reply"}
+                        {item.signals
+                          .map((signal) =>
+                            signal === "UNANSWERED" ? "No public reply" : "No source matched",
+                          )
+                          .join(" · ")}
+                        {item.count > 1 ? ` · ${item.count} occurrences` : ""}
                       </span>
                     </Link>
                     {canManage ? (
@@ -2013,4 +2016,5 @@ type ReviewKnowledgeItem = {
   reason?: string | null;
   askedAt?: string;
   status?: "OPEN" | "RESOLVED" | "IGNORED";
+  signals?: ("UNANSWERED" | "NO_SOURCE_MATCH")[];
 };
