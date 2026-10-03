@@ -13,7 +13,7 @@ import {
 import { z } from "zod";
 
 const okResponseSchema = z.object({ ok: z.boolean() });
-const retrySourceResponseSchema = okResponseSchema.extend({ status: z.literal("processing") });
+const processSourceResponseSchema = okResponseSchema.extend({ status: z.literal("processing") });
 const uploadSourceResponseSchema = z.object({
   documentId: z.string().uuid(),
   job: z.object({
@@ -103,22 +103,22 @@ export function useDeleteKnowledgeBaseSource() {
   });
 }
 
-export function useRetryKnowledgeBaseSource() {
+export function useProcessKnowledgeBaseSource() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (sourceId: string) => {
+    mutationFn: async ({ sourceId, action }: { sourceId: string; action: "retry" | "sync" }) => {
       const response = await fetch(`/api/dashboard/knowledge-base/sources/${sourceId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "retry" }),
+        body: JSON.stringify({ action }),
       });
       const body = (await response.json().catch(() => null)) as unknown;
       if (!response.ok) {
         const error = z.object({ error: z.string() }).safeParse(body);
-        throw new Error(error.success ? error.data.error : "Failed to retry source");
+        throw new Error(error.success ? error.data.error : "Failed to process source");
       }
-      return retrySourceResponseSchema.parse(body);
+      return processSourceResponseSchema.parse(body);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeBase.all });
