@@ -64,6 +64,8 @@ const LEGACY_TAB_MAP: Record<string, AgentSection> = {
 const WIDGET_CARD_CLASS = "rounded-xl border border-border";
 
 const WIDGET_SETTINGS_CARD_CLASS = `${WIDGET_CARD_CLASS} overflow-hidden`;
+// The API aborts model runs at 55 seconds; keep the test UI open long enough to receive that result.
+const PREVIEW_RESPONSE_TIMEOUT_MS = 59_000;
 
 async function waitForPreviewWidget(prompt: string): Promise<WidgetPreviewEvidence | null> {
   for (let attempt = 0; attempt < 50; attempt += 1) {
@@ -95,7 +97,7 @@ async function waitForPreviewWidget(prompt: string): Promise<WidgetPreviewEviden
         };
 
         window.addEventListener("cogni:widget-preview-evidence", onEvidence);
-        timeoutId = window.setTimeout(() => finish(null), 45_000);
+        timeoutId = window.setTimeout(() => finish(null), PREVIEW_RESPONSE_TIMEOUT_MS);
         void sendPreviewMessage(prompt).then(
           (sent) => {
             sendFinished = true;

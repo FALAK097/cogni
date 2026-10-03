@@ -88,7 +88,9 @@ export function WidgetTestPanel({
     try {
       const previewEvidence = await onTryPrompt(prompt);
       if (!previewEvidence) {
-        setTryError("The preview couldn't start. Retry the preview, then try again.");
+        setTryError(
+          "No test result arrived. Check the preview and model connection, then try again.",
+        );
       }
       return previewEvidence;
     } catch {
