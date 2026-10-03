@@ -23,6 +23,7 @@
     "test:widget-publication": "node --test scripts/test-widget-publication.mjs",
     "test:widget-publication-db": "node --import dotenv/config --test scripts/test-widget-publication-db.mjs",
     "test:widget-publish-route": "node --test scripts/test-widget-publish-route.mjs",
+    "test:privileged-route-permissions": "node --test scripts/test-privileged-route-permissions.mjs",
     "test:widget-settings": "node --test scripts/test-widget-settings.mjs",
     "test:agent-tests": "node --test scripts/test-agent-tests.mjs",
     "test:agent-readiness": "node --test scripts/test-agent-readiness.mjs",
