@@ -51,6 +51,7 @@
     "test:safe-fetch": "node --test scripts/test-safe-fetch.mjs",
     "test:knowledge-retrieval": "node --test scripts/test-knowledge-retrieval.mjs",
     "test:knowledge-source-type": "node --test scripts/test-knowledge-source-type.mjs",
+    "test:knowledge-source-sync": "node --test scripts/test-knowledge-source-sync.mjs",
     "check": "pnpm lint && pnpm typecheck && pnpm fmt:check",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
