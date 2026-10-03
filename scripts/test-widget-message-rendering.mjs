@@ -44,8 +44,33 @@ globalThis.document = {
   },
 };
 
-const { formatBotMessage, getAssistantAnnouncement } = await import(
+const { formatBotMessage, getAssistantAnnouncement, getSafeDocumentHref } = await import(
   `data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString("base64")}`
+);
+const documentsCompiled = await build({
+  entryPoints: ["public/widget/documents.js"],
+  bundle: true,
+  write: false,
+  format: "esm",
+  platform: "node",
+  plugins: [
+    {
+      name: "identity-remend",
+      setup(builder) {
+        builder.onResolve({ filter: /^remend$/ }, () => ({
+          path: "remend",
+          namespace: "test",
+        }));
+        builder.onLoad({ filter: /.*/, namespace: "test" }, () => ({
+          contents: "export default (text) => text;",
+          loader: "js",
+        }));
+      },
+    },
+  ],
+});
+const { normalizeWidgetDocument, renderDocumentCard } = await import(
+  `data:text/javascript;base64,${Buffer.from(documentsCompiled.outputFiles[0].text).toString("base64")}`
 );
 const feedbackCompiled = await build({
   entryPoints: ["public/widget/feedback.js"],
@@ -102,6 +127,52 @@ test("message formatter encodes quote characters before restoring anchor markup"
 
   assert.doesNotMatch(rendered, /<a\s+[^>]*\sonmouseover=/i);
   assert.ok(rendered.includes('href="https://support.example.com/%22%20onmouseover=%22alert(1"'));
+});
+
+test("document URLs allow only credential-free HTTP and HTTPS destinations", () => {
+  assert.equal(
+    getSafeDocumentHref("https://docs.example.com/guide"),
+    "https://docs.example.com/guide",
+  );
+  assert.equal(
+    getSafeDocumentHref("http://docs.example.com/guide"),
+    "http://docs.example.com/guide",
+  );
+  assert.equal(getSafeDocumentHref("javascript:alert(1)"), null);
+  assert.equal(getSafeDocumentHref("data:text/html,hello"), null);
+  assert.equal(getSafeDocumentHref("https://user:pass@docs.example.com/guide"), null);
+  assert.equal(getSafeDocumentHref(undefined), null);
+});
+
+test("document search results use their title and open safe links accessibly", () => {
+  const document = {
+    title: "Getting started.pdf",
+    url: "https://docs.example.com/guide.pdf",
+  };
+  const normalized = normalizeWidgetDocument(document);
+  const markup = renderDocumentCard(document);
+
+  assert.deepEqual(normalized, {
+    fileName: "Getting started.pdf",
+    description: "",
+    fileUrl: "https://docs.example.com/guide.pdf",
+  });
+  assert.ok(markup.includes("Getting started.pdf"));
+  assert.ok(markup.includes('href="https://docs.example.com/guide.pdf"'));
+  assert.ok(markup.includes('target="_blank" rel="noopener noreferrer"'));
+  assert.ok(markup.includes('aria-label="Open Getting started.pdf in a new tab"'));
+  assert.doesNotMatch(markup, />Document</);
+});
+
+test("unsafe document URLs render a filename without a clickable link", () => {
+  const markup = renderDocumentCard({
+    title: '<img src=x onerror="alert(1)">',
+    url: "javascript:alert(1)",
+  });
+
+  assert.ok(markup.includes("&lt;img src=x onerror="));
+  assert.doesNotMatch(markup, /href=/i);
+  assert.doesNotMatch(markup, /<img\b/i);
 });
 
 test("feedback controls expose names, toggle state, and an announcement region", () => {
