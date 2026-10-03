@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 import "./src/lib/env/server";
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ["127.0.0.1"],
   serverExternalPackages: [
     "chat",
     "pdf-parse",
