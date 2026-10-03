@@ -5,7 +5,6 @@ import { useLayoutEffect } from "react";
 import { usePathname } from "next/navigation";
 
 import { AppTopbar } from "@/components/app-nav/app-topbar";
-import { AgentNavigation } from "@/components/app-nav/agent-navigation";
 import { Sidebar } from "@/components/app-nav/sidebar";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { cn } from "@/lib/utils";
@@ -61,7 +60,6 @@ export function DashboardShell({
         )}
       >
         <AppTopbar userData={userData} className={cn(isFullBleedPage && "lg:hidden")} />
-        {(pathname === "/playground" || pathname === "/knowledge-base") && <AgentNavigation />}
         <div
           id="workspace-content"
           tabIndex={-1}
