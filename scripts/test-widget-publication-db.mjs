@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { after, before, test } from "node:test";
@@ -76,6 +76,18 @@ const foreignWorkspaceId = randomUUID();
 const userId = randomUUID();
 const now = new Date().toISOString();
 
+const migration = await readFile(
+  join(process.cwd(), "drizzle", "0010_agent_publication_versions.sql"),
+  "utf8",
+);
+
+function migrationFunction(name) {
+  const start = migration.indexOf(`CREATE FUNCTION pg_temp.${name}(`);
+  const end = migration.indexOf("$$;--> statement-breakpoint", start);
+  if (start < 0 || end < 0) throw new Error(`Could not find ${name} in the widget migration.`);
+  return migration.slice(start, end + 3);
+}
+
 before(async () => {
   await raw`
     INSERT INTO "workspace" ("id", "name", "slug", "updatedAt") VALUES
@@ -93,6 +105,40 @@ after(async () => {
   await raw`DELETE FROM "user" WHERE "id" = ${userId}`;
   await getDb().$client.end({ timeout: 5 });
   await raw.end({ timeout: 5 });
+});
+
+test("legacy backfill helpers keep published snapshots within runtime schema limits", async () => {
+  await raw.unsafe(migrationFunction("widget_json_array_or_empty"));
+  await raw.unsafe(migrationFunction("widget_json_object_or_default"));
+
+  const [normalized] = await raw`
+    SELECT
+      pg_temp.widget_json_array_or_empty(${JSON.stringify(["ok", 7, "three", "four"])}, 3, 5) AS suggestions,
+      pg_temp.widget_json_array_or_empty(${JSON.stringify(["valid", "x".repeat(101)])}, 20, 100) AS keywords,
+      pg_temp.widget_json_object_or_default(${JSON.stringify({
+        start: "09:00",
+        end: "17:00",
+        weekdays: [1, "2", 9, -1, 6.5],
+      })}) AS working_hours,
+      pg_temp.widget_json_object_or_default(${JSON.stringify({
+        start: "9am",
+        end: "17:00",
+        weekdays: [1, 2],
+      })}) AS fallback_hours
+  `;
+
+  assert.deepEqual(normalized.suggestions, ["ok", "three"]);
+  assert.deepEqual(normalized.keywords, ["valid"]);
+  assert.deepEqual(normalized.working_hours, {
+    start: "09:00",
+    end: "17:00",
+    weekdays: [1],
+  });
+  assert.deepEqual(normalized.fallback_hours, {
+    start: "09:00",
+    end: "17:00",
+    weekdays: [1, 2, 3, 4, 5],
+  });
 });
 
 test("new agents are unpublished; publish, edit, and rollback stay workspace scoped", async () => {

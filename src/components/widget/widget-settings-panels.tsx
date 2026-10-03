@@ -2,9 +2,19 @@
 
 import Image from "next/image";
 import type { ReactNode } from "react";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 
 import { Check, Copy, Moon, RotateCcw, Shield, ShieldCheck, Sun, Trash2 } from "@/components/icons";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1121,56 +1131,90 @@ export function WidgetVersionHistory({
   currentVersion: number | null;
   canManage: boolean;
   restoringVersion: number | null;
-  onRestore: (version: number) => void;
+  onRestore: (version: number) => Promise<void>;
 }) {
+  const [restoreTarget, setRestoreTarget] = useState<WidgetPublicationVersion | null>(null);
   const historicalVersions = versions.filter((version) => version.version !== currentVersion);
   if (historicalVersions.length === 0) return null;
 
+  const confirmRestore = async () => {
+    if (!restoreTarget) return;
+    await onRestore(restoreTarget.version);
+    setRestoreTarget(null);
+  };
+
   return (
-    <details className="rounded-xl border border-border bg-card">
-      <summary className="cursor-pointer rounded-xl px-4 py-3 text-sm font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-        Version history
-      </summary>
-      <ol className="divide-y divide-border border-t border-border">
-        {versions.map((version) => {
-          const isCurrent = version.version === currentVersion;
-          const date = new Date(version.publishedAt);
-          const dateLabel = Number.isNaN(date.getTime())
-            ? "Publication date unavailable"
-            : date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-          return (
-            <li
-              key={version.version}
-              className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+    <>
+      <details className="rounded-xl border border-border bg-card">
+        <summary className="cursor-pointer rounded-xl px-4 py-3 text-sm font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+          Version history
+        </summary>
+        <ol className="divide-y divide-border border-t border-border">
+          {versions.map((version) => {
+            const isCurrent = version.version === currentVersion;
+            const date = new Date(version.publishedAt);
+            const dateLabel = Number.isNaN(date.getTime())
+              ? "Publication date unavailable"
+              : date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+            return (
+              <li
+                key={version.version}
+                className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">
+                    Version {version.version}
+                    {isCurrent ? " · Live" : ""}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {dateLabel} · {version.authorName ?? "Existing setup"}
+                  </p>
+                </div>
+                {!isCurrent && canManage ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={restoringVersion !== null}
+                    onClick={() => setRestoreTarget(version)}
+                    aria-label={`Restore version ${version.version}`}
+                  >
+                    {restoringVersion === version.version ? "Restoring…" : "Restore"}
+                  </Button>
+                ) : null}
+              </li>
+            );
+          })}
+        </ol>
+        <p className="px-4 pb-3 text-xs leading-relaxed text-muted-foreground">
+          Restoring a version replaces the current draft and publishes it immediately.
+        </p>
+      </details>
+      <AlertDialog
+        open={restoreTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && restoringVersion === null) setRestoreTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Restore version {restoreTarget?.version}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This replaces your current draft and immediately publishes the selected version for
+              visitors. You can restore another published version afterward.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={restoringVersion !== null}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={restoringVersion !== null}
+              onClick={() => void confirmRestore()}
             >
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-foreground">
-                  Version {version.version}
-                  {isCurrent ? " · Live" : ""}
-                </p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {dateLabel} · {version.authorName ?? "Existing setup"}
-                </p>
-              </div>
-              {!isCurrent && canManage ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={restoringVersion !== null}
-                  onClick={() => onRestore(version.version)}
-                  aria-label={`Restore and publish version ${version.version}`}
-                >
-                  {restoringVersion === version.version ? "Restoring…" : "Restore"}
-                </Button>
-              ) : null}
-            </li>
-          );
-        })}
-      </ol>
-      <p className="px-4 pb-3 text-xs leading-relaxed text-muted-foreground">
-        Restoring a version replaces the current draft and publishes it immediately.
-      </p>
-    </details>
+              {restoringVersion === restoreTarget?.version ? "Restoring…" : "Restore and publish"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

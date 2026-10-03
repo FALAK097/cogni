@@ -545,19 +545,19 @@ export function WidgetCustomizer({
     }
   };
 
-  const publishChanges = (restoreVersion?: number) => {
+  const publishChanges = async (restoreVersion?: number) => {
     if (!activeWorkspaceId) return;
     setPublicationError(null);
-    void publishWidgetConfigMutation
-      .mutateAsync({
+    try {
+      await publishWidgetConfigMutation.mutateAsync({
         workspaceId: activeWorkspaceId,
         ...(restoreVersion ? { restoreVersion } : {}),
-      })
-      .catch((error: unknown) => {
-        setPublicationError(
-          error instanceof Error ? error.message : "Couldn't publish these agent changes.",
-        );
       });
+    } catch (error: unknown) {
+      setPublicationError(
+        error instanceof Error ? error.message : "Couldn't publish these agent changes.",
+      );
+    }
   };
 
   const appearanceConfig: AppearanceConfig = {

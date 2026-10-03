@@ -12,13 +12,19 @@ ALTER TABLE "widget_publication" ADD CONSTRAINT "widget_publication_widgetId_wid
 ALTER TABLE "widget_publication" ADD CONSTRAINT "widget_publication_createdByUserId_user_id_fk" FOREIGN KEY ("createdByUserId") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE cascade;--> statement-breakpoint
 CREATE UNIQUE INDEX "widget_publication_widgetId_version_key" ON "widget_publication" USING btree ("widgetId","version");--> statement-breakpoint
 CREATE INDEX "widget_publication_widgetId_publishedAt_idx" ON "widget_publication" USING btree ("widgetId","publishedAt");--> statement-breakpoint
-CREATE FUNCTION pg_temp.widget_json_array_or_empty(value text) RETURNS jsonb
+CREATE FUNCTION pg_temp.widget_json_array_or_empty(value text, max_items integer, max_chars integer) RETURNS jsonb
 LANGUAGE plpgsql IMMUTABLE AS $$
 DECLARE parsed jsonb;
 BEGIN
 	parsed := value::jsonb;
 	IF jsonb_typeof(parsed) = 'array' THEN
-		RETURN parsed;
+		RETURN COALESCE((
+			SELECT jsonb_agg(item.value ORDER BY item.ordinality)
+			FROM jsonb_array_elements(parsed) WITH ORDINALITY AS item(value, ordinality)
+			WHERE jsonb_typeof(item.value) = 'string'
+				AND item.ordinality <= max_items
+				AND char_length(item.value #>> '{}') <= max_chars
+		), '[]'::jsonb);
 	END IF;
 	RETURN '[]'::jsonb;
 EXCEPTION WHEN others THEN
@@ -27,15 +33,26 @@ END;
 $$;--> statement-breakpoint
 CREATE FUNCTION pg_temp.widget_json_object_or_default(value text) RETURNS jsonb
 LANGUAGE plpgsql IMMUTABLE AS $$
-DECLARE parsed jsonb;
+DECLARE
+	parsed jsonb;
+	weekdays jsonb;
 BEGIN
 	parsed := value::jsonb;
 	IF jsonb_typeof(parsed) = 'object'
 		AND jsonb_typeof(parsed->'start') = 'string'
 		AND jsonb_typeof(parsed->'end') = 'string'
+		AND parsed->>'start' ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+		AND parsed->>'end' ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'
 		AND jsonb_typeof(parsed->'weekdays') = 'array'
 		AND jsonb_array_length(parsed->'weekdays') > 0 THEN
-		RETURN parsed;
+		SELECT COALESCE(jsonb_agg(item.value ORDER BY item.ordinality), '[]'::jsonb)
+		INTO weekdays
+		FROM jsonb_array_elements(parsed->'weekdays') WITH ORDINALITY AS item(value, ordinality)
+		WHERE jsonb_typeof(item.value) = 'number'
+			AND item.value::text ~ '^[0-6]$';
+		IF jsonb_array_length(weekdays) > 0 THEN
+			RETURN jsonb_build_object('start', parsed->'start', 'end', parsed->'end', 'weekdays', weekdays);
+		END IF;
 	END IF;
 	RETURN '{"start":"09:00","end":"17:00","weekdays":[1,2,3,4,5]}'::jsonb;
 EXCEPTION WHEN others THEN
@@ -82,14 +99,14 @@ SELECT
 		'headerGradientFrom', "headerGradientFrom",
 		'headerGradientTo', "headerGradientTo",
 		'shadowSize', "shadowSize",
-		'suggestions', pg_temp.widget_json_array_or_empty("suggestions"),
+		'suggestions', pg_temp.widget_json_array_or_empty("suggestions", 10, 500),
 		'hideSuggestionsOnInteract', "hideSuggestionsOnInteract",
-		'previewMessages', pg_temp.widget_json_array_or_empty("previewMessages"),
+		'previewMessages', pg_temp.widget_json_array_or_empty("previewMessages", 10, 500),
 		'autoShowPreviewDelay', "autoShowPreviewDelay",
 		'showBranding', "showBranding",
 		'privacyPolicyUrl', "privacyPolicyUrl",
 		'enableLeadCapture', "enableLeadCapture",
-		'leadCaptureKeywords', pg_temp.widget_json_array_or_empty("leadCaptureKeywords"),
+		'leadCaptureKeywords', pg_temp.widget_json_array_or_empty("leadCaptureKeywords", 20, 100),
 		'leadCaptureMinutesThreshold', "leadCaptureMinutesThreshold",
 		'leadCaptureMessageThreshold', "leadCaptureMessageThreshold",
 		'enableBrochure', "enableBrochure",
@@ -100,5 +117,5 @@ SELECT
 	NULL
 FROM "widget";--> statement-breakpoint
 UPDATE "widget" SET "publishedVersion" = 1;--> statement-breakpoint
-DROP FUNCTION pg_temp.widget_json_array_or_empty(text);--> statement-breakpoint
+DROP FUNCTION pg_temp.widget_json_array_or_empty(text, integer, integer);--> statement-breakpoint
 DROP FUNCTION pg_temp.widget_json_object_or_default(text);
