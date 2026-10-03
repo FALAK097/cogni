@@ -18,7 +18,7 @@ import { toSavePayload, type WidgetCustomizerConfig } from "./widget-settings-pa
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import { WidgetPreviewPanel } from "./widget-preview-panel";
+import { isPreviewEvidence, WidgetPreviewPanel } from "./widget-preview-panel";
 import { WidgetTestPanel, type WidgetPreviewEvidence } from "./widget-test-panel";
 import {
   APPEARANCE_DEFAULTS,
@@ -64,13 +64,53 @@ const WIDGET_CARD_CLASS = "rounded-xl border border-border";
 
 const WIDGET_SETTINGS_CARD_CLASS = `${WIDGET_CARD_CLASS} overflow-hidden`;
 
-async function waitForPreviewWidget(prompt: string): Promise<boolean> {
+async function waitForPreviewWidget(prompt: string): Promise<WidgetPreviewEvidence | null> {
   for (let attempt = 0; attempt < 50; attempt += 1) {
     const sendPreviewMessage = window.Widget?.sendPreviewMessage;
-    if (sendPreviewMessage) return sendPreviewMessage(prompt);
+    if (sendPreviewMessage) {
+      return new Promise((resolve) => {
+        let resolved = false;
+        let sendFinished = false;
+        let sendSucceeded = false;
+        let receivedEvidence: WidgetPreviewEvidence | null = null;
+        let timeoutId: number | null = null;
+
+        const finish = (evidence: WidgetPreviewEvidence | null) => {
+          if (resolved) return;
+          resolved = true;
+          window.removeEventListener("cogni:widget-preview-evidence", onEvidence);
+          if (timeoutId !== null) window.clearTimeout(timeoutId);
+          resolve(evidence);
+        };
+        const finishWhenReady = () => {
+          if (!sendFinished) return;
+          if (!sendSucceeded || receivedEvidence) finish(receivedEvidence);
+        };
+        const onEvidence = (event: Event) => {
+          const detail = (event as CustomEvent<unknown>).detail;
+          if (!isPreviewEvidence(detail) || detail.prompt !== prompt) return;
+          receivedEvidence = detail;
+          finishWhenReady();
+        };
+
+        window.addEventListener("cogni:widget-preview-evidence", onEvidence);
+        timeoutId = window.setTimeout(() => finish(null), 45_000);
+        void sendPreviewMessage(prompt).then(
+          (sent) => {
+            sendFinished = true;
+            sendSucceeded = sent;
+            finishWhenReady();
+          },
+          () => {
+            sendFinished = true;
+            finishWhenReady();
+          },
+        );
+      });
+    }
     await new Promise<void>((resolve) => window.setTimeout(resolve, 100));
   }
-  return false;
+  return null;
 }
 
 function resolveInitialSection(initialSubtab?: string | null): AgentSection {
@@ -227,6 +267,15 @@ export function WidgetCustomizer({
     setSendingTestPrompt(prompt);
     setShowMobilePreview(true);
     return waitForPreviewWidget(prompt).finally(() => setSendingTestPrompt(null));
+  }, []);
+
+  const resetPreview = useCallback(async () => {
+    setPreviewEvidence(null);
+    try {
+      return Boolean(await window.Widget?.resetPreview?.());
+    } catch {
+      return false;
+    }
   }, []);
 
   useEffect(() => {
@@ -743,6 +792,7 @@ export function WidgetCustomizer({
                   sendingPrompt={sendingTestPrompt}
                   canManage={canManage}
                   onTryPrompt={tryPreviewPrompt}
+                  onResetPreview={resetPreview}
                 />
               </TabsContent>
 

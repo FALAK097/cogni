@@ -12,7 +12,7 @@ import type { WidgetPreviewEvidence } from "./widget-test-panel";
 type PreviewMode = "widget" | "full-chat";
 const PREVIEW_EVIDENCE_EVENT = "cogni:widget-preview-evidence";
 
-function isPreviewEvidence(value: unknown): value is WidgetPreviewEvidence {
+export function isPreviewEvidence(value: unknown): value is WidgetPreviewEvidence {
   if (typeof value !== "object" || value === null) return false;
   const evidence = value as Record<string, unknown>;
   if (

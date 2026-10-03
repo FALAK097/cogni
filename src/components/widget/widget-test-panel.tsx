@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { runAgentTestSuite, type AgentTestSuiteResult } from "@/features/agent-tests/run-suite";
 import {
   useAgentTestCases,
   useDeleteAgentTestCase,
@@ -45,13 +46,15 @@ export function WidgetTestPanel({
   sendingPrompt,
   canManage,
   onTryPrompt,
+  onResetPreview,
 }: {
   escalationKeywords: string;
   suggestions: string[];
   evidence: WidgetPreviewEvidence | null;
   sendingPrompt: string | null;
   canManage: boolean;
-  onTryPrompt: (prompt: string) => Promise<boolean>;
+  onTryPrompt: (prompt: string) => Promise<WidgetPreviewEvidence | null>;
+  onResetPreview: () => Promise<boolean>;
 }) {
   const [tryError, setTryError] = useState<string | null>(null);
   const [noEvidencePrompt, setNoEvidencePrompt] = useState("");
@@ -62,6 +65,13 @@ export function WidgetTestPanel({
   const [expectedOutcome, setExpectedOutcome] =
     useState<AgentTestExpectedOutcome>("grounded_answer");
   const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
+  const [resettingCaseId, setResettingCaseId] = useState<string | null>(null);
+  const [batchProgress, setBatchProgress] = useState<{
+    index: number;
+    total: number;
+    title: string;
+  } | null>(null);
+  const [batchResults, setBatchResults] = useState<Record<string, AgentTestSuiteResult>>({});
   const casesQuery = useAgentTestCases();
   const saveCase = useSaveAgentTestCase();
   const deleteCase = useDeleteAgentTestCase();
@@ -70,22 +80,27 @@ export function WidgetTestPanel({
   const visibleSuggestions = [...new Set(suggestions.map((suggestion) => suggestion.trim()))]
     .filter((suggestion) => suggestion.length > 0 && suggestion.length <= 500)
     .slice(0, 3);
+  const isBusy = sendingPrompt !== null || resettingCaseId !== null || batchProgress !== null;
 
   const tryPrompt = async (prompt: string) => {
+    if (isBusy) return null;
     setTryError(null);
     try {
-      if (!(await onTryPrompt(prompt))) {
+      const previewEvidence = await onTryPrompt(prompt);
+      if (!previewEvidence) {
         setTryError("The preview couldn't start. Retry the preview, then try again.");
       }
+      return previewEvidence;
     } catch {
       setTryError("Couldn't send that test. Retry the preview and try again.");
+      return null;
     }
   };
 
   const submitNoEvidencePrompt = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const trimmedPrompt = noEvidencePrompt.trim();
-    if (!trimmedPrompt || sendingPrompt !== null) return;
+    if (!trimmedPrompt || isBusy) return;
     void tryPrompt(trimmedPrompt);
   };
 
@@ -106,9 +121,44 @@ export function WidgetTestPanel({
   };
 
   const runCase = async (testCase: AgentTestCase) => {
+    if (isBusy) return;
+    setTryError(null);
+    setBatchResults({});
     setActiveCaseId(testCase.id);
-    const started = await onTryPrompt(testCase.prompt).catch(() => false);
-    if (!started) setActiveCaseId(null);
+    setResettingCaseId(testCase.id);
+    const reset = await onResetPreview().catch(() => false);
+    setResettingCaseId(null);
+    if (!reset) {
+      setTryError("The preview couldn't reset. Retry the preview, then run this test again.");
+      setActiveCaseId(null);
+      return;
+    }
+    const result = await onTryPrompt(testCase.prompt).catch(() => null);
+    if (!result) {
+      setTryError("Couldn't complete this test. Retry the preview, then run it again.");
+      setActiveCaseId(null);
+    }
+  };
+
+  const runAllCases = async () => {
+    const savedCases = casesQuery.data?.cases ?? [];
+    if (savedCases.length < 2 || isBusy) return;
+    setTryError(null);
+    setActiveCaseId(null);
+    setBatchResults({});
+    const results = await runAgentTestSuite(savedCases, {
+      resetPreview: onResetPreview,
+      runPrompt: (testCase) => onTryPrompt(testCase.prompt),
+      onCaseStart: (testCase, index) =>
+        setBatchProgress({ index: index + 1, total: savedCases.length, title: testCase.title }),
+      onResult: (result) => setBatchResults((current) => ({ ...current, [result.id]: result })),
+    });
+    setBatchProgress(null);
+    if (results.some((result) => result.status === "error" || result.status === "not_run")) {
+      setTryError(
+        "Some tests couldn't run because the preview did not complete. Review each result.",
+      );
+    }
   };
 
   const submitCase = async (event: FormEvent<HTMLFormElement>) => {
@@ -162,7 +212,7 @@ export function WidgetTestPanel({
                       variant="outline"
                       className="h-auto min-h-10 w-full justify-between gap-3 whitespace-normal rounded-lg px-3 py-2 text-left text-sm font-normal"
                       onClick={() => void tryPrompt(suggestion)}
-                      disabled={sendingPrompt !== null}
+                      disabled={isBusy}
                       aria-label={`Send test question: ${suggestion}`}
                     >
                       <span className="line-clamp-2 min-w-0">{suggestion}</span>
@@ -206,7 +256,7 @@ export function WidgetTestPanel({
                 value={noEvidencePrompt}
                 onChange={(event) => setNoEvidencePrompt(event.target.value)}
                 maxLength={500}
-                disabled={sendingPrompt !== null}
+                disabled={isBusy}
                 aria-label="Question your sources do not cover"
                 placeholder="Type a question missing from your sources"
                 className="min-w-0"
@@ -215,9 +265,9 @@ export function WidgetTestPanel({
                 type="submit"
                 variant="outline"
                 className="h-10 shrink-0 rounded-lg"
-                disabled={sendingPrompt !== null || noEvidencePrompt.trim().length === 0}
+                disabled={isBusy || noEvidencePrompt.trim().length === 0}
               >
-                {sendingPrompt !== null ? "Sending…" : "Try in preview"}
+                {isBusy ? "Running…" : "Try in preview"}
               </Button>
             </form>
           </div>
@@ -257,7 +307,7 @@ export function WidgetTestPanel({
                 size="sm"
                 className="mt-3 h-9 rounded-lg"
                 onClick={() => void tryPrompt(visibleTerms[0]!)}
-                disabled={sendingPrompt !== null}
+                disabled={isBusy}
               >
                 {sendingPrompt === visibleTerms[0] ? "Sending…" : "Try handoff in preview"}
               </Button>
@@ -279,17 +329,32 @@ export function WidgetTestPanel({
               Reusable prompts; each run stays in preview.
             </p>
           </div>
-          {canManage ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="h-8 rounded-lg"
-              onClick={openCreate}
-            >
-              <Plus className="size-4" aria-hidden="true" /> Add test
-            </Button>
-          ) : null}
+          <div className="flex shrink-0 items-center gap-2">
+            {canManage && (casesQuery.data?.cases.length ?? 0) > 1 ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 rounded-lg"
+                onClick={() => void runAllCases()}
+                disabled={isBusy}
+              >
+                <Play className="size-3.5" aria-hidden="true" /> Run all
+              </Button>
+            ) : null}
+            {canManage ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 rounded-lg"
+                onClick={openCreate}
+                disabled={isBusy}
+              >
+                <Plus className="size-4" aria-hidden="true" /> Add test
+              </Button>
+            ) : null}
+          </div>
         </div>
         {casesQuery.isLoading ? (
           <p className="text-sm text-muted-foreground">Loading saved tests…</p>
@@ -306,6 +371,25 @@ export function WidgetTestPanel({
               : "No saved tests in this workspace yet."}
           </p>
         ) : null}
+        {batchProgress ? (
+          <p className="text-xs text-muted-foreground" aria-live="polite">
+            Running {batchProgress.index} of {batchProgress.total}: {batchProgress.title}
+          </p>
+        ) : null}
+        {batchResults && Object.keys(batchResults).length > 0 && !batchProgress ? (
+          <p className="text-xs text-muted-foreground" aria-live="polite">
+            Latest run:{" "}
+            {Object.values(batchResults).filter((result) => result.status === "passed").length}{" "}
+            passed ·{" "}
+            {Object.values(batchResults).filter((result) => result.status === "mismatch").length}{" "}
+            need review ·{" "}
+            {Object.values(batchResults).filter((result) => result.status === "error").length}{" "}
+            couldn’t run
+            {Object.values(batchResults).filter((result) => result.status === "not_run").length > 0
+              ? ` · ${Object.values(batchResults).filter((result) => result.status === "not_run").length} not run`
+              : ""}
+          </p>
+        ) : null}
         <ul className="space-y-2">
           {casesQuery.data?.cases.map((testCase) => {
             const outcomeLabel =
@@ -314,10 +398,12 @@ export function WidgetTestPanel({
                 : testCase.expectedOutcome === "no_evidence"
                   ? "No evidence"
                   : "Human handoff";
+            const suiteResult = batchResults[testCase.id];
             const evaluated =
-              activeCaseId === testCase.id && evidence && evidence.prompt === testCase.prompt
+              suiteResult?.evidence ??
+              (activeCaseId === testCase.id && evidence && evidence.prompt === testCase.prompt
                 ? evidence
-                : null;
+                : null);
             const passed = evaluated
               ? matchesAgentTestOutcome(testCase.expectedOutcome, evaluated)
               : false;
@@ -330,7 +416,13 @@ export function WidgetTestPanel({
                     <p className="mt-2 line-clamp-2 break-words text-sm text-muted-foreground">
                       {testCase.prompt}
                     </p>
-                    {evaluated ? (
+                    {suiteResult?.status === "not_run" ? (
+                      <p className="mt-2 text-xs text-muted-foreground">Not run</p>
+                    ) : suiteResult?.status === "error" && !evaluated ? (
+                      <p className="mt-2 text-xs font-medium text-destructive">
+                        Run didn’t complete; try again
+                      </p>
+                    ) : evaluated ? (
                       <p
                         className={`mt-2 text-xs font-medium ${passed ? "text-primary" : "text-muted-foreground"}`}
                       >
@@ -348,10 +440,14 @@ export function WidgetTestPanel({
                       size="icon-sm"
                       variant="ghost"
                       aria-label={`Run ${testCase.title}`}
-                      disabled={sendingPrompt !== null}
+                      disabled={isBusy}
                       onClick={() => void runCase(testCase)}
                     >
-                      <Play className="size-4" aria-hidden="true" />
+                      {resettingCaseId === testCase.id ? (
+                        "…"
+                      ) : (
+                        <Play className="size-4" aria-hidden="true" />
+                      )}
                     </Button>
                     {canManage ? (
                       <>
@@ -360,6 +456,7 @@ export function WidgetTestPanel({
                           size="icon-sm"
                           variant="ghost"
                           aria-label={`Edit ${testCase.title}`}
+                          disabled={isBusy}
                           onClick={() => openEdit(testCase)}
                         >
                           <Pencil className="size-4" aria-hidden="true" />
@@ -369,7 +466,7 @@ export function WidgetTestPanel({
                           size="icon-sm"
                           variant="ghost"
                           aria-label={`Delete ${testCase.title}`}
-                          disabled={deleteCase.isPending}
+                          disabled={deleteCase.isPending || isBusy}
                           onClick={() =>
                             void deleteCase
                               .mutateAsync(testCase.id)
