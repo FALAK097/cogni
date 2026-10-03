@@ -24,12 +24,7 @@ import Link from "next/link";
 import type { FormEvent, ReactNode } from "react";
 import { useMemo, useState } from "react";
 
-import type {
-  DashboardAnalytics,
-  MetricComparison,
-  NegativeFeedbackItem,
-  TopQuestion,
-} from "@/features/analytics/types";
+import type { DashboardAnalytics, MetricComparison, TopQuestion } from "@/features/analytics/types";
 import {
   aggregateWeeklyCounts,
   aggregateWeeklySatisfaction,
@@ -1122,7 +1117,8 @@ export function DashboardPage({
   const [dateRange, setDateRange] = useState<DateRangeValue>(() =>
     getDefaultDateRange(workspaceTimezone),
   );
-  const [feedbackToImprove, setFeedbackToImprove] = useState<NegativeFeedbackItem | null>(null);
+  const [feedbackToImprove, setFeedbackToImprove] = useState<ReviewKnowledgeItem | null>(null);
+  const [reviewFilter, setReviewFilter] = useState<"negative" | "unanswered">("negative");
   const [convGranularity, setConvGranularity] = useState<Granularity>("daily");
   const [satGranularity, setSatGranularity] = useState<Granularity>("daily");
 
@@ -1565,13 +1561,34 @@ export function DashboardPage({
             <div>
               <h3 className="text-sm font-semibold tracking-tight">Needs review</h3>
               <p className="mt-1 text-xs text-muted-foreground">
-                Recent AI answers rated negatively
+                {reviewFilter === "negative"
+                  ? "Recent AI answers rated negatively"
+                  : "Visitor questions with no public reply"}
               </p>
             </div>
             <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
               <HugeiconsIcon icon={ThumbsDownIcon} strokeWidth={1.8} className="size-4" />
             </span>
           </div>
+          <fieldset className="mt-4 flex w-fit rounded-lg bg-muted p-1">
+            <legend className="sr-only">Review type</legend>
+            <button
+              type="button"
+              aria-pressed={reviewFilter === "negative"}
+              onClick={() => setReviewFilter("negative")}
+              className="min-h-10 rounded-md px-3 text-xs font-medium transition-colors hover:bg-background/70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-sm"
+            >
+              Negative feedback
+            </button>
+            <button
+              type="button"
+              aria-pressed={reviewFilter === "unanswered"}
+              onClick={() => setReviewFilter("unanswered")}
+              className="min-h-10 rounded-md px-3 text-xs font-medium transition-colors hover:bg-background/70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-sm"
+            >
+              No public reply
+            </button>
+          </fieldset>
           {isLoading ? (
             <div className="mt-4 space-y-2">
               {Array.from({ length: 3 }).map((_, index) => (
@@ -1581,11 +1598,16 @@ export function DashboardPage({
                 />
               ))}
             </div>
-          ) : (analytics?.negativeFeedback ?? []).length === 0 ? (
+          ) : reviewFilter === "negative" && (analytics?.negativeFeedback ?? []).length === 0 ? (
             <p className="mt-4 flex min-h-36 flex-1 items-center justify-center rounded-lg border border-dashed border-border/60 px-5 text-center text-sm text-muted-foreground">
               No negative feedback from conversations in this period.
             </p>
-          ) : (
+          ) : reviewFilter === "unanswered" &&
+            (analytics?.unansweredQuestions ?? []).length === 0 ? (
+            <p className="mt-4 flex min-h-36 flex-1 items-center justify-center rounded-lg border border-dashed border-border/60 px-5 text-center text-sm text-muted-foreground">
+              No older unanswered questions in this period.
+            </p>
+          ) : reviewFilter === "negative" ? (
             <ul className="mt-4 divide-y divide-border/50">
               {(analytics?.negativeFeedback ?? []).map((item, index) => (
                 <li key={`${item.conversationId}-${item.feedbackAt}-${index}`}>
@@ -1609,6 +1631,40 @@ export function DashboardPage({
                           Feedback: {item.reason}
                         </span>
                       ) : null}
+                    </Link>
+                    {canManage ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-1 min-h-11 shrink-0 px-3"
+                        onClick={() => setFeedbackToImprove(item)}
+                        aria-label={`Write a verified answer for: ${item.question}`}
+                      >
+                        Add answer
+                      </Button>
+                    ) : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <ul className="mt-4 divide-y divide-border/50">
+              {(analytics?.unansweredQuestions ?? []).map((item, index) => (
+                <li key={`${item.conversationId}-${item.askedAt}-${index}`}>
+                  <div className="flex items-start gap-2 py-3">
+                    <Link
+                      href={{
+                        pathname: "/conversations",
+                        query: { conversationId: item.conversationId },
+                      }}
+                      aria-label={`Review unanswered visitor question: ${item.question}`}
+                      className="-mx-2 min-h-11 min-w-0 flex-1 rounded-lg px-2 py-2 text-sm leading-relaxed outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    >
+                      <span className="line-clamp-3">{item.question}</span>
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        No public AI or teammate reply
+                      </span>
                     </Link>
                     {canManage ? (
                       <Button
@@ -1738,7 +1794,7 @@ function FeedbackKnowledgeDialog({
   feedback,
   onOpenChange,
 }: {
-  feedback: NegativeFeedbackItem;
+  feedback: ReviewKnowledgeItem;
   onOpenChange: (open: boolean) => void;
 }) {
   const [title, setTitle] = useState(buildVerifiedAnswerTitle(feedback.question));
@@ -1768,8 +1824,8 @@ function FeedbackKnowledgeDialog({
         <DialogHeader>
           <DialogTitle>Add a verified answer</DialogTitle>
           <DialogDescription>
-            Review the customer question and write the answer your agent should use. The current AI
-            answer will not be added.
+            Review the customer question and write the answer your agent should use. Existing AI
+            replies are never added as trusted knowledge.
           </DialogDescription>
         </DialogHeader>
         <form className="space-y-4" onSubmit={(event) => void handleSubmit(event)}>
@@ -1781,9 +1837,8 @@ function FeedbackKnowledgeDialog({
               </p>
             </div>
             <div>
-              <h3 className="text-xs font-medium text-muted-foreground">Current AI answer</h3>
               <p className="mt-1 max-h-24 overflow-y-auto whitespace-pre-wrap break-words text-sm text-foreground">
-                {feedback.response}
+                {feedback.response ?? "No public AI or teammate reply was recorded."}
               </p>
             </div>
             {feedback.reason ? (
@@ -1842,3 +1897,11 @@ function FeedbackKnowledgeDialog({
     </Dialog>
   );
 }
+
+type ReviewKnowledgeItem = {
+  conversationId: string;
+  question: string;
+  response?: string | null;
+  reason?: string | null;
+  askedAt?: string;
+};

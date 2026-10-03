@@ -45,6 +45,12 @@ export type NegativeFeedbackItem = {
   feedbackAt: string;
 };
 
+export type UnansweredQuestionItem = {
+  conversationId: string;
+  question: string;
+  askedAt: string;
+};
+
 export type DashboardAnalytics = {
   dateRange: DashboardDateRange;
   previousDateRange: DashboardDateRange;
@@ -60,6 +66,7 @@ export type DashboardAnalytics = {
   conversationsByStatus: BreakdownItem[];
   topQuestions: TopQuestion[];
   negativeFeedback: NegativeFeedbackItem[];
+  unansweredQuestions: UnansweredQuestionItem[];
   userEngagement: {
     messagesSent: MetricComparison;
     messagesReceived: MetricComparison;
