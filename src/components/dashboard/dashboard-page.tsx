@@ -32,7 +32,7 @@ import {
 import { InsightsTrendChart } from "@/components/dashboard/insights-trend-chart";
 import { EvilPieChart } from "@/components/evilcharts/charts/recharts-pie-chart";
 import type { ChartConfig } from "@/components/evilcharts/ui/recharts-chart";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -1290,18 +1290,11 @@ export function DashboardPage({
                 No conversations in this date range
               </h2>
               <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                Insights charts appear when visitors start conversations. Try a longer range for
-                recent activity, or review your live installation.
+                Insights charts appear when visitors start conversations. Try a longer range to
+                check for recent activity.
               </p>
             </div>
           </div>
-          <Link
-            href="/playground?subtab=deploy"
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9 shrink-0 gap-2")}
-          >
-            Review deployment
-            <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-4" />
-          </Link>
         </section>
       ) : null}
 
