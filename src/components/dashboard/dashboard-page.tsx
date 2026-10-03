@@ -190,7 +190,7 @@ function AgentSetupChecklist({ canManage }: { canManage: boolean }) {
           ? "Your source is processing. Check back when indexing finishes."
           : "Give your agent trusted information to answer from.",
       complete: sourceReady,
-      href: "/knowledge-base",
+      href: "/playground?subtab=build#knowledge",
       action: sourceReady ? "Review sources" : "Add a source",
     },
     {
