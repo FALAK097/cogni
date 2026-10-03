@@ -32,7 +32,7 @@ import {
 import { InsightsTrendChart } from "@/components/dashboard/insights-trend-chart";
 import { EvilPieChart } from "@/components/evilcharts/charts/recharts-pie-chart";
 import type { ChartConfig } from "@/components/evilcharts/ui/recharts-chart";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -1278,6 +1278,31 @@ export function DashboardPage({
       ) : null}
 
       <AgentSetupChecklist canManage={canManage} />
+
+      {!isLoading && analytics?.kpis.totalConversations.value === 0 ? (
+        <section className="flex flex-col gap-4 rounded-xl border border-border/60 bg-card/60 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <HugeiconsIcon icon={Message01Icon} strokeWidth={2} className="size-[18px]" />
+            </span>
+            <div className="min-w-0">
+              <h2 className="text-sm font-semibold tracking-tight">
+                No conversations in this date range
+              </h2>
+              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                Try a longer date range, or send a preview message to see how your agent responds.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/playground?subtab=test"
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9 shrink-0 gap-2")}
+          >
+            Test your agent
+            <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-4" />
+          </Link>
+        </section>
+      ) : null}
 
       <section
         hidden={hasInitialError}
