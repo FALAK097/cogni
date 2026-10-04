@@ -4,7 +4,8 @@ const STEPS = [
   {
     num: "01",
     title: "Connect your website",
-    description: "Add the widget script to your site, then verify the installation in Agent.",
+    description:
+      "Add the widget script to your site, then review the domain and publication settings in Agent → Deploy.",
     color: "#6366f1",
     bg: "#eef0fe",
   },
@@ -18,15 +19,16 @@ const STEPS = [
   },
   {
     num: "03",
-    title: "Customize the widget",
-    description: "Set the widget's appearance and conversation starters to fit your site.",
+    title: "Customize your widget",
+    description:
+      "In Agent → Deploy, set the widget's appearance and conversation starters to fit your site.",
     color: "#f59e0b",
     bg: "#fffbeb",
   },
   {
     num: "04",
     title: "Test and go live",
-    description: "Try real questions, review the answers, and publish when your setup is ready.",
+    description: "Try real questions in Agent → Test, review the answers, then publish your agent.",
     color: "#8b5cf6",
     bg: "#f5f3ff",
   },

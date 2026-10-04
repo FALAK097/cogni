@@ -11,7 +11,7 @@ const FAQS = [
   {
     question: "Can I customize the chat widget's appearance?",
     answer:
-      "In Agent → Customize, adjust colors, typography, avatar, welcome message, and conversation starters. Use the live preview to check your changes before installing the widget.",
+      "In Agent → Deploy, adjust colors, typography, avatar, welcome message, and conversation starters. Use the live preview to check your changes before installing the widget.",
   },
   {
     question: "What happens when a customer needs a human?",

@@ -7,7 +7,7 @@ export const APP_PAGES = {
   agent: {
     href: "/agent",
     label: "Agent",
-    description: "Build, test, customize and deploy your AI support agent.",
+    description: "Build, test and deploy your AI support agent.",
   },
   insights: {
     href: "/insights",
@@ -28,17 +28,18 @@ export const APP_ROUTES = {
   settings: APP_PAGES.settings.href,
 } as const;
 
-export const AGENT_TABS = ["build", "test", "customize", "deploy"] as const;
+export const AGENT_TABS = ["build", "test", "deploy"] as const;
 export type AgentTab = (typeof AGENT_TABS)[number];
 
 const LEGACY_AGENT_TABS: Record<string, AgentTab> = {
   general: "build",
   agent: "build",
   behaviour: "build",
-  appearance: "customize",
-  "conversation-starter": "customize",
-  "suggested-questions": "customize",
-  content: "customize",
+  customize: "deploy",
+  appearance: "deploy",
+  "conversation-starter": "deploy",
+  "suggested-questions": "deploy",
+  content: "deploy",
   "lead-capture": "build",
   installation: "deploy",
   embed: "deploy",

@@ -31,7 +31,7 @@ test("saved draft changes keep the checklist incomplete", () => {
     hasUnpublishedChanges: true,
   });
   assert.equal(readiness.complete, false);
-  assert.match(readiness.description, /not live until you publish/);
+  assert.match(readiness.description, /not included in the published agent/);
 });
 
 test("paused agents direct owners to resume visitor access", () => {
@@ -52,4 +52,6 @@ test("published enabled agents complete the checklist item", () => {
   });
   assert.equal(readiness.complete, true);
   assert.equal(readiness.title, "Agent published");
+  assert.match(readiness.description, /ready to install/);
+  assert.doesNotMatch(readiness.description, /available to visitors/);
 });

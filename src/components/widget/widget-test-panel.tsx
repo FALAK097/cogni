@@ -340,10 +340,10 @@ export function WidgetTestPanel({
             <p className="text-xs text-muted-foreground">
               Add a suggested question in{" "}
               <Link
-                href={agentHref("customize")}
+                href={agentHref("deploy")}
                 className="rounded-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               >
-                Customize
+                Deploy
               </Link>{" "}
               to test a prompt tailored to your agent.
             </p>

@@ -122,10 +122,12 @@ metadata. Privileged buttons follow role policy; denied states explain required 
 
 ## Agent lifecycle
 
-Use `/agent` as the canonical Agent route; legacy `/playground` URLs redirect to the matching tab. Its four focused steps are **Build** (instructions,
-behavior and connected actions), **Test** (safe sandbox conversations and evidence), **Customize**
-(appearance and conversation prompts), and **Deploy** (installation and allowed domains). Keep the
-live widget preview beside these steps. Legacy `subtab` and `section` query values normalize to `?tab=`; the default Build tab has no query parameter.
+Use `/agent` as the canonical Agent route; legacy `/playground` URLs redirect to the matching tab.
+Keep three focused tabs: **Build** (instructions, behavior, connected actions and knowledge),
+**Test** (safe sandbox conversations and evidence), and **Deploy** (widget appearance, conversation
+prompts, publication, installation and allowed domains). Keep the live widget preview beside these
+tabs. Legacy Customize links and `subtab`/`section` query values normalize to the canonical
+`?tab=deploy`; the default Build tab has no query parameter.
 
 Test uses the authenticated preview sandbox: external actions stay disabled, preview messages stay
 out of Inbox and Insights, and a reset starts a fresh preview session. Show retrieved source titles
@@ -144,18 +146,20 @@ The target lifecycle remains:
 2. **Test**: realistic conversation and reset; expose sources, tool proposals, handoff events,
    latency/cost and failure explanation. Test actions use sandbox/preview and do not execute live
    side effects by default. Save cases and expected outcomes.
-3. **Deploy**: authorized domains, copy loader, installation verification, channels and readiness
+3. **Deploy**: widget appearance, conversation prompts, authorized domains, copy loader,
+   installation verification, channels and readiness
    checklist. Draft saves stay private to preview; public requests resolve an immutable published
    version. Publishing records version, timestamp and author, and restoring a version creates a new
-   publication. Show the current live version's author and publish time without hiding it in history.
+   publication. Show the current published version's author and publish time without hiding it in history.
    Domain authorization and the enable switch remain immediate safety controls; state that clearly
    beside each control. The setup checklist only reports ready when a version is published, current,
    and enabled. Explain each missing prerequisite beside its action.
 4. **Optimize**: unanswered questions, negative feedback, eval results and source/policy gaps;
    one suggested next step, reviewed and accepted by a person.
 
-Separate AI configuration from widget appearance. Appearance belongs inside Deploy with an
-interactive preview. General-purpose builder panels must not hide the human inbox.
+Keep agent instructions and connected actions in Build. Put widget appearance and conversation
+prompts in Deploy beside the interactive preview. General-purpose builder panels must not hide the
+human inbox.
 
 ## Knowledge
 

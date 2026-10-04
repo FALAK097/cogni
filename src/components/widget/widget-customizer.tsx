@@ -43,7 +43,6 @@ const NAV_ITEMS: {
 }[] = [
   { id: "build", label: "Build", icon: Bot },
   { id: "test", label: "Test", icon: MessageCircle },
-  { id: "customize", label: "Customize", icon: Sparkles },
   { id: "deploy", label: "Deploy", icon: Code },
 ];
 
@@ -252,8 +251,8 @@ export function WidgetCustomizer({
         ? "Unsaved draft changes"
         : publication?.current
           ? publication.hasUnpublishedChanges
-            ? `Draft saved · live v${publication.current.version}`
-            : `Live · v${publication.current.version}`
+            ? `Draft saved · published v${publication.current.version}`
+            : `Published · v${publication.current.version}`
           : "Draft saved · not published";
   const canPublishChanges =
     canManage &&
@@ -727,13 +726,13 @@ export function WidgetCustomizer({
       </div>
       {canManage && hasLocalDraftChanges && !saveWidgetConfigMutation.isError ? (
         <p className="shrink-0 text-xs text-muted-foreground">
-          Draft changes save automatically. Visitors continue to see the live version until you
-          publish.
+          Draft changes save automatically. Any installed widget continues to use the published
+          version until you publish.
         </p>
       ) : null}
       {publicationError ? (
         <p role="alert" className="shrink-0 text-sm text-destructive">
-          {publicationError} The live version is unchanged.
+          {publicationError} The published version is unchanged.
         </p>
       ) : null}
       {!canManage ? (
@@ -825,7 +824,7 @@ export function WidgetCustomizer({
                 />
               </TabsContent>
 
-              <TabsContent value="customize" keepMounted={false} className="space-y-8">
+              <TabsContent value="deploy" keepMounted={false} className="space-y-8">
                 <fieldset disabled={!canManage} className="min-w-0 space-y-8 border-0 p-0">
                   <legend className="sr-only">Widget appearance settings</legend>
                   <WidgetAppearancePanel
@@ -845,9 +844,6 @@ export function WidgetCustomizer({
                     onChange={(value) => handleArrayChange("suggestions", value)}
                   />
                 </fieldset>
-              </TabsContent>
-
-              <TabsContent value="deploy" keepMounted={false}>
                 <WidgetInstallationPanel
                   isEnabled={config.isEnabled}
                   currentPublication={publication?.current ?? null}

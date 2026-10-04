@@ -175,12 +175,12 @@ The owner explicitly prefers fewer pages and low complexity. Launch with **three
 destinations: Inbox, Agent and Insights**, plus Settings at the bottom. Feature parity is a
 capability goal, not a requirement to copy competitors' navigation or create a page per feature.
 
-| Destination          | Main task                                   | Where related capabilities live                                                                                                                                                                    |
-| -------------------- | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Inbox `/inbox`       | Triage, reply, handoff, close               | Saved views and ticket queues in the list; contact history, attributes and linked tickets in the Details panel; approvals attached to their conversation                                           |
-| Agent `/agent`       | Build → Test → Deploy → Improve             | Knowledge and instructions in Build; repeatable evaluations in Test; widget/channels in Deploy; unanswered questions in Improve; actions configured alongside agent behavior                       |
-| Insights `/insights` | Understand support quality, volume and cost | Existing overview and reports share one screen with filters and detail drill-downs; ranges, comparisons and daily buckets use the workspace timezone; setup checklist appears here until completed |
-| Settings             | Manage the workspace                        | Teammates/roles, connected business tools, business hours, usage/billing, developer and privacy grouped within one settings surface                                                                |
+| Destination          | Main task                                   | Where related capabilities live                                                                                                                                                                         |
+| -------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Inbox `/inbox`       | Triage, reply, handoff, close               | Saved views and ticket queues in the list; contact history, attributes and linked tickets in the Details panel; approvals attached to their conversation                                                |
+| Agent `/agent`       | Build → Test → Deploy                       | Knowledge, instructions and actions in Build; repeatable evaluations in Test; widget appearance, installation and channels in Deploy; no separate Customize destination                                 |
+| Insights `/insights` | Understand support quality, volume and cost | Existing overview and reports share one screen with filters and detail drill-downs; ranges, comparisons and daily buckets use the workspace timezone; unanswered-question improvements stay in Insights |
+| Settings             | Manage the workspace                        | Teammates/roles, connected business tools, business hours, usage/billing, developer and privacy grouped within one settings surface                                                                     |
 
 Keep channels (message delivery) and business-tool connections (agent actions) clearly named
 inside these surfaces, without making them separate sidebar destinations. Help-center publishing

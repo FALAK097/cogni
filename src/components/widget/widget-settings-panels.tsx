@@ -939,7 +939,7 @@ export function WidgetInstallationPanel({
           className="flex items-start gap-3 rounded-lg border border-border/70 bg-muted/30 p-3"
           aria-label={
             currentPublication
-              ? `Live agent version ${currentPublication.version}`
+              ? `Published agent version ${currentPublication.version}`
               : "Agent is not published"
           }
         >
@@ -953,7 +953,7 @@ export function WidgetInstallationPanel({
           <div className="min-w-0">
             <p className="text-sm font-medium text-foreground">
               {currentPublication
-                ? `Live version ${currentPublication.version}`
+                ? `Published version ${currentPublication.version}`
                 : "No published version yet"}
             </p>
             <p className="mt-0.5 text-sm text-muted-foreground">
@@ -971,7 +971,7 @@ export function WidgetInstallationPanel({
                     : " · Existing setup"}
                 </>
               ) : (
-                "Publish your agent before visitors can use the widget."
+                "Publish your agent and install the widget before visitors can use it."
               )}
             </p>
           </div>
@@ -1164,7 +1164,7 @@ export function WidgetVersionHistory({
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-foreground">
                     Version {version.version}
-                    {isCurrent ? " · Live" : ""}
+                    {isCurrent ? " · Published" : ""}
                   </p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     {dateLabel} · {version.authorName ?? "Existing setup"}

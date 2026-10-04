@@ -22,7 +22,7 @@ export function getAgentPublicationReadiness(input: {
     return {
       complete: false,
       title: "Publish your agent",
-      description: "Preview looks right? Publish an agent version before visitors can use it.",
+      description: "Publish an agent version before it can be installed on your website.",
       action: "Review and publish",
     };
   }
@@ -30,14 +30,15 @@ export function getAgentPublicationReadiness(input: {
     return {
       complete: false,
       title: "Publish your changes",
-      description: "Saved draft changes are not live until you publish them.",
+      description:
+        "Saved draft changes are not included in the published agent until you publish them.",
       action: "Review and publish",
     };
   }
   return {
     complete: true,
     title: "Agent published",
-    description: "Your current agent version is published and available to visitors.",
+    description: "Your current agent version is published and ready to install on your website.",
     action: "Review deployment",
   };
 }

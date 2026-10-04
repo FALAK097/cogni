@@ -33,11 +33,16 @@ test("primary labels resolve to matching canonical page URLs", () => {
 test("Agent tabs use one canonical URL key and omit the default tab", () => {
   assert.equal(routes.agentHref("build"), "/agent");
   assert.equal(routes.agentHref("test"), "/agent?tab=test");
-  assert.equal(routes.agentHref("customize", "#knowledge"), "/agent?tab=customize#knowledge");
+  assert.equal(routes.agentHref("deploy", "#installation"), "/agent?tab=deploy#installation");
+  assert.deepEqual(routes.AGENT_TABS, ["build", "test", "deploy"]);
 });
 
-test("legacy Agent tab names map into the current four tabs", () => {
-  assert.equal(routes.resolveAgentTab("appearance"), "customize");
+test("legacy appearance and customization tabs map into Deploy", () => {
+  assert.equal(routes.resolveAgentTab("customize"), "deploy");
+  assert.equal(routes.resolveAgentTab("appearance"), "deploy");
+  assert.equal(routes.resolveAgentTab("conversation-starter"), "deploy");
+  assert.equal(routes.resolveAgentTab("suggested-questions"), "deploy");
+  assert.equal(routes.resolveAgentTab("content"), "deploy");
   assert.equal(routes.resolveAgentTab("installation"), "deploy");
   assert.equal(routes.resolveAgentTab("test"), "test");
   assert.equal(routes.resolveAgentTab("unknown"), "build");
@@ -46,8 +51,12 @@ test("legacy Agent tab names map into the current four tabs", () => {
 test("Agent redirects old tab parameters to one canonical tab key", () => {
   assert.equal(
     routes.canonicalAgentPath({ subtab: "appearance", view: "open", tag: ["billing", "urgent"] }),
-    "/agent?view=open&tag=billing&tag=urgent&tab=customize",
+    "/agent?view=open&tag=billing&tag=urgent&tab=deploy",
   );
+  assert.equal(routes.canonicalAgentPath({ tab: "customize" }), "/agent?tab=deploy");
+  assert.equal(routes.canonicalAgentPath({ tab: "conversation-starter" }), "/agent?tab=deploy");
+  assert.equal(routes.canonicalAgentPath({ tab: "suggested-questions" }), "/agent?tab=deploy");
+  assert.equal(routes.canonicalAgentPath({ tab: "unknown" }), "/agent");
   assert.equal(
     routes.canonicalAgentPath({ section: "build", source: "setup" }),
     "/agent?source=setup",
