@@ -1,3 +1,4 @@
+pyenv: cannot rehash: /Users/falakgala/.pyenv/shims isn't writable
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -209,7 +210,7 @@ export function WidgetCustomizer({
     "tab",
     parseAsStringLiteral(AGENT_TABS).withDefault("build").withOptions({
       clearOnDefault: true,
-      history: "replace",
+      history: "push",
       scroll: false,
       shallow: true,
     }),
