@@ -1,5 +1,6 @@
 import { SITE_NAME } from "@/lib/constants";
 import { redirect } from "next/navigation";
+import { agentHref } from "@/features/navigation/app-routes";
 
 export const metadata = {
   title: `Agent | ${SITE_NAME}`,
@@ -7,5 +8,5 @@ export const metadata = {
 };
 
 export default async function KnowledgeBasePage() {
-  redirect("/playground?subtab=build#knowledge");
+  redirect(agentHref("build", "knowledge"));
 }

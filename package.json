@@ -69,7 +69,8 @@
     "cf:check": "pnpm cf:types && tsc --noEmit -p workers/ingestion-queue/tsconfig.json",
     "cf:deploy": "wrangler deploy --config workers/ingestion-queue/wrangler.jsonc",
     "prepare": "husky",
-    "test:analytics-knowledge-gap-review-route": "node --test scripts/test-analytics-knowledge-gap-review-route.mjs"
+    "test:analytics-knowledge-gap-review-route": "node --test scripts/test-analytics-knowledge-gap-review-route.mjs",
+    "test:navigation-routes": "node --test scripts/test-navigation-routes.mjs"
   },
   "dependencies": {
     "@ai-sdk/google": "4.0.87",

@@ -152,7 +152,7 @@ export function DashboardHeader({
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem render={<Link href="/dashboard/settings" />}>
+              <DropdownMenuItem render={<Link href="/settings" />}>
                 <HugeiconsIcon icon={CheckmarkBadgeIcon} strokeWidth={2} />
                 Account
               </DropdownMenuItem>

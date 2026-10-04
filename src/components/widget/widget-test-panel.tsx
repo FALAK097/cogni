@@ -1,4 +1,5 @@
 import Link from "next/link";
+
 import { useState, type FormEvent } from "react";
 
 import {
@@ -11,6 +12,7 @@ import {
   Trash2,
 } from "@/components/icons";
 import { Button } from "@/components/ui/button";
+import { agentHref } from "@/features/navigation/app-routes";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { runAgentTestSuite, type AgentTestSuiteResult } from "@/features/agent-tests/run-suite";
@@ -338,7 +340,7 @@ export function WidgetTestPanel({
             <p className="text-xs text-muted-foreground">
               Add a suggested question in{" "}
               <Link
-                href="/playground?subtab=customize"
+                href={agentHref("customize")}
                 className="rounded-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               >
                 Customize

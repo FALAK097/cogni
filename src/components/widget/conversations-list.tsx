@@ -3,6 +3,7 @@
 import { format, isToday, isYesterday } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import Link from "next/link";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent as ReactKeyboardEvent } from "react";
 import {
@@ -56,6 +57,7 @@ import { getConversationTargetIndex } from "@/features/conversations/list-keyboa
 import type { InboxChannel } from "@/features/conversations/inbox-pagination";
 import { normalizeTimezone } from "@/features/conversations/snooze-schedule";
 import { cn } from "@/lib/utils";
+import { agentHref } from "@/features/navigation/app-routes";
 
 import { scrollPaneClassName } from "./conversation-layout";
 
@@ -700,7 +702,7 @@ export function ConversationsList({
             ) : filter === "all" ? (
               <Button
                 nativeButton={false}
-                render={<Link href="/playground" />}
+                render={<Link href={agentHref()} />}
                 variant="outline"
                 size="sm"
               >

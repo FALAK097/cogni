@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTrigger } from "@/components/ui/sheet";
 import { SITE_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import { APP_ROUTES } from "@/features/navigation/app-routes";
 
 export function SheetMenu() {
   return (
@@ -26,7 +27,7 @@ export function SheetMenu() {
       >
         <SheetHeader>
           <div className="flex items-center justify-center">
-            <Link href="/dashboard" className="flex items-center gap-2">
+            <Link href={APP_ROUTES.insights} className="flex items-center gap-2">
               <ThemeLogo className="flex-shrink-0 w-6 h-6" />
               <h1
                 className={cn(

@@ -49,7 +49,7 @@ export function WorkspaceSwitcher({ isOpen }: WorkspaceSwitcherProps) {
     try {
       await switchWorkspace.mutateAsync(workspaceId);
       window.dispatchEvent(new CustomEvent("workspace-switched"));
-      window.location.assign("/dashboard");
+      window.location.assign("/insights");
     } catch (error) {
       console.error("Failed to switch workspace:", error);
     }

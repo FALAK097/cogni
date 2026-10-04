@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   const { db, workspace, membership } = await requireDashboardContext();
   const url = new URL(request.url);
   const slug = url.searchParams.get("slug") ?? "";
-  const destination = new URL("/integrations", url.origin);
+  const destination = new URL("/settings", url.origin);
   if (!canManageWorkspace(membership.role)) {
     destination.searchParams.set("integration", "owner-required");
     return NextResponse.redirect(destination);

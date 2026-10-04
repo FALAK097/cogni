@@ -69,11 +69,7 @@ export function IntegrationDetail({ slug, canManage }: { slug: string; canManage
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <Button
-            variant="link"
-            className="h-auto p-0"
-            onClick={() => router.push("/integrations")}
-          >
+          <Button variant="link" className="h-auto p-0" onClick={() => router.push("/settings")}>
             ← All integrations
           </Button>
           <h1 className="mt-3 text-2xl font-semibold">{manifest?.name ?? detail.provider}</h1>
@@ -229,7 +225,7 @@ export function IntegrationDetail({ slug, canManage }: { slug: string; canManage
                     disconnect.mutate(slug, {
                       onSuccess: () => {
                         toast({ title: "Integration disconnected" });
-                        router.push("/integrations");
+                        router.push("/settings");
                       },
                       onError: (error) =>
                         toast({

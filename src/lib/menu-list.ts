@@ -1,4 +1,5 @@
 import { LayoutGrid, MessageCircle, MessageSquare } from "@/components/icons";
+import { APP_PAGES, APP_ROUTES } from "@/features/navigation/app-routes";
 
 export type MenuItem = {
   href: string;
@@ -21,20 +22,20 @@ export function getStaticMenuList(): MenuList {
       groupLabel: "",
       menus: [
         {
-          href: "/conversations",
-          label: "Inbox",
+          href: APP_ROUTES.inbox,
+          label: APP_PAGES.inbox.label,
           icon: MessageSquare,
           submenus: [],
         },
         {
-          href: "/playground",
-          label: "Agent",
+          href: APP_ROUTES.agent,
+          label: APP_PAGES.agent.label,
           icon: MessageCircle,
           submenus: [],
         },
         {
-          href: "/dashboard",
-          label: "Insights",
+          href: APP_ROUTES.insights,
+          label: APP_PAGES.insights.label,
           icon: LayoutGrid,
           submenus: [],
         },

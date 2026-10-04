@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 
 import { UserNav } from "@/components/app-nav/user-nav";
-import { ChevronRight, Home, MoreHorizontal, PanelLeft } from "@/components/icons";
+import { ChevronRight, MoreHorizontal, PanelLeft } from "@/components/icons";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -26,6 +26,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsMobileSidebar, useSidebar } from "@/hooks/use-sidebar";
 import { cn } from "@/lib/utils";
+import { APP_PAGES } from "@/features/navigation/app-routes";
 
 type AppTopbarProps = {
   userData?: {
@@ -39,14 +40,18 @@ type AppTopbarProps = {
 const LABELS: Record<string, string> = {
   analytics: "Analytics",
   "knowledge-base": "Knowledge Base",
-  conversations: "Inbox",
+  conversations: APP_PAGES.inbox.label,
+  inbox: APP_PAGES.inbox.label,
   tickets: "Tickets",
 
-  dashboard: "Insights",
-  playground: "Agent",
+  dashboard: APP_PAGES.insights.label,
+  insights: APP_PAGES.insights.label,
+  playground: APP_PAGES.agent.label,
+  agent: APP_PAGES.agent.label,
   widget: "Chat widget",
-  integrations: "Settings · Connections",
-  settings: "Settings",
+  integrations: APP_PAGES.settings.label,
+  settings: APP_PAGES.settings.label,
+  connections: "Connections",
   usage: "Usage",
   whatsapp: "WhatsApp",
   workspace: "Workspace",
@@ -92,7 +97,7 @@ function Breadcrumbs() {
   const pathname = usePathname();
   const segments = pathname.split("/").filter(Boolean);
 
-  const routeSegments = segments.length > 0 ? segments : ["dashboard"];
+  const routeSegments = segments.length > 0 ? segments : ["insights"];
   const routeCrumbs = routeSegments.map((segment, index) => {
     const isCurrent = index === routeSegments.length - 1;
 
@@ -103,7 +108,7 @@ function Breadcrumbs() {
     };
   });
 
-  const crumbs: Crumb[] = [{ href: "/dashboard", label: "Home" }, ...routeCrumbs];
+  const crumbs: Crumb[] = routeCrumbs;
   const isCompact = crumbs.length > 2;
   const { visible, hidden } = getVisibleCrumbs(crumbs);
 
@@ -111,12 +116,10 @@ function Breadcrumbs() {
     <Breadcrumb className="min-w-0">
       <BreadcrumbList className="flex-nowrap gap-1 text-sm sm:text-base">
         {visible.map((crumb, index) => {
-          const isHome = crumb.href === "/dashboard";
           return (
             <div
               className={cn(
                 "contents",
-                isCompact && isHome && "max-[640px]:hidden",
                 isCompact && !crumb.current && index < visible.length - 2 && "max-[640px]:hidden",
               )}
               key={`${crumb.href}-${index}`}
@@ -175,7 +178,6 @@ function Breadcrumbs() {
                   <BreadcrumbLink
                     render={<Link href={crumb.href} className="flex min-w-0 items-center gap-2" />}
                   >
-                    {crumb.href === "/dashboard" && <Home className="size-4 shrink-0" />}
                     <span className="truncate">{crumb.label}</span>
                   </BreadcrumbLink>
                 )}

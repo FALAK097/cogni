@@ -40,7 +40,7 @@ export function DashboardShell({
   const desktopOpenState =
     (hasHydrated ? isOpen : initialSidebarOpen) || (settings.isHoverOpen && isHover);
   const pathname = usePathname();
-  const isFullBleedPage = pathname === "/playground" || pathname === "/conversations";
+  const isFullBleedPage = pathname === "/agent" || pathname === "/inbox";
 
   return (
     <>

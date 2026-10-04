@@ -12,6 +12,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { closeMobileSidebar, useIsMobileSidebar, useSidebar } from "@/hooks/use-sidebar";
 import { SITE_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import { APP_PAGES, APP_ROUTES } from "@/features/navigation/app-routes";
 
 function SidebarContent({ expanded }: { expanded: boolean }) {
   const pathname = usePathname();
@@ -20,7 +21,7 @@ function SidebarContent({ expanded }: { expanded: boolean }) {
     <div className="flex h-full min-h-0 flex-col items-stretch">
       <div className="flex-none px-4 pt-4 pb-2">
         <Link
-          href="/dashboard"
+          href={APP_ROUTES.insights}
           aria-label={`${SITE_NAME} home`}
           onClick={closeMobileSidebar}
           className={cn(
@@ -40,19 +41,19 @@ function SidebarContent({ expanded }: { expanded: boolean }) {
       </div>
       <div className={cn("flex-none border-t border-sidebar-border", expanded ? "p-3" : "p-2")}>
         <Link
-          href="/integrations"
+          href={APP_ROUTES.settings}
           onClick={closeMobileSidebar}
-          aria-label="Settings: connections"
-          aria-current={pathname.startsWith("/integrations") ? "page" : false}
-          title={expanded ? "Workspace connections" : "Settings"}
+          aria-label={APP_PAGES.settings.label}
+          aria-current={pathname.startsWith(APP_ROUTES.settings) ? "page" : false}
+          title={APP_PAGES.settings.label}
           className={cn(
             "flex min-h-11 lg:min-h-10 items-center gap-4 rounded-md px-4 text-sm transition-colors duration-150 hover:bg-sidebar-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
             !expanded && "justify-center px-0",
-            pathname.startsWith("/integrations") && "bg-sidebar-accent font-medium",
+            pathname.startsWith(APP_ROUTES.settings) && "bg-sidebar-accent font-medium",
           )}
         >
           <Settings className="size-[18px] shrink-0" />
-          {expanded && <span>Settings</span>}
+          {expanded && <span>{APP_PAGES.settings.label}</span>}
         </Link>
       </div>
     </div>

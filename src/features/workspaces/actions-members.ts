@@ -62,7 +62,7 @@ function activeWorkspaceCookieOptions() {
 
 function safeReturnPath(returnTo: string | undefined) {
   if (!returnTo || !returnTo.startsWith("/") || returnTo.startsWith("//")) {
-    return "/dashboard";
+    return "/insights";
   }
 
   return returnTo;
@@ -299,7 +299,7 @@ export async function acceptInviteAction(
   const cookieStore = await cookies();
   cookieStore.set("active_workspace_id", invite.workspaceId, activeWorkspaceCookieOptions());
   revalidatePath("/dashboard");
-  redirect("/dashboard");
+  redirect("/insights");
 }
 
 export async function transferOwnershipAction(formData: FormData) {

@@ -39,7 +39,7 @@ export function AuthDialog({
 
     const result = await authClient.signIn.social({
       provider: "google",
-      callbackURL: "/dashboard",
+      callbackURL: "/insights",
     });
 
     if (result?.error) {

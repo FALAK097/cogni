@@ -37,6 +37,7 @@ import {
   updateConversationComposerDrafts,
 } from "@/features/conversations/draft-state";
 import { cn } from "@/lib/utils";
+import { APP_PAGES, agentHref } from "@/features/navigation/app-routes";
 
 import { ConversationDetail } from "./conversation-detail";
 import { ConversationsList } from "./conversations-list";
@@ -158,7 +159,7 @@ export function WidgetConversations({
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-sidebar">
       <header className="shrink-0 bg-sidebar px-4 pt-3 sm:px-5 sm:pt-4 lg:pt-4">
         <h1 className="hidden text-xl font-semibold tracking-tight text-foreground lg:block">
-          Inbox
+          {APP_PAGES.inbox.label}
         </h1>
 
         {!isWorkspaceInboxEmpty ? (
@@ -279,7 +280,7 @@ export function WidgetConversations({
             {canManage ? (
               <Button
                 nativeButton={false}
-                render={<Link href="/playground" />}
+                render={<Link href={agentHref()} />}
                 variant="outline"
                 size="sm"
                 className="min-h-11 px-4"

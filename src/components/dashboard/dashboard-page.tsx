@@ -64,6 +64,7 @@ import {
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useDashboardAnalytics, useReviewKnowledgeGap } from "@/hooks/query";
+import { APP_PAGES, APP_ROUTES, agentHref } from "@/features/navigation/app-routes";
 import { useAddManualTextSource, useKnowledgeBaseSources } from "@/hooks/query/use-knowledge-base";
 import { useWidgetConfig } from "@/hooks/query/use-widget";
 import { useActiveWorkspaceId } from "@/hooks/use-auth";
@@ -205,7 +206,7 @@ function AgentSetupChecklist({ canManage }: { canManage: boolean }) {
           ? "Your source is processing. Check back when indexing finishes."
           : "Give your agent trusted information to answer from.",
       complete: sourceReady,
-      href: "/playground?subtab=build#knowledge",
+      href: agentHref("build", "knowledge"),
       action: sourceReady ? "Review sources" : "Add a source",
     },
     {
@@ -214,7 +215,7 @@ function AgentSetupChecklist({ canManage }: { canManage: boolean }) {
         ? "Your agent has guidance for how to respond."
         : "Set tone, boundaries, and when to hand off to a teammate.",
       complete: instructionsReady,
-      href: "/playground?subtab=build",
+      href: agentHref("build"),
       action: instructionsReady ? "Review instructions" : "Configure agent",
     },
     {
@@ -223,14 +224,14 @@ function AgentSetupChecklist({ canManage }: { canManage: boolean }) {
         ? "Your website is allowed to load the widget."
         : "Allow your production domain before installing the widget.",
       complete: domainReady,
-      href: "/playground?subtab=deploy",
+      href: agentHref("deploy"),
       action: domainReady ? "Review installation" : "Set up installation",
     },
     {
       title: publicationReadiness.title,
       description: publicationReadiness.description,
       complete: publicationReadiness.complete,
-      href: "/playground?subtab=deploy",
+      href: agentHref("deploy"),
       action: publicationReadiness.action,
     },
   ];
@@ -1265,7 +1266,9 @@ export function DashboardPage({
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-6 pb-8">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Insights</h1>
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+            {APP_PAGES.insights.label}
+          </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Understand conversation volume, response times and customer feedback.
           </p>
@@ -1613,7 +1616,7 @@ export function DashboardPage({
                       <TableCell className="whitespace-normal break-words px-0 py-2.5 text-sm">
                         <Link
                           href={{
-                            pathname: "/conversations",
+                            pathname: APP_ROUTES.inbox,
                             query: { conversationId: item.conversationId },
                           }}
                           aria-label={`Open a conversation about: ${item.question}`}
@@ -1639,7 +1642,7 @@ export function DashboardPage({
           </div>
           <div className="mt-4 border-t border-border/50 pt-4">
             <Link
-              href="/conversations"
+              href={APP_ROUTES.inbox}
               className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
             >
               Open inbox
@@ -1742,7 +1745,7 @@ export function DashboardPage({
                   <div className="flex items-start gap-2 py-3">
                     <Link
                       href={{
-                        pathname: "/conversations",
+                        pathname: APP_ROUTES.inbox,
                         query: { conversationId: item.conversationId },
                       }}
                       aria-label={`Review AI answer. Visitor asked: ${item.question}. AI replied: ${item.response}`}
@@ -1783,7 +1786,7 @@ export function DashboardPage({
                   <div className="flex items-start gap-2 py-3">
                     <Link
                       href={{
-                        pathname: "/conversations",
+                        pathname: APP_ROUTES.inbox,
                         query: { conversationId: item.conversationId },
                       }}
                       aria-label={`Review knowledge gap: ${item.question}`}
@@ -1847,7 +1850,7 @@ export function DashboardPage({
           )}
           <div className="mt-auto border-t border-border/50 pt-4">
             <Link
-              href="/conversations"
+              href={APP_ROUTES.inbox}
               className="inline-flex min-h-8 items-center gap-1 rounded-sm text-sm font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             >
               Open inbox

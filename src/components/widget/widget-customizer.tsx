@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { parseAsStringLiteral, useQueryState } from "nuqs";
 
 import { Bot, Code, Eye, MessageCircle, Sparkles } from "@/components/icons";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,6 +15,7 @@ import { WIDGET_PREVIEW_RESPONSE_TIMEOUT_MS } from "@/features/widget/agent-time
 import { BookingSettingsCard } from "@/features/integrations/components/booking-settings-card";
 import { WidgetKnowledgeManager } from "@/components/workspace/widget-knowledge-manager";
 import { cn } from "@/lib/utils";
+import { APP_PAGES, AGENT_TABS, type AgentTab } from "@/features/navigation/app-routes";
 
 import { toSavePayload, type WidgetCustomizerConfig } from "./widget-settings-payload";
 import { Button } from "@/components/ui/button";
@@ -35,11 +36,8 @@ import {
   type AppearanceConfig,
 } from "./widget-settings-panels";
 
-const AGENT_SECTIONS = ["build", "test", "customize", "deploy"] as const;
-type AgentSection = (typeof AGENT_SECTIONS)[number];
-
 const NAV_ITEMS: {
-  id: AgentSection;
+  id: AgentTab;
   label: string;
   icon: typeof Sparkles;
 }[] = [
@@ -48,19 +46,6 @@ const NAV_ITEMS: {
   { id: "customize", label: "Customize", icon: Sparkles },
   { id: "deploy", label: "Deploy", icon: Code },
 ];
-
-const LEGACY_TAB_MAP: Record<string, AgentSection> = {
-  general: "build",
-  agent: "build",
-  behaviour: "build",
-  appearance: "customize",
-  "conversation-starter": "customize",
-  "suggested-questions": "customize",
-  content: "customize",
-  "lead-capture": "build",
-  installation: "deploy",
-  embed: "deploy",
-};
 
 const WIDGET_CARD_CLASS = "rounded-xl border border-border";
 
@@ -112,12 +97,6 @@ async function waitForPreviewWidget(prompt: string): Promise<WidgetPreviewEviden
     await new Promise<void>((resolve) => window.setTimeout(resolve, 100));
   }
   return null;
-}
-
-function resolveInitialSection(initialSubtab?: string | null): AgentSection {
-  if (!initialSubtab) return "build";
-  if (AGENT_SECTIONS.includes(initialSubtab as AgentSection)) return initialSubtab as AgentSection;
-  return LEGACY_TAB_MAP[initialSubtab] ?? "build";
 }
 
 function mergeWidgetConfig(
@@ -220,17 +199,22 @@ function WidgetCustomizerSkeleton() {
 
 export function WidgetCustomizer({
   workspaceId,
-  initialSubtab,
   canManage,
 }: {
   workspaceId?: string | null;
-  initialSubtab?: string | null;
   canManage: boolean;
 }) {
   const activeWorkspaceId = workspaceId || "";
   const { toast } = useToast();
-  const router = useRouter();
-  const activeSection = resolveInitialSection(initialSubtab);
+  const [activeTab, setActiveTab] = useQueryState(
+    "tab",
+    parseAsStringLiteral(AGENT_TABS).withDefault("build").withOptions({
+      clearOnDefault: true,
+      history: "replace",
+      scroll: false,
+      shallow: true,
+    }),
+  );
   const [showMobilePreview, setShowMobilePreview] = useState(false);
   const [previewEvidence, setPreviewEvidence] = useState<WidgetPreviewEvidence | null>(null);
   const [sendingTestPrompt, setSendingTestPrompt] = useState<string | null>(null);
@@ -338,11 +322,9 @@ export function WidgetCustomizer({
     [canManage],
   );
 
-  const handleSubTabChange = (value: string | number) => {
-    if (typeof value !== "string" || !AGENT_SECTIONS.includes(value as AgentSection)) return;
-    const url = new URL(window.location.href);
-    url.searchParams.set("subtab", value);
-    router.push(`${url.pathname}?${url.searchParams.toString()}`, { scroll: false });
+  const handleTabChange = (value: string | number) => {
+    if (typeof value !== "string" || !AGENT_TABS.includes(value as AgentTab)) return;
+    void setActiveTab(value as AgentTab);
   };
 
   const handleArrayChange = (
@@ -689,7 +671,7 @@ export function WidgetCustomizer({
     >
       <div className="flex shrink-0 flex-wrap items-center gap-2">
         <h1 className="hidden text-xl font-semibold tracking-tight text-foreground lg:block">
-          Agent
+          {APP_PAGES.agent.label}
         </h1>
         <button
           type="button"
@@ -699,7 +681,7 @@ export function WidgetCustomizer({
             showMobilePreview && "border-[var(--widget-accent)] text-[var(--widget-accent)]",
           )}
           aria-label={
-            showMobilePreview && activeSection === "test"
+            showMobilePreview && activeTab === "test"
               ? "Return to test scenarios"
               : showMobilePreview
                 ? "Hide preview"
@@ -708,7 +690,7 @@ export function WidgetCustomizer({
           aria-pressed={showMobilePreview}
         >
           <Eye className="size-4" strokeWidth={2} />
-          {showMobilePreview && activeSection === "test" ? "Back to tests" : "Preview"}
+          {showMobilePreview && activeTab === "test" ? "Back to tests" : "Preview"}
         </button>
         <output
           className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2 text-xs text-muted-foreground"
@@ -770,13 +752,13 @@ export function WidgetCustomizer({
           )}
         >
           <Tabs
-            value={activeSection}
-            onValueChange={handleSubTabChange}
+            value={activeTab}
+            onValueChange={handleTabChange}
             className="flex min-h-0 min-w-0 flex-1 flex-col gap-0"
           >
             <TabsList
               variant="line"
-              aria-label="Agent setup steps"
+              aria-label="Agent workspace tabs"
               className="mx-4 h-12 w-auto shrink-0 justify-start gap-1 rounded-none border-b border-border bg-transparent px-0 sm:mx-6"
             >
               {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
@@ -900,7 +882,7 @@ export function WidgetCustomizer({
           className={cn(
             WIDGET_CARD_CLASS,
             "flex min-h-0 w-full shrink-0 flex-col",
-            showMobilePreview && activeSection === "test"
+            showMobilePreview && activeTab === "test"
               ? "flex-1 overflow-y-auto lg:overflow-hidden lg:h-full lg:w-[380px] xl:w-[420px]"
               : showMobilePreview
                 ? "h-[min(70vh,520px)] flex-1 overflow-hidden lg:h-full lg:w-[380px] xl:w-[420px]"
@@ -910,18 +892,18 @@ export function WidgetCustomizer({
           <div
             className={cn(
               "min-h-0 flex-1",
-              showMobilePreview && activeSection === "test"
+              showMobilePreview && activeTab === "test"
                 ? "h-[min(58vh,460px)] min-h-[320px] shrink-0 lg:h-full lg:min-h-0 lg:shrink"
                 : "h-full",
             )}
           >
             <WidgetPreviewPanel
               liveConfig={liveConfig}
-              testMode={activeSection === "test"}
+              testMode={activeTab === "test"}
               onEvidenceChange={setPreviewEvidence}
             />
           </div>
-          {showMobilePreview && activeSection === "test" ? (
+          {showMobilePreview && activeTab === "test" ? (
             <section
               ref={mobileTestResultRef}
               tabIndex={-1}

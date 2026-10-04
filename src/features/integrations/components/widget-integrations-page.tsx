@@ -40,7 +40,7 @@ export function WidgetIntegrationsPage({ canManage }: { canManage: boolean }) {
   async function handleSelect(slug: string) {
     const connected = connectedSlugs.has(slug) || (!canManage && existingSlugs.has(slug));
     if (connected) {
-      window.location.assign(`/integrations/${slug}`);
+      window.location.assign(`/settings/connections/${encodeURIComponent(slug)}`);
       return;
     }
     if (!canManage) return;

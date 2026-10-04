@@ -42,7 +42,7 @@ export function AuthForm({ mode }: AuthFormProps) {
 
     const result = await authClient.signIn.social({
       provider: "google",
-      callbackURL: "/dashboard",
+      callbackURL: "/insights",
     });
 
     if (result?.error) {

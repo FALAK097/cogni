@@ -1,24 +1,12 @@
-import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
-import { DashboardPage } from "@/components/dashboard/dashboard-page";
-import { ContentLayout } from "@/components/app-nav/content-layout";
-import { requireDashboardContext } from "@/lib/auth/dashboard-context";
-import { SITE_NAME } from "@/lib/constants";
+import { APP_ROUTES, queryStringFromSearchParams } from "@/features/navigation/app-routes";
 
-export const metadata: Metadata = {
-  title: `Insights | ${SITE_NAME}`,
-};
-
-export default async function DashboardHomePage() {
-  const { membership, workspace } = await requireDashboardContext();
-
-  return (
-    <ContentLayout className="bg-transparent py-6">
-      <DashboardPage
-        key={workspace.id}
-        canManage={membership.role === "OWNER"}
-        workspaceTimezone={workspace.timezone}
-      />
-    </ContentLayout>
-  );
+export default async function LegacyDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const query = queryStringFromSearchParams(await searchParams);
+  redirect(`${APP_ROUTES.insights}${query ? `?${query}` : ""}`);
 }
