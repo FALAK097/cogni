@@ -7,7 +7,7 @@ import { SITE_NAME } from "@/lib/constants";
 
 export const metadata = {
   title: SITE_NAME,
-  description: "Customer support dashboard",
+  description: "Manage customer conversations and your AI support agent.",
 };
 
 export const dynamic = "force-dynamic";

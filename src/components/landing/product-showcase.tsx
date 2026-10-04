@@ -112,7 +112,7 @@ const showcases = [
     ),
   },
   {
-    title: "Analytics",
+    title: "Insights",
     description: "Understand your support performance and identify knowledge gaps instantly.",
     bullets: [
       "Resolution rate tracking",

@@ -383,7 +383,7 @@ const FEATURES = [
     Visual: KnowledgeVisual,
   },
   {
-    tag: "Analytics",
+    tag: "Insights",
     title: (
       <>
         Insights that
@@ -391,8 +391,7 @@ const FEATURES = [
         actually matter.
       </>
     ),
-    description:
-      "Review conversation volume, response times, and customer feedback in your dashboard.",
+    description: "Review conversation volume, response times, and customer feedback in Insights.",
     bg: "#EEFFE8",
     color: "#064E2A",
     Visual: AnalyticsVisual,

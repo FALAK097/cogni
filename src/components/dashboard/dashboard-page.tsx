@@ -69,16 +69,13 @@ import {
   resolveInsightsDateQuery,
   serializeInsightsDateRange,
 } from "@/features/analytics/insights-url-state";
-import { APP_PAGES, APP_ROUTES, agentHref } from "@/features/navigation/app-routes";
-import { useAddManualTextSource, useKnowledgeBaseSources } from "@/hooks/query/use-knowledge-base";
-import { useWidgetConfig } from "@/hooks/query/use-widget";
-import { useActiveWorkspaceId } from "@/hooks/use-auth";
+import { APP_PAGES, APP_ROUTES } from "@/features/navigation/app-routes";
+import { useAddManualTextSource } from "@/hooks/query/use-knowledge-base";
 import {
   buildVerifiedAnswerSource,
   buildVerifiedAnswerTitle,
 } from "@/features/knowledge/feedback-answer";
 import { normalizeTimezone } from "@/features/conversations/snooze-schedule";
-import { getAgentPublicationReadiness } from "@/features/widget/agent-readiness";
 import { cn } from "@/lib/utils";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useToast } from "@/components/ui/use-toast";
@@ -166,152 +163,6 @@ const DATE_RANGE_PRESETS: { id: DateRangePreset; label: string }[] = [
   { id: "this-month", label: "This month" },
   { id: "previous-month", label: "Previous month" },
 ];
-
-function AgentSetupChecklist({ canManage }: { canManage: boolean }) {
-  const workspaceId = useActiveWorkspaceId() ?? "";
-  const configQuery = useWidgetConfig(workspaceId);
-  const sourcesQuery = useKnowledgeBaseSources();
-
-  if (!workspaceId || configQuery.isPending || sourcesQuery.isPending) return null;
-
-  if (configQuery.isError || sourcesQuery.isError) {
-    return (
-      <div
-        role="alert"
-        className="flex flex-col gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4 sm:flex-row sm:items-center sm:justify-between"
-      >
-        <p className="text-sm text-muted-foreground">Unable to check agent setup progress.</p>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            void configQuery.refetch();
-            void sourcesQuery.refetch();
-          }}
-          disabled={configQuery.isFetching || sourcesQuery.isFetching}
-        >
-          Try again
-        </Button>
-      </div>
-    );
-  }
-
-  const config = configQuery.data;
-  const sources = sourcesQuery.data?.sources ?? [];
-  if (!config) return null;
-
-  const sourceReady = sources.some((source) => source.status === "ready" && source.chunkCount > 0);
-  const instructionsReady = Boolean(config.instructions.trim());
-  const domainReady = config.allowedDomains.length > 0;
-  const publicationReadiness = getAgentPublicationReadiness({
-    isEnabled: config.isEnabled,
-    hasPublishedVersion: config.publication.current !== null,
-    hasUnpublishedChanges: config.publication.hasUnpublishedChanges,
-  });
-  const steps = [
-    {
-      title: "Add a knowledge source",
-      description: sourceReady
-        ? "A source is indexed and ready to answer from."
-        : sources.some((source) => source.status === "processing")
-          ? "Your source is processing. Check back when indexing finishes."
-          : "Give your agent trusted information to answer from.",
-      complete: sourceReady,
-      href: agentHref("build", "knowledge"),
-      action: sourceReady ? "Review sources" : "Add a source",
-    },
-    {
-      title: "Set agent instructions",
-      description: instructionsReady
-        ? "Your agent has guidance for how to respond."
-        : "Set tone, boundaries, and when to hand off to a teammate.",
-      complete: instructionsReady,
-      href: agentHref("build"),
-      action: instructionsReady ? "Review instructions" : "Configure agent",
-    },
-    {
-      title: "Authorize your website",
-      description: domainReady
-        ? "Your website is allowed to load the widget."
-        : "Allow your production domain before installing the widget.",
-      complete: domainReady,
-      href: agentHref("deploy"),
-      action: domainReady ? "Review installation" : "Set up installation",
-    },
-    {
-      title: publicationReadiness.title,
-      description: publicationReadiness.description,
-      complete: publicationReadiness.complete,
-      href: agentHref("deploy"),
-      action: publicationReadiness.action,
-    },
-  ];
-  const completedCount = steps.filter((step) => step.complete).length;
-  if (completedCount === steps.length) return null;
-
-  return (
-    <DashboardCard className="bg-card p-5 sm:p-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-base font-semibold tracking-tight">Get your agent ready</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Complete these essentials to start handling customer questions.
-          </p>
-        </div>
-        <span className="w-fit rounded-full bg-muted px-2.5 py-1 text-xs font-medium tabular-nums text-muted-foreground">
-          {completedCount} of {steps.length} complete
-        </span>
-      </div>
-      <progress
-        aria-label="Agent setup progress"
-        max={steps.length}
-        value={completedCount}
-        className="mt-4 block h-1.5 w-full overflow-hidden rounded-full [appearance:none] [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-primary [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-bar]:bg-muted [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-primary"
-      />
-      <ol className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {steps.map((step, index) => (
-          <li
-            key={step.title}
-            className="flex min-w-0 items-start gap-3 rounded-lg border border-border/60 bg-background/50 p-3"
-          >
-            <span
-              className={cn(
-                "flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold tabular-nums",
-                step.complete ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground",
-              )}
-            >
-              {step.complete ? (
-                <HugeiconsIcon icon={Tick02Icon} strokeWidth={2.2} className="size-4" />
-              ) : (
-                index + 1
-              )}
-            </span>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-foreground">{step.title}</p>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                {step.description}
-              </p>
-              {step.complete || canManage ? (
-                <Link
-                  href={step.href}
-                  className="mt-2 inline-flex min-h-8 items-center gap-1 rounded-sm text-xs font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-                >
-                  {step.action}
-                  <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-3.5" />
-                </Link>
-              ) : (
-                <p className="mt-2 min-h-8 content-center text-xs text-muted-foreground">
-                  A workspace owner needs to complete this step.
-                </p>
-              )}
-            </div>
-          </li>
-        ))}
-      </ol>
-    </DashboardCard>
-  );
-}
 
 const DEFAULT_EXPORT_SELECTION = Object.fromEntries(
   EXPORT_SECTIONS.map((section) => [section.id, true]),
@@ -444,7 +295,7 @@ function buildExportSections(
           pct(analytics.kpis.uniqueUsers.changePercent),
         ],
         [
-          "Currently Closed Conversations",
+          "Closed now",
           String(analytics.kpis.closedConversations.value),
           String(analytics.kpis.closedConversations.previousValue),
           pct(analytics.kpis.closedConversations.changePercent),
@@ -598,7 +449,7 @@ function runDashboardExport(
   if (ids.length === 0) return false;
 
   const sections = buildExportSections(analytics, new Set(ids));
-  const baseName = `dashboard-${format(dateRange.start, "yyyy-MM-dd")}-${format(dateRange.end, "yyyy-MM-dd")}`;
+  const baseName = `insights-${format(dateRange.start, "yyyy-MM-dd")}-${format(dateRange.end, "yyyy-MM-dd")}`;
 
   if (formatType === "csv") {
     downloadFile(sectionsToCsv(sections), `${baseName}.csv`, "text/csv;charset=utf-8");
@@ -970,7 +821,7 @@ function ExportMenu({
             size="sm"
             className="h-9 gap-2 rounded-lg border-border/50 bg-transparent px-3 shadow-none"
             disabled={disabled}
-            aria-label="Export dashboard data"
+            aria-label="Export Insights data"
           />
         }
       >
@@ -1357,8 +1208,6 @@ export function DashboardPage({
           </Button>
         </div>
       ) : null}
-
-      <AgentSetupChecklist canManage={canManage} />
 
       {isEmptyPeriod && analytics ? (
         <section className="flex flex-col gap-4 rounded-xl border border-border/60 bg-card/60 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">

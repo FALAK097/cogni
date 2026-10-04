@@ -34,7 +34,7 @@ const METRICS = [
     iconColor: "text-blue-500 bg-blue-50",
   },
   {
-    label: "Closed Conversations",
+    label: "Closed now",
     value: "846",
     change: "↑ 16.7%",
     note: "vs previous 7 days",
@@ -52,7 +52,7 @@ const METRICS = [
     iconColor: "text-violet-500 bg-violet-50",
   },
   {
-    label: "Avg. Response Time",
+    label: "Avg. AI Response Time",
     value: "2.6s",
     change: "↓ 8.3%",
     note: "vs previous 7 days",
@@ -190,7 +190,7 @@ function DashboardMockup() {
           {/* Topbar */}
           <div className="flex shrink-0 flex-col gap-2 border-b border-gray-100 px-3 py-3 sm:flex-row sm:items-start sm:justify-between sm:px-5 sm:py-3.5">
             <div className="min-w-0">
-              <h2 className="text-[14px] font-semibold text-gray-900">Dashboard</h2>
+              <h2 className="text-[14px] font-semibold text-gray-900">Insights</h2>
               <p className="text-[11px] text-gray-400">Illustrative preview · sample data</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -249,7 +249,7 @@ function DashboardMockup() {
                   >
                     <Icon className="size-3" />
                   </div>
-                  <p className="truncate text-[9.5px] text-gray-400">{label}</p>
+                  <p className="min-h-6 text-[9px] leading-3 text-gray-400">{label}</p>
                 </div>
                 <p className="mt-1 text-[17px] font-bold leading-none text-gray-900">{value}</p>
                 <p

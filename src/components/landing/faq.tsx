@@ -6,12 +6,12 @@ const FAQS = [
   {
     question: "How do I add knowledge for the AI?",
     answer:
-      "Add website URLs, a sitemap, pasted text, or supported files in Knowledge Base. Sources show their processing status. Wait until a source is ready, then test its answers in the Playground.",
+      "Add website URLs, a sitemap, pasted text, or supported files in Agent → Build. Sources show their processing status. When a source is ready, check its answers in Agent → Test.",
   },
   {
     question: "Can I customize the chat widget's appearance?",
     answer:
-      "You can customize colors, typography, avatar, welcome message, and conversation starters. The Playground includes a preview so you can check your changes before installing the widget.",
+      "In Agent → Customize, adjust colors, typography, avatar, welcome message, and conversation starters. Use the live preview to check your changes before installing the widget.",
   },
   {
     question: "What happens when a customer needs a human?",
@@ -21,12 +21,12 @@ const FAQS = [
   {
     question: "Can the AI answer in different languages?",
     answer:
-      "Language support depends on the model you select and your source content. Test the languages your customers use in the Playground before deploying your agent.",
+      "Language support depends on the model you select and your source content. Test the languages your customers use in Agent → Test before deploying your agent.",
   },
   {
     question: "How is my data handled?",
     answer:
-      "Workspace membership controls dashboard access, and knowledge retrieval is scoped to the workspace. AI providers process content needed to generate answers. Contact us to discuss your data requirements before uploading sensitive information.",
+      "Workspace membership controls access to Cogni, and knowledge retrieval is scoped to the workspace. AI providers process content needed to generate answers. Contact us to discuss your data requirements before uploading sensitive information.",
   },
   {
     question: "Which integrations can I connect?",
