@@ -66,6 +66,13 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Popover,
   PopoverContent,
   PopoverDescription,
@@ -81,6 +88,7 @@ import {
   useInboxMacros,
   useCreateInboxMacro,
   useUpdateInboxMacro,
+  useAssignConversation,
   useSetConversationAiPaused,
   useSetConversationSnooze,
   useSetConversationStatus,
@@ -88,6 +96,7 @@ import {
   useTakeOverConversation,
   useUpdateContactTag,
   useUpdateConversationLabel,
+  useWorkspaceMembers,
 } from "@/hooks/query";
 import { useCurrentTimestamp } from "@/hooks/use-current-timestamp";
 import type { ConversationDetail as ConversationDetailData, WidgetMessage } from "@/hooks/query";
@@ -635,7 +644,8 @@ export function ConversationDetail({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete conversation?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the conversation history.
+              This action cannot be undone. It permanently deletes this conversation and its
+              attachments. Other conversations and the visitor profile are kept.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1588,6 +1598,8 @@ function SessionDetailsContent({
   onSelectConversation: (conversationId: string) => void;
 }) {
   const { toast } = useToast();
+  const membersQuery = useWorkspaceMembers();
+  const assignConversation = useAssignConversation();
   const updateContactTag = useUpdateContactTag();
   const updateConversationLabel = useUpdateConversationLabel();
   const [newTag, setNewTag] = useState("");
@@ -1598,6 +1610,34 @@ function SessionDetailsContent({
   const [labelPopoverOpen, setLabelPopoverOpen] = useState(false);
   const [labelError, setLabelError] = useState<string | null>(null);
   const [clockTime, setClockTime] = useState(() => new Date());
+  const assignedMemberName = membersQuery.data?.members.find(
+    (member) => member.id === session.assigneeId,
+  )?.name;
+
+  const handleAssigneeChange = (value: string | null) => {
+    if (!value || assignConversation.isPending) return;
+    const assignedMemberId = value === "unassigned" ? null : value;
+    if (assignedMemberId === session.assigneeId) return;
+
+    assignConversation.mutate(
+      { conversationId: session.conversationId ?? session.id, assignedMemberId },
+      {
+        onSuccess: () =>
+          toast({
+            title: assignedMemberId
+              ? `Assigned to ${membersQuery.data?.members.find((member) => member.id === assignedMemberId)?.name ?? "teammate"}`
+              : "Conversation unassigned",
+            description: "AI reply settings were left unchanged.",
+          }),
+        onError: (error) =>
+          toast({
+            title: "Could not update assignee",
+            description: error instanceof Error ? error.message : "Please try again.",
+            variant: "destructive",
+          }),
+      },
+    );
+  };
   useEffect(() => {
     const timer = window.setInterval(() => setClockTime(new Date()), 60_000);
     return () => window.clearInterval(timer);
@@ -1998,10 +2038,40 @@ function SessionDetailsContent({
           </DetailRow>
           <DetailRow label="Ticket">{session.conversationSubject ?? "Customer request"}</DetailRow>
           <DetailRow label="Assignee">
-            <span className="inline-flex items-center gap-1">
-              {session.assigneeName ?? "Unassigned"}
-              <Pencil className="h-3 w-3 text-muted-foreground" />
-            </span>
+            <Select value={session.assigneeId ?? "unassigned"} onValueChange={handleAssigneeChange}>
+              <SelectTrigger
+                aria-label="Assign conversation"
+                className="h-8 w-40 rounded-lg border-border/60 bg-background px-2.5 text-xs shadow-none"
+                disabled={
+                  membersQuery.isLoading || membersQuery.isError || assignConversation.isPending
+                }
+              >
+                <SelectValue>
+                  {session.assigneeId
+                    ? (assignedMemberName ?? session.assigneeName ?? "Former teammate")
+                    : "Unassigned"}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent align="end" className="rounded-xl">
+                <SelectItem value="unassigned" className="min-h-9 rounded-lg">
+                  Unassigned
+                </SelectItem>
+                {membersQuery.data?.members.map((member) => (
+                  <SelectItem key={member.id} value={member.id} className="min-h-9 rounded-lg">
+                    {member.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {membersQuery.isError ? (
+              <button
+                type="button"
+                className="mt-1 text-left text-[11px] text-destructive underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                onClick={() => void membersQuery.refetch()}
+              >
+                Could not load teammates. Retry
+              </button>
+            ) : null}
           </DetailRow>
           <DetailRow label="Channel">
             {session.conversationChannel === "WIDGET" ? "Widget" : session.conversationChannel}

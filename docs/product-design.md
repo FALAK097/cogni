@@ -102,6 +102,11 @@ Conversation list:
 Transcript:
 
 - Header: customer identity, channel, assignment, status, AI paused state and close/snooze action.
+- Details exposes one workspace-scoped assignee picker for assign, reassign, and unassign. These
+  changes update ownership and wake a snoozed conversation without changing AI reply settings;
+  **Take over** remains the explicit action that assigns the current teammate and pauses AI.
+- Deleting a conversation removes only that conversation and its attachments. Confirm this scope
+  and preserve other threads and visitor identity that share the same widget session.
 - Initial load lands on the latest reply. While an agent reads older messages, background updates
   preserve their position and offer a clear jump to new messages; repeated polling does not clear
   that cue before the agent catches up.

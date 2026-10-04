@@ -16,10 +16,7 @@ import { parseContactTags } from "@/features/contacts/server/contact-tags";
 import { parseConversationLabels } from "@/features/conversations/server/labels";
 import { uploadPublicPath } from "@/lib/storage/index";
 import { isChatSdkChannel, postChannelReply } from "@/features/integrations/server/chat-sdk";
-import {
-  conversation as conversationTable,
-  visitorSession as visitorSessionTable,
-} from "@/lib/db/schema";
+import { conversation as conversationTable } from "@/lib/db/schema";
 
 type RouteContext = { params: Promise<{ conversation_id: string }> };
 
@@ -240,6 +237,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     paused?: boolean;
     readThroughMessageId?: string;
     snoozedUntil?: string;
+    assignedMemberId?: string | null;
   };
   try {
     body = (await request.json()) as {
@@ -248,6 +246,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       paused?: boolean;
       readThroughMessageId?: string;
       snoozedUntil?: string;
+      assignedMemberId?: string | null;
     };
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
@@ -260,6 +259,58 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   if (!conversation) {
     return NextResponse.json({ error: "Conversation not found." }, { status: 404 });
+  }
+
+  if (body.action === "assign_to_member") {
+    const assignment = z
+      .object({
+        action: z.literal("assign_to_member"),
+        assignedMemberId: z.union([z.string().trim().min(1).max(128), z.null()]),
+      })
+      .strict()
+      .safeParse(body);
+    if (!assignment.success) {
+      return NextResponse.json({ error: "Choose a valid workspace teammate." }, { status: 400 });
+    }
+
+    const assignedMemberId = assignment.data.assignedMemberId;
+    if (assignedMemberId) {
+      const assignedMember = await db.query.workspaceMember.findFirst({
+        where: (fields, { eq, and }) =>
+          and(eq(fields.id, assignedMemberId), eq(fields.workspaceId, workspace.id)),
+        columns: { id: true },
+      });
+      if (!assignedMember) {
+        return NextResponse.json(
+          { error: "That teammate is not in this workspace." },
+          { status: 404 },
+        );
+      }
+    }
+
+    const status =
+      conversation.status === "CLOSED" ? "CLOSED" : assignedMemberId ? "ASSIGNED" : "OPEN";
+    const updated = await db
+      .update(conversationTable)
+      .set({
+        assignedMemberId,
+        status,
+        snoozedUntil: null,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(
+        and(
+          eq(conversationTable.id, conversation.id),
+          eq(conversationTable.workspaceId, workspace.id),
+        ),
+      )
+      .returning({ id: conversationTable.id });
+    if (updated.length === 0) {
+      return NextResponse.json({ error: "Conversation not found." }, { status: 404 });
+    }
+
+    await broadcastConversationChanged(conversation.id, status, assignedMemberId);
+    return NextResponse.json({ ok: true });
   }
 
   if (body.action === "assign" || body.action === "takeover") {
@@ -454,30 +505,17 @@ export async function DELETE(_request: Request, context: RouteContext) {
   }
   const { conversation_id: conversationId } = await context.params;
 
-  const conversation = await db.query.conversation.findFirst({
-    where: (fields, { eq, and }) =>
-      and(eq(fields.id, conversationId), eq(fields.workspaceId, workspace.id)),
-    with: { visitorSession: true },
-  });
-
-  if (!conversation) {
+  const deleted = await db
+    .delete(conversationTable)
+    .where(
+      and(
+        eq(conversationTable.id, conversationId),
+        eq(conversationTable.workspaceId, workspace.id),
+      ),
+    )
+    .returning({ id: conversationTable.id });
+  if (deleted.length === 0) {
     return NextResponse.json({ error: "Conversation not found." }, { status: 404 });
-  }
-
-  if (conversation.visitorSessionId) {
-    await db
-      .delete(conversationTable)
-      .where(
-        and(
-          eq(conversationTable.visitorSessionId, conversation.visitorSessionId),
-          eq(conversationTable.workspaceId, workspace.id),
-        ),
-      );
-    await db
-      .delete(visitorSessionTable)
-      .where(eq(visitorSessionTable.id, conversation.visitorSessionId));
-  } else {
-    await db.delete(conversationTable).where(eq(conversationTable.id, conversation.id));
   }
 
   return NextResponse.json({ ok: true });

@@ -213,6 +213,15 @@ redirect; and caps streamed bodies. Seven focused tests cover address ranges, mi
 redirect rebinding, redirect policy, and byte limits. The CI workflow now runs them. This proves
 local policy behavior; external-host runtime acceptance and deployment remain unverified.
 
+On 2026-10-04, the Inbox Details panel gained workspace-scoped assign, reassign and unassign
+controls. Assignment validates the selected membership against the active workspace, updates the
+conversation's ownership state, and leaves AI reply state unchanged; **Take over** remains the
+explicit AI-pausing action. Conversation deletion now removes only the selected conversation and
+its attachments, retaining the shared visitor session and sibling threads. Route-level tests cover
+member denial, tenant-scoped assignee validation, malformed IDs and the selected-thread deletion
+predicate; these tests run with the existing privileged-route CI command. Rendered authenticated
+assignment behavior remains unverified in this preview.
+
 ## Verdict
 
 **Block production parity claim.** The first corrections improve trust and usability.

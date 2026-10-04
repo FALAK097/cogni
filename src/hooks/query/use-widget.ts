@@ -871,6 +871,30 @@ export function useTakeOverConversation() {
   return useConversationStateAction("takeover");
 }
 
+export function useAssignConversation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      conversationId,
+      assignedMemberId,
+    }: {
+      conversationId: string;
+      assignedMemberId: string | null;
+    }) => {
+      const { data, error } = await api.PATCH<{ ok: boolean }>(
+        "/api/conversations/{conversation_id}",
+        {
+          params: { path: { conversation_id: conversationId } },
+          body: { action: "assign_to_member", assignedMemberId },
+        },
+      );
+      return requireData(data, error, "Failed to update conversation assignee");
+    },
+    onSuccess: () => invalidateConversationQueries(queryClient),
+  });
+}
+
 export function useSetConversationAiPaused() {
   const queryClient = useQueryClient();
 
