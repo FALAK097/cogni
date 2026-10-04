@@ -12,7 +12,7 @@ export const APP_PAGES = {
   insights: {
     href: "/insights",
     label: "Insights",
-    description: "Understand your support quality, volume and cost.",
+    description: "Understand conversation volume, response times and customer feedback.",
   },
   settings: {
     href: "/settings",

@@ -22,7 +22,8 @@ import {
 import { toZonedTime } from "date-fns-tz";
 import Link from "next/link";
 import type { FormEvent, ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { parseAsString, parseAsStringLiteral, useQueryStates } from "nuqs";
 
 import type { DashboardAnalytics, MetricComparison, TopQuestion } from "@/features/analytics/types";
 import {
@@ -64,6 +65,10 @@ import {
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useDashboardAnalytics, useReviewKnowledgeGap } from "@/hooks/query";
+import {
+  resolveInsightsDateQuery,
+  serializeInsightsDateRange,
+} from "@/features/analytics/insights-url-state";
 import { APP_PAGES, APP_ROUTES, agentHref } from "@/features/navigation/app-routes";
 import { useAddManualTextSource, useKnowledgeBaseSources } from "@/hooks/query/use-knowledge-base";
 import { useWidgetConfig } from "@/hooks/query/use-widget";
@@ -147,6 +152,13 @@ type DateRangeValue = { start: Date; end: Date };
 type Granularity = "daily" | "weekly";
 type ExportSection = { title: string; headers: string[]; rows: string[][] };
 type DateRangePreset = "last-7-days" | "last-30-days" | "this-month" | "previous-month";
+
+const INSIGHTS_QUERY_PARSERS = {
+  from: parseAsString,
+  to: parseAsString,
+  volume: parseAsStringLiteral(["daily", "weekly"] as const).withDefault("daily"),
+  satisfaction: parseAsStringLiteral(["daily", "weekly"] as const).withDefault("daily"),
+};
 
 const DATE_RANGE_PRESETS: { id: DateRangePreset; label: string }[] = [
   { id: "last-7-days", label: "Last 7 days" },
@@ -304,11 +316,6 @@ function AgentSetupChecklist({ canManage }: { canManage: boolean }) {
 const DEFAULT_EXPORT_SELECTION = Object.fromEntries(
   EXPORT_SECTIONS.map((section) => [section.id, true]),
 ) as Record<ExportSectionId, boolean>;
-
-function getDefaultDateRange(timezone: string): DateRangeValue {
-  const end = endOfDay(toZonedTime(new Date(), normalizeTimezone(timezone)));
-  return { start: startOfDay(subDays(end, 6)), end };
-}
 
 function getPresetDateRange(preset: DateRangePreset, timezone: string): DateRangeValue {
   const today = toZonedTime(new Date(), normalizeTimezone(timezone));
@@ -1122,14 +1129,30 @@ export function DashboardPage({
   canManage?: boolean;
   workspaceTimezone: string;
 }) {
-  const [dateRange, setDateRange] = useState<DateRangeValue>(() =>
-    getDefaultDateRange(workspaceTimezone),
+  const [insightsQuery, setInsightsQuery] = useQueryStates(INSIGHTS_QUERY_PARSERS, {
+    clearOnDefault: true,
+    history: "push",
+    scroll: false,
+    shallow: true,
+  });
+  const resolvedDateRange = useMemo(
+    () => resolveInsightsDateQuery(insightsQuery.from, insightsQuery.to, workspaceTimezone),
+    [insightsQuery.from, insightsQuery.to, workspaceTimezone],
   );
+  const dateRange = resolvedDateRange.value;
+  const convGranularity = insightsQuery.volume;
+  const satGranularity = insightsQuery.satisfaction;
+
+  useEffect(() => {
+    if (resolvedDateRange.invalidQuery) void setInsightsQuery({ from: null, to: null });
+  }, [resolvedDateRange.invalidQuery, setInsightsQuery]);
+
+  const updateDateRange = (range: DateRangeValue) => {
+    void setInsightsQuery(serializeInsightsDateRange(range, workspaceTimezone));
+  };
   const [feedbackToImprove, setFeedbackToImprove] = useState<ReviewKnowledgeItem | null>(null);
   const [reviewFilter, setReviewFilter] = useState<"negative" | "unanswered">("negative");
   const [gapFilter, setGapFilter] = useState<"OPEN" | "RESOLVED" | "IGNORED">("OPEN");
-  const [convGranularity, setConvGranularity] = useState<Granularity>("daily");
-  const [satGranularity, setSatGranularity] = useState<Granularity>("daily");
 
   const queryParams = useMemo(
     () => ({
@@ -1269,12 +1292,14 @@ export function DashboardPage({
           <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
             {APP_PAGES.insights.label}
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Understand conversation volume, response times and customer feedback.
-          </p>
+          <p className="mt-1 text-sm text-muted-foreground">{APP_PAGES.insights.description}</p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
-          <DateRangePicker value={dateRange} onChange={setDateRange} timezone={workspaceTimezone} />
+          <DateRangePicker
+            value={dateRange}
+            onChange={updateDateRange}
+            timezone={workspaceTimezone}
+          />
           {analytics ? (
             <ExportMenu
               analytics={analytics}
@@ -1359,7 +1384,7 @@ export function DashboardPage({
               size="sm"
               className="h-9 shrink-0"
               onClick={() =>
-                setDateRange({
+                updateDateRange({
                   start: startOfDay(parseISO(analytics.previousDateRange.start)),
                   end: endOfDay(parseISO(analytics.previousDateRange.end)),
                 })
@@ -1404,7 +1429,7 @@ export function DashboardPage({
               }
             />
             <MetricCard
-              label="Currently closed"
+              label="Closed now"
               value={analytics.kpis.closedConversations.value.toLocaleString()}
               metric={analytics.kpis.closedConversations}
               previousRange={analytics.previousDateRange}
@@ -1416,7 +1441,7 @@ export function DashboardPage({
                       <button
                         type="button"
                         className="text-muted-foreground transition-colors hover:text-foreground"
-                        aria-label="Currently closed conversation count information"
+                        aria-label="Closed now conversation count information"
                       />
                     }
                   >
@@ -1518,7 +1543,10 @@ export function DashboardPage({
         <DashboardCard className="flex min-h-[320px] flex-1 flex-col p-6 md:col-span-2 xl:col-span-2">
           <div className="mb-5 flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold tracking-tight">Conversations Over Time</h3>
-            <GranularitySelect value={convGranularity} onChange={setConvGranularity} />
+            <GranularitySelect
+              value={convGranularity}
+              onChange={(value) => void setInsightsQuery({ volume: value })}
+            />
           </div>
           {isLoading ? (
             <Skeleton className="h-60 w-full rounded-lg border border-border/50 bg-transparent" />
@@ -1904,7 +1932,10 @@ export function DashboardPage({
                 Ratings are grouped by when each conversation began.
               </p>
             </div>
-            <GranularitySelect value={satGranularity} onChange={setSatGranularity} />
+            <GranularitySelect
+              value={satGranularity}
+              onChange={(value) => void setInsightsQuery({ satisfaction: value })}
+            />
           </div>
           {isLoading ? (
             <Skeleton className="h-60 w-full rounded-lg border border-border/50 bg-transparent" />

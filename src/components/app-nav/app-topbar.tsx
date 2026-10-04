@@ -38,7 +38,7 @@ type AppTopbarProps = {
 };
 
 const LABELS: Record<string, string> = {
-  analytics: "Analytics",
+  analytics: APP_PAGES.insights.label,
   "knowledge-base": "Knowledge Base",
   conversations: APP_PAGES.inbox.label,
   inbox: APP_PAGES.inbox.label,

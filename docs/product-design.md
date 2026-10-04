@@ -61,6 +61,10 @@ Use three primary destinations: Inbox, Agent and Insights, with Settings at the 
 Knowledge belongs inside Agent Build; deployment contains widget and channels. Tickets are
 Inbox views and customer history belongs in its Details panel. Business-tool connections belong
 in Settings; reports belong in Insights. Preserve existing deep links during consolidation.
+Keep shareable state on the same canonical pages: Inbox uses view and conversationId, Agent
+uses tab, and Insights uses from, to, volume and satisfaction. Omit defaults, validate URL values
+before use, and restore the same page state on refresh and browser Back/Forward within the active
+workspace; do not create nested routes for filters.
 Keep future capabilities hidden until functional and avoid a separate page for every feature.
 Search/command palette uses immediate keyboard feedback; no staged entry delay.
 Persist layout preferences per user/workspace. Tenant change discards selected foreign records.

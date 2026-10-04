@@ -9,20 +9,8 @@ export const metadata = {
   description: APP_PAGES.inbox.description,
 };
 
-export default async function InboxPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ conversationId?: string }>;
-}) {
-  const [{ membership }, { conversationId }] = await Promise.all([
-    requireDashboardContext(),
-    searchParams,
-  ]);
+export default async function InboxPage() {
+  const { membership } = await requireDashboardContext();
 
-  return (
-    <WidgetConversations
-      initialConversationId={conversationId ?? null}
-      canManage={canManageWorkspace(membership.role)}
-    />
-  );
+  return <WidgetConversations canManage={canManageWorkspace(membership.role)} />;
 }

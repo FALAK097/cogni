@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { parseAsString, useQueryStates } from "nuqs";
 
 import { MessageSquare, Trash2 } from "@/components/icons";
 import {
@@ -44,7 +45,6 @@ import { ConversationsList } from "./conversations-list";
 import { detailsColumnClassName, panelBoxClassName } from "./conversation-layout";
 
 interface WidgetConversationsProps {
-  initialConversationId?: string | null;
   canManage: boolean;
 }
 
@@ -72,15 +72,21 @@ const EMPTY_COUNTS = {
   snoozed: 0,
 };
 
-export function WidgetConversations({
-  initialConversationId = null,
-  canManage,
-}: WidgetConversationsProps) {
-  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(
-    initialConversationId,
+export function WidgetConversations({ canManage }: WidgetConversationsProps) {
+  const [inboxQuery, setInboxQuery] = useQueryStates(
+    {
+      view: parseAsString.withDefault("all"),
+      conversationId: parseAsString.withDefault(""),
+    },
+    { clearOnDefault: true, history: "push", scroll: false, shallow: true },
   );
-  const [filter, setFilter] = useState<ConversationFilter>("all");
-  const [selectedSavedViewId, setSelectedSavedViewId] = useState<string | null>(null);
+  const selectedConversationId = inboxQuery.conversationId || null;
+  const setSelectedConversationId = (
+    conversationId: string | null,
+    history: "push" | "replace" = "push",
+  ) => {
+    void setInboxQuery({ conversationId: conversationId ?? "" }, { history });
+  };
   const [viewSelectionRevision, setViewSelectionRevision] = useState(0);
   const [deleteViewOpen, setDeleteViewOpen] = useState(false);
   const [deleteViewError, setDeleteViewError] = useState<string | null>(null);
@@ -95,31 +101,42 @@ export function WidgetConversations({
     refetch: refetchSavedViews,
   } = useInboxSavedViews();
   const deleteSavedView = useDeleteInboxSavedView();
-  const savedViews = savedViewsData?.views ?? [];
-  const selectedSavedView = savedViews.find((view) => view.id === selectedSavedViewId) ?? null;
-  const [prevInitialConversationId, setPrevInitialConversationId] = useState(initialConversationId);
-  const [prevFilter, setPrevFilter] = useState(filter);
+  const savedViews = useMemo(() => savedViewsData?.views ?? [], [savedViewsData]);
+  const selectedSavedView = savedViews.find((view) => view.id === inboxQuery.view) ?? null;
+  const filter =
+    selectedSavedView?.filter ??
+    (FILTER_TABS.some((tab) => tab.value === inboxQuery.view)
+      ? (inboxQuery.view as ConversationFilter)
+      : "all");
+  const previousView = useRef(inboxQuery.view);
+  const preserveFacetStateForView = useRef<string | null>(null);
 
   useEffect(() => {
-    if (previousWorkspaceId.current === workspaceId) return;
-    previousWorkspaceId.current = workspaceId;
-    setSelectedConversationId(null);
-    setSelectedSavedViewId(null);
-    setFilter("all");
-    setViewSelectionRevision((revision) => revision + 1);
-  }, [workspaceId]);
-
-  if (initialConversationId !== prevInitialConversationId) {
-    setPrevInitialConversationId(initialConversationId);
-    if (initialConversationId) {
-      setSelectedConversationId(initialConversationId);
+    if (!workspaceId || previousWorkspaceId.current === workspaceId) return;
+    if (!previousWorkspaceId.current) {
+      previousWorkspaceId.current = workspaceId;
+      return;
     }
-  }
+    previousWorkspaceId.current = workspaceId;
+    void setInboxQuery({ conversationId: "", view: "all" });
+    setViewSelectionRevision((revision) => revision + 1);
+  }, [setInboxQuery, workspaceId]);
 
-  if (filter !== prevFilter) {
-    setPrevFilter(filter);
-    setSelectedConversationId(null);
-  }
+  useEffect(() => {
+    if (previousView.current === inboxQuery.view) return;
+    previousView.current = inboxQuery.view;
+    if (preserveFacetStateForView.current === inboxQuery.view) {
+      preserveFacetStateForView.current = null;
+      return;
+    }
+    setViewSelectionRevision((revision) => revision + 1);
+  }, [inboxQuery.view]);
+
+  useEffect(() => {
+    if (!savedViewsData || FILTER_TABS.some((tab) => tab.value === inboxQuery.view)) return;
+    if (savedViews.some((view) => view.id === inboxQuery.view)) return;
+    void setInboxQuery({ view: "all", conversationId: "" });
+  }, [inboxQuery.view, savedViews, savedViewsData, setInboxQuery]);
 
   const { data: conversationsData, isSuccess: conversationsLoaded } = useConversations({
     limit: 20,
@@ -140,7 +157,7 @@ export function WidgetConversations({
   const composerDraft = composerDrafts[composerDraftKey] ?? EMPTY_CONVERSATION_COMPOSER_DRAFT;
   const backToConversationList = () => {
     const conversationId = selectedConversationId;
-    setSelectedConversationId(null);
+    setSelectedConversationId(null, "replace");
     requestAnimationFrame(() => {
       const options = document.querySelectorAll<HTMLButtonElement>("[data-conversation-option]");
       const selectedOption = Array.from(options).find(
@@ -168,16 +185,10 @@ export function WidgetConversations({
               value={selectedSavedView?.id ?? filter}
               onValueChange={(value) => {
                 if (!value) return;
-                setSelectedConversationId(null);
-                const savedView = savedViews.find((view) => view.id === value);
-                if (savedView) {
-                  setSelectedSavedViewId(savedView.id);
-                  setFilter(savedView.filter);
-                } else {
-                  setSelectedSavedViewId(null);
-                  setFilter(value as ConversationFilter);
+                if (value === inboxQuery.view) {
+                  setViewSelectionRevision((revision) => revision + 1);
                 }
-                setViewSelectionRevision((revision) => revision + 1);
+                void setInboxQuery({ conversationId: "", view: value });
               }}
             >
               <SelectTrigger
@@ -309,8 +320,7 @@ export function WidgetConversations({
               selectedConversationId={selectedConversationId}
               onSelectConversation={setSelectedConversationId}
               onClearFilter={() => {
-                setSelectedSavedViewId(null);
-                setFilter("all");
+                void setInboxQuery({ view: "all" });
               }}
               initialChannel={selectedSavedView?.channel ?? null}
               initialAssignee={
@@ -319,7 +329,12 @@ export function WidgetConversations({
                   : (selectedSavedView?.assigneeFilter ?? null)
               }
               initialLabel={selectedSavedView?.labelFilter ?? null}
-              onFacetChange={() => setSelectedSavedViewId(null)}
+              onFacetChange={() => {
+                if (selectedSavedView) {
+                  preserveFacetStateForView.current = filter;
+                  void setInboxQuery({ view: filter });
+                }
+              }}
             />
           </div>
 
@@ -393,9 +408,7 @@ export function WidgetConversations({
                 deleteSavedView.mutate(selectedSavedView.id, {
                   onSuccess: () => {
                     setDeleteViewOpen(false);
-                    setSelectedSavedViewId(null);
-                    setFilter("all");
-                    setViewSelectionRevision((revision) => revision + 1);
+                    void setInboxQuery({ view: "all" });
                   },
                   onError: (error) => setDeleteViewError(error.message),
                 });
