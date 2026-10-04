@@ -26,7 +26,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useConversations, useDeleteInboxSavedView, useInboxSavedViews } from "@/hooks/query";
+import {
+  useConversations,
+  useDeleteInboxSavedView,
+  useInboxConversationEvents,
+  useInboxSavedViews,
+} from "@/hooks/query";
 import type { ConversationFilter } from "@/hooks/query";
 import { useActiveWorkspaceId } from "@/hooks/use-auth";
 import type {
@@ -73,6 +78,7 @@ const EMPTY_COUNTS = {
 };
 
 export function WidgetConversations({ canManage }: WidgetConversationsProps) {
+  useInboxConversationEvents();
   const [inboxQuery, setInboxQuery] = useQueryStates(
     {
       view: parseAsString.withDefault("all"),

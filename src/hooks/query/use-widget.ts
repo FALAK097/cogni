@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api, requireData } from "@/lib/api/client";
@@ -13,6 +14,7 @@ import type {
 } from "@/features/widget/domain";
 import { toast } from "@/components/ui/use-toast";
 import type { AgentTestCaseInput } from "@/features/agent-tests/input";
+import { parseInboxConversationEventsResponse } from "@/features/conversations/inbox-events";
 
 export type DashboardWidgetConfig = Omit<WidgetWidgetConfig, "borderRadius"> & {
   agentName: string;
@@ -536,6 +538,78 @@ export function useConversations(
     refetchInterval: 8_000,
     refetchOnWindowFocus: true,
   });
+}
+
+export function useInboxConversationEvents() {
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!workspaceId) return;
+
+    const controller = new AbortController();
+    let cursor: string | null = null;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    let retryDelay = 3_500;
+    let inFlight = false;
+
+    const invalidateInbox = () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.list(workspaceId) });
+      void queryClient.invalidateQueries({
+        queryKey: [...queryKeys.conversations.all, "detail", workspaceId],
+      });
+    };
+
+    const poll = async () => {
+      if (document.visibilityState === "hidden") {
+        timeoutId = setTimeout(poll, 10_000);
+        return;
+      }
+      if (inFlight) return;
+      inFlight = true;
+
+      try {
+        const url = new URL("/api/dashboard/conversations/events", window.location.origin);
+        if (cursor !== null) url.searchParams.set("after", cursor);
+        const response = await fetch(url, {
+          cache: "no-store",
+          credentials: "same-origin",
+          headers: { Accept: "application/json" },
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error("Inbox updates are temporarily unavailable.");
+        const payload: unknown = await response.json();
+        const parsed = parseInboxConversationEventsResponse(payload);
+        if (!parsed) throw new Error("Inbox updates returned an invalid response.");
+
+        if (cursor === null || parsed.reset || parsed.events.length > 0) invalidateInbox();
+        cursor = parsed.cursor;
+        retryDelay = 3_500;
+      } catch {
+        if (!controller.signal.aborted) retryDelay = Math.min(retryDelay * 2, 30_000);
+      } finally {
+        inFlight = false;
+      }
+
+      if (!controller.signal.aborted) timeoutId = setTimeout(poll, retryDelay);
+    };
+
+    const resume = () => {
+      if (document.visibilityState === "visible" && timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = undefined;
+        void poll();
+      }
+    };
+
+    document.addEventListener("visibilitychange", resume);
+    void poll();
+    return () => {
+      document.removeEventListener("visibilitychange", resume);
+      controller.abort();
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [queryClient, workspaceId]);
 }
 
 export function useInboxSavedViews() {

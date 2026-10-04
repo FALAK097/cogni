@@ -14,7 +14,6 @@ import {
 import { deliverAiReplyIfActive } from "@/features/conversations/server/conversation-service";
 import type { Db } from "@/lib/db/client";
 import { env } from "@/lib/env/server";
-import { broadcastConversationEvent } from "@/lib/realtime/broadcast";
 
 export const chatSdkChannelSchema = ["slack", "discord", "gchat", "teams", "whatsapp"] as const;
 export type ChatSdkChannel = (typeof chatSdkChannelSchema)[number];
@@ -104,7 +103,7 @@ export function createChannelBot({
     });
     if (answer === null) return;
 
-    const delivered = await deliverAiReplyIfActive({
+    await deliverAiReplyIfActive({
       db,
       workspaceId: ingested.connection.workspaceId,
       conversationId: ingested.conversation.id,
@@ -113,13 +112,6 @@ export function createChannelBot({
         await thread.post(answer.body);
       },
     });
-    if (delivered) {
-      await broadcastConversationEvent({
-        type: "message",
-        conversationId: ingested.conversation.id,
-        messageId: answer.id,
-      });
-    }
   }
 
   bot.onDirectMessage(async (thread, message) => handleMessage(thread, message, true));

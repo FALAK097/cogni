@@ -6,6 +6,7 @@ import { Resend } from "resend";
 
 import {
   appendConversationMessage,
+  updateConversationState,
   type MessageJson,
 } from "@/features/conversations/server/conversation-service";
 import { changeContactTag } from "@/features/contacts/server/contact-tags";
@@ -20,7 +21,7 @@ import {
   getActionExecutionDecision,
 } from "@/features/integrations/action-recovery";
 import type { Db } from "@/lib/db/client";
-import { contact, conversation, integrationAction } from "@/lib/db/schema";
+import { contact, integrationAction } from "@/lib/db/schema";
 import { env } from "@/lib/env/server";
 
 export class ActionOutcomeUnknownError extends Error {
@@ -75,15 +76,17 @@ async function executeInternalTool({
       columns: { id: true },
     });
     if (!membership) throw new Error("Teammate is not in this workspace.");
-    await db
-      .update(conversation)
-      .set({
+    await updateConversationState({
+      db,
+      workspaceId,
+      conversationId,
+      changes: {
         assignedMemberId: membershipId,
         status: "ASSIGNED",
         snoozedUntil: null,
         updatedAt: new Date().toISOString(),
-      })
-      .where(and(eq(conversation.id, conversationId), eq(conversation.workspaceId, workspaceId)));
+      },
+    });
     return { conversationId, assignedMemberId: membershipId };
   }
 
@@ -136,20 +139,27 @@ async function executeInternalTool({
 
   if (actionType === "conversation.set_status") {
     const status = requiredString(input, "status");
-    await db
-      .update(conversation)
-      .set({ status, snoozedUntil: null, updatedAt: new Date().toISOString() })
-      .where(and(eq(conversation.id, conversationId), eq(conversation.workspaceId, workspaceId)));
+    if (status !== "OPEN" && status !== "ASSIGNED" && status !== "CLOSED") {
+      throw new Error("Unsupported conversation status.");
+    }
+    await updateConversationState({
+      db,
+      workspaceId,
+      conversationId,
+      changes: { status, snoozedUntil: null, updatedAt: new Date().toISOString() },
+    });
     return { conversationId, status };
   }
 
   if (actionType === "conversation.set_ai_paused") {
     const paused = input.paused;
     if (typeof paused !== "boolean") throw new Error("Missing paused state.");
-    await db
-      .update(conversation)
-      .set({ aiPaused: paused, updatedAt: new Date().toISOString() })
-      .where(and(eq(conversation.id, conversationId), eq(conversation.workspaceId, workspaceId)));
+    await updateConversationState({
+      db,
+      workspaceId,
+      conversationId,
+      changes: { aiPaused: paused, updatedAt: new Date().toISOString() },
+    });
     return { conversationId, paused };
   }
 

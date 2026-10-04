@@ -1,5 +1,6 @@
 import {
   boolean,
+  bigint,
   check,
   index,
   integer,
@@ -240,6 +241,31 @@ export const conversation = pgTable(
       table.workspaceId,
       table.lastMessageAt,
       table.id,
+    ),
+  ],
+);
+
+export const conversationEvent = pgTable(
+  "conversation_event",
+  {
+    cursor: bigint({ mode: "bigint" }).generatedAlwaysAsIdentity().primaryKey(),
+    workspaceId: text()
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    conversationId: text().notNull(),
+    type: text({ enum: ["message", "state", "read"] }).notNull(),
+    createdAt: timestampString()
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+  },
+  (table) => [
+    check("conversation_event_type_check", sql`${table.type} IN ('message', 'state', 'read')`),
+    index("conversation_event_workspaceId_cursor_idx").on(table.workspaceId, table.cursor),
+    index("conversation_event_createdAt_idx").on(table.createdAt),
+    index("conversation_event_workspaceId_conversationId_cursor_idx").on(
+      table.workspaceId,
+      table.conversationId,
+      table.cursor,
     ),
   ],
 );

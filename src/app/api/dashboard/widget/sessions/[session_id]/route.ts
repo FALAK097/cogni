@@ -4,8 +4,11 @@ import { and, eq } from "drizzle-orm";
 
 import {
   appendConversationMessage,
+  recordConversationEvent,
+  updateConversationState,
   type MessageJson,
 } from "@/features/conversations/server/conversation-service";
+import { runDbWriteOperation } from "@/lib/db/client";
 import {
   DASHBOARD_SESSION_MESSAGE_MAX_LENGTH,
   DASHBOARD_SESSION_PATCH_MAX_BYTES,
@@ -258,19 +261,16 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   if (body.action === "assign") {
     const nowIso = new Date().toISOString();
-    await db
-      .update(conversationTable)
-      .set({
+    await updateConversationState({
+      db,
+      workspaceId: workspace.id,
+      conversationId: conversation.id,
+      changes: {
         assignedMemberId: membership.id,
         status: "ASSIGNED",
         updatedAt: nowIso,
-      })
-      .where(
-        and(
-          eq(conversationTable.id, conversation.id),
-          eq(conversationTable.workspaceId, workspace.id),
-        ),
-      );
+      },
+    });
     return NextResponse.json({ ok: true });
   }
 
@@ -356,15 +356,29 @@ export async function DELETE(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Session not found." }, { status: 404 });
   }
 
-  await db
-    .delete(conversationTable)
-    .where(
-      and(
-        eq(conversationTable.visitorSessionId, session.id),
-        eq(conversationTable.workspaceId, workspace.id),
-      ),
-    );
-  await db.delete(visitorSessionTable).where(eq(visitorSessionTable.id, session.id));
+  await runDbWriteOperation(db, async (transaction) => {
+    const conversations = await transaction
+      .select({ id: conversationTable.id })
+      .from(conversationTable)
+      .where(
+        and(
+          eq(conversationTable.visitorSessionId, session.id),
+          eq(conversationTable.workspaceId, workspace.id),
+        ),
+      );
+    for (const item of conversations) {
+      await recordConversationEvent(transaction, workspace.id, item.id, "state");
+    }
+    await transaction
+      .delete(conversationTable)
+      .where(
+        and(
+          eq(conversationTable.visitorSessionId, session.id),
+          eq(conversationTable.workspaceId, workspace.id),
+        ),
+      );
+    await transaction.delete(visitorSessionTable).where(eq(visitorSessionTable.id, session.id));
+  });
 
   if (session.contactId) {
     const hasConvos = await db.query.conversation.findFirst({

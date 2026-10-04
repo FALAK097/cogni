@@ -1,15 +1,19 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { eq, and, inArray, ne } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
 import {
   appendTeamConversationMessage,
-  broadcastConversationChanged,
   getConversation,
   markConversationAsRead,
 } from "@/features/conversations/server/queries";
-import { setConversationStatus } from "@/features/conversations/server/conversation-service";
+import {
+  recordConversationEvent,
+  setConversationStatus,
+  updateConversationState,
+} from "@/features/conversations/server/conversation-service";
+import { runDbWriteOperation } from "@/lib/db/client";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { canManageWorkspace } from "@/lib/auth/permissions";
 import { parseContactTags } from "@/features/contacts/server/contact-tags";
@@ -290,46 +294,37 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     const status =
       conversation.status === "CLOSED" ? "CLOSED" : assignedMemberId ? "ASSIGNED" : "OPEN";
-    const updated = await db
-      .update(conversationTable)
-      .set({
+    const updated = await updateConversationState({
+      db,
+      workspaceId: workspace.id,
+      conversationId: conversation.id,
+      changes: {
         assignedMemberId,
         status,
         snoozedUntil: null,
         updatedAt: new Date().toISOString(),
-      })
-      .where(
-        and(
-          eq(conversationTable.id, conversation.id),
-          eq(conversationTable.workspaceId, workspace.id),
-        ),
-      )
-      .returning({ id: conversationTable.id });
-    if (updated.length === 0) {
+      },
+    });
+    if (!updated) {
       return NextResponse.json({ error: "Conversation not found." }, { status: 404 });
     }
 
-    await broadcastConversationChanged(conversation.id, status, assignedMemberId);
     return NextResponse.json({ ok: true });
   }
 
   if (body.action === "assign" || body.action === "takeover") {
     const takeOver = body.action === "takeover";
-    await db
-      .update(conversationTable)
-      .set({
+    await updateConversationState({
+      db,
+      workspaceId: workspace.id,
+      conversationId: conversation.id,
+      changes: {
         assignedMemberId: membership.id,
         status: "ASSIGNED",
         snoozedUntil: null,
         ...(takeOver ? { aiPaused: true } : {}),
-      })
-      .where(
-        and(
-          eq(conversationTable.id, conversation.id),
-          eq(conversationTable.workspaceId, workspace.id),
-        ),
-      );
-    await broadcastConversationChanged(conversation.id, "ASSIGNED", membership.id);
+      },
+    });
     return NextResponse.json({ ok: true });
   }
 
@@ -355,18 +350,14 @@ export async function PATCH(request: Request, context: RouteContext) {
       snoozedUntil = new Date(timestamp).toISOString();
     }
 
-    const updated = await db
-      .update(conversationTable)
-      .set({ snoozedUntil, updatedAt: new Date().toISOString() })
-      .where(
-        and(
-          eq(conversationTable.id, conversation.id),
-          eq(conversationTable.workspaceId, workspace.id),
-          ne(conversationTable.status, "CLOSED"),
-        ),
-      )
-      .returning({ id: conversationTable.id });
-    if (updated.length === 0) {
+    const updated = await updateConversationState({
+      db,
+      workspaceId: workspace.id,
+      conversationId: conversation.id,
+      changes: { snoozedUntil, updatedAt: new Date().toISOString() },
+      onlyOpen: true,
+    });
+    if (!updated) {
       return NextResponse.json({ error: "Conversation is resolved." }, { status: 409 });
     }
     return NextResponse.json({ ok: true, snoozedUntil });
@@ -376,20 +367,12 @@ export async function PATCH(request: Request, context: RouteContext) {
     if (typeof body.paused !== "boolean") {
       return NextResponse.json({ error: "A valid AI reply state is required." }, { status: 400 });
     }
-    await db
-      .update(conversationTable)
-      .set({ aiPaused: body.paused })
-      .where(
-        and(
-          eq(conversationTable.id, conversation.id),
-          eq(conversationTable.workspaceId, workspace.id),
-        ),
-      );
-    await broadcastConversationChanged(
-      conversation.id,
-      conversation.status,
-      conversation.assignedMemberId,
-    );
+    await updateConversationState({
+      db,
+      workspaceId: workspace.id,
+      conversationId: conversation.id,
+      changes: { aiPaused: body.paused },
+    });
     return NextResponse.json({ ok: true });
   }
 
@@ -404,7 +387,6 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Conversation not found." }, { status: 404 });
     }
 
-    await broadcastConversationChanged(updated.id, updated.status, updated.assignedMemberId);
     return NextResponse.json({ ok: true });
   }
 
@@ -505,15 +487,21 @@ export async function DELETE(_request: Request, context: RouteContext) {
   }
   const { conversation_id: conversationId } = await context.params;
 
-  const deleted = await db
-    .delete(conversationTable)
-    .where(
-      and(
-        eq(conversationTable.id, conversationId),
-        eq(conversationTable.workspaceId, workspace.id),
-      ),
-    )
-    .returning({ id: conversationTable.id });
+  const deleted = await runDbWriteOperation(db, async (transaction) => {
+    const rows = await transaction
+      .delete(conversationTable)
+      .where(
+        and(
+          eq(conversationTable.id, conversationId),
+          eq(conversationTable.workspaceId, workspace.id),
+        ),
+      )
+      .returning({ id: conversationTable.id });
+    if (rows.length > 0) {
+      await recordConversationEvent(transaction, workspace.id, conversationId, "state");
+    }
+    return rows;
+  });
   if (deleted.length === 0) {
     return NextResponse.json({ error: "Conversation not found." }, { status: 404 });
   }

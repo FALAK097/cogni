@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { and, eq } from "drizzle-orm";
 
 import {
   recordAiMessage,
   recordVisitorMessage,
   startVisitorConversation,
+  updateConversationState,
   type MessageJson,
 } from "@/features/conversations/server/conversation-service";
 import { handoffReply, matchesEscalationKeywords } from "@/features/conversations/server/handoff";
@@ -40,7 +40,6 @@ import {
 } from "@/lib/ai/telemetry";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { getDb } from "@/lib/db/client";
-import { conversation as conversationTable } from "@/lib/db/schema";
 import { emitDomainEvent } from "@/lib/events/domain-events";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { notifyWorkspaceMembers } from "@/lib/notifications/create-notification";
@@ -378,19 +377,16 @@ export async function POST(
   const shouldEscalate = matchesEscalationKeywords(body.message, settings.escalationKeywords);
 
   if (!isPreview && shouldEscalate && activeConversation?.status !== "ESCALATED") {
-    await db
-      .update(conversationTable)
-      .set({
+    await updateConversationState({
+      db,
+      workspaceId: widget.workspace.id,
+      conversationId,
+      changes: {
         status: "ESCALATED",
         aiPaused: true,
         updatedAt: new Date().toISOString(),
-      })
-      .where(
-        and(
-          eq(conversationTable.id, conversationId),
-          eq(conversationTable.workspaceId, widget.workspace.id),
-        ),
-      );
+      },
+    });
     await notifyWorkspaceMembers({
       db,
       workspaceId: widget.workspace.id,

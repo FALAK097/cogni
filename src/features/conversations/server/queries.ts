@@ -21,7 +21,6 @@ import {
   type MessageJson,
 } from "./conversation-service";
 import { encodeInboxCursor, type InboxChannel, type InboxCursor } from "../inbox-pagination";
-import { broadcastConversationEvent } from "@/lib/realtime/broadcast";
 import { parseConversationLabels } from "@/features/conversations/server/labels";
 
 function getInboxConversationBaseCond(c: typeof conversationTable) {
@@ -193,14 +192,7 @@ export async function markConversationAsRead(
     readAt: now,
   });
 
-  if (updated) {
-    await broadcastConversationEvent({
-      type: "read",
-      conversationId,
-      actor: "TEAM",
-    });
-    return true;
-  }
+  if (updated) return true;
 
   return Boolean(
     await db.query.conversation.findFirst({
@@ -238,25 +230,7 @@ export async function appendTeamConversationMessage(
   });
   if (!appended) return false;
 
-  await broadcastConversationEvent({
-    type: "message",
-    conversationId,
-    messageId: appended.message.id,
-  });
   return appended.inserted;
-}
-
-export async function broadcastConversationChanged(
-  conversationId: string,
-  status: string,
-  assignedMemberId: string | null,
-) {
-  await broadcastConversationEvent({
-    type: "state",
-    conversationId,
-    status,
-    assignedMemberId,
-  });
 }
 
 function getLastPublicMessage(messages: MessageJson[]) {

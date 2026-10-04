@@ -33,6 +33,7 @@ await build({
         setConversationStatus,
         setAiMessageFeedback,
       } from "@/features/conversations/server/conversation-service";
+      export { runDbWriteOperation } from "@/lib/db/client";
       import { drizzle } from "drizzle-orm/postgres-js";
       import * as schema from "@/lib/db/schema";
       import * as relations from "@/lib/db/relations";
@@ -73,6 +74,7 @@ const {
   recordAiMessage,
   setConversationStatus,
   setAiMessageFeedback,
+  runDbWriteOperation,
   createTestDb,
 } = await import(`${pathToFileURL(outputFile).href}?build=${randomUUID()}`);
 const raw = postgres(databaseUrl, { max: 2 });
@@ -134,6 +136,12 @@ test("concurrent transcript appends preserve every message", async () => {
     new Set(storedMessages.map((message) => message.id)),
     new Set(messages.map((message) => message.id)),
   );
+  const [eventCount] = await raw`
+    SELECT count(*)::int AS count
+    FROM "conversation_event"
+    WHERE "workspaceId" = ${workspaceId} AND "conversationId" = ${conversationId}
+  `;
+  assert.equal(Number(eventCount.count), messages.length);
 });
 
 test("duplicate webhook deliveries append only once", async () => {
@@ -162,6 +170,45 @@ test("duplicate webhook deliveries append only once", async () => {
   assert.equal(matching.length, 1);
   assert.equal(deliveries.filter((delivery) => delivery?.inserted).length, 1);
   assert.ok(deliveries.every((delivery) => delivery?.message.id === matching[0].id));
+  const [eventCount] = await raw`
+    SELECT count(*)::int AS count
+    FROM "conversation_event"
+    WHERE "workspaceId" = ${workspaceId} AND "conversationId" = ${conversationId}
+  `;
+  assert.equal(Number(eventCount.count), 41);
+});
+
+test("conversation events roll back with their transcript write", async () => {
+  const eventCount = async () => {
+    const [result] = await raw`
+      SELECT count(*)::int AS count
+      FROM "conversation_event"
+      WHERE "workspaceId" = ${workspaceId} AND "conversationId" = ${conversationId}
+    `;
+    return Number(result.count);
+  };
+  const before = await eventCount();
+
+  await assert.rejects(
+    runDbWriteOperation(appDatabases[0], async (transaction) => {
+      await appendConversationMessage({
+        db: transaction,
+        workspaceId,
+        conversationId,
+        message: {
+          id: randomUUID(),
+          body: "This transaction must roll back.",
+          authorType: "TEAM",
+          visibility: "INTERNAL",
+          createdAt: new Date().toISOString(),
+        },
+      });
+      throw new Error("rollback test");
+    }),
+    /rollback test/,
+  );
+
+  assert.equal(await eventCount(), before);
 });
 
 test("team author names are preserved in transcript messages", async () => {

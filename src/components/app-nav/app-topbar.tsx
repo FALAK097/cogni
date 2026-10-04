@@ -38,22 +38,11 @@ type AppTopbarProps = {
 };
 
 const LABELS: Record<string, string> = {
-  analytics: APP_PAGES.insights.label,
-  "knowledge-base": "Knowledge Base",
-  conversations: APP_PAGES.inbox.label,
   inbox: APP_PAGES.inbox.label,
-  tickets: "Tickets",
-
-  dashboard: APP_PAGES.insights.label,
   insights: APP_PAGES.insights.label,
-  playground: APP_PAGES.agent.label,
   agent: APP_PAGES.agent.label,
-  widget: "Chat widget",
-  integrations: APP_PAGES.settings.label,
   settings: APP_PAGES.settings.label,
   connections: "Connections",
-  usage: "Usage",
-  whatsapp: "WhatsApp",
   workspace: "Workspace",
 };
 
@@ -75,9 +64,7 @@ function formatSegment(segment: string) {
     .join(" ");
 }
 
-function getFallbackLabel(segment: string, index: number, routeSegments: string[]) {
-  const previous = routeSegments[index - 1];
-  if (previous === "agents") return "Agent";
+function getFallbackLabel(segment: string) {
   return formatSegment(segment);
 }
 
@@ -103,7 +90,7 @@ function Breadcrumbs() {
 
     return {
       href: getBreadcrumbHref(routeSegments, index),
-      label: getFallbackLabel(segment, index, routeSegments),
+      label: getFallbackLabel(segment),
       current: isCurrent,
     };
   });

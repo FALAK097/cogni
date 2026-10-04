@@ -96,10 +96,14 @@ atomic JSONB expressions cast back to text, or a consistent compare-and-swap rev
 Client message and external event deduplication must happen inside the same transaction. Protect
 first-conversation creation as well as updates. Preserve order and never discard a teammate note.
 
-Publish durable outbox events after committed changes. Choose one managed realtime transport
-compatible with Vercel after a latency/cost spike. Keep bounded polling as a reconnect fallback;
-do not hold a permanent Node process in a serverless request or label a no-op broadcast realtime.
-A future Durable Object may coordinate live presence, but Postgres remains the durable transcript.
+The first durable inbox-update layer now writes workspace-scoped message, read and state cursors in
+the same transaction as each conversation change. An authenticated catch-up endpoint returns only
+conversation IDs and cursors; the dashboard invalidates affected inbox data and retains slower
+refreshes as a recovery fallback. Old event rows are pruned during writes. This is cursor polling,
+not live push. Choose one managed realtime transport compatible with Vercel after a measured
+latency/load need; do not hold a permanent Node process in a serverless request or label a no-op
+broadcast realtime. A future Durable Object may coordinate live presence, but Postgres remains the
+durable transcript.
 
 External side effects have at-least-once delivery and uncertain outcomes. An idempotent local
 record does not make a provider call exactly once. Pass provider-supported idempotency keys;

@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { runDbWriteOperation, type Db } from "@/lib/db/client";
-import { conversation, visitorSession as visitorSessionTable, contact } from "@/lib/db/schema";
+import {
+  conversation,
+  conversationEvent,
+  visitorSession as visitorSessionTable,
+  contact,
+} from "@/lib/db/schema";
 import type { widget as widgetTable } from "@/lib/db/schema";
 import { and, eq, ne, sql } from "drizzle-orm";
 
@@ -70,6 +75,29 @@ export type MessageCitation = {
   excerpt: string;
 };
 
+export async function recordConversationEvent(
+  db: Db,
+  workspaceId: string,
+  conversationId: string,
+  type: "message" | "state" | "read",
+) {
+  // Identity values are allocated before commit. Serializing per workspace keeps
+  // the cursor order consistent with commit order, so clients cannot skip events.
+  await db.execute(
+    sql`SELECT pg_advisory_xact_lock(hashtext('cogni_inbox_events'), hashtext(${workspaceId}))`,
+  );
+  const [event] = await db
+    .insert(conversationEvent)
+    .values({ workspaceId, conversationId, type })
+    .returning({ cursor: conversationEvent.cursor });
+
+  if (event && event.cursor % BigInt(1000) === BigInt(0)) {
+    await db
+      .delete(conversationEvent)
+      .where(sql`${conversationEvent.createdAt} < CURRENT_TIMESTAMP - INTERVAL '14 days'`);
+  }
+}
+
 /**
  * Serialize an AI channel delivery with human takeover. The row lock is held
  * only for the external send and transcript write, never while generating.
@@ -136,58 +164,65 @@ export async function appendConversationMessage({
   updateLastMessageAt?: boolean;
   requireAiActive?: boolean;
 }) {
-  const messages = sql`COALESCE(NULLIF(${conversation.messages}, '')::jsonb, '[]'::jsonb)`;
-  const duplicate = message.clientId
-    ? sql`EXISTS (
+  return runDbWriteOperation(db, async (transaction) => {
+    const messages = sql`COALESCE(NULLIF(${conversation.messages}, '')::jsonb, '[]'::jsonb)`;
+    const duplicate = message.clientId
+      ? sql`EXISTS (
         SELECT 1
         FROM jsonb_array_elements(${messages}) AS existing(item)
         WHERE existing.item ->> 'clientId' = ${message.clientId}
       )`
-    : message.replyToMessageId
-      ? sql`EXISTS (
+      : message.replyToMessageId
+        ? sql`EXISTS (
           SELECT 1
           FROM jsonb_array_elements(${messages}) AS existing(item)
           WHERE existing.item ->> 'replyToMessageId' = ${message.replyToMessageId}
         )`
-      : null;
-  const appendedMessages = sql`(${messages} || ${JSON.stringify([message])}::jsonb)::text`;
+        : null;
+    const appendedMessages = sql`(${messages} || ${JSON.stringify([message])}::jsonb)::text`;
 
-  const conditions = [
-    eq(conversation.id, conversationId),
-    eq(conversation.workspaceId, workspaceId),
-  ];
-  if (requireAiActive) {
-    conditions.push(eq(conversation.aiPaused, false), ne(conversation.status, "CLOSED"));
-  }
+    const conditions = [
+      eq(conversation.id, conversationId),
+      eq(conversation.workspaceId, workspaceId),
+    ];
+    if (requireAiActive) {
+      conditions.push(eq(conversation.aiPaused, false), ne(conversation.status, "CLOSED"));
+    }
 
-  const [updatedConversation] = await db
-    .update(conversation)
-    .set({
-      messages: duplicate
-        ? sql`CASE WHEN ${duplicate} THEN ${conversation.messages} ELSE ${appendedMessages} END`
-        : appendedMessages,
-      updatedAt: message.createdAt,
-      ...(message.authorType === "VISITOR" ? { snoozedUntil: null } : {}),
-      ...(updateLastMessageAt ? { lastMessageAt: message.createdAt } : {}),
-    })
-    .where(and(...conditions))
-    .returning();
+    const [updatedConversation] = await transaction
+      .update(conversation)
+      .set({
+        messages: duplicate
+          ? sql`CASE WHEN ${duplicate} THEN ${conversation.messages} ELSE ${appendedMessages} END`
+          : appendedMessages,
+        updatedAt: message.createdAt,
+        ...(message.authorType === "VISITOR" ? { snoozedUntil: null } : {}),
+        ...(updateLastMessageAt ? { lastMessageAt: message.createdAt } : {}),
+      })
+      .where(and(...conditions))
+      .returning();
 
-  if (!updatedConversation) return null;
+    if (!updatedConversation) return null;
 
-  const persistedMessages = JSON.parse(updatedConversation.messages || "[]") as MessageJson[];
-  const persistedMessage = persistedMessages.find(
-    (candidate) =>
-      candidate.id === message.id ||
-      (message.clientId && candidate.clientId === message.clientId) ||
-      (message.replyToMessageId && candidate.replyToMessageId === message.replyToMessageId),
-  );
+    const persistedMessages = JSON.parse(updatedConversation.messages || "[]") as MessageJson[];
+    const persistedMessage = persistedMessages.find(
+      (candidate) =>
+        candidate.id === message.id ||
+        (message.clientId && candidate.clientId === message.clientId) ||
+        (message.replyToMessageId && candidate.replyToMessageId === message.replyToMessageId),
+    );
 
-  return {
-    conversation: updatedConversation,
-    message: persistedMessage ?? message,
-    inserted: persistedMessage?.id === message.id,
-  };
+    const inserted = persistedMessage?.id === message.id;
+    if (inserted) {
+      await recordConversationEvent(transaction, workspaceId, conversationId, "message");
+    }
+
+    return {
+      conversation: updatedConversation,
+      message: persistedMessage ?? message,
+      inserted,
+    };
+  });
 }
 
 async function appendVisitorMessage(
@@ -310,6 +345,14 @@ async function appendVisitorMessage(
     })
     .returning();
   const createdConvo = conversationResults[0];
+  if (createdConvo) {
+    await recordConversationEvent(
+      db,
+      visitorSession.widget.workspace.id,
+      createdConvo.id,
+      "message",
+    );
+  }
 
   await db
     .update(visitorSessionTable)
@@ -433,21 +476,22 @@ export async function markVisitorMessagesAsRead({
   throughMessageId: string;
   readAt: string;
 }) {
-  const messages = sql`COALESCE(NULLIF(${conversation.messages}, '')::jsonb, '[]'::jsonb)`;
-  const throughMessageOrdinality = sql`(
+  return runDbWriteOperation(db, async (transaction) => {
+    const messages = sql`COALESCE(NULLIF(${conversation.messages}, '')::jsonb, '[]'::jsonb)`;
+    const throughMessageOrdinality = sql`(
     SELECT max(entry.ordinality)
     FROM jsonb_array_elements(${messages}) WITH ORDINALITY AS entry(item, ordinality)
     WHERE entry.item ->> 'id' = ${throughMessageId}
       AND entry.item ->> 'authorType' = 'VISITOR'
   )`;
-  const hasUnreadVisitorMessage = sql`EXISTS (
+    const hasUnreadVisitorMessage = sql`EXISTS (
     SELECT 1
     FROM jsonb_array_elements(${messages}) WITH ORDINALITY AS candidate(item, ordinality)
     WHERE candidate.item ->> 'authorType' = 'VISITOR'
       AND candidate.item ->> 'readAt' IS NULL
       AND candidate.ordinality <= ${throughMessageOrdinality}
   )`;
-  const updatedMessages = sql`(
+    const updatedMessages = sql`(
     SELECT COALESCE(
       jsonb_agg(
         CASE
@@ -464,19 +508,23 @@ export async function markVisitorMessagesAsRead({
     FROM jsonb_array_elements(${messages}) WITH ORDINALITY AS entry(item, ordinality)
   )`;
 
-  const updated = await db
-    .update(conversation)
-    .set({ messages: updatedMessages, updatedAt: readAt })
-    .where(
-      and(
-        eq(conversation.id, conversationId),
-        eq(conversation.workspaceId, workspaceId),
-        hasUnreadVisitorMessage,
-      ),
-    )
-    .returning({ id: conversation.id });
+    const updated = await transaction
+      .update(conversation)
+      .set({ messages: updatedMessages, updatedAt: readAt })
+      .where(
+        and(
+          eq(conversation.id, conversationId),
+          eq(conversation.workspaceId, workspaceId),
+          hasUnreadVisitorMessage,
+        ),
+      )
+      .returning({ id: conversation.id });
 
-  return updated.length > 0;
+    if (updated.length > 0) {
+      await recordConversationEvent(transaction, workspaceId, conversationId, "read");
+    }
+    return updated.length > 0;
+  });
 }
 
 export async function setConversationStatus({
@@ -490,25 +538,63 @@ export async function setConversationStatus({
   conversationId: string;
   status: "CLOSED" | "OPEN";
 }) {
-  const status =
-    targetStatus === "CLOSED"
-      ? "CLOSED"
-      : sql<string>`case when ${conversation.assignedMemberId} is null then 'OPEN' else 'ASSIGNED' end`;
-  const [updated] = await db
-    .update(conversation)
-    .set({
-      status,
-      snoozedUntil: null,
-      updatedAt: new Date().toISOString(),
-    })
-    .where(and(eq(conversation.id, conversationId), eq(conversation.workspaceId, workspaceId)))
-    .returning({
-      id: conversation.id,
-      status: conversation.status,
-      assignedMemberId: conversation.assignedMemberId,
-    });
+  return runDbWriteOperation(db, async (transaction) => {
+    const status =
+      targetStatus === "CLOSED"
+        ? "CLOSED"
+        : sql<string>`case when ${conversation.assignedMemberId} is null then 'OPEN' else 'ASSIGNED' end`;
+    const [updated] = await transaction
+      .update(conversation)
+      .set({
+        status,
+        snoozedUntil: null,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(and(eq(conversation.id, conversationId), eq(conversation.workspaceId, workspaceId)))
+      .returning({
+        id: conversation.id,
+        status: conversation.status,
+        assignedMemberId: conversation.assignedMemberId,
+      });
 
-  return updated ?? null;
+    if (updated) await recordConversationEvent(transaction, workspaceId, conversationId, "state");
+    return updated ?? null;
+  });
+}
+
+export async function updateConversationState({
+  db,
+  workspaceId,
+  conversationId,
+  changes,
+  onlyOpen = false,
+}: {
+  db: Db;
+  workspaceId: string;
+  conversationId: string;
+  onlyOpen?: boolean;
+  changes: {
+    assignedMemberId?: string | null;
+    status?: (typeof conversation.$inferSelect)["status"];
+    snoozedUntil?: string | null;
+    aiPaused?: boolean;
+    updatedAt?: string;
+  };
+}) {
+  return runDbWriteOperation(db, async (transaction) => {
+    const conditions = [
+      eq(conversation.id, conversationId),
+      eq(conversation.workspaceId, workspaceId),
+    ];
+    if (onlyOpen) conditions.push(ne(conversation.status, "CLOSED"));
+    const [updated] = await transaction
+      .update(conversation)
+      .set(changes)
+      .where(and(...conditions))
+      .returning({ id: conversation.id });
+    if (updated) await recordConversationEvent(transaction, workspaceId, conversationId, "state");
+    return updated ?? null;
+  });
 }
 
 export async function startVisitorConversation({

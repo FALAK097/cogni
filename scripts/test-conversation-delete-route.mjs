@@ -10,6 +10,7 @@ const state = {
   visitorSessionId: "visitor-session-shared",
   queryCalls: 0,
   deletes: [],
+  events: [],
 };
 globalThis.__conversationDeleteRouteTest = state;
 
@@ -33,12 +34,14 @@ const stubs = {
             },
           }),
         }),
+        transaction: async (operation) => operation(state.db),
       },
     };
   };`,
   "@/lib/auth/permissions": `export const canManageWorkspace = (role) => role === "OWNER";`,
-  "@/features/conversations/server/queries": `export const appendTeamConversationMessage = async () => false; export const broadcastConversationChanged = async () => {}; export const getConversation = async () => null; export const markConversationAsRead = async () => {};`,
-  "@/features/conversations/server/conversation-service": `export const setConversationStatus = async () => null;`,
+  "@/features/conversations/server/queries": `export const appendTeamConversationMessage = async () => false; export const getConversation = async () => null; export const markConversationAsRead = async () => {};`,
+  "@/features/conversations/server/conversation-service": `export const setConversationStatus = async () => null; export const recordConversationEvent = async (_db, ...event) => { globalThis.__conversationDeleteRouteTest.events.push(event); }; export const updateConversationState = async () => null;`,
+  "@/lib/db/client": `export const runDbWriteOperation = async (db, operation) => operation(db);`,
   "@/features/contacts/server/contact-tags": `export const parseContactTags = () => [];`,
   "@/features/conversations/server/labels": `export const parseConversationLabels = () => [];`,
   "@/lib/storage/index": `export const uploadPublicPath = (value) => value;`,
@@ -83,6 +86,7 @@ function resetState(role = "OWNER") {
   state.role = role;
   state.queryCalls = 0;
   state.deletes = [];
+  state.events = [];
 }
 
 const context = { params: Promise.resolve({ conversation_id: state.conversationId }) };
@@ -120,4 +124,5 @@ test("deleting a conversation removes only that workspace conversation and prese
       },
     },
   ]);
+  assert.deepEqual(state.events, [[state.workspaceId, state.conversationId, "state"]]);
 });

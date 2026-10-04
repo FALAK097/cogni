@@ -2,9 +2,10 @@ import "server-only";
 
 import { and, eq } from "drizzle-orm";
 
-import type { Db } from "@/lib/db/client";
+import { runDbWriteOperation, type Db } from "@/lib/db/client";
 import { conversation } from "@/lib/db/schema";
 import { conversationLabelSchema } from "@/features/conversations/inbox-pagination";
+import { recordConversationEvent } from "@/features/conversations/server/conversation-service";
 
 export function parseConversationLabels(value: string) {
   try {
@@ -45,7 +46,7 @@ export async function changeConversationLabel({
   if (!parsedLabel.success) throw new Error("Enter a valid conversation label.");
   const label = parsedLabel.data.toLowerCase();
 
-  return db.transaction(async (transaction): Promise<ConversationLabelUpdateResult> => {
+  return runDbWriteOperation(db, async (transaction): Promise<ConversationLabelUpdateResult> => {
     const [conversationRow] = await transaction
       .select({ labels: conversation.labels })
       .from(conversation)
@@ -74,6 +75,7 @@ export async function changeConversationLabel({
         .update(conversation)
         .set({ labels: JSON.stringify(nextLabels), updatedAt: new Date().toISOString() })
         .where(and(eq(conversation.id, conversationId), eq(conversation.workspaceId, workspaceId)));
+      await recordConversationEvent(transaction, workspaceId, conversationId, "state");
     }
 
     return { kind: "updated", labels: nextLabels };

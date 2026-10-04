@@ -9,8 +9,9 @@ globalThis.__conversationAssignmentRouteTest = state;
 const stubs = {
   "next/server": `export const NextResponse = { json: (value, init = {}) => new Response(JSON.stringify(value), { ...init, headers: { "content-type": "application/json", ...init.headers } }) };`,
   "@/lib/auth/dashboard-context": `export const requireDashboardContext = () => globalThis.__conversationAssignmentRouteTest.context();`,
-  "@/features/conversations/server/queries": `export const appendTeamConversationMessage = async () => false; export const broadcastConversationChanged = async (...args) => { globalThis.__conversationAssignmentRouteTest.broadcasts.push(args); }; export const getConversation = async () => null; export const markConversationAsRead = async () => false;`,
-  "@/features/conversations/server/conversation-service": `export const setConversationStatus = async () => null;`,
+  "@/features/conversations/server/queries": `export const appendTeamConversationMessage = async () => false; export const getConversation = async () => null; export const markConversationAsRead = async () => false;`,
+  "@/features/conversations/server/conversation-service": `export const setConversationStatus = async () => null; export const recordConversationEvent = async () => {}; export const updateConversationState = async ({ db, workspaceId, conversationId, changes }) => { globalThis.__conversationAssignmentRouteTest.stateUpdates.push({ workspaceId, conversationId }); const [row] = await db.update({}).set(changes).where({}).returning(); return row ?? null; };`,
+  "@/lib/db/client": `export const runDbWriteOperation = async (db, operation) => operation(db);`,
   "@/lib/auth/permissions": `export const canManageWorkspace = () => true;`,
   "@/features/contacts/server/contact-tags": `export const parseContactTags = () => [];`,
   "@/features/conversations/server/labels": `export const parseConversationLabels = () => [];`,
@@ -74,7 +75,7 @@ function reset({ conversation = {}, members = [] } = {}) {
     members,
     memberLookupExpressions: [],
     updates: [],
-    broadcasts: [],
+    stateUpdates: [],
   });
 
   state.db = {
@@ -158,11 +159,12 @@ test("assigning an active-workspace member updates ownership without pausing AI"
       state.memberLookupExpressions[0],
     ),
   );
-  assert.equal(state.broadcasts.length, 1);
-  assert.deepEqual(state.broadcasts[0], ["conversation-1", "ASSIGNED", "member-local"]);
+  assert.deepEqual(state.stateUpdates, [
+    { workspaceId: "workspace-active", conversationId: "conversation-1" },
+  ]);
 });
 
-test("a foreign-workspace assignee is rejected before update or broadcast", async () => {
+test("a foreign-workspace assignee is rejected before any state change", async () => {
   reset({ members: [{ id: "member-foreign", workspaceId: "workspace-foreign" }] });
 
   const response = await patch({ action: "assign_to_member", assignedMemberId: "member-foreign" });
@@ -170,7 +172,7 @@ test("a foreign-workspace assignee is rejected before update or broadcast", asyn
   assert.equal(response.status, 404);
   assert.equal(state.memberLookupExpressions.length, 1);
   assert.equal(state.updates.length, 0);
-  assert.equal(state.broadcasts.length, 0);
+  assert.equal(state.stateUpdates.length, 0);
 });
 
 test("unassigning an open conversation clears ownership and returns it to Open", async () => {
@@ -186,7 +188,7 @@ test("unassigning an open conversation clears ownership and returns it to Open",
   assert.equal(state.updates[0].status, "OPEN");
   assert.equal(state.updates[0].snoozedUntil, null);
   assert.equal(Object.hasOwn(state.updates[0], "aiPaused"), false);
-  assert.deepEqual(state.broadcasts[0], ["conversation-1", "OPEN", null]);
+  assert.equal(state.stateUpdates.length, 1);
 });
 
 test("reassigning a closed conversation keeps it closed and preserves its AI state", async () => {
@@ -201,16 +203,16 @@ test("reassigning a closed conversation keeps it closed and preserves its AI sta
   assert.equal(state.updates[0].assignedMemberId, "member-next");
   assert.equal(state.updates[0].status, "CLOSED");
   assert.equal(Object.hasOwn(state.updates[0], "aiPaused"), false);
-  assert.deepEqual(state.broadcasts[0], ["conversation-1", "CLOSED", "member-next"]);
+  assert.equal(state.stateUpdates.length, 1);
 });
 
-test("malformed assignee identifiers return 400 without updating or broadcasting", async () => {
+test("malformed assignee identifiers return 400 without changing state", async () => {
   const invalidAssignees = ["", " ", "x".repeat(129), 42, ["member-local"]];
   for (const assignedMemberId of invalidAssignees) {
     reset();
     const response = await patch({ action: "assign_to_member", assignedMemberId });
     assert.equal(response.status, 400, `expected 400 for ${JSON.stringify(assignedMemberId)}`);
     assert.equal(state.updates.length, 0);
-    assert.equal(state.broadcasts.length, 0);
+    assert.equal(state.stateUpdates.length, 0);
   }
 });

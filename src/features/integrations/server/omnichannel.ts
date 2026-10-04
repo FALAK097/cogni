@@ -9,8 +9,9 @@ import {
 import { retrieveKnowledgeContext } from "@/features/knowledge/server/retrieval";
 import { getWidgetModel } from "@/lib/ai/providers";
 import type { Db } from "@/lib/db/client";
+import { runDbWriteOperation } from "@/lib/db/client";
 import { contact, conversation } from "@/lib/db/schema";
-import { broadcastConversationEvent } from "@/lib/realtime/broadcast";
+import { recordConversationEvent } from "@/features/conversations/server/conversation-service";
 
 export const supportedChatChannels = ["SLACK", "DISCORD", "TEAMS", "GCHAT", "WHATSAPP"] as const;
 export type SupportedChatChannel = (typeof supportedChatChannels)[number];
@@ -90,20 +91,26 @@ export async function ingestOmnichannelMessage({
   };
   let ingestedMessageId = incoming.id;
   if (!current) {
-    const [created] = await db
-      .insert(conversation)
-      .values({
-        id: crypto.randomUUID(),
-        workspaceId,
-        contactId: channelContact.id,
-        channel,
-        externalThreadId,
-        subject: text.slice(0, 100) || `${channel} conversation`,
-        messages: JSON.stringify([incoming]),
-        updatedAt: now,
-        lastMessageAt: now,
-      })
-      .returning();
+    const [created] = await runDbWriteOperation(db, async (transaction) => {
+      const [newConversation] = await transaction
+        .insert(conversation)
+        .values({
+          id: crypto.randomUUID(),
+          workspaceId,
+          contactId: channelContact.id,
+          channel,
+          externalThreadId,
+          subject: text.slice(0, 100) || `${channel} conversation`,
+          messages: JSON.stringify([incoming]),
+          updatedAt: now,
+          lastMessageAt: now,
+        })
+        .returning();
+      if (newConversation) {
+        await recordConversationEvent(transaction, workspaceId, newConversation.id, "message");
+      }
+      return [newConversation];
+    });
     current = created;
     if (!current) throw new Error("Conversation could not be created.");
   } else {
@@ -116,13 +123,6 @@ export async function ingestOmnichannelMessage({
     if (!appended) throw new Error("Conversation not found.");
     current = appended.conversation;
     ingestedMessageId = appended.message.id;
-    if (appended.inserted) {
-      await broadcastConversationEvent({
-        type: "message",
-        conversationId: current.id,
-        messageId: incoming.id,
-      });
-    }
     return {
       connection,
       contact: channelContact,
@@ -130,11 +130,6 @@ export async function ingestOmnichannelMessage({
       messageId: ingestedMessageId,
     };
   }
-  await broadcastConversationEvent({
-    type: "message",
-    conversationId: current.id,
-    messageId: incoming.id,
-  });
   return {
     connection,
     contact: channelContact,
