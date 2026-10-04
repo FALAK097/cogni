@@ -69,7 +69,7 @@ import {
   resolveInsightsDateQuery,
   serializeInsightsDateRange,
 } from "@/features/analytics/insights-url-state";
-import { APP_PAGES, APP_ROUTES } from "@/features/navigation/app-routes";
+import { agentHref, APP_PAGES, APP_ROUTES } from "@/features/navigation/app-routes";
 import { useAddManualTextSource } from "@/hooks/query/use-knowledge-base";
 import {
   buildVerifiedAnswerSource,
@@ -925,20 +925,20 @@ function MetricCard({
   invertTrend?: boolean;
 }) {
   return (
-    <DashboardCard className="flex h-full flex-col p-6">
+    <DashboardCard className="flex h-full flex-col p-4 sm:p-5 xl:p-6">
       <div className="flex items-start justify-between gap-2">
         <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
           {icon}
         </div>
         {info}
       </div>
-      <div className="mt-4 space-y-0.5">
-        <p className="text-sm text-muted-foreground">{label}</p>
-        <p className="text-[1.75rem] font-semibold leading-tight tracking-tight tabular-nums">
+      <div className="mt-3 space-y-0.5 sm:mt-4">
+        <p className="text-xs text-muted-foreground sm:text-sm">{label}</p>
+        <p className="text-2xl font-semibold leading-tight tracking-tight tabular-nums sm:text-[1.75rem]">
           {value}
         </p>
       </div>
-      <div className="mt-auto flex flex-col items-start gap-0.5 pt-3 text-xs">
+      <div className="mt-auto flex flex-col items-start gap-0.5 pt-2 text-xs sm:pt-3">
         <ChangeIndicator change={metric.changePercent} invertTrend={invertTrend} />
         <span className="text-muted-foreground">
           vs {formatComparisonRange(previousRange.start, previousRange.end)}
@@ -1140,9 +1140,7 @@ export function DashboardPage({
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-6 pb-8">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-xl font-semibold tracking-tight">
-            {APP_PAGES.insights.label}
-          </h1>
+          <h1 className="text-xl font-semibold tracking-tight">{APP_PAGES.insights.label}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{APP_PAGES.insights.description}</p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -1222,7 +1220,7 @@ export function DashboardPage({
               <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
                 {analytics.kpis.totalConversations.previousValue > 0
                   ? `The previous comparable period had ${formatNumber(analytics.kpis.totalConversations.previousValue)} ${analytics.kpis.totalConversations.previousValue === 1 ? "conversation" : "conversations"}.`
-                  : "The previous comparable period also had no conversations. Choose a wider date range above to check for earlier activity."}
+                  : "Try a wider date range, or add a knowledge source so your agent is ready for its first conversation."}
               </p>
             </div>
           </div>
@@ -1241,7 +1239,17 @@ export function DashboardPage({
             >
               View previous period
             </Button>
-          ) : null}
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-9 shrink-0"
+              render={<Link href={agentHref("knowledge")} />}
+            >
+              Add a knowledge source
+            </Button>
+          )}
         </section>
       ) : null}
 
@@ -1255,7 +1263,7 @@ export function DashboardPage({
 
       <section
         hidden={hasInitialError}
-        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
+        className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-5"
       >
         {isLoading || !analytics ? (
           Array.from({ length: 5 }).map((_, i) => <CardSkeleton key={i} />)

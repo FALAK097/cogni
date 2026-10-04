@@ -21,18 +21,20 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "flex min-h-[320px] flex-col items-center justify-center rounded-2xl border border-dashed border-border/70 bg-muted/20 p-8 text-center",
+        "flex min-h-[280px] flex-col items-center justify-center rounded-2xl border border-dashed border-border/70 bg-muted/20 p-6 text-center sm:p-8",
         className,
       )}
     >
       {Icon ? (
-        <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-border/60 bg-card text-muted-foreground">
-          <Icon className="h-5 w-5" />
+        <span className="mb-4 flex size-11 items-center justify-center rounded-xl border border-border/60 bg-card text-muted-foreground shadow-sm">
+          <Icon className="size-[18px]" aria-hidden="true" />
         </span>
       ) : null}
-      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-      <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">{description}</p>
-      {children ? <div className="mt-5 flex items-center gap-2">{children}</div> : null}
+      <h3 className="text-[15px] font-semibold tracking-tight text-foreground">{title}</h3>
+      <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">{description}</p>
+      {children ? (
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-2">{children}</div>
+      ) : null}
     </div>
   );
 }

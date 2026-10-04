@@ -5,15 +5,16 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import { eq } from "drizzle-orm";
-import {
-  workspaceMember as workspaceMemberTable,
-  workspaceInvite as workspaceInviteTable,
-} from "@/lib/db/schema";
 import { requireAuth, requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { getAuth } from "@/lib/auth/server";
-import { getDb, runDbWriteOperation } from "@/lib/db/client";
+import { getDb } from "@/lib/db/client";
 import {
+  removeWorkspaceMember,
+  transferWorkspaceOwnership,
+  updateWorkspaceMemberRole,
+} from "@/features/workspaces/server/owner-management";
+import {
+  acceptWorkspaceInviteMembership,
   getWorkspaceInviteByToken,
   upsertWorkspaceInvite,
 } from "@/features/workspaces/server/members";
@@ -136,42 +137,15 @@ export async function updateMemberRoleAction(formData: FormData) {
   }
 
   const { db, membership, workspace } = context;
-  const targetMembership = await db.query.workspaceMember.findFirst({
-    where: (member, { eq, and }) =>
-      and(eq(member.id, parsed.data.membershipId), eq(member.workspaceId, workspace.id)),
-    columns: {
-      id: true,
-      role: true,
-    },
-  });
+  const changed = await updateWorkspaceMemberRole(
+    db,
+    workspace.id,
+    membership.id,
+    parsed.data.membershipId,
+    parsed.data.role,
+  );
 
-  if (!targetMembership) {
-    return;
-  }
-
-  if (targetMembership.id === membership.id && parsed.data.role !== "OWNER") {
-    return;
-  }
-
-  if (targetMembership.role === "OWNER" && parsed.data.role !== "OWNER") {
-    const owners = await db.query.workspaceMember.findMany({
-      where: (member, { eq, and }) =>
-        and(eq(member.workspaceId, workspace.id), eq(member.role, "OWNER")),
-      columns: { id: true },
-    });
-
-    if (owners.length <= 1) {
-      return;
-    }
-  }
-
-  await db
-    .update(workspaceMemberTable)
-    .set({
-      role: parsed.data.role,
-      updatedAt: new Date().toISOString(),
-    })
-    .where(eq(workspaceMemberTable.id, targetMembership.id));
+  if (!changed) return;
 
   revalidatePath("/dashboard/settings");
   revalidatePath("/dashboard/settings/members");
@@ -199,32 +173,14 @@ export async function removeMemberAction(formData: FormData) {
     return;
   }
 
-  const targetMembership = await db.query.workspaceMember.findFirst({
-    where: (member, { eq, and }) =>
-      and(eq(member.id, parsed.data.membershipId), eq(member.workspaceId, workspace.id)),
-    columns: {
-      id: true,
-      role: true,
-    },
-  });
+  const changed = await removeWorkspaceMember(
+    db,
+    workspace.id,
+    membership.id,
+    parsed.data.membershipId,
+  );
 
-  if (!targetMembership) {
-    return;
-  }
-
-  if (targetMembership.role === "OWNER") {
-    const owners = await db.query.workspaceMember.findMany({
-      where: (member, { eq, and }) =>
-        and(eq(member.workspaceId, workspace.id), eq(member.role, "OWNER")),
-      columns: { id: true },
-    });
-
-    if (owners.length <= 1) {
-      return;
-    }
-  }
-
-  await db.delete(workspaceMemberTable).where(eq(workspaceMemberTable.id, targetMembership.id));
+  if (!changed) return;
 
   revalidatePath("/dashboard/settings");
   revalidatePath("/dashboard/settings/members");
@@ -270,31 +226,16 @@ export async function acceptInviteAction(
     return { error: "This invite belongs to a different email address." };
   }
 
-  await runDbWriteOperation(db, async (tx) => {
-    await tx
-      .insert(workspaceMemberTable)
-      .values({
-        id: crypto.randomUUID(),
-        userId: session.user.id,
-        workspaceId: invite.workspaceId,
-        role: invite.role,
-        updatedAt: now.toISOString(),
-      })
-      .onConflictDoUpdate({
-        target: [workspaceMemberTable.userId, workspaceMemberTable.workspaceId],
-        set: {
-          role: invite.role,
-          updatedAt: now.toISOString(),
-        },
-      });
-
-    await tx
-      .update(workspaceInviteTable)
-      .set({
-        acceptedAt: now.toISOString(),
-      })
-      .where(eq(workspaceInviteTable.id, invite.id));
+  const acceptedAt = now.toISOString();
+  const accepted = await acceptWorkspaceInviteMembership(db, {
+    inviteId: invite.id,
+    workspaceId: invite.workspaceId,
+    userId: session.user.id,
+    email: session.user.email,
+    acceptedAt,
   });
+
+  if (!accepted) return { error: "This invite has already been accepted or expired." };
 
   const cookieStore = await cookies();
   cookieStore.set("active_workspace_id", invite.workspaceId, activeWorkspaceCookieOptions());
@@ -319,37 +260,14 @@ export async function transferOwnershipAction(formData: FormData) {
   }
 
   const { db, membership, workspace } = context;
-  const target = await db.query.workspaceMember.findFirst({
-    where: (member, { eq, and }) =>
-      and(eq(member.id, parsed.data.membershipId), eq(member.workspaceId, workspace.id)),
-    columns: {
-      id: true,
-      userId: true,
-    },
-  });
+  const transferred = await transferWorkspaceOwnership(
+    db,
+    workspace.id,
+    membership.id,
+    parsed.data.membershipId,
+  );
 
-  if (!target || target.id === membership.id) {
-    return;
-  }
-
-  const now = new Date().toISOString();
-  await runDbWriteOperation(db, async (tx) => {
-    await tx
-      .update(workspaceMemberTable)
-      .set({
-        role: "MEMBER",
-        updatedAt: now,
-      })
-      .where(eq(workspaceMemberTable.id, membership.id));
-
-    await tx
-      .update(workspaceMemberTable)
-      .set({
-        role: "OWNER",
-        updatedAt: now,
-      })
-      .where(eq(workspaceMemberTable.id, target.id));
-  });
+  if (!transferred) return;
 
   revalidatePath("/dashboard/settings/members");
 }

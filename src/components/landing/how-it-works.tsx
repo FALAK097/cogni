@@ -4,8 +4,7 @@ const STEPS = [
   {
     num: "01",
     title: "Build your agent",
-    description:
-      "Add website URLs, sitemaps, text, and supported files in Agent → Build.",
+    description: "Add website URLs, sitemaps, text, and supported files in Agent → Build.",
     color: "#6366f1",
     bg: "#eef0fe",
   },

@@ -66,6 +66,7 @@ jobs:
       - run: pnpm test:contact-tags
       - run: pnpm test:integration-action-recovery
       - run: pnpm test:workspace-permissions
+      - run: pnpm test:workspace-owners
       - run: pnpm test:analytics-response-time
       - run: pnpm test:rate-limit
       - run: pnpm test:safe-fetch

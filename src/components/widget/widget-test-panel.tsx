@@ -12,6 +12,7 @@ import {
   Trash2,
 } from "@/components/icons";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { agentHref } from "@/features/navigation/app-routes";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -340,12 +341,12 @@ export function WidgetTestPanel({
             <p className="text-xs text-muted-foreground">
               Add a suggested question in{" "}
               <Link
-                href={agentHref("deploy")}
+                href={agentHref()}
                 className="rounded-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               >
-                Deploy
+                Agent
               </Link>{" "}
-              to test a prompt tailored to your agent.
+              under Deploy, then return here to test a prompt tailored to your agent.
             </p>
           )}
         </div>
@@ -447,7 +448,10 @@ export function WidgetTestPanel({
           </div>
         </div>
         {casesQuery.isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading saved tests…</p>
+          <output aria-busy="true" aria-label="Loading saved tests" className="space-y-2">
+            <Skeleton aria-hidden="true" className="h-14 w-full rounded-lg" />
+            <Skeleton aria-hidden="true" className="h-14 w-full rounded-lg" />
+          </output>
         ) : null}
         {casesQuery.isError ? (
           <p role="alert" className="text-sm text-destructive">

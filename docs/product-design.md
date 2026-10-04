@@ -61,10 +61,12 @@ Use three primary destinations: Inbox, Agent and Insights, with Settings at the 
 Knowledge belongs inside Agent Build; deployment contains widget and channels. Tickets are
 Inbox views and customer history belongs in its Details panel. Business-tool connections belong
 in Settings; reports belong in Insights. Preserve existing deep links during consolidation.
-Keep shareable state on the same canonical pages: Inbox uses view and conversationId, Agent
-uses tab, and Insights uses from, to, volume and satisfaction. Omit defaults, validate URL values
-before use, and restore the same page state on refresh and browser Back/Forward within the active
-workspace; do not create nested routes for filters.
+Keep shareable state on the same canonical pages: Inbox uses view and conversationId, while
+Insights uses from, to, volume and satisfaction. Agent's Build/Test/Deploy tabs stay in page state
+rather than creating query-string variants; use a section anchor only when a link needs to focus a
+specific part of Agent. Omit defaults, validate URL values before use, and restore shareable state
+on refresh and browser Back/Forward within the active workspace; do not create nested routes for
+filters.
 Keep future capabilities hidden until functional and avoid a separate page for every feature.
 Search/command palette uses immediate keyboard feedback; no staged entry delay.
 Persist layout preferences per user/workspace. Tenant change discards selected foreign records.
@@ -127,12 +129,13 @@ metadata. Privileged buttons follow role policy; denied states explain required 
 
 ## Agent lifecycle
 
-Use `/agent` as the canonical Agent route; legacy `/playground` URLs redirect to the matching tab.
-Keep three focused tabs: **Build** (instructions, behavior, connected actions and knowledge),
-**Test** (safe sandbox conversations and evidence), and **Deploy** (widget appearance, conversation
-prompts, publication, installation and allowed domains). Keep the live widget preview beside these
-tabs. Legacy Customize links and `subtab`/`section` query values normalize to the canonical
-`?tab=deploy`; the default Build tab has no query parameter.
+Use `/agent` as the only Agent route; legacy `/playground` URLs redirect to `/agent`. Keep three
+focused in-page tabs: **Build** (instructions, behavior, connected actions and knowledge), **Test**
+(safe sandbox conversations and evidence), and **Deploy** (widget appearance, conversation prompts,
+publication, installation and allowed domains). Keep the live widget preview beside these tabs.
+Changing an Agent tab must not create a second page or query-string variant. `nuqs` is reserved for
+shareable view state such as Inbox filters and Insights date ranges; use a section anchor only when
+a link needs to focus a specific part of the Agent page.
 
 Test uses the authenticated preview sandbox: external actions stay disabled, preview messages stay
 out of Inbox and Insights, and a reset starts a fresh preview session. Show retrieved source titles

@@ -1,11 +1,7 @@
 import { redirect } from "next/navigation";
 
-import { canonicalAgentPath } from "@/features/navigation/app-routes";
+import { APP_ROUTES } from "@/features/navigation/app-routes";
 
-export default async function LegacyPlaygroundPage({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
-  redirect(canonicalAgentPath(await searchParams));
+export default function LegacyPlaygroundPage() {
+  redirect(APP_ROUTES.agent);
 }

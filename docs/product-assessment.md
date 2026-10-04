@@ -222,6 +222,14 @@ member denial, tenant-scoped assignee validation, malformed IDs and the selected
 predicate; these tests run with the existing privileged-route CI command. Rendered authenticated
 assignment behavior remains unverified in this preview.
 
+On 2026-10-04, workspace owner role changes, removals and ownership transfers now lock the
+workspace row and re-check the acting membership within the write transaction. A local
+PostgreSQL regression test ran competing owner demotions and removal/demotion requests through
+separate database clients; each race preserved exactly one owner. Ownership transfer also passed
+its atomicity check. Invite acceptance also preserves the role of an existing membership, so a
+stale member invite cannot demote a current owner. This closes the identified ownerless-workspace
+race; other tenant, provider round-trip and production acceptance gates remain open.
+
 ## Verdict
 
 **Block production parity claim.** The first corrections improve trust and usability.

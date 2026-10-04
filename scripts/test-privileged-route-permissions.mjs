@@ -6,6 +6,7 @@ import { resolve } from "node:path";
 const state = {
   membershipRole: "MEMBER",
   sideEffects: 0,
+  parseAttempts: 0,
   requireDashboardContext: async () => ({
     db: { testDatabase: true },
     workspace: { id: "workspace-1" },
@@ -18,8 +19,10 @@ globalThis.__privilegedRoutePermissionTest = state;
 const stubs = {
   "next/server": `export const NextResponse = { json: (value, init = {}) => new Response(JSON.stringify(value), { ...init, headers: { "content-type": "application/json", ...init.headers } }) };`,
   "@/lib/auth/dashboard-context": `export const requireDashboardContext = () => globalThis.__privilegedRoutePermissionTest.requireDashboardContext();`,
+  "@/lib/auth/permissions": `export const canManageWorkspace = (role) => role === "OWNER";`,
   "@/lib/workflows/runner": `export const createWorkflowWithSteps = (...args) => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; return args; }; export const completeWorkflowRun = () => {}; export const updateWorkflowStep = () => {};`,
-  "@/features/integrations/server/approval-service": `export const createApprovalRequest = () => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; };`,
+  "@/features/integrations/server/approval-service": `export const createApprovalRequest = () => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; }; export const decideApprovalRequest = async (input) => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; return { id: input.approvalId, status: input.decision, actionType: "contact.update", payload: "{}", workflowRunId: null, workflowStepId: null }; };`,
+  "@/features/integrations/server/tool-executor": `export const executeApprovedTool = async () => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; return { id: "action-1", result: {} }; };`,
   "@/features/agent-tests/input": `export const agentTestCaseInputSchema = { safeParse: (value) => ({ success: true, data: value }) };`,
   "@/features/agent-tests/server/cases": `export const createAgentTestCase = () => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; }; export const listAgentTestCases = () => []; export class AgentTestCaseTitleConflictError extends Error {}`,
   "@/lib/jobs/ingestion": `export const enqueueDocumentProcessing = () => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; };`,
@@ -27,7 +30,9 @@ const stubs = {
   "@/lib/storage/index": `export const isAllowedKnowledgeUpload = () => true; export const saveObject = () => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; };`,
   "@/lib/storage": `export const deleteObject = () => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; };`,
   "@/features/integrations/server/composio-connections": `export const COMPOSIO_PROVIDER_SLUGS = {}; export const COMPOSIO_TOOLKITS = {}; export const createComposioClient = () => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; }; export const getComposioProviderBySlug = () => null; export const getOrCreateAuthConfig = () => {};`,
-  "@/lib/db/schema": `export const integration = { workspaceId: "workspaceId", provider: "provider" }; export const workflowRun = { id: "id", workspaceId: "workspaceId", name: "name", idempotencyKey: "idempotencyKey", status: "status" }; export const document = { id: "id", workspaceId: "workspaceId" };`,
+  "@/lib/db/schema": `export const integration = { workspaceId: "workspaceId", provider: "provider" }; export const approvalRequest = { id: "id", workspaceId: "workspaceId" }; export const workflowRun = { id: "id", workspaceId: "workspaceId", name: "name", idempotencyKey: "idempotencyKey", status: "status" }; export const document = { id: "id", workspaceId: "workspaceId" }; export const widget = { id: "id" };`,
+  "@/features/widget/domain": `export const normalizeHostname = () => null; export const normalizeLauncherSize = () => "md"; export const normalizePosition = () => "right"; export const normalizeFontFamily = () => "system"; export const normalizeFontSize = () => "md"; export const normalizeLogoUrl = () => null; export const stringifyJsonArray = () => "[]";`,
+  "@/features/widget/server/widget-service": `export const ensureWorkspaceWidget = () => ({}); export const getWidgetPublicationStatus = () => ({}); export const toWidgetSettings = () => ({});`,
   "@/lib/env/server": `export const env = {};`,
   "drizzle-orm": `export const and = (...args) => args; export const eq = (...args) => args; export const like = (...args) => args; export const inArray = (...args) => args;`,
   "@/features/workflows/progression": `export const getWorkflowProgression = () => ({ kind: "complete" });`,
@@ -78,6 +83,8 @@ const knowledgeWebsiteRoute = await loadRoute(
 const knowledgeSourceRoute = await loadRoute(
   "src/app/api/dashboard/knowledge-base/sources/[source_id]/route.ts",
 );
+const widgetSettingsRoutes = await loadRoute("src/app/api/dashboard/widget/route.ts");
+const approvalRoute = await loadRoute("src/app/api/dashboard/actions/[approval_id]/route.ts");
 
 const request = new Request("https://cogni.test/api/dashboard/mutation", {
   method: "POST",
@@ -112,6 +119,58 @@ test("members cannot create or advance workflows", async () => {
 
 test("members cannot create agent evaluation cases", async () => {
   await expectMemberDenied(agentTestRoutes.POST);
+});
+
+test("members cannot parse or decide pending action approvals", async () => {
+  state.parseAttempts = 0;
+  const malformedRequest = new Request("https://cogni.test/api/dashboard/actions/approval-1", {
+    method: "PATCH",
+    body: "{",
+  });
+  malformedRequest.json = async () => {
+    state.parseAttempts += 1;
+    throw new Error("A denied approval request must not be parsed.");
+  };
+
+  await expectMemberDenied(approvalRoute.PATCH, [
+    malformedRequest,
+    { params: Promise.resolve({ approval_id: "approval-1" }) },
+  ]);
+  assert.equal(state.parseAttempts, 0);
+});
+
+test("owners can reject approvals without executing the approved action", async () => {
+  state.membershipRole = "OWNER";
+  state.sideEffects = 0;
+  const response = await approvalRoute.PATCH(
+    new Request("https://cogni.test/api/dashboard/actions/approval-1", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token: "approval-token", decision: "REJECTED" }),
+    }),
+    { params: Promise.resolve({ approval_id: "approval-1" }) },
+  );
+
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).action, null);
+  assert.equal(state.sideEffects, 1);
+});
+
+test("members cannot parse or change legacy widget settings", async () => {
+  for (const handler of [widgetSettingsRoutes.PUT, widgetSettingsRoutes.POST]) {
+    state.parseAttempts = 0;
+    const malformedRequest = new Request("https://cogni.test/api/dashboard/widget", {
+      method: handler === widgetSettingsRoutes.PUT ? "PUT" : "POST",
+      body: "{",
+    });
+    malformedRequest.json = async () => {
+      state.parseAttempts += 1;
+      throw new Error("A denied settings request must not be parsed.");
+    };
+
+    await expectMemberDenied(handler, [malformedRequest]);
+    assert.equal(state.parseAttempts, 0);
+  }
 });
 
 test("members cannot upload, add, retry, or delete knowledge sources", async () => {

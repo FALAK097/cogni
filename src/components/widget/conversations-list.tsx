@@ -234,6 +234,10 @@ export function ConversationsList({
     }
     return result;
   }, [effectivePagesCache, page, conversationsData?.conversations]);
+  const isResultsBusy =
+    (isLoading && conversations.length === 0) ||
+    isSearchPending ||
+    (page === 1 && isFetching && isPlaceholderData);
 
   useEffect(() => {
     if (!selectedConversationId) {
@@ -638,7 +642,16 @@ export function ConversationsList({
           </Button>
         </div>
       ) : null}
-      <div aria-busy={isSearchPending} className={cn("min-h-0 flex-1", scrollPaneClassName)}>
+      <section
+        aria-label="Conversations"
+        aria-busy={isResultsBusy}
+        className={cn("min-h-0 flex-1", scrollPaneClassName)}
+      >
+        {isResultsBusy ? (
+          <output className="sr-only">
+            {isSearchPending ? "Searching conversations…" : "Loading conversations…"}
+          </output>
+        ) : null}
         {isError && conversations.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
             <p role="alert" className="text-sm text-muted-foreground">
@@ -650,15 +663,17 @@ export function ConversationsList({
           </div>
         ) : isLoading && conversations.length === 0 ? (
           <div className="space-y-1 px-2 pb-2">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <div key={index} className="flex items-start gap-3 rounded-lg px-3 py-3">
-                <Skeleton className="h-10 w-10 rounded-full" />
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-4 w-28" />
-                  <Skeleton className="h-3 w-full" />
+            <div aria-hidden="true" className="space-y-1">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <div key={index} className="flex items-start gap-3 rounded-lg px-3 py-3">
+                  <Skeleton className="h-10 w-10 rounded-full" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-28" />
+                    <Skeleton className="h-3 w-full" />
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         ) : conversations.length === 0 ? (
           <div className="flex h-full min-h-[240px] flex-col items-center justify-center gap-3 px-5 py-8 text-center">
@@ -850,7 +865,7 @@ export function ConversationsList({
             })}
           </ul>
         )}
-      </div>
+      </section>
 
       {hasMore ? (
         <div className="shrink-0 p-3 pt-0">

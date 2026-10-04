@@ -31,33 +31,9 @@ export const APP_ROUTES = {
 export const AGENT_TABS = ["build", "test", "deploy"] as const;
 export type AgentTab = (typeof AGENT_TABS)[number];
 
-const LEGACY_AGENT_TABS: Record<string, AgentTab> = {
-  general: "build",
-  agent: "build",
-  behaviour: "build",
-  customize: "deploy",
-  appearance: "deploy",
-  "conversation-starter": "deploy",
-  "suggested-questions": "deploy",
-  content: "deploy",
-  "lead-capture": "build",
-  installation: "deploy",
-  embed: "deploy",
-};
-
-export function resolveAgentTab(value?: string | null): AgentTab {
-  if (value && AGENT_TABS.includes(value as AgentTab)) return value as AgentTab;
-  return (value && LEGACY_AGENT_TABS[value]) || "build";
-}
-
-export function isAgentTab(value?: string | null): value is AgentTab {
-  return Boolean(value && AGENT_TABS.includes(value as AgentTab));
-}
-
-export function agentHref(tab?: AgentTab, hash?: string): string {
-  const query = tab && tab !== "build" ? `?tab=${tab}` : "";
+export function agentHref(hash?: string): string {
   const fragment = hash ? `#${encodeURIComponent(hash.replace(/^#/, ""))}` : "";
-  return `${APP_ROUTES.agent}${query}${fragment}`;
+  return `${APP_ROUTES.agent}${fragment}`;
 }
 
 export function queryStringFromSearchParams(
@@ -72,25 +48,4 @@ export function queryStringFromSearchParams(
     }
   }
   return query.toString();
-}
-
-export function canonicalAgentPath(params: Record<string, string | string[] | undefined>): string {
-  const query = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (key === "tab" || key === "section" || key === "subtab" || value === undefined) continue;
-    if (Array.isArray(value)) {
-      for (const entry of value) query.append(key, entry);
-    } else {
-      query.set(key, value);
-    }
-  }
-
-  const rawTab = Array.isArray(params.tab) ? params.tab[0] : params.tab;
-  const rawSection = Array.isArray(params.section) ? params.section[0] : params.section;
-  const rawSubtab = Array.isArray(params.subtab) ? params.subtab[0] : params.subtab;
-  const requestedTab = rawTab ?? rawSection ?? rawSubtab;
-  const tab = resolveAgentTab(requestedTab);
-  if (requestedTab && tab !== "build") query.set("tab", tab);
-
-  return `${APP_ROUTES.agent}${query.size > 0 ? `?${query.toString()}` : ""}`;
 }

@@ -16,7 +16,7 @@ export default async function SettingsPage() {
     <ContentLayout>
       <div className="container mx-auto">
         <header className="mb-8">
-          <h1 className="text-2xl font-semibold tracking-tight">{APP_PAGES.settings.label}</h1>
+          <h1 className="text-xl font-semibold tracking-tight">{APP_PAGES.settings.label}</h1>
           <p className="mt-2 text-sm text-muted-foreground">{APP_PAGES.settings.description}</p>
         </header>
         <section aria-labelledby="connections-heading">

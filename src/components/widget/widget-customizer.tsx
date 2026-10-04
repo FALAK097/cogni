@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { parseAsStringLiteral, useQueryState } from "nuqs";
 
 import { Bot, Code, Eye, MessageCircle, Sparkles } from "@/components/icons";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -150,49 +149,70 @@ function setConfigOverride<K extends keyof WidgetCustomizerConfig>(
   target[key] = value;
 }
 
-function WidgetCustomizerSkeleton() {
+export function WidgetCustomizerSkeleton() {
   return (
-    <div
-      className="flex h-full min-h-0 w-full flex-col gap-3 overflow-hidden p-2 sm:p-3 lg:flex-row"
+    <output
+      aria-busy="true"
+      aria-label="Loading Agent setup"
+      className="flex h-full min-h-0 w-full flex-col gap-2 overflow-hidden p-2 sm:gap-3 sm:p-3"
       style={getWidgetAccentVars(WIDGET_BRAND_COLOR)}
     >
-      <Skeleton className="size-9 shrink-0 rounded-lg" />
+      <div aria-hidden="true" className="flex shrink-0 flex-wrap items-center gap-2 px-1 py-1">
+        <Skeleton className="h-6 w-16 rounded" />
+        <Skeleton className="h-11 w-24 rounded-lg lg:hidden" />
+        <span className="ml-auto flex items-center gap-2">
+          <Skeleton className="h-4 w-20 rounded" />
+          <Skeleton className="h-10 w-28 rounded-lg" />
+        </span>
+      </div>
 
-      <div
-        className={cn(
-          WIDGET_SETTINGS_CARD_CLASS,
-          "flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden",
-        )}
-      >
-        <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
-          <Skeleton className="h-5 w-28 rounded" />
-          <Skeleton className="mt-2 h-4 w-56 rounded" />
-          <div className="mt-6 space-y-4">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <Skeleton key={index} className="h-14 w-full rounded-lg" />
-            ))}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 lg:flex-row lg:gap-3">
+        <div
+          aria-hidden="true"
+          className={cn(
+            WIDGET_SETTINGS_CARD_CLASS,
+            "flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden",
+          )}
+        >
+          <div
+            aria-hidden="true"
+            className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4 sm:px-6"
+          >
+            <Skeleton className="h-8 w-20 rounded-md" />
+            <Skeleton className="h-8 w-16 rounded-md" />
+            <Skeleton className="h-8 w-20 rounded-md" />
+          </div>
+          <div aria-hidden="true" className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+            <Skeleton className="h-5 w-36 rounded" />
+            <Skeleton className="mt-2 h-4 w-56 max-w-full rounded" />
+            <div className="mt-6 space-y-4">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <Skeleton key={index} className="h-14 w-full rounded-lg" />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div
+          aria-hidden="true"
+          className={cn(
+            WIDGET_CARD_CLASS,
+            "hidden h-[360px] min-h-0 w-full shrink-0 flex-col overflow-hidden sm:h-[420px] lg:flex lg:h-full lg:w-[380px] xl:w-[420px]",
+          )}
+        >
+          <div aria-hidden="true" className="flex shrink-0 gap-2 px-4 py-3">
+            <Skeleton className="h-8 w-20 rounded-md" />
+            <Skeleton className="h-8 w-20 rounded-md" />
+            <Skeleton className="h-7 w-7 rounded-md" />
+            <Skeleton className="h-7 w-7 rounded-md" />
+            <Skeleton className="h-7 w-7 rounded-md" />
+          </div>
+          <div className="flex min-h-0 flex-1 overflow-hidden p-4">
+            <Skeleton className="h-full min-h-0 w-full rounded-2xl" />
           </div>
         </div>
       </div>
-
-      <div
-        className={cn(
-          WIDGET_CARD_CLASS,
-          "hidden h-[360px] min-h-0 w-full shrink-0 flex-col overflow-hidden sm:h-[420px] lg:flex lg:h-full lg:w-[380px] xl:w-[420px]",
-        )}
-      >
-        <div className="flex shrink-0 gap-2 px-4 py-3">
-          <Skeleton className="h-8 w-20 rounded-md" />
-          <Skeleton className="h-8 w-20 rounded-md" />
-          <Skeleton className="h-7 w-7 rounded-md" />
-          <Skeleton className="h-7 w-7 rounded-md" />
-          <Skeleton className="h-7 w-7 rounded-md" />
-        </div>
-        <div className="flex min-h-0 flex-1 overflow-hidden p-4">
-          <Skeleton className="h-full min-h-0 w-full rounded-2xl" />
-        </div>
-      </div>
-    </div>
+    </output>
   );
 }
 
@@ -205,15 +225,7 @@ export function WidgetCustomizer({
 }) {
   const activeWorkspaceId = workspaceId || "";
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useQueryState(
-    "tab",
-    parseAsStringLiteral(AGENT_TABS).withDefault("build").withOptions({
-      clearOnDefault: true,
-      history: "push",
-      scroll: false,
-      shallow: true,
-    }),
-  );
+  const [activeTab, setActiveTab] = useState<AgentTab>("build");
   const [showMobilePreview, setShowMobilePreview] = useState(false);
   const [previewEvidence, setPreviewEvidence] = useState<WidgetPreviewEvidence | null>(null);
   const [sendingTestPrompt, setSendingTestPrompt] = useState<string | null>(null);
@@ -323,7 +335,7 @@ export function WidgetCustomizer({
 
   const handleTabChange = (value: string | number) => {
     if (typeof value !== "string" || !AGENT_TABS.includes(value as AgentTab)) return;
-    void setActiveTab(value as AgentTab);
+    setActiveTab(value as AgentTab);
   };
 
   const handleArrayChange = (
