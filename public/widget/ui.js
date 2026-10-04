@@ -469,7 +469,8 @@ function exitTickets() {
 }
 
 async function restoreChatView() {
-  state.messagesContainer.innerHTML = "";
+  state.messagesContainer.innerHTML =
+    '<div class="oc-panel-loading" role="status" aria-live="polite">Loading conversation…</div>';
 
   try {
     const data = await fetchSessionHistory(state.sessionDbId);
@@ -495,30 +496,30 @@ async function switchToSession(session) {
     return;
   }
 
-  const scopeKey = state.publicKey || state.config.workspaceId;
-  state.sessionDbId = session.id;
-  if (!state.preview) {
-    state.sessionToken = session.token;
-    state.sessionId = session.browserSessionId;
-    storeSessionId(state.sessionId, scopeKey);
-    storeSessionToken(state.sessionToken, scopeKey);
-  }
-
   exitPanelView();
-  resetChatState();
-  state.messagesContainer.innerHTML = "";
+  state.messagesContainer.innerHTML =
+    '<div class="oc-panel-loading" role="status" aria-live="polite">Loading conversation…</div>';
 
   try {
     const data = await fetchSessionHistory(session.id);
-    if (data?.messages?.length) {
-      restoreMessages(data.messages);
-      return;
+    if (data?.token && data?.sessionId) {
+      const scopeKey = state.publicKey || state.config.workspaceId;
+      state.sessionDbId = data.sessionId;
+      state.sessionId = data.browserSessionId || session.browserSessionId;
+      state.sessionToken = data.token;
+      storeSessionId(state.sessionId, scopeKey);
+      storeSessionToken(state.sessionToken, scopeKey);
+      resetChatState();
+      if (data.messages?.length) {
+        restoreMessages(data.messages);
+        return;
+      }
     }
   } catch (error) {
     console.error("widget: failed to load selected chat", error);
   }
 
-  addBotMessage(state.config.welcomeMessage);
+  void restoreChatView();
 }
 
 /**

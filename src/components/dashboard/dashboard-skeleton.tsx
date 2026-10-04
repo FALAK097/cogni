@@ -1,10 +1,10 @@
 import { Skeleton } from "@/components/ui/skeleton";
 
-export function DashboardSkeleton() {
+export function DashboardSkeleton({ label = "Loading Insights" }: { label?: string }) {
   return (
     <output
       aria-busy="true"
-      aria-label="Loading Insights"
+      aria-label={label}
       className="mx-auto flex w-full max-w-[1400px] flex-col gap-6 pb-8"
     >
       <div
