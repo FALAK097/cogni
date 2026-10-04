@@ -1,10 +1,10 @@
-import { LayoutGrid, MessageCircle, MessageSquare } from "@/components/icons";
+import { Bot, ChartNoAxesCombined, MessageSquare } from "@/components/icons";
 import { APP_PAGES, APP_ROUTES } from "@/features/navigation/app-routes";
 
 export type MenuItem = {
   href: string;
   label: string;
-  icon: typeof LayoutGrid;
+  icon: typeof Bot;
   submenus: { href: string; label: string; active?: boolean }[];
   active?: boolean;
 };
@@ -30,13 +30,13 @@ export function getStaticMenuList(): MenuList {
         {
           href: APP_ROUTES.agent,
           label: APP_PAGES.agent.label,
-          icon: MessageCircle,
+          icon: Bot,
           submenus: [],
         },
         {
           href: APP_ROUTES.insights,
           label: APP_PAGES.insights.label,
-          icon: LayoutGrid,
+          icon: ChartNoAxesCombined,
           submenus: [],
         },
       ],

@@ -21,7 +21,7 @@ function SidebarContent({ expanded }: { expanded: boolean }) {
     <div className="flex h-full min-h-0 flex-col items-stretch">
       <div className="flex-none px-4 pt-4 pb-2">
         <Link
-          href={APP_ROUTES.insights}
+          href={APP_ROUTES.inbox}
           aria-label={`${SITE_NAME} home`}
           onClick={closeMobileSidebar}
           className={cn(

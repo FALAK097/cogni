@@ -27,7 +27,7 @@ export function SheetMenu() {
       >
         <SheetHeader>
           <div className="flex items-center justify-center">
-            <Link href={APP_ROUTES.insights} className="flex items-center gap-2">
+            <Link href={APP_ROUTES.inbox} className="flex items-center gap-2">
               <ThemeLogo className="flex-shrink-0 w-6 h-6" />
               <h1
                 className={cn(

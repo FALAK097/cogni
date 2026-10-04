@@ -178,6 +178,7 @@ function Breadcrumbs() {
 }
 
 export function AppTopbar({ userData, className }: AppTopbarProps) {
+  const pathname = usePathname();
   const toggleOpen = useSidebar((state) => state.toggleOpen);
   const sidebarDisabled = useSidebar((state) => state.settings.disabled);
   const isMobile = useIsMobileSidebar();
@@ -185,6 +186,7 @@ export function AppTopbar({ userData, className }: AppTopbarProps) {
   const isOpen = useSidebar((state) => state.isOpen);
   const isHover = useSidebar((state) => state.isHover);
   const isHoverOpen = useSidebar((state) => state.settings.isHoverOpen);
+  const showBreadcrumbs = !Object.values(APP_PAGES).some((page) => page.href === pathname);
   const normalizedUserData = {
     avatar: userData?.avatar ?? "",
     name: userData?.name ?? "Unknown",
@@ -256,10 +258,10 @@ export function AppTopbar({ userData, className }: AppTopbarProps) {
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-            <div className="h-6 w-px shrink-0 bg-border" />
+            {showBreadcrumbs && <div className="h-6 w-px shrink-0 bg-border" />}
           </>
         )}
-        <Breadcrumbs />
+        {showBreadcrumbs && <Breadcrumbs />}
       </div>
       <div className="flex shrink-0 items-center gap-1 sm:gap-2">
         <ModeToggle />

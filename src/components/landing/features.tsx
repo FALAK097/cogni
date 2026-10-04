@@ -368,16 +368,16 @@ const FEATURES = [
     Visual: HandoffVisual,
   },
   {
-    tag: "Knowledge Base",
+    tag: "Agent · Knowledge sources",
     title: (
       <>
-        Bring your knowledge.
+        Ground your agent.
         <br />
         Track each source.
       </>
     ),
     description:
-      "Add website URLs, sitemaps, text, and supported files. Track processing status in your knowledge base.",
+      "Add website URLs, sitemaps, text, and supported files in Agent → Build, then track each source as it processes.",
     bg: "#FFF2DF",
     color: "#C64E27",
     Visual: KnowledgeVisual,

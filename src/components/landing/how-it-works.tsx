@@ -3,32 +3,32 @@ import { SectionLayout, SectionHeader } from "./section-layout";
 const STEPS = [
   {
     num: "01",
-    title: "Connect your website",
+    title: "Build your agent",
     description:
-      "Add the widget script to your site, then review the domain and publication settings in Agent → Deploy.",
+      "Add website URLs, sitemaps, text, and supported files in Agent → Build.",
     color: "#6366f1",
     bg: "#eef0fe",
   },
   {
     num: "02",
-    title: "Import your knowledge",
+    title: "Test its answers",
     description:
-      "Add website URLs, sitemaps, text, and supported files. Check that each source is ready.",
+      "Try real customer questions in Agent → Test and review the sources behind each answer.",
     color: "#10b981",
     bg: "#ecfdf5",
   },
   {
     num: "03",
-    title: "Customize your widget",
+    title: "Deploy your widget",
     description:
-      "In Agent → Deploy, set the widget's appearance and conversation starters to fit your site.",
+      "In Agent → Deploy, customize the experience, authorize your domain, and install the widget.",
     color: "#f59e0b",
     bg: "#fffbeb",
   },
   {
     num: "04",
-    title: "Test and go live",
-    description: "Try real questions in Agent → Test, review the answers, then publish your agent.",
+    title: "Support customers in Inbox",
+    description: "Review conversations and reply from Inbox whenever a customer needs your team.",
     color: "#8b5cf6",
     bg: "#f5f3ff",
   },

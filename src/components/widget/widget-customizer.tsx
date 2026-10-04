@@ -669,7 +669,7 @@ export function WidgetCustomizer({
       style={getWidgetAccentVars(WIDGET_BRAND_COLOR)}
     >
       <div className="flex shrink-0 flex-wrap items-center gap-2">
-        <h1 className="hidden text-xl font-semibold tracking-tight text-foreground lg:block">
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">
           {APP_PAGES.agent.label}
         </h1>
         <button
