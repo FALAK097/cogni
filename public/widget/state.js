@@ -17,6 +17,7 @@ export const state = {
   isInitialized: false,
   hasInteracted: false,
   isMenuOpen: false,
+  isSending: false,
 
   // Session state
   sessionId: null,

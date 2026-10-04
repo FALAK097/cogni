@@ -275,6 +275,25 @@ export function getAssistantAnnouncement(agentName, state = "complete") {
   return `${name} has replied.`;
 }
 
+export function renderTeamMessageHeader(authorName) {
+  const name =
+    typeof authorName === "string" && authorName.trim() ? authorName.trim() : "Support team";
+  const initials = name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+
+  return `
+    <div class="oc-bot-header oc-team-header">
+      <div class="oc-team-avatar" aria-hidden="true">${escapeHtml(initials)}</div>
+      <span class="oc-bot-name">${escapeHtml(name)}</span>
+      <span class="oc-team-label">Support</span>
+    </div>
+  `;
+}
+
 function normalizeMessageHref(destination) {
   const value = destination.trim();
   if (!value) return null;

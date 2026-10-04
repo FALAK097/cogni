@@ -42,11 +42,14 @@ import {
   formatBotMessage,
   getCurrentTime,
   getAssistantAnnouncement,
+  renderTeamMessageHeader,
   generateUUID,
   renderAvatarMarkup,
   renderBotAvatarMarkup,
   attachAvatarImageFallbacks,
 } from "./utils.js";
+
+let historyRefreshInFlight = false;
 
 /**
  * Create the widget DOM structure
@@ -562,14 +565,24 @@ function stopMessagePolling() {
 }
 
 async function refreshMessagesFromServer() {
-  if (!state.sessionDbId || state.activePanel) return;
+  if (!state.sessionDbId || state.activePanel || state.isSending || historyRefreshInFlight) return;
+  const sessionDbId = state.sessionDbId;
+  const historyLength = state.conversationHistory.length;
+  historyRefreshInFlight = true;
   try {
-    const data = await fetchSessionHistory(state.sessionDbId);
-    if (data?.messages?.length) {
+    const data = await fetchSessionHistory(sessionDbId);
+    if (
+      data?.messages?.length &&
+      state.sessionDbId === sessionDbId &&
+      state.conversationHistory.length === historyLength &&
+      !state.isSending
+    ) {
       restoreMessages(data.messages);
     }
   } catch (error) {
     console.error("widget: failed to refresh messages", error);
+  } finally {
+    historyRefreshInFlight = false;
   }
 }
 
@@ -681,21 +694,24 @@ export function restoreMessages(messages) {
   if (privacyEl) privacyEl.style.display = "none";
 
   messages.forEach((msg) => {
+    const timestamp = msg.createdAt || msg.timestamp || null;
     if (msg.role === "user") {
-      addUserMessage(msg.content, msg.timestamp, true);
+      addUserMessage(msg.content, timestamp, true);
       state.conversationHistory.push({ role: "user", content: msg.content });
     } else if (msg.role === "assistant") {
-      // Check if this is a document message
-      if (msg.metadata?.type === "documents" && msg.metadata?.documents?.length > 0) {
+      if (msg.authorType === "TEAM") {
+        addTeamMessage(msg.content, msg.authorName, timestamp);
+        // Check if this is a document message
+      } else if (msg.metadata?.type === "documents" && msg.metadata?.documents?.length > 0) {
         restoreDocumentMessage(
           msg.content,
           msg.metadata.documents,
-          msg.timestamp,
+          timestamp,
           msg.id,
           msg.feedback,
         );
       } else {
-        addBotMessage(msg.content, msg.timestamp, true, msg.id, msg.feedback);
+        addBotMessage(msg.content, timestamp, true, msg.id, msg.feedback);
       }
       state.conversationHistory.push({ role: "assistant", content: msg.content });
     }
@@ -718,6 +734,19 @@ export function addUserMessage(text, timestamp = null, isRestored = false) {
   if (!isRestored) {
     state.conversationHistory.push({ role: "user", content: text });
   }
+}
+
+/** Restore a public reply from a teammate without presenting it as an AI answer. */
+function addTeamMessage(text, authorName, timestamp = null) {
+  const msg = document.createElement("div");
+  msg.className = "oc-message team";
+  msg.innerHTML = `
+		${renderTeamMessageHeader(authorName)}
+		<div class="oc-bubble">${formatBotMessage(text)}</div>
+		<div class="oc-timestamp">${formatTimestamp(timestamp)}</div>
+	`;
+  state.messagesContainer.appendChild(msg);
+  scrollToBottom();
 }
 
 /**
@@ -845,7 +874,8 @@ export function removeTypingIndicator() {
  */
 export async function sendMessage() {
   const text = state.input.value.trim();
-  if (!text) return;
+  if (!text || state.isSending) return;
+  state.isSending = true;
 
   if (!state.hasInteracted) {
     state.hasInteracted = true;
@@ -869,6 +899,7 @@ export async function sendMessage() {
     const searchQuery = extractBrochureSearchQuery(text);
     searchAndDisplayDocuments(searchQuery);
     if (sendBtn) sendBtn.disabled = false;
+    state.isSending = false;
     return;
   }
 
@@ -877,6 +908,7 @@ export async function sendMessage() {
     const triggered = await detectLeadCapture(text);
     if (triggered) {
       if (sendBtn) sendBtn.disabled = false;
+      state.isSending = false;
       return;
     }
   }
@@ -965,6 +997,7 @@ async function callWidgetChat(userMessage, interactionId) {
     // Re-enable send button
     const sendBtn = state.windowEl.querySelector(".oc-send-btn");
     if (sendBtn) sendBtn.disabled = false;
+    state.isSending = false;
 
     // Check if we should trigger lead capture
     await detectLeadCapture();
@@ -1000,6 +1033,7 @@ async function callWidgetChat(userMessage, interactionId) {
 
     const sendBtn = state.windowEl.querySelector(".oc-send-btn");
     if (sendBtn) sendBtn.disabled = false;
+    state.isSending = false;
   }
 }
 

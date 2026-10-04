@@ -29,10 +29,47 @@ const {
   readWidgetModelText,
   createWidgetCompletion,
   interruptWidgetTextStream,
+  toWidgetHistoryMessages,
 } = await import(
   `data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString("base64")}`
 );
 const encoder = new TextEncoder();
+
+test("public widget history preserves teammate attribution and excludes internal notes", () => {
+  const history = toWidgetHistoryMessages([
+    { id: "visitor", body: "Where is my order?", authorType: "VISITOR", createdAt: "now" },
+    { id: "ai", body: "I can check that.", authorType: "AI", createdAt: "now" },
+    {
+      id: "team",
+      body: "I found your order.",
+      authorType: "TEAM",
+      authorName: '<img src=x onerror="alert(1)">',
+      visibility: "PUBLIC",
+      createdAt: "now",
+    },
+    {
+      id: "note",
+      body: "Internal escalation details",
+      authorType: "TEAM",
+      authorName: "Sam",
+      visibility: "INTERNAL",
+      createdAt: "now",
+    },
+  ]);
+
+  assert.deepEqual(history, [
+    { id: "visitor", role: "user", content: "Where is my order?", createdAt: "now" },
+    { id: "ai", role: "assistant", content: "I can check that.", createdAt: "now" },
+    {
+      id: "team",
+      role: "assistant",
+      authorType: "TEAM",
+      authorName: '<img src=x onerror="alert(1)">',
+      content: "I found your order.",
+      createdAt: "now",
+    },
+  ]);
+});
 
 async function* textChunks(chunks) {
   yield* chunks;

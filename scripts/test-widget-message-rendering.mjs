@@ -44,9 +44,10 @@ globalThis.document = {
   },
 };
 
-const { formatBotMessage, getAssistantAnnouncement, getSafeDocumentHref } = await import(
-  `data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString("base64")}`
-);
+const { formatBotMessage, getAssistantAnnouncement, getSafeDocumentHref, renderTeamMessageHeader } =
+  await import(
+    `data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString("base64")}`
+  );
 const documentsCompiled = await build({
   entryPoints: ["public/widget/documents.js"],
   bundle: true,
@@ -213,4 +214,14 @@ test("assistant live announcements summarize typing, completion, and interruptio
     getAssistantAnnouncement(" ", "error"),
     "Assistant couldn't respond. Please try again.",
   );
+});
+
+test("teammate history uses a distinct, safely escaped support identity", () => {
+  const header = renderTeamMessageHeader('<img src=x onerror="alert(1)">');
+  assert.ok(header.includes("&lt;img src=x onerror=&quot;alert(1)&quot;&gt;"));
+  assert.ok(header.includes('class="oc-team-avatar" aria-hidden="true">'));
+  assert.ok(header.includes("&lt;"));
+  assert.ok(header.includes('class="oc-team-label">Support</span>'));
+  assert.doesNotMatch(header, /<img\b/i);
+  assert.ok(renderTeamMessageHeader(" ").includes(">Support team</span>"));
 });

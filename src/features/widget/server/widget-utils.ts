@@ -6,20 +6,30 @@ import type { MessageJson } from "@/features/conversations/server/conversation-s
 export type WidgetHistoryMessage = {
   id: string;
   role: "user" | "assistant";
+  authorType?: "TEAM";
+  authorName?: string;
   content: string;
   metadata?: Record<string, unknown>;
   createdAt?: string;
 };
 
 export function toWidgetHistoryMessages(messages: MessageJson[]): WidgetHistoryMessage[] {
-  return messages.map((message) => {
-    return {
-      id: message.id,
-      role: message.authorType === "VISITOR" ? "user" : "assistant",
-      content: message.body,
-      createdAt: message.createdAt,
-    };
-  });
+  return messages
+    .filter((message) => message.visibility === "PUBLIC" || !message.visibility)
+    .map((message) => {
+      return {
+        id: message.id,
+        role: message.authorType === "VISITOR" ? "user" : "assistant",
+        ...(message.authorType === "TEAM"
+          ? {
+              authorType: "TEAM" as const,
+              ...(message.authorName ? { authorName: message.authorName } : {}),
+            }
+          : {}),
+        content: message.body,
+        createdAt: message.createdAt,
+      };
+    });
 }
 
 export function widgetHistoryToUiMessages(value: unknown) {

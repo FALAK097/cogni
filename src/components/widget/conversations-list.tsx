@@ -4,7 +4,7 @@ import { format, isToday, isYesterday } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import Link from "next/link";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { FormEvent, KeyboardEvent as ReactKeyboardEvent } from "react";
 import {
   AlertCircle,
@@ -73,6 +73,9 @@ interface ConversationsListProps {
 }
 
 const PAGE_SIZE = 20;
+const subscribeToHydration = () => () => {};
+const getClientHydrationSnapshot = () => true;
+const getServerHydrationSnapshot = () => false;
 
 function getDisplayName(conversation: ConversationSummary) {
   if (
@@ -122,6 +125,11 @@ export function ConversationsList({
   const [labelFilter, setLabelFilter] = useState<string>(initialLabel ?? "");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [savingView, setSavingView] = useState(false);
+  const hasHydrated = useSyncExternalStore(
+    subscribeToHydration,
+    getClientHydrationSnapshot,
+    getServerHydrationSnapshot,
+  );
   const [savedViewName, setSavedViewName] = useState("");
   const [saveViewError, setSaveViewError] = useState<string | null>(null);
   const [saveViewMessage, setSaveViewMessage] = useState<string | null>(null);
@@ -194,7 +202,7 @@ export function ConversationsList({
 
   const {
     data: conversationsData,
-    isLoading,
+    isPending: isConversationsPending,
     isFetching,
     isPlaceholderData,
     isError,
@@ -235,7 +243,7 @@ export function ConversationsList({
     return result;
   }, [effectivePagesCache, page, conversationsData?.conversations]);
   const isResultsBusy =
-    (isLoading && conversations.length === 0) ||
+    ((!hasHydrated || isConversationsPending) && conversations.length === 0) ||
     isSearchPending ||
     (page === 1 && isFetching && isPlaceholderData);
 
@@ -661,7 +669,7 @@ export function ConversationsList({
               Retry loading
             </Button>
           </div>
-        ) : isLoading && conversations.length === 0 ? (
+        ) : (!hasHydrated || isConversationsPending) && conversations.length === 0 ? (
           <div className="space-y-1 px-2 pb-2">
             <div aria-hidden="true" className="space-y-1">
               {Array.from({ length: 6 }).map((_, index) => (

@@ -341,6 +341,10 @@ export function injectStyles() {
 			align-self: flex-start;
 		}
 
+		.oc-message.team {
+			align-self: flex-start;
+		}
+
 		.oc-screen-reader-only {
 			position: absolute;
 			width: 1px;
@@ -381,6 +385,12 @@ export function injectStyles() {
 		}
 
 		.oc-message.bot .oc-bubble {
+			background-color: ${config.botBubbleColor};
+			color: ${config.botBubbleTextColor};
+			border-bottom-left-radius: 2px;
+		}
+
+		.oc-message.team .oc-bubble {
 			background-color: ${config.botBubbleColor};
 			color: ${config.botBubbleTextColor};
 			border-bottom-left-radius: 2px;
@@ -507,6 +517,34 @@ export function injectStyles() {
 			font-size: 12px;
 			font-weight: 500;
 			color: ${config.theme === "dark" ? "#71717a" : "#71717a"};
+		}
+
+		.oc-team-avatar {
+			width: 24px;
+			height: 24px;
+			border-radius: 50%;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			flex-shrink: 0;
+			background: ${config.theme === "dark" ? "#27272a" : "#f4f4f5"};
+			color: ${config.theme === "dark" ? "#d4d4d8" : "#52525b"};
+			font-size: 9px;
+			font-weight: 600;
+			letter-spacing: 0.02em;
+		}
+
+		.oc-team-label {
+			font-size: 10px;
+			color: ${config.theme === "dark" ? "#71717a" : "#a1a1aa"};
+		}
+
+		.oc-team-header .oc-bot-name {
+			max-width: 140px;
+			min-width: 0;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
 		}
 
 		.oc-timestamp {
