@@ -29,7 +29,7 @@
     "test:widget-settings": "node --test scripts/test-widget-settings.mjs",
     "test:agent-tests": "node --test scripts/test-agent-tests.mjs",
     "test:agent-readiness": "node --test scripts/test-agent-readiness.mjs",
-    "test:conversation-append": "node --test scripts/test-conversation-append.mjs",
+    "test:conversation-append": "node --test scripts/test-conversation-append.mjs scripts/test-dashboard-session-patch.mjs",
     "test:conversation-draft": "node --test scripts/test-conversation-draft.mjs",
     "test:conversation-scroll": "node --test scripts/test-conversation-scroll.mjs",
     "test:conversation-timeline": "node --test scripts/test-conversation-timeline.mjs",
@@ -70,7 +70,8 @@
     "cf:deploy": "wrangler deploy --config workers/ingestion-queue/wrangler.jsonc",
     "prepare": "husky",
     "test:analytics-knowledge-gap-review-route": "node --test scripts/test-analytics-knowledge-gap-review-route.mjs",
-    "test:navigation-routes": "node --test scripts/test-navigation-routes.mjs"
+    "test:navigation-routes": "node --test scripts/test-navigation-routes.mjs",
+    "test:dashboard-session-patch": "node --test scripts/test-dashboard-session-patch.mjs"
   },
   "dependencies": {
     "@ai-sdk/google": "4.0.87",

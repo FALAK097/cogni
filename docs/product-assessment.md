@@ -199,6 +199,13 @@ Synthetic testing added one clearly named QA-only Atlas policy source and a loca
 
 Independent review of the incremental diff found the SDK error/abort and terminal-persistence gaps. Both were corrected and verified with installed-SDK mocks; the reviewer approved the scoped changes after those fixes. This does not establish full product readiness.
 
+On 2026-10-04, the dashboard session PATCH route stopped replacing transcripts from stale reads:
+public replies and internal notes now use the workspace-scoped atomic append helper, and assignment
+updates include the workspace predicate. Streamed JSON is capped at 48 KiB before parsing; reply and
+note text is validated at 10,000 characters. Three focused body/action tests and the 13-case local
+PostgreSQL conversation-append suite pass. `pnpm check` passes. The route remains part of the broader
+Inbox security review; this does not prove every mutation path or production runtime behavior.
+
 The knowledge URL SSRF boundary is implemented in the current PR branch for both website crawling
 and direct URL extraction. One server-only fetcher rejects credentials, local names, nonstandard
 ports, and non-public IPv4/IPv6 answers; pins the selected DNS address per request; rechecks each

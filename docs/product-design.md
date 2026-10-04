@@ -118,10 +118,10 @@ metadata. Privileged buttons follow role policy; denied states explain required 
 
 ## Agent lifecycle
 
-Keep `/playground` working and label it Agent. Its four focused steps are **Build** (instructions,
+Use `/agent` as the canonical Agent route; legacy `/playground` URLs redirect to the matching tab. Its four focused steps are **Build** (instructions,
 behavior and connected actions), **Test** (safe sandbox conversations and evidence), **Customize**
 (appearance and conversation prompts), and **Deploy** (installation and allowed domains). Keep the
-live widget preview beside these steps. Legacy `subtab` URLs resolve to the matching step.
+live widget preview beside these steps. Legacy `subtab` and `section` query values normalize to `?tab=`; the default Build tab has no query parameter.
 
 Test uses the authenticated preview sandbox: external actions stay disabled, preview messages stay
 out of Inbox and Insights, and a reset starts a fresh preview session. Show retrieved source titles
