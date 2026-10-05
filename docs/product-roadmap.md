@@ -282,3 +282,7 @@ loading states without speaking on every background poll. The first-run setup ac
 the canonical workspace-empty screen. Focused inbox tests pass 21/21; current combined local
 validation includes lint, typecheck, formatting, and production build. Browser acceptance remains
 unverified for this pass.
+
+Agent Test now uses saved-test-shaped loading placeholders, a retryable load error, and a compact
+first-use empty state that points to the existing Add test action. A failed refresh keeps cached
+tests visible and explains their age. Focused saved-test and preview-evidence checks pass 8/8.

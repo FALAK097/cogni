@@ -11,6 +11,7 @@ import {
   Plus,
   Trash2,
 } from "@/components/icons";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { agentHref } from "@/features/navigation/app-routes";
@@ -449,21 +450,50 @@ export function WidgetTestPanel({
         </div>
         {casesQuery.isLoading ? (
           <output aria-busy="true" aria-label="Loading saved tests" className="space-y-2">
-            <Skeleton aria-hidden="true" className="h-14 w-full rounded-lg" />
-            <Skeleton aria-hidden="true" className="h-14 w-full rounded-lg" />
+            <div aria-hidden="true" className="space-y-2">
+              {Array.from({ length: 2 }).map((_, index) => (
+                <div key={index} className="rounded-lg border border-border/60 p-3">
+                  <Skeleton className="h-4 w-40 max-w-[70%]" />
+                  <Skeleton className="mt-2 h-3 w-3/4" />
+                  <Skeleton className="mt-3 h-7 w-24 rounded-md" />
+                </div>
+              ))}
+            </div>
           </output>
         ) : null}
         {casesQuery.isError ? (
-          <p role="alert" className="text-sm text-destructive">
-            {casesQuery.error.message}
-          </p>
+          <div
+            role={casesQuery.data ? undefined : "alert"}
+            aria-live={casesQuery.data ? "polite" : undefined}
+            className="flex flex-col gap-3 rounded-lg border border-border/70 bg-muted/30 px-3.5 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+          >
+            <p className="text-muted-foreground">
+              {casesQuery.data
+                ? "Couldn’t refresh saved tests. Showing the last loaded results."
+                : "Saved tests could not be loaded. Try again."}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="min-h-9 shrink-0"
+              onClick={() => void casesQuery.refetch()}
+              disabled={casesQuery.isFetching}
+            >
+              {casesQuery.isFetching ? "Retrying…" : "Try again"}
+            </Button>
+          </div>
         ) : null}
         {casesQuery.data?.cases.length === 0 ? (
-          <p className="rounded-lg bg-muted/40 px-3 py-3 text-sm text-muted-foreground">
-            {canManage
-              ? "Save a prompt to rerun your most important agent checks."
-              : "No saved tests in this workspace yet."}
-          </p>
+          <EmptyState
+            title="No saved tests yet"
+            className="min-h-[120px] rounded-lg bg-muted/20 p-4 sm:p-4"
+            description={
+              canManage
+                ? "Add a reusable prompt to rerun an important agent check."
+                : "A workspace owner can add reusable checks for the team."
+            }
+          />
         ) : null}
         {batchProgress ? (
           <p className="text-xs text-muted-foreground" aria-live="polite">
