@@ -10,6 +10,7 @@ import { useConnectIntegration, useIntegrations } from "@/hooks/query";
 import { INTEGRATION_CATEGORIES } from "@/features/integrations/categories";
 import { getAllIntegrations, getIntegrationsByCategory } from "@/features/integrations/registry";
 import { Info } from "@/components/icons";
+import { IntegrationsPageSkeleton } from "@/features/integrations/components/integrations-page-skeleton";
 
 export function WidgetIntegrationsPage({ canManage }: { canManage: boolean }) {
   const { toast } = useToast();
@@ -57,7 +58,7 @@ export function WidgetIntegrationsPage({ canManage }: { canManage: boolean }) {
   }
 
   if (integrationsQuery.isLoading) {
-    return <p className="text-sm text-muted-foreground">Loading integrations…</p>;
+    return <IntegrationsPageSkeleton />;
   }
 
   if (integrationsQuery.isError && !integrationsQuery.data) {
@@ -105,7 +106,9 @@ export function WidgetIntegrationsPage({ canManage }: { canManage: boolean }) {
       })}
 
       {getAllIntegrations().length === 0 ? (
-        <p className="text-sm text-muted-foreground">No integrations configured.</p>
+        <p className="rounded-xl border border-dashed border-border/70 px-5 py-8 text-center text-sm text-muted-foreground">
+          No connections are available yet.
+        </p>
       ) : null}
     </div>
   );
