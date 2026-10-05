@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { queryKeys } from "@/lib/query-keys";
 import { useActiveWorkspaceId } from "@/hooks/use-auth";
@@ -28,15 +29,78 @@ export function BookingSettingsCard() {
       return response.json() as Promise<{ settings: BookingSettings }>;
     },
   });
-  if (query.isLoading) return <div className="h-48 animate-pulse rounded-2xl border bg-muted/30" />;
+  if (query.isLoading) return <BookingSettingsSkeleton />;
   if (!query.data)
-    return <p className="text-sm text-destructive">Could not load booking settings.</p>;
+    return (
+      <div
+        role="alert"
+        className="flex flex-col items-start gap-4 rounded-2xl border border-border/70 bg-card p-5 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <div>
+          <h2 className="font-semibold">Booking settings unavailable</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            We couldn’t load booking settings. Check your connection and try again.
+          </p>
+        </div>
+        <Button variant="outline" onClick={() => void query.refetch()} disabled={query.isFetching}>
+          {query.isFetching ? "Trying again…" : "Try again"}
+        </Button>
+      </div>
+    );
   return (
-    <BookingForm
-      key={JSON.stringify(query.data.settings)}
-      initial={query.data.settings}
-      workspaceId={workspaceId}
-    />
+    <>
+      {query.isError ? (
+        <output className="mb-4 flex flex-col items-start gap-3 rounded-xl border border-border/70 bg-muted/30 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted-foreground">
+            Couldn’t refresh booking settings. Showing the last loaded settings.
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void query.refetch()}
+            disabled={query.isFetching}
+          >
+            {query.isFetching ? "Trying again…" : "Try again"}
+          </Button>
+        </output>
+      ) : null}
+      <BookingForm
+        key={JSON.stringify(query.data.settings)}
+        initial={query.data.settings}
+        workspaceId={workspaceId}
+      />
+    </>
+  );
+}
+
+function BookingSettingsSkeleton() {
+  return (
+    <output
+      aria-busy="true"
+      aria-label="Loading booking settings"
+      className="block space-y-5 rounded-2xl border border-border/60 bg-card p-5"
+    >
+      <div aria-hidden="true" className="space-y-2">
+        <Skeleton className="h-5 w-40" />
+        <Skeleton className="h-4 w-64 max-w-full" />
+      </div>
+      <div
+        aria-hidden="true"
+        className="flex h-12 items-center justify-between rounded-xl border p-3"
+      >
+        <Skeleton className="h-4 w-40" />
+        <Skeleton className="h-5 w-9 rounded-full" />
+      </div>
+      <div aria-hidden="true" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div key={index} className="space-y-2">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-10 w-full rounded-lg" />
+          </div>
+        ))}
+      </div>
+      <Skeleton aria-hidden="true" className="h-9 w-24 rounded-lg" />
+    </output>
   );
 }
 
