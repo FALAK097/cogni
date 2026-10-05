@@ -17,6 +17,7 @@
     "typecheck": "tsc --noEmit",
     "test:widget-stream": "node --test scripts/test-widget-stream.mjs",
     "test:widget-history-route": "node --test scripts/test-widget-history-route.mjs",
+    "test:widget-documents-route": "node --test scripts/test-widget-documents-route.mjs",
     "test:widget-message-rendering": "node --test scripts/test-widget-message-rendering.mjs",
     "test:widget-preview-isolation": "node --test scripts/test-widget-preview-isolation.mjs",
     "test:widget-preview-evidence": "node --test scripts/test-widget-preview-evidence.mjs",
