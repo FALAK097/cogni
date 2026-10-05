@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle, Info } from "@/components/icons";
 import { useToast } from "@/components/ui/use-toast";
 import { queryKeys } from "@/lib/query-keys";
@@ -66,7 +67,37 @@ export function PendingActionsCard({ canManage }: { canManage: boolean }) {
     },
   });
 
-  if (query.isLoading || !query.data || query.data.approvals.length === 0) return null;
+  if (query.isLoading) {
+    return (
+      <output aria-busy="true" aria-label="Checking pending approvals" className="block">
+        <Card aria-hidden="true">
+          <CardHeader>
+            <Skeleton className="h-5 w-52 max-w-full" />
+            <Skeleton className="h-4 w-72 max-w-full" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-16 w-full rounded-xl" />
+          </CardContent>
+        </Card>
+      </output>
+    );
+  }
+
+  if (query.isError && !query.data) {
+    return (
+      <div role="alert" className="rounded-xl border border-border bg-card p-5">
+        <p className="font-medium">Pending approvals could not be loaded</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Try again to check for agent actions that need your review.
+        </p>
+        <Button className="mt-4" variant="outline" onClick={() => void query.refetch()}>
+          Try again
+        </Button>
+      </div>
+    );
+  }
+
+  if (!query.data || query.data.approvals.length === 0) return null;
 
   return (
     <Card>
@@ -76,6 +107,17 @@ export function PendingActionsCard({ canManage }: { canManage: boolean }) {
           Review external writes requested by the widget or an automated workflow.
         </p>
       </CardHeader>
+      {query.isError ? (
+        <div role="alert" className="mx-6 rounded-lg border border-border bg-muted/30 p-3 text-sm">
+          <p className="font-medium">Approvals may be out of date</p>
+          <p className="mt-1 text-muted-foreground">
+            The latest review status could not be checked.
+          </p>
+          <Button className="mt-3" variant="outline" size="sm" onClick={() => void query.refetch()}>
+            Try again
+          </Button>
+        </div>
+      ) : null}
       <CardContent className="space-y-3">
         {query.data.approvals.map((approval) => {
           const isPending = decision.isPending && decision.variables.approval.id === approval.id;
