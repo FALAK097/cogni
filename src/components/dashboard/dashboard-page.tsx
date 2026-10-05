@@ -477,9 +477,9 @@ function DashboardCard({ className, children }: { className?: string; children: 
 
 function CardSkeleton({ className }: { className?: string }) {
   return (
-    <div
+    <Skeleton
       className={cn(
-        "animate-pulse rounded-xl border border-border/50 bg-transparent",
+        "rounded-xl border border-border/50 bg-transparent",
         className ?? "h-[156px]",
       )}
     />

@@ -4,12 +4,12 @@ function Skeleton({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="skeleton"
-      aria-hidden="true"
       className={cn(
         "motion-safe:animate-pulse motion-reduce:animate-none rounded-2xl bg-muted",
         className,
       )}
       {...props}
+      aria-hidden="true"
     />
   );
 }
