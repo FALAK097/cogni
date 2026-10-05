@@ -1,3 +1,4 @@
+pyenv: cannot rehash: /Users/falakgala/.pyenv/shims isn't writable
 "use client";
 
 import { format, isToday, isYesterday } from "date-fns";
@@ -696,7 +697,7 @@ export function ConversationsList({
                 {searchTerm || hasFacetFilters
                   ? "Try another search or clear the active filters."
                   : filter === "all"
-                    ? "New website chats will appear here when your agent is live."
+                    ? "Website chats and messages from connected channels will appear here."
                     : filter === "unread"
                       ? "Unread visitor messages will show up here."
                       : filter === "snoozed"

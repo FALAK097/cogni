@@ -1,3 +1,4 @@
+pyenv: cannot rehash: /Users/falakgala/.pyenv/shims isn't writable
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -296,7 +297,7 @@ export function WidgetConversations({ canManage }: WidgetConversationsProps) {
             <div>
               <h2 className="text-sm font-semibold text-foreground">Your inbox is ready</h2>
               <p className="mt-1 max-w-sm text-sm leading-relaxed text-muted-foreground">
-                Set up your agent to start receiving website conversations here.
+                Set up your agent or connect a channel to start receiving conversations here.
               </p>
             </div>
             {canManage ? (
@@ -311,7 +312,8 @@ export function WidgetConversations({ canManage }: WidgetConversationsProps) {
               </Button>
             ) : (
               <p className="max-w-sm text-xs text-muted-foreground">
-                A workspace owner needs to finish setup before conversations can arrive.
+                A workspace owner needs to finish agent setup or connect a channel before
+                conversations can arrive.
               </p>
             )}
           </section>
