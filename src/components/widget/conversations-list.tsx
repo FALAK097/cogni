@@ -1,4 +1,3 @@
-pyenv: cannot rehash: /Users/falakgala/.pyenv/shims isn't writable
 "use client";
 
 import { format, isToday, isYesterday } from "date-fns";

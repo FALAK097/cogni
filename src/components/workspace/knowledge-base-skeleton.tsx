@@ -1,4 +1,3 @@
-pyenv: cannot rehash: /Users/falakgala/.pyenv/shims isn't writable
 import { Skeleton } from "@/components/ui/skeleton";
 
 const ROW_COUNT = 5;
