@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { APP_ROUTES } from "@/features/navigation/app-routes";
 
 import { randomUUID } from "node:crypto";
 import { eq, and } from "drizzle-orm";
@@ -78,7 +79,7 @@ export async function addUrlSourceAction(
     return { error: "Could not process that URL." };
   }
 
-  revalidatePath("/knowledge-base");
+  revalidatePath(APP_ROUTES.agent);
   return { savedAt: Date.now() };
 }
 
@@ -142,7 +143,7 @@ export async function uploadDocumentAction(formData: FormData) {
     // Status updated inside processDocument.
   }
 
-  revalidatePath("/knowledge-base");
+  revalidatePath(APP_ROUTES.agent);
 }
 
 export async function addManualTextSourceAction(
@@ -197,7 +198,7 @@ export async function addManualTextSourceAction(
     return { error: "Could not process that text." };
   }
 
-  revalidatePath("/knowledge-base");
+  revalidatePath(APP_ROUTES.agent);
   return { savedAt: Date.now() };
 }
 
@@ -244,7 +245,7 @@ export async function importSitemapSourceAction(
     return { error: "Could not process that sitemap." };
   }
 
-  revalidatePath("/knowledge-base");
+  revalidatePath(APP_ROUTES.agent);
   return { savedAt: Date.now() };
 }
 
@@ -271,5 +272,5 @@ export async function deleteDocumentAction(formData: FormData) {
   await db
     .delete(documentTable)
     .where(and(eq(documentTable.id, documentId), eq(documentTable.workspaceId, workspace.id)));
-  revalidatePath("/knowledge-base");
+  revalidatePath(APP_ROUTES.agent);
 }

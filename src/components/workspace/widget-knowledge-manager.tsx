@@ -281,13 +281,30 @@ export function WidgetKnowledgeManager({ canManage }: { canManage: boolean }) {
         canManage={canManage}
         addMenuOpen={addMenuOpen}
         isRefetching={isRefetching}
-        showRetry={sourcesQuery.isError && !isInitialLoading}
+        showRetry={sourcesQuery.isError && !isInitialLoading && !sourcesQuery.data}
         onAddMenuOpenChange={setAddMenuOpen}
         onRetry={() => sourcesQuery.refetch()}
         onSelectAddDialog={startAddDialog}
       />
 
       {addError ? <ErrorBanner message={addError} onDismiss={() => setAddError(null)} /> : null}
+      {sourcesQuery.isError && sourcesQuery.data ? (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm text-muted-foreground"
+        >
+          <span>Couldn’t refresh knowledge sources. Showing the last loaded version.</span>
+          <Button
+            size="sm"
+            variant="outline"
+            className="min-h-9"
+            disabled={isRefetching}
+            onClick={() => void sourcesQuery.refetch()}
+          >
+            {isRefetching ? "Retrying…" : "Retry"}
+          </Button>
+        </div>
+      ) : null}
       {!canManage ? (
         <output className="block rounded-lg border border-border/70 bg-muted/30 px-3 py-2.5 text-sm text-muted-foreground">
           You can review source health. Only workspace owners can add, sync, retry, or delete
@@ -298,7 +315,7 @@ export function WidgetKnowledgeManager({ canManage }: { canManage: boolean }) {
       <KnowledgeSourcesPanel
         canManage={canManage}
         isInitialLoading={isInitialLoading}
-        isError={sourcesQuery.isError}
+        isError={sourcesQuery.isError && !sourcesQuery.data}
         isRefetching={isRefetching}
         sources={sources}
         sorting={sorting}

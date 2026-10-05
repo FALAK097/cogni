@@ -10,6 +10,7 @@ import { getAuth } from "@/lib/auth/server";
 import { getDb } from "@/lib/db/client";
 import { env } from "@/lib/env/server";
 import { safeReturnPath } from "@/lib/auth/return-path";
+import { APP_ROUTES } from "@/features/navigation/app-routes";
 import {
   removeWorkspaceMember,
   transferWorkspaceOwnership,
@@ -261,7 +262,7 @@ export async function acceptInviteAction(
 
   const cookieStore = await cookies();
   cookieStore.set("active_workspace_id", invite.workspaceId, activeWorkspaceCookieOptions());
-  revalidatePath("/dashboard");
+  revalidatePath(APP_ROUTES.insights);
   redirect("/insights");
 }
 
@@ -321,6 +322,5 @@ export async function switchWorkspaceAction(formData: FormData) {
 
   const cookieStore = await cookies();
   cookieStore.set("active_workspace_id", parsed.data.workspaceId, activeWorkspaceCookieOptions());
-  revalidatePath("/dashboard");
   redirect(safeReturnPath(parsed.data.returnTo));
 }

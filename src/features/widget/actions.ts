@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { eq } from "drizzle-orm";
 import { widget as widgetTable } from "@/lib/db/schema";
+import { APP_ROUTES } from "@/features/navigation/app-routes";
 import {
   normalizeHostname,
   normalizeLauncherSize,
@@ -168,7 +169,7 @@ export async function saveWidgetWidgetSettingsAction(
     })
     .where(eq(widgetTable.id, widget.id));
 
-  revalidatePath("/playground");
+  revalidatePath(APP_ROUTES.agent);
   return { savedAt: Date.now() };
 }
 
