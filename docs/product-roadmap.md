@@ -1,6 +1,6 @@
 # Cogni product roadmap
 
-Updated: 2026-10-01. Target: **AI agent + shared support inbox**, confirmed by the owner.
+Updated: 2026-10-05. Target: **AI agent + shared support inbox**, confirmed by the owner.
 
 This replaces the July architecture/status snapshot. Implementation evidence is the local branch
 `agent/omnichannel-agent-platform` and [PR #48](https://github.com/FALAK097/cogni/pull/48). Code
@@ -257,3 +257,15 @@ responses, interruptions, and request failures without reading every stream chun
 focused widget suite passes six tests and the production build passes. The Codex in-app
 browser did not return a controllable preview tab, so visual acceptance remains unverified and
 issue #40 stays open for the remaining attachment, citation, and manual keyboard/mobile checks.
+
+On 2026-10-05, the public widget's prior-chat flow now keeps the active session credentials until
+the server confirms the selected history belongs to the same visitor, then stores the selected
+session credentials. History responses are private and non-cacheable. Route regression tests cover
+same-visitor resume, cross-visitor denial, and missing session IDs. Inbox and widget transcript
+loading now have explicit status announcements. Insights keeps a stable screen-reader status during
+range changes and background refreshes, marks its report content busy while fetching, and gives a
+retry path when refresh fails while preserving the last loaded report.
+
+The existing Insights trends and distribution charts use EvilCharts components and follow the
+repository's theme tokens. On PR head `326bc85`, CI, React Doctor, CodeRabbit, and Vercel were green;
+the follow-up accessibility changes still need their own pushed-head verification.

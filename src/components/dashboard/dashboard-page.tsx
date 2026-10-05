@@ -1018,6 +1018,13 @@ export function DashboardPage({
   const { toast } = useToast();
   const analytics = analyticsQuery.data;
   const isLoading = analyticsQuery.isLoading;
+  const insightsStatusMessage = analyticsQuery.isFetching
+    ? analytics
+      ? "Updating Insights…"
+      : "Loading Insights…"
+    : analytics && !analyticsQuery.isError
+      ? "Insights updated."
+      : "";
   const conversationCount = analytics?.kpis.totalConversations.value ?? 0;
   const isEmptyPeriod = !isLoading && analytics !== undefined && conversationCount === 0;
   const hasLowConversationVolume =
@@ -1137,717 +1144,766 @@ export function DashboardPage({
     : [];
 
   return (
-    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-6 pb-8">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-xl font-semibold tracking-tight">{APP_PAGES.insights.label}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{APP_PAGES.insights.description}</p>
-        </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
-          <DateRangePicker
-            value={dateRange}
-            onChange={updateDateRange}
-            timezone={workspaceTimezone}
-          />
-          {analytics ? (
-            <ExportMenu
-              analytics={analytics}
-              dateRange={dateRange}
-              disabled={analyticsQuery.isFetching}
-            />
-          ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 gap-2 rounded-lg border-border/50 bg-transparent px-3 shadow-none"
-              disabled
-            >
-              <HugeiconsIcon icon={Download01Icon} strokeWidth={2} className="size-4" />
-              Export
-            </Button>
-          )}
-        </div>
-      </header>
-
-      {hasInitialError ? (
-        <div
-          role="alert"
-          className="flex flex-col gap-4 rounded-xl border border-destructive/30 bg-destructive/5 p-5 sm:flex-row sm:items-center sm:justify-between"
-        >
-          <div className="flex items-start gap-3">
-            <HugeiconsIcon
-              icon={AlertCircleIcon}
-              strokeWidth={2}
-              className="mt-0.5 size-5 shrink-0 text-destructive"
-              aria-hidden="true"
-            />
-            <div>
-              <h2 className="text-sm font-semibold">Unable to load Insights</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                The selected date range is unchanged.
-              </p>
-            </div>
+    <>
+      <output aria-live="polite" aria-atomic="true" className="sr-only">
+        {insightsStatusMessage}
+      </output>
+      <div
+        aria-busy={analyticsQuery.isFetching}
+        className="mx-auto flex w-full max-w-[1400px] flex-col gap-6 pb-8"
+      >
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold tracking-tight">{APP_PAGES.insights.label}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">{APP_PAGES.insights.description}</p>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            className="h-9 shrink-0 gap-2"
-            onClick={() => void analyticsQuery.refetch()}
-            disabled={analyticsQuery.isFetching}
-            aria-busy={analyticsQuery.isFetching}
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <DateRangePicker
+              value={dateRange}
+              onChange={updateDateRange}
+              timezone={workspaceTimezone}
+            />
+            {analytics ? (
+              <ExportMenu
+                analytics={analytics}
+                dateRange={dateRange}
+                disabled={analyticsQuery.isFetching}
+              />
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 gap-2 rounded-lg border-border/50 bg-transparent px-3 shadow-none"
+                disabled
+              >
+                <HugeiconsIcon icon={Download01Icon} strokeWidth={2} className="size-4" />
+                Export
+              </Button>
+            )}
+          </div>
+        </header>
+
+        {hasInitialError ? (
+          <div
+            role="alert"
+            className="flex flex-col gap-4 rounded-xl border border-destructive/30 bg-destructive/5 p-5 sm:flex-row sm:items-center sm:justify-between"
           >
-            <HugeiconsIcon
-              icon={Refresh01Icon}
-              strokeWidth={2}
-              className={cn("size-4", analyticsQuery.isFetching && "motion-safe:animate-spin")}
-              aria-hidden="true"
-            />
-            {analyticsQuery.isFetching ? "Retrying…" : "Try again"}
-          </Button>
-        </div>
-      ) : null}
-
-      {isEmptyPeriod && analytics ? (
-        <section className="flex flex-col gap-4 rounded-xl border border-border/60 bg-card/60 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-          <div className="flex min-w-0 items-start gap-3">
-            <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <HugeiconsIcon icon={Message01Icon} strokeWidth={2} className="size-[18px]" />
-            </span>
-            <div className="min-w-0">
-              <h2 className="text-sm font-semibold tracking-tight">
-                No conversations in the selected period
-              </h2>
-              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                {analytics.kpis.totalConversations.previousValue > 0
-                  ? `The previous comparable period had ${formatNumber(analytics.kpis.totalConversations.previousValue)} ${analytics.kpis.totalConversations.previousValue === 1 ? "conversation" : "conversations"}.`
-                  : "Try a wider date range, or add a knowledge source so your agent is ready for its first conversation."}
-              </p>
+            <div className="flex items-start gap-3">
+              <HugeiconsIcon
+                icon={AlertCircleIcon}
+                strokeWidth={2}
+                className="mt-0.5 size-5 shrink-0 text-destructive"
+                aria-hidden="true"
+              />
+              <div>
+                <h2 className="text-sm font-semibold">Unable to load Insights</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  The selected date range is unchanged.
+                </p>
+              </div>
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-9 shrink-0 gap-2"
+              onClick={() => void analyticsQuery.refetch()}
+              disabled={analyticsQuery.isFetching}
+              aria-busy={analyticsQuery.isFetching}
+            >
+              <HugeiconsIcon
+                icon={Refresh01Icon}
+                strokeWidth={2}
+                className={cn("size-4", analyticsQuery.isFetching && "motion-safe:animate-spin")}
+                aria-hidden="true"
+              />
+              {analyticsQuery.isFetching ? "Retrying…" : "Try again"}
+            </Button>
           </div>
-          {analytics.kpis.totalConversations.previousValue > 0 ? (
+        ) : null}
+
+        {analyticsQuery.isError && analytics ? (
+          <output
+            aria-live="polite"
+            className="flex flex-col gap-3 rounded-xl border border-border/60 bg-muted/30 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <span className="text-sm text-muted-foreground">
+              Insights could not refresh. Showing the last loaded results.
+            </span>
             <Button
               type="button"
               variant="outline"
-              size="sm"
-              className="h-9 shrink-0"
-              onClick={() =>
-                updateDateRange({
-                  start: startOfDay(parseISO(analytics.previousDateRange.start)),
-                  end: endOfDay(parseISO(analytics.previousDateRange.end)),
-                })
-              }
+              className="h-9 shrink-0 gap-2"
+              onClick={() => void analyticsQuery.refetch()}
+              disabled={analyticsQuery.isFetching}
+              aria-busy={analyticsQuery.isFetching}
             >
-              View previous period
+              <HugeiconsIcon
+                icon={Refresh01Icon}
+                strokeWidth={2}
+                className={cn("size-4", analyticsQuery.isFetching && "motion-safe:animate-spin")}
+                aria-hidden="true"
+              />
+              {analyticsQuery.isFetching ? "Retrying…" : "Try again"}
             </Button>
+          </output>
+        ) : null}
+
+        {isEmptyPeriod && analytics ? (
+          <section className="flex flex-col gap-4 rounded-xl border border-border/60 bg-card/60 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <HugeiconsIcon icon={Message01Icon} strokeWidth={2} className="size-[18px]" />
+              </span>
+              <div className="min-w-0">
+                <h2 className="text-sm font-semibold tracking-tight">
+                  No conversations in the selected period
+                </h2>
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                  {analytics.kpis.totalConversations.previousValue > 0
+                    ? `The previous comparable period had ${formatNumber(analytics.kpis.totalConversations.previousValue)} ${analytics.kpis.totalConversations.previousValue === 1 ? "conversation" : "conversations"}.`
+                    : "Try a wider date range, or add a knowledge source so your agent is ready for its first conversation."}
+                </p>
+              </div>
+            </div>
+            {analytics.kpis.totalConversations.previousValue > 0 ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9 shrink-0"
+                onClick={() =>
+                  updateDateRange({
+                    start: startOfDay(parseISO(analytics.previousDateRange.start)),
+                    end: endOfDay(parseISO(analytics.previousDateRange.end)),
+                  })
+                }
+              >
+                View previous period
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9 shrink-0"
+                render={<Link href={agentHref("knowledge")} />}
+              >
+                Add a knowledge source
+              </Button>
+            )}
+          </section>
+        ) : null}
+
+        {hasLowConversationVolume ? (
+          <p className="-mt-3 text-xs leading-relaxed text-muted-foreground">
+            Early signal: based on {formatNumber(conversationCount)}{" "}
+            {conversationCount === 1 ? "conversation" : "conversations"} in this period. Small
+            samples can make rates and comparisons change sharply.
+          </p>
+        ) : null}
+
+        <section
+          hidden={hasInitialError}
+          className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-5"
+        >
+          {isLoading || !analytics ? (
+            Array.from({ length: 5 }).map((_, i) => <CardSkeleton key={i} />)
           ) : (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-9 shrink-0"
-              render={<Link href={agentHref("knowledge")} />}
-            >
-              Add a knowledge source
-            </Button>
+            <>
+              <MetricCard
+                label="Total Conversations"
+                value={analytics.kpis.totalConversations.value.toLocaleString()}
+                metric={analytics.kpis.totalConversations}
+                previousRange={analytics.previousDateRange}
+                icon={
+                  <HugeiconsIcon icon={Message01Icon} strokeWidth={2} className="size-[18px]" />
+                }
+              />
+              <MetricCard
+                label="Visitor sessions"
+                value={analytics.kpis.uniqueUsers.value.toLocaleString()}
+                metric={analytics.kpis.uniqueUsers}
+                previousRange={analytics.previousDateRange}
+                icon={
+                  <HugeiconsIcon
+                    icon={UserMultiple02Icon}
+                    strokeWidth={2}
+                    className="size-[18px]"
+                  />
+                }
+              />
+              <MetricCard
+                label="Closed now"
+                value={analytics.kpis.closedConversations.value.toLocaleString()}
+                metric={analytics.kpis.closedConversations}
+                previousRange={analytics.previousDateRange}
+                icon={<HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="size-[18px]" />}
+                info={
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <button
+                          type="button"
+                          className="text-muted-foreground transition-colors hover:text-foreground"
+                          aria-label="Closed now conversation count information"
+                        />
+                      }
+                    >
+                      <HugeiconsIcon
+                        icon={InformationCircleIcon}
+                        strokeWidth={2}
+                        className="size-4"
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs">
+                      These conversations started in the selected period and are closed now. This is
+                      their current status, not a count of conversations closed during that period.
+                    </TooltipContent>
+                  </Tooltip>
+                }
+              />
+              <MetricCard
+                label="Avg. AI Response Time"
+                value={
+                  analytics.kpis.avgAiResponseTime.formatted === "—"
+                    ? "No data"
+                    : analytics.kpis.avgAiResponseTime.formatted
+                }
+                metric={analytics.kpis.avgAiResponseTime}
+                previousRange={analytics.previousDateRange}
+                icon={<HugeiconsIcon icon={Clock01Icon} strokeWidth={2} className="size-[18px]" />}
+                info={
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <button
+                          type="button"
+                          className="text-muted-foreground transition-colors hover:text-foreground"
+                          aria-label="Average AI response time information"
+                        />
+                      }
+                    >
+                      <HugeiconsIcon
+                        icon={InformationCircleIcon}
+                        strokeWidth={2}
+                        className="size-4"
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs">
+                      Average time from the first visitor message in a turn to the next public AI
+                      reply. Human-only replies and unanswered turns are excluded. Based on{" "}
+                      {analytics.kpis.avgAiResponseTime.samples} answered AI{" "}
+                      {analytics.kpis.avgAiResponseTime.samples === 1 ? " turn." : " turns."}
+                    </TooltipContent>
+                  </Tooltip>
+                }
+                invertTrend
+              />
+              <MetricCard
+                label="Satisfaction Score"
+                value={
+                  analytics.kpis.satisfactionScore.formatted === "—"
+                    ? "No data"
+                    : `${analytics.kpis.satisfactionScore.formatted} / ${analytics.kpis.satisfactionScore.max}`
+                }
+                metric={analytics.kpis.satisfactionScore}
+                previousRange={analytics.previousDateRange}
+                icon={<HugeiconsIcon icon={StarIcon} strokeWidth={2} className="size-[18px]" />}
+                info={
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <button
+                          type="button"
+                          className="text-muted-foreground transition-colors hover:text-foreground"
+                          aria-label="Satisfaction score information"
+                        />
+                      }
+                    >
+                      <HugeiconsIcon
+                        icon={InformationCircleIcon}
+                        strokeWidth={2}
+                        className="size-4"
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs">
+                      Average of thumbs feedback on AI responses in conversations started during the
+                      selected period: thumbs-up counts as 5 and thumbs-down as 0. Each rating is
+                      counted on its conversation&apos;s start date, even if the visitor rated it
+                      later. Based on {analytics.kpis.satisfactionScore.responses}{" "}
+                      {analytics.kpis.satisfactionScore.responses === 1
+                        ? "response."
+                        : "responses."}
+                    </TooltipContent>
+                  </Tooltip>
+                }
+              />
+            </>
           )}
         </section>
-      ) : null}
 
-      {hasLowConversationVolume ? (
-        <p className="-mt-3 text-xs leading-relaxed text-muted-foreground">
-          Early signal: based on {formatNumber(conversationCount)}{" "}
-          {conversationCount === 1 ? "conversation" : "conversations"} in this period. Small samples
-          can make rates and comparisons change sharply.
-        </p>
-      ) : null}
-
-      <section
-        hidden={hasInitialError}
-        className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-5"
-      >
-        {isLoading || !analytics ? (
-          Array.from({ length: 5 }).map((_, i) => <CardSkeleton key={i} />)
-        ) : (
-          <>
-            <MetricCard
-              label="Total Conversations"
-              value={analytics.kpis.totalConversations.value.toLocaleString()}
-              metric={analytics.kpis.totalConversations}
-              previousRange={analytics.previousDateRange}
-              icon={<HugeiconsIcon icon={Message01Icon} strokeWidth={2} className="size-[18px]" />}
-            />
-            <MetricCard
-              label="Visitor sessions"
-              value={analytics.kpis.uniqueUsers.value.toLocaleString()}
-              metric={analytics.kpis.uniqueUsers}
-              previousRange={analytics.previousDateRange}
-              icon={
-                <HugeiconsIcon icon={UserMultiple02Icon} strokeWidth={2} className="size-[18px]" />
-              }
-            />
-            <MetricCard
-              label="Closed now"
-              value={analytics.kpis.closedConversations.value.toLocaleString()}
-              metric={analytics.kpis.closedConversations}
-              previousRange={analytics.previousDateRange}
-              icon={<HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="size-[18px]" />}
-              info={
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <button
-                        type="button"
-                        className="text-muted-foreground transition-colors hover:text-foreground"
-                        aria-label="Closed now conversation count information"
-                      />
-                    }
-                  >
-                    <HugeiconsIcon
-                      icon={InformationCircleIcon}
-                      strokeWidth={2}
-                      className="size-4"
-                    />
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-xs">
-                    These conversations started in the selected period and are closed now. This is
-                    their current status, not a count of conversations closed during that period.
-                  </TooltipContent>
-                </Tooltip>
-              }
-            />
-            <MetricCard
-              label="Avg. AI Response Time"
-              value={
-                analytics.kpis.avgAiResponseTime.formatted === "—"
-                  ? "No data"
-                  : analytics.kpis.avgAiResponseTime.formatted
-              }
-              metric={analytics.kpis.avgAiResponseTime}
-              previousRange={analytics.previousDateRange}
-              icon={<HugeiconsIcon icon={Clock01Icon} strokeWidth={2} className="size-[18px]" />}
-              info={
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <button
-                        type="button"
-                        className="text-muted-foreground transition-colors hover:text-foreground"
-                        aria-label="Average AI response time information"
-                      />
-                    }
-                  >
-                    <HugeiconsIcon
-                      icon={InformationCircleIcon}
-                      strokeWidth={2}
-                      className="size-4"
-                    />
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-xs">
-                    Average time from the first visitor message in a turn to the next public AI
-                    reply. Human-only replies and unanswered turns are excluded. Based on{" "}
-                    {analytics.kpis.avgAiResponseTime.samples} answered AI{" "}
-                    {analytics.kpis.avgAiResponseTime.samples === 1 ? " turn." : " turns."}
-                  </TooltipContent>
-                </Tooltip>
-              }
-              invertTrend
-            />
-            <MetricCard
-              label="Satisfaction Score"
-              value={
-                analytics.kpis.satisfactionScore.formatted === "—"
-                  ? "No data"
-                  : `${analytics.kpis.satisfactionScore.formatted} / ${analytics.kpis.satisfactionScore.max}`
-              }
-              metric={analytics.kpis.satisfactionScore}
-              previousRange={analytics.previousDateRange}
-              icon={<HugeiconsIcon icon={StarIcon} strokeWidth={2} className="size-[18px]" />}
-              info={
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <button
-                        type="button"
-                        className="text-muted-foreground transition-colors hover:text-foreground"
-                        aria-label="Satisfaction score information"
-                      />
-                    }
-                  >
-                    <HugeiconsIcon
-                      icon={InformationCircleIcon}
-                      strokeWidth={2}
-                      className="size-4"
-                    />
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-xs">
-                    Average of thumbs feedback on AI responses in conversations started during the
-                    selected period: thumbs-up counts as 5 and thumbs-down as 0. Each rating is
-                    counted on its conversation&apos;s start date, even if the visitor rated it
-                    later. Based on {analytics.kpis.satisfactionScore.responses}{" "}
-                    {analytics.kpis.satisfactionScore.responses === 1 ? "response." : "responses."}
-                  </TooltipContent>
-                </Tooltip>
-              }
-            />
-          </>
-        )}
-      </section>
-
-      <section
-        hidden={hasInitialError || (!isLoading && analytics?.kpis.totalConversations.value === 0)}
-        className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 xl:grid-cols-4"
-      >
-        <DashboardCard className="flex min-h-[320px] flex-1 flex-col p-6 md:col-span-2 xl:col-span-2">
-          <div className="mb-5 flex items-center justify-between gap-3">
-            <h3 className="text-sm font-semibold tracking-tight">Conversations Over Time</h3>
-            <GranularitySelect
-              value={convGranularity}
-              onChange={(value) => void setInsightsQuery({ volume: value })}
-            />
-          </div>
-          {isLoading ? (
-            <Skeleton className="h-60 w-full rounded-lg border border-border/50 bg-transparent" />
-          ) : (
-            <InsightsTrendChart
-              data={convChartData}
-              empty={convChartData.length > 0 && convChartData.every((point) => point.value === 0)}
-              emptyMessage="No conversation trend data is available for this period."
-              labelFormatter={formatChartDate}
-              seriesLabel="Conversations"
-              allowDecimals={false}
-              ariaLabel="Conversations over time"
-            />
-          )}
-        </DashboardCard>
-
-        <DashboardCard className="flex min-h-[320px] flex-1 flex-col p-6 xl:col-span-1">
-          <h3 className="mb-5 text-sm font-semibold tracking-tight">Conversations by Source</h3>
-          {isLoading ? (
-            <Skeleton className="mx-auto size-[180px] rounded-full border border-border/50 bg-transparent" />
-          ) : (
-            <div className="flex flex-1 flex-col items-center gap-4">
-              <DonutChart
-                data={sourceChart.segments}
-                centerValue={sourceChart.total.toLocaleString()}
-                emptyMessage="No source data for this period"
-                ariaLabel="Conversations by source"
+        <section
+          hidden={hasInitialError || (!isLoading && analytics?.kpis.totalConversations.value === 0)}
+          className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 xl:grid-cols-4"
+        >
+          <DashboardCard className="flex min-h-[320px] flex-1 flex-col p-6 md:col-span-2 xl:col-span-2">
+            <div className="mb-5 flex items-center justify-between gap-3">
+              <h3 className="text-sm font-semibold tracking-tight">Conversations Over Time</h3>
+              <GranularitySelect
+                value={convGranularity}
+                onChange={(value) => void setInsightsQuery({ volume: value })}
               />
-              <DonutLegend items={sourceChart.legend} className="w-full" />
             </div>
-          )}
-        </DashboardCard>
-
-        <DashboardCard className="flex min-h-[320px] flex-1 flex-col p-6 xl:col-span-1">
-          <div className="mb-5">
-            <h3 className="text-sm font-semibold tracking-tight">Current conversation status</h3>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              Current status of conversations started in the selected period.
-            </p>
-          </div>
-          {isLoading ? (
-            <Skeleton className="mx-auto size-[180px] rounded-full border border-border/50 bg-transparent" />
-          ) : (
-            <div className="flex flex-1 flex-col items-center gap-4">
-              <DonutChart
-                data={statusChart.segments}
-                centerValue={statusChart.total.toLocaleString()}
-                emptyMessage="No status data for this period"
-                ariaLabel="Conversations by status"
-              />
-              <DonutLegend items={statusChart.legend} className="w-full" />
-            </div>
-          )}
-        </DashboardCard>
-      </section>
-
-      <section
-        hidden={hasInitialError || (!isLoading && analytics?.kpis.totalConversations.value === 0)}
-        className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-2 xl:grid-cols-4"
-      >
-        <DashboardCard className="flex h-full flex-col p-6 xl:col-span-2">
-          <h3 className="text-sm font-semibold tracking-tight">Top Questions</h3>
-          <div className="mt-4 flex-1">
             {isLoading ? (
-              <div className="space-y-2">
-                {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton className="h-60 w-full rounded-lg border border-border/50 bg-transparent" />
+            ) : (
+              <InsightsTrendChart
+                data={convChartData}
+                empty={
+                  convChartData.length > 0 && convChartData.every((point) => point.value === 0)
+                }
+                emptyMessage="No conversation trend data is available for this period."
+                labelFormatter={formatChartDate}
+                seriesLabel="Conversations"
+                allowDecimals={false}
+                ariaLabel="Conversations over time"
+              />
+            )}
+          </DashboardCard>
+
+          <DashboardCard className="flex min-h-[320px] flex-1 flex-col p-6 xl:col-span-1">
+            <h3 className="mb-5 text-sm font-semibold tracking-tight">Conversations by Source</h3>
+            {isLoading ? (
+              <Skeleton className="mx-auto size-[180px] rounded-full border border-border/50 bg-transparent" />
+            ) : (
+              <div className="flex flex-1 flex-col items-center gap-4">
+                <DonutChart
+                  data={sourceChart.segments}
+                  centerValue={sourceChart.total.toLocaleString()}
+                  emptyMessage="No source data for this period"
+                  ariaLabel="Conversations by source"
+                />
+                <DonutLegend items={sourceChart.legend} className="w-full" />
+              </div>
+            )}
+          </DashboardCard>
+
+          <DashboardCard className="flex min-h-[320px] flex-1 flex-col p-6 xl:col-span-1">
+            <div className="mb-5">
+              <h3 className="text-sm font-semibold tracking-tight">Current conversation status</h3>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                Current status of conversations started in the selected period.
+              </p>
+            </div>
+            {isLoading ? (
+              <Skeleton className="mx-auto size-[180px] rounded-full border border-border/50 bg-transparent" />
+            ) : (
+              <div className="flex flex-1 flex-col items-center gap-4">
+                <DonutChart
+                  data={statusChart.segments}
+                  centerValue={statusChart.total.toLocaleString()}
+                  emptyMessage="No status data for this period"
+                  ariaLabel="Conversations by status"
+                />
+                <DonutLegend items={statusChart.legend} className="w-full" />
+              </div>
+            )}
+          </DashboardCard>
+        </section>
+
+        <section
+          hidden={hasInitialError || (!isLoading && analytics?.kpis.totalConversations.value === 0)}
+          className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-2 xl:grid-cols-4"
+        >
+          <DashboardCard className="flex h-full flex-col p-6 xl:col-span-2">
+            <h3 className="text-sm font-semibold tracking-tight">Top Questions</h3>
+            <div className="mt-4 flex-1">
+              {isLoading ? (
+                <div className="space-y-2">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Skeleton
+                      key={i}
+                      className="h-9 w-full rounded-md border border-border/50 bg-transparent"
+                    />
+                  ))}
+                </div>
+              ) : (analytics?.topQuestions ?? []).length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  No visitor questions recorded in this period.
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-border/50 hover:bg-transparent">
+                      <TableHead className="h-8 px-0 text-xs font-medium text-muted-foreground">
+                        Question
+                      </TableHead>
+                      <TableHead className="h-8 w-24 px-0 text-right text-xs font-medium text-muted-foreground">
+                        Conversations
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(analytics?.topQuestions ?? []).map((item: TopQuestion) => (
+                      <TableRow
+                        key={item.question}
+                        className="group border-border/50 hover:bg-transparent"
+                      >
+                        <TableCell className="whitespace-normal break-words px-0 py-2.5 text-sm">
+                          <Link
+                            href={{
+                              pathname: APP_ROUTES.inbox,
+                              query: { conversationId: item.conversationId },
+                            }}
+                            aria-label={`Open a conversation about: ${item.question}`}
+                            className="inline-flex min-h-11 items-center gap-1.5 rounded-sm pr-1 text-left outline-none transition-colors hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                          >
+                            <span>{item.question}</span>
+                            <HugeiconsIcon
+                              icon={ArrowRight01Icon}
+                              strokeWidth={1.75}
+                              className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                              aria-hidden="true"
+                            />
+                          </Link>
+                        </TableCell>
+                        <TableCell className="px-0 py-2.5 text-right text-sm font-medium tabular-nums">
+                          {formatNumber(item.count)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+            <div className="mt-4 border-t border-border/50 pt-4">
+              <Link
+                href={APP_ROUTES.inbox}
+                className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+              >
+                Open inbox
+                <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-4" />
+              </Link>
+            </div>
+          </DashboardCard>
+
+          <DashboardCard className="flex h-full flex-col p-6 xl:col-span-2">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold tracking-tight">Needs review</h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {reviewFilter === "negative"
+                    ? "Recent AI answers rated negatively"
+                    : "No public reply or no knowledge source matched"}
+                </p>
+              </div>
+              <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                <HugeiconsIcon
+                  icon={reviewFilter === "negative" ? ThumbsDownIcon : Message01Icon}
+                  strokeWidth={1.8}
+                  className="size-4"
+                  aria-hidden="true"
+                />
+              </span>
+            </div>
+            <fieldset className="mt-4 flex w-fit rounded-lg bg-muted p-1">
+              <legend className="sr-only">Review type</legend>
+              <button
+                type="button"
+                aria-pressed={reviewFilter === "negative"}
+                onClick={() => setReviewFilter("negative")}
+                className="min-h-10 rounded-md px-3 text-xs font-medium transition-colors hover:bg-background/70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-sm"
+              >
+                Negative feedback
+              </button>
+              <button
+                type="button"
+                aria-pressed={reviewFilter === "unanswered"}
+                onClick={() => setReviewFilter("unanswered")}
+                className="min-h-10 rounded-md px-3 text-xs font-medium transition-colors hover:bg-background/70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-sm"
+              >
+                Knowledge gaps
+              </button>
+            </fieldset>
+            {reviewFilter === "unanswered" ? (
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <p className="text-xs text-muted-foreground">Review questions and source misses</p>
+                <Select
+                  value={gapFilter}
+                  onValueChange={(value) => {
+                    if (value === "OPEN" || value === "RESOLVED" || value === "IGNORED") {
+                      setGapFilter(value);
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-9 max-w-[190px] rounded-lg border-border/70 bg-background text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="OPEN">
+                      Open ({analytics?.knowledgeGaps.counts.open ?? 0})
+                    </SelectItem>
+                    <SelectItem value="RESOLVED">
+                      Resolved ({analytics?.knowledgeGaps.counts.resolved ?? 0})
+                    </SelectItem>
+                    <SelectItem value="IGNORED">
+                      Ignored ({analytics?.knowledgeGaps.counts.ignored ?? 0})
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
+            {isLoading ? (
+              <div className="mt-4 space-y-2">
+                {Array.from({ length: 3 }).map((_, index) => (
                   <Skeleton
-                    key={i}
-                    className="h-9 w-full rounded-md border border-border/50 bg-transparent"
+                    key={index}
+                    className="h-[92px] w-full rounded-lg border border-border/50 bg-transparent"
                   />
                 ))}
               </div>
-            ) : (analytics?.topQuestions ?? []).length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">
-                No visitor questions recorded in this period.
+            ) : reviewFilter === "negative" && (analytics?.negativeFeedback ?? []).length === 0 ? (
+              <p className="mt-4 flex min-h-36 flex-1 items-center justify-center rounded-lg border border-dashed border-border/60 px-5 text-center text-sm text-muted-foreground">
+                No negative feedback from conversations in this period.
               </p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-border/50 hover:bg-transparent">
-                    <TableHead className="h-8 px-0 text-xs font-medium text-muted-foreground">
-                      Question
-                    </TableHead>
-                    <TableHead className="h-8 w-24 px-0 text-right text-xs font-medium text-muted-foreground">
-                      Conversations
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(analytics?.topQuestions ?? []).map((item: TopQuestion) => (
-                    <TableRow
-                      key={item.question}
-                      className="group border-border/50 hover:bg-transparent"
-                    >
-                      <TableCell className="whitespace-normal break-words px-0 py-2.5 text-sm">
-                        <Link
-                          href={{
-                            pathname: APP_ROUTES.inbox,
-                            query: { conversationId: item.conversationId },
-                          }}
-                          aria-label={`Open a conversation about: ${item.question}`}
-                          className="inline-flex min-h-11 items-center gap-1.5 rounded-sm pr-1 text-left outline-none transition-colors hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                        >
-                          <span>{item.question}</span>
-                          <HugeiconsIcon
-                            icon={ArrowRight01Icon}
-                            strokeWidth={1.75}
-                            className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
-                            aria-hidden="true"
-                          />
-                        </Link>
-                      </TableCell>
-                      <TableCell className="px-0 py-2.5 text-right text-sm font-medium tabular-nums">
-                        {formatNumber(item.count)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </div>
-          <div className="mt-4 border-t border-border/50 pt-4">
-            <Link
-              href={APP_ROUTES.inbox}
-              className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
-            >
-              Open inbox
-              <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-4" />
-            </Link>
-          </div>
-        </DashboardCard>
-
-        <DashboardCard className="flex h-full flex-col p-6 xl:col-span-2">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h3 className="text-sm font-semibold tracking-tight">Needs review</h3>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {reviewFilter === "negative"
-                  ? "Recent AI answers rated negatively"
-                  : "No public reply or no knowledge source matched"}
+            ) : reviewFilter === "unanswered" && gapItems.length === 0 ? (
+              <p className="mt-4 flex min-h-36 flex-1 items-center justify-center rounded-lg border border-dashed border-border/60 px-5 text-center text-sm text-muted-foreground">
+                {gapFilter === "OPEN"
+                  ? "No open knowledge gaps in this period."
+                  : gapFilter === "RESOLVED"
+                    ? "No resolved knowledge gaps in this period."
+                    : "No ignored knowledge gaps in this period."}
               </p>
-            </div>
-            <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-              <HugeiconsIcon
-                icon={reviewFilter === "negative" ? ThumbsDownIcon : Message01Icon}
-                strokeWidth={1.8}
-                className="size-4"
-                aria-hidden="true"
-              />
-            </span>
-          </div>
-          <fieldset className="mt-4 flex w-fit rounded-lg bg-muted p-1">
-            <legend className="sr-only">Review type</legend>
-            <button
-              type="button"
-              aria-pressed={reviewFilter === "negative"}
-              onClick={() => setReviewFilter("negative")}
-              className="min-h-10 rounded-md px-3 text-xs font-medium transition-colors hover:bg-background/70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-sm"
-            >
-              Negative feedback
-            </button>
-            <button
-              type="button"
-              aria-pressed={reviewFilter === "unanswered"}
-              onClick={() => setReviewFilter("unanswered")}
-              className="min-h-10 rounded-md px-3 text-xs font-medium transition-colors hover:bg-background/70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-sm"
-            >
-              Knowledge gaps
-            </button>
-          </fieldset>
-          {reviewFilter === "unanswered" ? (
-            <div className="mt-3 flex items-center justify-between gap-3">
-              <p className="text-xs text-muted-foreground">Review questions and source misses</p>
-              <Select
-                value={gapFilter}
-                onValueChange={(value) => {
-                  if (value === "OPEN" || value === "RESOLVED" || value === "IGNORED") {
-                    setGapFilter(value);
-                  }
-                }}
-              >
-                <SelectTrigger className="h-9 max-w-[190px] rounded-lg border-border/70 bg-background text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="OPEN">
-                    Open ({analytics?.knowledgeGaps.counts.open ?? 0})
-                  </SelectItem>
-                  <SelectItem value="RESOLVED">
-                    Resolved ({analytics?.knowledgeGaps.counts.resolved ?? 0})
-                  </SelectItem>
-                  <SelectItem value="IGNORED">
-                    Ignored ({analytics?.knowledgeGaps.counts.ignored ?? 0})
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          ) : null}
-          {isLoading ? (
-            <div className="mt-4 space-y-2">
-              {Array.from({ length: 3 }).map((_, index) => (
-                <Skeleton
-                  key={index}
-                  className="h-[92px] w-full rounded-lg border border-border/50 bg-transparent"
-                />
-              ))}
-            </div>
-          ) : reviewFilter === "negative" && (analytics?.negativeFeedback ?? []).length === 0 ? (
-            <p className="mt-4 flex min-h-36 flex-1 items-center justify-center rounded-lg border border-dashed border-border/60 px-5 text-center text-sm text-muted-foreground">
-              No negative feedback from conversations in this period.
-            </p>
-          ) : reviewFilter === "unanswered" && gapItems.length === 0 ? (
-            <p className="mt-4 flex min-h-36 flex-1 items-center justify-center rounded-lg border border-dashed border-border/60 px-5 text-center text-sm text-muted-foreground">
-              {gapFilter === "OPEN"
-                ? "No open knowledge gaps in this period."
-                : gapFilter === "RESOLVED"
-                  ? "No resolved knowledge gaps in this period."
-                  : "No ignored knowledge gaps in this period."}
-            </p>
-          ) : reviewFilter === "negative" ? (
-            <ul className="mt-4 divide-y divide-border/50">
-              {(analytics?.negativeFeedback ?? []).map((item, index) => (
-                <li key={`${item.conversationId}-${item.feedbackAt}-${index}`}>
-                  <div className="flex items-start gap-2 py-3">
-                    <Link
-                      href={{
-                        pathname: APP_ROUTES.inbox,
-                        query: { conversationId: item.conversationId },
-                      }}
-                      aria-label={`Review AI answer. Visitor asked: ${item.question}. AI replied: ${item.response}`}
-                      className="-mx-2 min-h-11 min-w-0 flex-1 rounded-lg px-2 py-1 outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                    >
-                      <span className="block truncate text-xs font-medium text-muted-foreground">
-                        {item.question}
-                      </span>
-                      <span className="mt-1 block line-clamp-2 text-sm leading-relaxed text-foreground">
-                        {item.response}
-                      </span>
-                      {item.reason ? (
-                        <span className="mt-1.5 block line-clamp-1 text-xs text-muted-foreground">
-                          Feedback: {item.reason}
-                        </span>
-                      ) : null}
-                    </Link>
-                    {canManage ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="mt-1 min-h-11 shrink-0 px-3"
-                        onClick={() => setFeedbackToImprove(item)}
-                        aria-label={`Write a verified answer for: ${item.question}`}
+            ) : reviewFilter === "negative" ? (
+              <ul className="mt-4 divide-y divide-border/50">
+                {(analytics?.negativeFeedback ?? []).map((item, index) => (
+                  <li key={`${item.conversationId}-${item.feedbackAt}-${index}`}>
+                    <div className="flex items-start gap-2 py-3">
+                      <Link
+                        href={{
+                          pathname: APP_ROUTES.inbox,
+                          query: { conversationId: item.conversationId },
+                        }}
+                        aria-label={`Review AI answer. Visitor asked: ${item.question}. AI replied: ${item.response}`}
+                        className="-mx-2 min-h-11 min-w-0 flex-1 rounded-lg px-2 py-1 outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                       >
-                        Add answer
-                      </Button>
-                    ) : null}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <ul className="mt-4 divide-y divide-border/50">
-              {gapItems.map((item, index) => (
-                <li key={`${item.conversationId}-${item.askedAt}-${index}`}>
-                  <div className="flex items-start gap-2 py-3">
-                    <Link
-                      href={{
-                        pathname: APP_ROUTES.inbox,
-                        query: { conversationId: item.conversationId },
-                      }}
-                      aria-label={`Review knowledge gap: ${item.question}`}
-                      className="-mx-2 min-h-11 min-w-0 flex-1 rounded-lg px-2 py-2 text-sm leading-relaxed outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                    >
-                      <span className="line-clamp-3">{item.question}</span>
-                      <span className="mt-1 block text-xs text-muted-foreground">
-                        {item.signals
-                          .map((signal) =>
-                            signal === "UNANSWERED" ? "No public reply" : "No source matched",
-                          )
-                          .join(" · ")}
-                        {item.count > 1 ? ` · ${item.count} occurrences` : ""}
-                      </span>
-                    </Link>
-                    {canManage ? (
-                      <div className="mt-1 flex shrink-0 flex-col items-end gap-1">
-                        {gapFilter === "OPEN" ? (
-                          <>
+                        <span className="block truncate text-xs font-medium text-muted-foreground">
+                          {item.question}
+                        </span>
+                        <span className="mt-1 block line-clamp-2 text-sm leading-relaxed text-foreground">
+                          {item.response}
+                        </span>
+                        {item.reason ? (
+                          <span className="mt-1.5 block line-clamp-1 text-xs text-muted-foreground">
+                            Feedback: {item.reason}
+                          </span>
+                        ) : null}
+                      </Link>
+                      {canManage ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="mt-1 min-h-11 shrink-0 px-3"
+                          onClick={() => setFeedbackToImprove(item)}
+                          aria-label={`Write a verified answer for: ${item.question}`}
+                        >
+                          Add answer
+                        </Button>
+                      ) : null}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <ul className="mt-4 divide-y divide-border/50">
+                {gapItems.map((item, index) => (
+                  <li key={`${item.conversationId}-${item.askedAt}-${index}`}>
+                    <div className="flex items-start gap-2 py-3">
+                      <Link
+                        href={{
+                          pathname: APP_ROUTES.inbox,
+                          query: { conversationId: item.conversationId },
+                        }}
+                        aria-label={`Review knowledge gap: ${item.question}`}
+                        className="-mx-2 min-h-11 min-w-0 flex-1 rounded-lg px-2 py-2 text-sm leading-relaxed outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                      >
+                        <span className="line-clamp-3">{item.question}</span>
+                        <span className="mt-1 block text-xs text-muted-foreground">
+                          {item.signals
+                            .map((signal) =>
+                              signal === "UNANSWERED" ? "No public reply" : "No source matched",
+                            )
+                            .join(" · ")}
+                          {item.count > 1 ? ` · ${item.count} occurrences` : ""}
+                        </span>
+                      </Link>
+                      {canManage ? (
+                        <div className="mt-1 flex shrink-0 flex-col items-end gap-1">
+                          {gapFilter === "OPEN" ? (
+                            <>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="min-h-11 px-3"
+                                onClick={() => setFeedbackToImprove(item)}
+                                aria-label={`Write a verified answer for: ${item.question}`}
+                              >
+                                Add answer
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="min-h-11 px-3 text-muted-foreground"
+                                disabled={reviewKnowledgeGap.isPending}
+                                onClick={() => void setKnowledgeGapStatus(item.question, "IGNORED")}
+                                aria-label={`Ignore knowledge gap: ${item.question}`}
+                              >
+                                Ignore
+                              </Button>
+                            </>
+                          ) : (
                             <Button
                               type="button"
                               variant="outline"
                               size="sm"
                               className="min-h-11 px-3"
-                              onClick={() => setFeedbackToImprove(item)}
-                              aria-label={`Write a verified answer for: ${item.question}`}
-                            >
-                              Add answer
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="min-h-11 px-3 text-muted-foreground"
                               disabled={reviewKnowledgeGap.isPending}
-                              onClick={() => void setKnowledgeGapStatus(item.question, "IGNORED")}
-                              aria-label={`Ignore knowledge gap: ${item.question}`}
+                              onClick={() => void setKnowledgeGapStatus(item.question, "OPEN")}
+                              aria-label={`Reopen knowledge gap: ${item.question}`}
                             >
-                              Ignore
+                              Reopen
                             </Button>
-                          </>
-                        ) : (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="min-h-11 px-3"
-                            disabled={reviewKnowledgeGap.isPending}
-                            onClick={() => void setKnowledgeGapStatus(item.question, "OPEN")}
-                            aria-label={`Reopen knowledge gap: ${item.question}`}
-                          >
-                            Reopen
-                          </Button>
-                        )}
-                      </div>
-                    ) : null}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className="mt-auto border-t border-border/50 pt-4">
-            <Link
-              href={APP_ROUTES.inbox}
-              className="inline-flex min-h-8 items-center gap-1 rounded-sm text-sm font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-            >
-              Open inbox
-              <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-4" />
-            </Link>
-          </div>
-        </DashboardCard>
-
-        <DashboardCard className="flex h-full flex-col p-6 xl:col-span-2">
-          <div>
-            <h3 className="text-sm font-semibold tracking-tight">Conversation activity</h3>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              Repeat visitor rate means conversations with at least two visitor messages.
-            </p>
-          </div>
-          <div className="mt-4 grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2">
-            {isLoading || !engagement
-              ? Array.from({ length: 4 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="h-24 animate-pulse rounded-lg border border-border/50 bg-transparent"
-                  />
-                ))
-              : engagementTiles.map((tile) => (
-                  <div
-                    key={tile.label}
-                    className="rounded-lg border border-border/50 bg-transparent p-4"
-                  >
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <HugeiconsIcon icon={tile.icon} strokeWidth={2} className="size-4 shrink-0" />
-                      <span className="text-sm">{tile.label}</span>
+                          )}
+                        </div>
+                      ) : null}
                     </div>
-                    <p className="mt-2 text-xl font-semibold tracking-tight tabular-nums">
-                      {tile.value}
-                    </p>
-                    <p className="mt-1.5 text-xs">
-                      <ChangeIndicator change={tile.change} />
-                    </p>
-                  </div>
+                  </li>
                 ))}
-          </div>
-        </DashboardCard>
+              </ul>
+            )}
+            <div className="mt-auto border-t border-border/50 pt-4">
+              <Link
+                href={APP_ROUTES.inbox}
+                className="inline-flex min-h-8 items-center gap-1 rounded-sm text-sm font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
+                Open inbox
+                <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-4" />
+              </Link>
+            </div>
+          </DashboardCard>
 
-        <DashboardCard className="flex h-full flex-col p-6 xl:col-span-2">
-          <div className="mb-5 flex items-center justify-between gap-3">
+          <DashboardCard className="flex h-full flex-col p-6 xl:col-span-2">
             <div>
-              <h3 className="text-sm font-semibold tracking-tight">
-                Satisfaction by Conversation Start
-              </h3>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Ratings are grouped by when each conversation began.
+              <h3 className="text-sm font-semibold tracking-tight">Conversation activity</h3>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                Repeat visitor rate means conversations with at least two visitor messages.
               </p>
             </div>
-            <GranularitySelect
-              value={satGranularity}
-              onChange={(value) => void setInsightsQuery({ satisfaction: value })}
-            />
-          </div>
-          {isLoading ? (
-            <Skeleton className="h-60 w-full rounded-lg border border-border/50 bg-transparent" />
-          ) : (
-            <InsightsTrendChart
-              data={satChartData}
-              empty={!hasSatisfactionResponses}
-              emptyMessage="No satisfaction feedback in this period."
-              labelFormatter={formatChartDate}
-              valueFormatter={(v) => v.toFixed(1)}
-              seriesLabel="Satisfaction score"
-              showResponseCount
-              yAxisDomain={[0, 5]}
-              ariaLabel="Satisfaction by conversation start date"
-            />
-          )}
-        </DashboardCard>
-      </section>
+            <div className="mt-4 grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2">
+              {isLoading || !engagement
+                ? Array.from({ length: 4 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="h-24 animate-pulse rounded-lg border border-border/50 bg-transparent"
+                    />
+                  ))
+                : engagementTiles.map((tile) => (
+                    <div
+                      key={tile.label}
+                      className="rounded-lg border border-border/50 bg-transparent p-4"
+                    >
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <HugeiconsIcon
+                          icon={tile.icon}
+                          strokeWidth={2}
+                          className="size-4 shrink-0"
+                        />
+                        <span className="text-sm">{tile.label}</span>
+                      </div>
+                      <p className="mt-2 text-xl font-semibold tracking-tight tabular-nums">
+                        {tile.value}
+                      </p>
+                      <p className="mt-1.5 text-xs">
+                        <ChangeIndicator change={tile.change} />
+                      </p>
+                    </div>
+                  ))}
+            </div>
+          </DashboardCard>
 
-      {analyticsQuery.isError ? (
-        <output className="flex flex-col gap-3 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-          <span className="text-muted-foreground">
-            Unable to refresh. Showing the last loaded data.
-          </span>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-8 shrink-0 gap-2"
-            onClick={() => void analyticsQuery.refetch()}
-            disabled={analyticsQuery.isFetching}
-            aria-busy={analyticsQuery.isFetching}
-          >
-            <HugeiconsIcon
-              icon={Refresh01Icon}
-              strokeWidth={2}
-              className={cn("size-3.5", analyticsQuery.isFetching && "motion-safe:animate-spin")}
-              aria-hidden="true"
-            />
-            {analyticsQuery.isFetching ? "Retrying…" : "Try again"}
-          </Button>
-        </output>
-      ) : null}
-      {feedbackToImprove ? (
-        <FeedbackKnowledgeDialog
-          feedback={feedbackToImprove}
-          onAnswerAdded={async (question) => {
-            await reviewKnowledgeGap.mutateAsync({ question, status: "RESOLVED" });
-          }}
-          onOpenChange={(open) => {
-            if (!open) setFeedbackToImprove(null);
-          }}
-        />
-      ) : null}
-    </div>
+          <DashboardCard className="flex h-full flex-col p-6 xl:col-span-2">
+            <div className="mb-5 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold tracking-tight">
+                  Satisfaction by Conversation Start
+                </h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Ratings are grouped by when each conversation began.
+                </p>
+              </div>
+              <GranularitySelect
+                value={satGranularity}
+                onChange={(value) => void setInsightsQuery({ satisfaction: value })}
+              />
+            </div>
+            {isLoading ? (
+              <Skeleton className="h-60 w-full rounded-lg border border-border/50 bg-transparent" />
+            ) : (
+              <InsightsTrendChart
+                data={satChartData}
+                empty={!hasSatisfactionResponses}
+                emptyMessage="No satisfaction feedback in this period."
+                labelFormatter={formatChartDate}
+                valueFormatter={(v) => v.toFixed(1)}
+                seriesLabel="Satisfaction score"
+                showResponseCount
+                yAxisDomain={[0, 5]}
+                ariaLabel="Satisfaction by conversation start date"
+              />
+            )}
+          </DashboardCard>
+        </section>
+
+        {analyticsQuery.isError ? (
+          <output className="flex flex-col gap-3 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+            <span className="text-muted-foreground">
+              Unable to refresh. Showing the last loaded data.
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 shrink-0 gap-2"
+              onClick={() => void analyticsQuery.refetch()}
+              disabled={analyticsQuery.isFetching}
+              aria-busy={analyticsQuery.isFetching}
+            >
+              <HugeiconsIcon
+                icon={Refresh01Icon}
+                strokeWidth={2}
+                className={cn("size-3.5", analyticsQuery.isFetching && "motion-safe:animate-spin")}
+                aria-hidden="true"
+              />
+              {analyticsQuery.isFetching ? "Retrying…" : "Try again"}
+            </Button>
+          </output>
+        ) : null}
+        {feedbackToImprove ? (
+          <FeedbackKnowledgeDialog
+            feedback={feedbackToImprove}
+            onAnswerAdded={async (question) => {
+              await reviewKnowledgeGap.mutateAsync({ question, status: "RESOLVED" });
+            }}
+            onOpenChange={(open) => {
+              if (!open) setFeedbackToImprove(null);
+            }}
+          />
+        ) : null}
+      </div>
+    </>
   );
 }
 
