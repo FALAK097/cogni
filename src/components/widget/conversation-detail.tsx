@@ -572,21 +572,57 @@ export function ConversationDetail({
     }
 
     return (
-      <output
+      <section
         aria-busy="true"
         aria-label="Loading conversation"
         className="flex h-full min-w-0 flex-1 flex-col"
       >
-        <div aria-hidden="true" className="flex h-full min-w-0 flex-1 flex-col">
-          <div className="px-5 py-4">
-            <Skeleton className="h-6 w-40" />
-          </div>
-          <div className="flex-1 space-y-4 p-5">
-            <Skeleton className="h-16 w-2/3" />
-            <Skeleton className="ml-auto h-16 w-1/2" />
+        <div className="flex h-full min-w-0 flex-1 flex-col">
+          <header className="flex shrink-0 items-center justify-between gap-2 px-3 py-2 sm:px-4">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                ref={backButtonRef}
+                onClick={onBack}
+                className="h-11 w-11 shrink-0 lg:hidden sm:h-9 sm:w-9"
+                aria-label="Back to conversations"
+              >
+                <ArrowLeft className="size-4" aria-hidden="true" />
+              </Button>
+              <div aria-hidden="true" className="flex min-w-0 items-center gap-2.5">
+                <Skeleton className="size-7 shrink-0 rounded-full" />
+                <div className="min-w-0 space-y-1.5">
+                  <Skeleton className="h-4 w-32 max-w-full" />
+                  <Skeleton className="h-3 w-24 max-w-full" />
+                </div>
+              </div>
+            </div>
+            <Skeleton aria-hidden="true" className="size-11 shrink-0 rounded-md sm:size-9" />
+          </header>
+          <div aria-hidden="true" className="flex min-h-0 flex-1 flex-col">
+            <div className="flex-1 space-y-4 overflow-hidden p-5">
+              <Skeleton className="mx-auto h-3 w-32" />
+              <Skeleton className="h-16 w-2/3 rounded-xl" />
+              <Skeleton className="ml-auto h-16 w-1/2 rounded-xl" />
+            </div>
+            <div className="shrink-0 border-t border-border/50 p-3 sm:p-4">
+              <div className="space-y-3 rounded-xl border border-border/60 bg-card p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <Skeleton className="h-8 w-28 rounded-lg" />
+                  <Skeleton className="h-3 w-32 max-w-[45%]" />
+                </div>
+                <Skeleton className="h-16 w-full rounded-lg" />
+                <div className="flex items-center justify-between gap-3">
+                  <Skeleton className="h-8 w-24 rounded-md" />
+                  <Skeleton className="h-9 w-20 rounded-md" />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </output>
+      </section>
     );
   }
 
@@ -1080,7 +1116,7 @@ export function ConversationDetail({
                 "border-amber-300/70 bg-amber-50/40 dark:border-amber-800/70 dark:bg-amber-950/10",
             )}
           >
-            <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <fieldset className="inline-flex min-w-0 items-center gap-0.5 rounded-lg border border-border/50 bg-muted/30 p-0.5">
                 <legend className="sr-only">Message type</legend>
                 <Button
@@ -1115,7 +1151,7 @@ export function ConversationDetail({
                 </span>
               ) : (
                 <span
-                  className="inline-flex max-w-[52%] min-w-0 items-center gap-1.5 text-xs text-muted-foreground sm:max-w-[60%]"
+                  className="inline-flex basis-full min-w-0 items-center gap-1.5 text-xs text-muted-foreground sm:basis-auto sm:max-w-[60%]"
                   title={replyTargetLabel}
                 >
                   <MessageSquare className="size-3 shrink-0" aria-hidden="true" />
@@ -1143,7 +1179,7 @@ export function ConversationDetail({
             />
 
             <div className="mt-2 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-0.5">
+              <div className="flex min-w-0 items-center gap-0.5">
                 {composerMode === "reply" ? (
                   <>
                     <Popover
@@ -1161,12 +1197,13 @@ export function ConversationDetail({
                             size="sm"
                             className="h-11 gap-1.5 px-2 text-sm text-muted-foreground sm:h-9"
                             aria-label="Open saved replies"
+                            title="Saved replies"
                           />
                         }
                       >
                         <span className="inline-flex items-center gap-1.5">
                           <FileText className="size-4" aria-hidden="true" />
-                          Saved replies
+                          <span className="hidden sm:inline">Saved replies</span>
                         </span>
                       </PopoverTrigger>
                       <PopoverContent align="start" className="w-[min(22rem,calc(100vw-2rem))] p-0">
@@ -1347,12 +1384,24 @@ export function ConversationDetail({
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="h-11 gap-1.5 px-2 text-sm text-muted-foreground sm:h-9"
+                      className="h-11 shrink-0 gap-1.5 px-2 text-sm text-muted-foreground sm:h-9"
+                      aria-label={
+                        copilotMutation.isPending
+                          ? "Generating a Copilot draft"
+                          : "Generate a reply with Copilot"
+                      }
+                      title={
+                        copilotMutation.isPending
+                          ? "Generating a Copilot draft"
+                          : "Generate a reply with Copilot"
+                      }
                       disabled={copilotMutation.isPending}
                       onClick={() => copilotMutation.mutate()}
                     >
                       <Bot className="size-4" aria-hidden="true" />
-                      {copilotMutation.isPending ? "Thinking…" : "Copilot"}
+                      <span className="hidden sm:inline">
+                        {copilotMutation.isPending ? "Thinking…" : "Copilot"}
+                      </span>
                     </Button>
                   </>
                 ) : null}
