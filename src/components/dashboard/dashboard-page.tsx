@@ -545,28 +545,42 @@ function DonutChart({
 
 function DonutLegend({
   items,
+  ariaLabel,
   className,
 }: {
   items: Array<{ label: string; value: number; percentage: number; colorClass: string }>;
+  ariaLabel: string;
   className?: string;
 }) {
   return (
-    <div className={cn("flex flex-col gap-3", className)}>
-      {items.map((item) => (
-        <div key={item.label} className="flex items-center justify-between gap-3 text-sm">
-          <div className="flex min-w-0 items-center gap-2">
-            <span className={cn("size-2.5 shrink-0 rounded-full", item.colorClass)} />
-            <span className="truncate text-muted-foreground">{item.label}</span>
-          </div>
-          <div className="flex shrink-0 items-center gap-2 tabular-nums">
-            <span className="font-medium">{item.value.toLocaleString()}</span>
-            <span className="w-12 text-right text-muted-foreground">
+    <table className={cn("w-full text-left text-sm", className)}>
+      <caption className="sr-only">{ariaLabel}</caption>
+      <thead className="sr-only">
+        <tr>
+          <th scope="col">Category</th>
+          <th scope="col">Conversations</th>
+          <th scope="col">Share</th>
+        </tr>
+      </thead>
+      <tbody>
+        {items.map((item) => (
+          <tr key={item.label}>
+            <td aria-label={item.label} className="py-1.5 pr-2">
+              <span className="flex min-w-0 items-center gap-2">
+                <span className={cn("size-2.5 shrink-0 rounded-full", item.colorClass)} />
+                <span className="truncate text-muted-foreground">{item.label}</span>
+              </span>
+            </td>
+            <td className="py-1.5 text-right font-medium tabular-nums">
+              {item.value.toLocaleString()}
+            </td>
+            <td className="w-14 py-1.5 pl-2 text-right text-muted-foreground tabular-nums">
               {formatBreakdownPercentage(item.percentage)}
-            </span>
-          </div>
-        </div>
-      ))}
-    </div>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 
@@ -1483,7 +1497,11 @@ export function DashboardPage({
                   emptyMessage="No source data for this period"
                   ariaLabel="Conversations by source"
                 />
-                <DonutLegend items={sourceChart.legend} className="w-full" />
+                <DonutLegend
+                  items={sourceChart.legend}
+                  ariaLabel="Conversation counts and percentages by source"
+                  className="w-full"
+                />
               </div>
             )}
           </DashboardCard>
@@ -1505,7 +1523,11 @@ export function DashboardPage({
                   emptyMessage="No status data for this period"
                   ariaLabel="Conversations by status"
                 />
-                <DonutLegend items={statusChart.legend} className="w-full" />
+                <DonutLegend
+                  items={statusChart.legend}
+                  ariaLabel="Conversation counts and percentages by status"
+                  className="w-full"
+                />
               </div>
             )}
           </DashboardCard>
@@ -1867,30 +1889,6 @@ export function DashboardPage({
           </DashboardCard>
         </section>
 
-        {analyticsQuery.isError ? (
-          <output className="flex flex-col gap-3 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-            <span className="text-muted-foreground">
-              Unable to refresh. Showing the last loaded data.
-            </span>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8 shrink-0 gap-2"
-              onClick={() => void analyticsQuery.refetch()}
-              disabled={analyticsQuery.isFetching}
-              aria-busy={analyticsQuery.isFetching}
-            >
-              <HugeiconsIcon
-                icon={Refresh01Icon}
-                strokeWidth={2}
-                className={cn("size-3.5", analyticsQuery.isFetching && "motion-safe:animate-spin")}
-                aria-hidden="true"
-              />
-              {analyticsQuery.isFetching ? "Retrying…" : "Try again"}
-            </Button>
-          </output>
-        ) : null}
         {feedbackToImprove ? (
           <FeedbackKnowledgeDialog
             feedback={feedbackToImprove}

@@ -41,6 +41,7 @@ export function InsightsTrendChart({
   ariaLabel: string;
 }) {
   const captionId = useId();
+  const summaryId = useId();
   const chartConfig = useMemo(
     () =>
       ({
@@ -58,12 +59,41 @@ export function InsightsTrendChart({
     () => data.map((point) => ({ ...point, label: labelFormatter(point.label) })),
     [data, labelFormatter],
   );
+  const dataPoints = data.flatMap((point) =>
+    point.value === null ? [] : [{ ...point, value: point.value }],
+  );
+  const peakPoint = dataPoints.reduce<(typeof dataPoints)[number] | null>(
+    (peak, point) => (peak === null || point.value > peak.value ? point : peak),
+    null,
+  );
+  const latestPoint = dataPoints.at(-1);
+  const chartSummary =
+    data.length === 0
+      ? ""
+      : `${data.length} ${data.length === 1 ? "period" : "periods"} shown. ${
+          peakPoint
+            ? `Peak ${seriesLabel.toLowerCase()} was ${valueFormatter(peakPoint.value)} on ${labelFormatter(peakPoint.label)}.`
+            : "No values are available for these periods."
+        } ${
+          latestPoint
+            ? `Most recent: ${valueFormatter(latestPoint.value)} on ${labelFormatter(latestPoint.label)}.`
+            : ""
+        }`;
 
   return (
-    <figure className={cn("min-w-0 w-full", className)} aria-labelledby={captionId}>
+    <figure
+      className={cn("min-w-0 w-full", className)}
+      aria-labelledby={captionId}
+      aria-describedby={data.length > 0 ? summaryId : undefined}
+    >
       <figcaption id={captionId} className="sr-only">
         {ariaLabel}
       </figcaption>
+      {data.length > 0 ? (
+        <p id={summaryId} className="sr-only">
+          {chartSummary}
+        </p>
+      ) : null}
       {empty || data.length === 0 ? (
         <output
           style={{ height }}
@@ -134,7 +164,7 @@ export function InsightsTrendChart({
       {data.length > 0 ? (
         <details className="mt-2 text-xs text-muted-foreground">
           <summary className="inline-flex min-h-11 cursor-pointer items-center rounded-sm py-1 pr-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
-            View data
+            View data table for {ariaLabel}
           </summary>
           <div className="mt-2 max-h-48 overflow-auto rounded-md border border-border">
             <table className="w-full text-left tabular-nums">

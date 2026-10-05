@@ -267,5 +267,11 @@ range changes and background refreshes, marks its report content busy while fetc
 retry path when refresh fails while preserving the last loaded report.
 
 The existing Insights trends and distribution charts use EvilCharts components and follow the
-repository's theme tokens. On PR head `326bc85`, CI, React Doctor, CodeRabbit, and Vercel were green;
-the follow-up accessibility changes still need their own pushed-head verification.
+repository's theme tokens. CI, React Doctor, CodeRabbit, and Vercel are verified independently for
+each pushed PR head; rendered browser acceptance remains a separate gate.
+
+The 2026-10-05 Insights pass removes duplicate refresh errors, makes distribution values available
+as labelled tables alongside EvilCharts, adds a concise trend summary and chart-specific table
+control, and reshapes the route skeleton to match the KPI/chart/report grid. Local Oxlint,
+TypeScript, formatting, focused analytics tests (7/7), and the optimized production build pass.
+Visual browser acceptance is still separate from these code and build checks.
