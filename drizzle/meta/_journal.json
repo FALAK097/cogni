@@ -92,6 +92,20 @@
       "when": 1791114505000,
       "tag": "0012_durable_conversation_events",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791199594003,
+      "tag": "0013_ticket_lifecycle",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1791199770068,
+      "tag": "0014_ticket_workspace_constraints",
+      "breakpoints": true
     }
   ]
 }

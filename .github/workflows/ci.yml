@@ -61,6 +61,7 @@ jobs:
       - run: pnpm test:widget-settings
       - run: pnpm test:widget-settings-state
       - run: pnpm test:conversation-append
+      - run: pnpm test:ticket-lifecycle-route
       - run: pnpm test:inbox-pagination
       - run: pnpm test:inbox-pagination-db
       - run: pnpm test:inbox-saved-views

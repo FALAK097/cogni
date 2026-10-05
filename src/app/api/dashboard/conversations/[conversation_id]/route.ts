@@ -192,6 +192,7 @@ export async function GET(_request: Request, context: RouteContext) {
     conversationChannel: conversation.channel,
     conversationStartedAt: new Date(conversation.createdAt).toISOString(),
     conversationSubject: conversation.subject,
+    ticket: conversation.ticket,
     snoozedUntil: conversation.snoozedUntil,
     workspaceTimezone: workspace.timezone,
     assigneeName: conversation.assignedMember?.user.name ?? null,

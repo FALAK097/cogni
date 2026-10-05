@@ -48,6 +48,10 @@ test("list params reject unsupported filters, oversized pages, and long searches
     parseInboxListParams(new URLSearchParams("filter=snoozed")).data.filter,
     "snoozed",
   );
+  assert.deepEqual(
+    parseInboxListParams(new URLSearchParams("filter=tickets")).data.filter,
+    "tickets",
+  );
   assert.equal(parseInboxListParams(new URLSearchParams("limit=101")).ok, false);
   assert.equal(parseInboxListParams(new URLSearchParams(`search=${"x".repeat(201)}`)).ok, false);
 });

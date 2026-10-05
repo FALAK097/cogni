@@ -8,6 +8,11 @@ function ConversationRowsSkeleton() {
         <Skeleton className="h-9 flex-1 rounded-lg" />
         <Skeleton className="size-9 rounded-lg" />
       </div>
+      <div aria-hidden="true" className="flex gap-1 px-2 pb-1">
+        <Skeleton className="h-6 w-12 rounded-full" />
+        <Skeleton className="h-6 w-16 rounded-full" />
+        <Skeleton className="h-6 w-14 rounded-full" />
+      </div>
       <div aria-hidden="true" className="space-y-1">
         {Array.from({ length: 6 }).map((_, index) => (
           <div key={index} className="flex items-start gap-3 rounded-lg px-3 py-3">
@@ -18,6 +23,73 @@ function ConversationRowsSkeleton() {
             </div>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function ConversationThreadSkeleton() {
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div
+        aria-hidden="true"
+        className="flex items-center gap-3 border-b border-border/60 px-4 py-3"
+      >
+        <Skeleton className="size-9 shrink-0 rounded-full" />
+        <div className="min-w-0 flex-1 space-y-2">
+          <Skeleton className="h-4 w-32 max-w-full" />
+          <Skeleton className="h-3 w-24 max-w-full" />
+        </div>
+        <Skeleton className="hidden h-8 w-20 rounded-lg sm:block" />
+        <Skeleton className="size-8 rounded-lg" />
+      </div>
+      <div
+        aria-hidden="true"
+        className="flex min-h-0 flex-1 flex-col justify-end gap-5 overflow-hidden p-4 sm:p-6"
+      >
+        <Skeleton className="mx-auto h-3 w-32" />
+        <Skeleton className="h-14 w-3/4 max-w-[420px] rounded-xl" />
+        <Skeleton className="ml-auto h-12 w-2/3 max-w-[360px] rounded-xl" />
+        <Skeleton className="h-20 w-4/5 max-w-[460px] rounded-xl" />
+      </div>
+      <div aria-hidden="true" className="border-t border-border/60 p-3 sm:p-4">
+        <Skeleton className="h-24 w-full rounded-xl" />
+        <div className="mt-2 flex items-center justify-between">
+          <div className="flex gap-2">
+            <Skeleton className="size-8 rounded-lg" />
+            <Skeleton className="size-8 rounded-lg" />
+          </div>
+          <Skeleton className="h-8 w-20 rounded-lg" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ContactDetailsSkeleton() {
+  return (
+    <div aria-hidden="true" className="space-y-4 p-4">
+      <div className="border-b border-border/60 pb-4">
+        <Skeleton className="size-10 rounded-full" />
+        <Skeleton className="mt-3 h-4 w-28" />
+        <Skeleton className="mt-2 h-3 w-40 max-w-full" />
+      </div>
+      <Skeleton className="h-4 w-24" />
+      <div className="space-y-3 rounded-xl border border-border/60 p-3">
+        <Skeleton className="h-3 w-20" />
+        <Skeleton className="h-8 w-full rounded-md" />
+        <Skeleton className="h-3 w-28" />
+      </div>
+      <div className="space-y-3 rounded-xl border border-border/60 p-3">
+        <Skeleton className="h-3 w-16" />
+        <Skeleton className="h-3 w-full" />
+        <Skeleton className="h-3 w-4/5" />
+      </div>
+      <div className="space-y-3 rounded-xl border border-border/60 p-3">
+        <Skeleton className="h-3 w-28" />
+        <Skeleton className="h-8 w-full rounded-lg" />
+        <Skeleton className="h-8 w-full rounded-lg" />
+        <Skeleton className="h-8 w-full rounded-lg" />
       </div>
     </div>
   );
@@ -43,19 +115,15 @@ export default function InboxLoading() {
         </div>
         <section
           aria-hidden="true"
-          className={`${panelBoxClassName} hidden min-w-0 flex-1 items-center justify-center lg:flex`}
+          className={`${panelBoxClassName} hidden min-w-0 flex-1 flex-col lg:flex`}
         >
-          <Skeleton className="h-4 w-48 max-w-[70%]" />
+          <ConversationThreadSkeleton />
         </section>
         <section
           aria-hidden="true"
-          className={`${panelBoxClassName} hidden w-[280px] shrink-0 items-center justify-center xl:flex`}
+          className={`${panelBoxClassName} hidden w-[280px] shrink-0 xl:block`}
         >
-          <div className="w-full space-y-3 p-4">
-            <Skeleton className="size-10 rounded-full" />
-            <Skeleton className="h-4 w-28" />
-            <Skeleton className="h-3 w-full" />
-          </div>
+          <ContactDetailsSkeleton />
         </section>
       </div>
     </output>

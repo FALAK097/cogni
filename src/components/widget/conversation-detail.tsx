@@ -96,10 +96,16 @@ import {
   useTakeOverConversation,
   useUpdateContactTag,
   useUpdateConversationLabel,
+  useCreateConversationTicket,
+  useUpdateTicket,
   useWorkspaceMembers,
 } from "@/hooks/query";
 import { useCurrentTimestamp } from "@/hooks/use-current-timestamp";
-import type { ConversationDetail as ConversationDetailData, WidgetMessage } from "@/hooks/query";
+import type {
+  ConversationDetail as ConversationDetailData,
+  TicketSummary,
+  WidgetMessage,
+} from "@/hooks/query";
 import { generateAvatarUrl } from "@/lib/avatar-generator";
 import { cn } from "@/lib/utils";
 import { resolveTranscriptScroll } from "@/features/conversations/transcript-scroll";
@@ -1672,6 +1678,8 @@ function SessionDetailsContent({
   const assignConversation = useAssignConversation();
   const updateContactTag = useUpdateContactTag();
   const updateConversationLabel = useUpdateConversationLabel();
+  const createTicket = useCreateConversationTicket();
+  const updateTicket = useUpdateTicket();
   const [newTag, setNewTag] = useState("");
   const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
   const [showAllTags, setShowAllTags] = useState(false);
@@ -1703,6 +1711,47 @@ function SessionDetailsContent({
           toast({
             title: "Could not update assignee",
             description: error instanceof Error ? error.message : "Please try again.",
+            variant: "destructive",
+          }),
+      },
+    );
+  };
+  const ticket = session.ticket ?? null;
+  const ticketBusy = createTicket.isPending || updateTicket.isPending;
+  const handleCreateTicket = () => {
+    if (ticketBusy) return;
+    createTicket.mutate(
+      {
+        conversationId: session.conversationId ?? session.id,
+        title: session.conversationSubject?.trim() || "Customer request",
+      },
+      {
+        onSuccess: () =>
+          toast({ title: "Ticket created", description: "It is linked to this conversation." }),
+        onError: (error) =>
+          toast({
+            title: "Could not create ticket",
+            description: error.message,
+            variant: "destructive",
+          }),
+      },
+    );
+  };
+  const patchTicket = (updates: {
+    title?: string;
+    status?: TicketSummary["status"];
+    priority?: TicketSummary["priority"];
+    assignedMemberId?: string | null;
+    dueAt?: string | null;
+  }) => {
+    if (!ticket || ticketBusy) return;
+    updateTicket.mutate(
+      { ticketId: ticket.id, ...updates },
+      {
+        onError: (error) =>
+          toast({
+            title: "Could not update ticket",
+            description: error.message,
             variant: "destructive",
           }),
       },
@@ -2106,7 +2155,157 @@ function SessionDetailsContent({
               {session.aiPaused ? "Paused" : "Enabled"}
             </Badge>
           </DetailRow>
-          <DetailRow label="Ticket">{session.conversationSubject ?? "Customer request"}</DetailRow>
+          <div className="my-2 rounded-lg border border-border/70 bg-muted/20 p-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-foreground">Ticket</p>
+                {ticket ? (
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground" title={ticket.title}>
+                    {ticket.title}
+                  </p>
+                ) : (
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Track follow-up for this conversation.
+                  </p>
+                )}
+              </div>
+              {ticket ? (
+                <Badge
+                  variant={ticket.status === "RESOLVED" ? "outline" : "secondary"}
+                  className="shrink-0 text-[10px]"
+                >
+                  {ticket.status === "RESOLVED"
+                    ? "Resolved"
+                    : ticket.status === "PENDING"
+                      ? "Pending"
+                      : "Open"}
+                </Badge>
+              ) : null}
+            </div>
+            {!ticket ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9 w-full rounded-lg"
+                onClick={handleCreateTicket}
+                disabled={ticketBusy}
+              >
+                {createTicket.isPending ? (
+                  <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                ) : (
+                  <Plus className="size-3.5" aria-hidden="true" />
+                )}
+                {createTicket.isPending ? "Creating ticket…" : "Create ticket"}
+              </Button>
+            ) : (
+              <div className="space-y-2">
+                <Select
+                  value={ticket.status}
+                  onValueChange={(value) => {
+                    if (value === "OPEN" || value === "PENDING" || value === "RESOLVED")
+                      patchTicket({ status: value });
+                  }}
+                >
+                  <SelectTrigger
+                    aria-label="Ticket status"
+                    className="h-9 w-full rounded-lg border-border/60 bg-background text-xs"
+                    disabled={ticketBusy}
+                  >
+                    <SelectValue>
+                      {ticket.status === "RESOLVED"
+                        ? "Resolved"
+                        : ticket.status === "PENDING"
+                          ? "Pending"
+                          : "Open"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent align="end" className="rounded-xl">
+                    <SelectItem value="OPEN">Open</SelectItem>
+                    <SelectItem value="PENDING">Pending</SelectItem>
+                    <SelectItem value="RESOLVED">Resolved</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={ticket.priority}
+                  onValueChange={(value) => {
+                    if (
+                      value === "LOW" ||
+                      value === "NORMAL" ||
+                      value === "HIGH" ||
+                      value === "URGENT"
+                    )
+                      patchTicket({ priority: value });
+                  }}
+                >
+                  <SelectTrigger
+                    aria-label="Ticket priority"
+                    className="h-9 w-full rounded-lg border-border/60 bg-background text-xs"
+                    disabled={ticketBusy}
+                  >
+                    <SelectValue>
+                      {ticket.priority === "URGENT"
+                        ? "Urgent priority"
+                        : `${ticket.priority[0]}${ticket.priority.slice(1).toLowerCase()} priority`}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent align="end" className="rounded-xl">
+                    <SelectItem value="LOW">Low</SelectItem>
+                    <SelectItem value="NORMAL">Normal</SelectItem>
+                    <SelectItem value="HIGH">High</SelectItem>
+                    <SelectItem value="URGENT">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={ticket.assignedMemberId ?? "unassigned"}
+                  onValueChange={(value) => {
+                    if (value)
+                      patchTicket({ assignedMemberId: value === "unassigned" ? null : value });
+                  }}
+                >
+                  <SelectTrigger
+                    aria-label="Ticket assignee"
+                    className="h-9 w-full rounded-lg border-border/60 bg-background text-xs"
+                    disabled={ticketBusy || membersQuery.isLoading || membersQuery.isError}
+                  >
+                    <SelectValue>
+                      {ticket.assignedMemberId
+                        ? (membersQuery.data?.members.find(
+                            (member) => member.id === ticket.assignedMemberId,
+                          )?.name ?? "Former teammate")
+                        : "Unassigned"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent align="end" className="rounded-xl">
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {membersQuery.data?.members.map((member) => (
+                      <SelectItem key={member.id} value={member.id}>
+                        {member.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="block space-y-1 text-xs text-muted-foreground">
+                  <label htmlFor="ticket-due-date">Due date</label>
+                  <Input
+                    id="ticket-due-date"
+                    type="date"
+                    aria-label="Ticket due date"
+                    className="h-9 text-xs"
+                    disabled={ticketBusy}
+                    value={ticket.dueAt ? format(new Date(ticket.dueAt), "yyyy-MM-dd") : ""}
+                    onChange={(event) =>
+                      patchTicket({
+                        dueAt: event.target.value
+                          ? new Date(`${event.target.value}T23:59:59`).toISOString()
+                          : null,
+                      })
+                    }
+                  />
+                </div>
+              </div>
+            )}
+          </div>
           <DetailRow label="Assignee">
             <Select value={session.assigneeId ?? "unassigned"} onValueChange={handleAssigneeChange}>
               <SelectTrigger

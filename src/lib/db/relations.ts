@@ -9,6 +9,7 @@ import {
   contactNote,
   visitorSession,
   conversation,
+  ticket,
   widget,
   attachment,
   document,
@@ -62,6 +63,7 @@ export const workspaceRelations = relations(workspace, ({ many }) => ({
   workspaceMembers: many(workspaceMember),
   contacts: many(contact),
   conversations: many(conversation),
+  tickets: many(ticket),
   widgets: many(widget),
   attachments: many(attachment),
   documents: many(document),
@@ -93,6 +95,7 @@ export const contactRelations = relations(contact, ({ one, many }) => ({
   }),
   contactNotes: many(contactNote),
   conversations: many(conversation),
+  tickets: many(ticket),
   visitorSessions: many(visitorSession),
   agentRuns: many(agentRun),
 }));
@@ -130,7 +133,21 @@ export const conversationRelations = relations(conversation, ({ one, many }) => 
     references: [workspace.id],
   }),
   attachments: many(attachment),
+  tickets: many(ticket),
   agentRuns: many(agentRun),
+}));
+
+export const ticketRelations = relations(ticket, ({ one }) => ({
+  workspace: one(workspace, { fields: [ticket.workspaceId], references: [workspace.id] }),
+  conversation: one(conversation, {
+    fields: [ticket.conversationId],
+    references: [conversation.id],
+  }),
+  contact: one(contact, { fields: [ticket.contactId], references: [contact.id] }),
+  assignee: one(workspaceMember, {
+    fields: [ticket.assignedMemberId],
+    references: [workspaceMember.id],
+  }),
 }));
 
 export const visitorSessionRelations = relations(visitorSession, ({ one, many }) => ({

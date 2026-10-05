@@ -7,9 +7,11 @@ import { getDb } from "@/lib/db/client";
 import {
   contact as contactTable,
   conversation as conversationTable,
+  ticket as ticketTable,
   type contact,
   type contactNote,
   type conversation,
+  type ticket,
   type user,
   type visitorSession,
   type widget,
@@ -54,6 +56,8 @@ function conversationFilterCond(
       return and(base, notSnoozed, eq(c.status, "CLOSED"));
     case "snoozed":
       return and(base, gt(c.snoozedUntil, sql`CURRENT_TIMESTAMP`), ne(c.status, "CLOSED"));
+    case "tickets":
+      return and(base, hasTicketSql(c));
     default:
       return and(base, notSnoozed);
   }
@@ -123,7 +127,25 @@ export type ParsedConversation = Omit<typeof conversation.$inferSelect, "message
     | null;
   visitorSession: typeof visitorSession.$inferSelect | null;
   widget?: typeof widget.$inferSelect | null;
+  ticket: TicketSummary | null;
 };
+
+export type TicketSummary = Pick<
+  typeof ticket.$inferSelect,
+  "id" | "title" | "status" | "priority" | "assignedMemberId" | "dueAt"
+>;
+
+function mapTicketSummary(row: typeof ticketTable.$inferSelect | undefined): TicketSummary | null {
+  if (!row) return null;
+  return {
+    id: row.id,
+    title: row.title,
+    status: row.status,
+    priority: row.priority,
+    assignedMemberId: row.assignedMemberId,
+    dueAt: row.dueAt,
+  };
+}
 
 function parseMessages(messagesJson: string): MessageJson[] {
   try {
@@ -145,9 +167,10 @@ function mapConversationRow(
       | null;
     visitorSession: typeof visitorSession.$inferSelect | null;
     widget?: typeof widget.$inferSelect | null;
+    tickets?: (typeof ticketTable.$inferSelect)[];
   },
 ): ParsedConversation {
-  const { workspaceMember, contact: contactRow, messages, ...conversationRow } = row;
+  const { workspaceMember, contact: contactRow, messages, tickets, ...conversationRow } = row;
 
   return {
     ...conversationRow,
@@ -162,6 +185,7 @@ function mapConversationRow(
     },
     visitorSession: row.visitorSession,
     widget: row.widget,
+    ticket: mapTicketSummary(tickets?.[0]),
   };
 }
 
@@ -174,6 +198,14 @@ function hasUnreadVisitorMessagesSql(c: typeof conversationTable) {
     select 1 from jsonb_array_elements(${c.messages}::jsonb) as message
     where message->>'authorType' = 'VISITOR'
       and message->>'readAt' is null
+  )`;
+}
+
+function hasTicketSql(c: typeof conversationTable) {
+  return sql`EXISTS (
+    SELECT 1 FROM "ticket" AS "ticket_filter"
+    WHERE "ticket_filter"."workspaceId" = ${c.workspaceId}
+      AND "ticket_filter"."conversationId" = ${c.id}
   )`;
 }
 
@@ -303,6 +335,10 @@ export async function getInboxPage(
             and ${conversationTable.snoozedUntil} > CURRENT_TIMESTAMP
             and ${conversationTable.status} <> 'CLOSED'
         )`.mapWith(Number),
+        tickets: sql<number>`count(*) filter (
+          where ${getInboxConversationBaseCond(conversationTable)}
+            and ${hasTicketSql(conversationTable)}
+        )`.mapWith(Number),
       })
       .from(conversationTable)
       .where(baseWhere),
@@ -329,6 +365,10 @@ export async function getInboxPage(
           with: { user: true },
         },
         visitorSession: true,
+        tickets: {
+          where: (fields, { eq }) => eq(fields.workspaceId, workspaceId),
+          limit: 1,
+        },
       },
     }),
   ]);
@@ -359,6 +399,7 @@ export async function getInboxPage(
     open: 0,
     closed: 0,
     snoozed: 0,
+    tickets: 0,
   };
 
   return {
@@ -399,6 +440,10 @@ export async function getConversation(
       },
       visitorSession: true,
       widget: true,
+      tickets: {
+        where: (fields, { eq }) => eq(fields.workspaceId, workspaceId),
+        limit: 1,
+      },
     },
   });
 
@@ -435,5 +480,6 @@ export function mapConversationToListItem(conversation: ParsedConversation) {
     city: conversation.visitorSession?.city ?? null,
     channel: conversation.channel,
     subject: conversation.subject,
+    ticket: conversation.ticket,
   };
 }

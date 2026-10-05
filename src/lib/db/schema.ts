@@ -2,6 +2,7 @@ import {
   boolean,
   bigint,
   check,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -159,6 +160,7 @@ export const contact = pgTable(
       .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
   },
   (table) => [
+    uniqueIndex("contact_workspaceId_id_key").on(table.workspaceId, table.id),
     uniqueIndex("contact_workspaceId_externalId_key").on(table.workspaceId, table.externalId),
     uniqueIndex("contact_workspaceId_email_key").on(table.workspaceId, table.email),
     index("contact_workspaceId_updatedAt_idx").on(table.workspaceId, table.updatedAt),
@@ -231,6 +233,7 @@ export const conversation = pgTable(
       table.channel,
       table.externalThreadId,
     ),
+    uniqueIndex("conversation_workspaceId_id_key").on(table.workspaceId, table.id),
     index("conversation_workspaceId_status_lastMessageAt_idx").on(
       table.workspaceId,
       table.status,
@@ -242,6 +245,72 @@ export const conversation = pgTable(
       table.lastMessageAt,
       table.id,
     ),
+  ],
+);
+
+export const ticketStatus = pgEnum("ticket_status", ["OPEN", "PENDING", "RESOLVED"]);
+export const ticketPriority = pgEnum("ticket_priority", ["LOW", "NORMAL", "HIGH", "URGENT"]);
+
+export const ticket = pgTable(
+  "ticket",
+  {
+    id: text().primaryKey().notNull(),
+    workspaceId: text()
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    conversationId: text()
+      .notNull()
+      .references(() => conversation.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    contactId: text()
+      .notNull()
+      .references(() => contact.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    title: text().notNull(),
+    status: ticketStatus().default("OPEN").notNull(),
+    priority: ticketPriority().default("NORMAL").notNull(),
+    assignedMemberId: text().references(() => workspaceMember.id, {
+      onDelete: "set null",
+      onUpdate: "cascade",
+    }),
+    dueAt: timestampString(),
+    createdByMembershipId: text().references(() => workspaceMember.id, {
+      onDelete: "set null",
+      onUpdate: "cascade",
+    }),
+    createdAt: timestampString()
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+    updatedAt: timestampString()
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "ticket_workspace_conversation_fk",
+      columns: [table.workspaceId, table.conversationId],
+      foreignColumns: [conversation.workspaceId, conversation.id],
+    })
+      .onDelete("cascade")
+      .onUpdate("cascade"),
+    foreignKey({
+      name: "ticket_workspace_contact_fk",
+      columns: [table.workspaceId, table.contactId],
+      foreignColumns: [contact.workspaceId, contact.id],
+    })
+      .onDelete("cascade")
+      .onUpdate("cascade"),
+    uniqueIndex("ticket_workspace_conversation_key").on(table.workspaceId, table.conversationId),
+    index("ticket_workspace_status_updated_idx").on(
+      table.workspaceId,
+      table.status,
+      table.updatedAt,
+    ),
+    index("ticket_workspace_assignee_status_idx").on(
+      table.workspaceId,
+      table.assignedMemberId,
+      table.status,
+    ),
+    index("ticket_workspace_due_idx").on(table.workspaceId, table.dueAt),
+    check("ticket_title_check", sql`length(trim(${table.title})) BETWEEN 1 AND 240`),
   ],
 );
 

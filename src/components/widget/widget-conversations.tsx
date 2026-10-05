@@ -66,6 +66,7 @@ const FILTER_TABS: Array<{
   { value: "open", label: "All open", countKey: "open" },
   { value: "snoozed", label: "Snoozed", countKey: "snoozed" },
   { value: "closed", label: "Closed", countKey: "closed" },
+  { value: "tickets", label: "Tickets", countKey: "tickets" },
 ];
 
 const EMPTY_COUNTS = {
@@ -76,6 +77,7 @@ const EMPTY_COUNTS = {
   open: 0,
   closed: 0,
   snoozed: 0,
+  tickets: 0,
 };
 
 export function WidgetConversations({ canManage }: WidgetConversationsProps) {
@@ -163,7 +165,8 @@ export function WidgetConversations({ canManage }: WidgetConversationsProps) {
   });
   const activeView = FILTER_TABS.find((tab) => tab.value === filter);
   const activeViewCount = activeView ? counts[activeView.countKey] : 0;
-  const activeCountKind = filter === "snoozed" ? "snoozed" : "unread";
+  const activeCountKind =
+    filter === "snoozed" ? "snoozed" : filter === "tickets" ? "tickets" : "unread";
   const composerDraftKey = `${workspaceId}:${selectedConversationId ?? ""}`;
   const composerDraft = composerDrafts[composerDraftKey] ?? EMPTY_CONVERSATION_COMPOSER_DRAFT;
   const backToConversationList = () => {
@@ -218,7 +221,12 @@ export function WidgetConversations({ canManage }: WidgetConversationsProps) {
               <SelectContent align="start" alignItemWithTrigger={false} className="w-64 rounded-xl">
                 {FILTER_TABS.map((tab) => {
                   const count = counts[tab.countKey];
-                  const countKind = tab.value === "snoozed" ? "snoozed" : "unread";
+                  const countKind =
+                    tab.value === "snoozed"
+                      ? "snoozed"
+                      : tab.value === "tickets"
+                        ? "tickets"
+                        : "unread";
 
                   return (
                     <SelectItem key={tab.value} value={tab.value} className="min-h-10 rounded-lg">

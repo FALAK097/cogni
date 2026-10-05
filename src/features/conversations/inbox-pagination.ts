@@ -9,7 +9,7 @@ export type InboxCursor = z.infer<typeof inboxCursorSchema>;
 
 export type InboxListParams = {
   search?: string;
-  filter: "all" | "unread" | "unassigned" | "mine" | "open" | "closed" | "snoozed";
+  filter: "all" | "unread" | "unassigned" | "mine" | "open" | "closed" | "snoozed" | "tickets";
   channel?: InboxChannel;
   assignee?: string | "unassigned";
   label?: string;
@@ -71,6 +71,7 @@ const inboxListFilterSchema = z.enum([
   "open",
   "closed",
   "snoozed",
+  "tickets",
 ]);
 const inboxChannelSchema = z.enum(["WIDGET", "DISCORD", "GCHAT", "SLACK", "TEAMS", "WHATSAPP"]);
 export const conversationLabelSchema = z

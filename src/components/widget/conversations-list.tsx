@@ -286,9 +286,11 @@ export function ConversationsList({
               ? "No conversations assigned to you"
               : filter === "open"
                 ? "No open conversations"
-                : filter === "snoozed"
-                  ? "Nothing snoozed"
-                  : "No closed conversations";
+                : filter === "tickets"
+                  ? "No tickets yet"
+                  : filter === "snoozed"
+                    ? "Nothing snoozed"
+                    : "No closed conversations";
   const hasVisibleSelection = conversations.some(
     (conversation) => conversation.id === selectedConversationId,
   );
@@ -674,8 +676,15 @@ export function ConversationsList({
                 <div key={index} className="flex items-start gap-3 rounded-lg px-3 py-3">
                   <Skeleton className="h-10 w-10 rounded-full" />
                   <div className="flex-1 space-y-2">
-                    <Skeleton className="h-4 w-28" />
-                    <Skeleton className="h-3 w-full" />
+                    <div className="flex items-center justify-between gap-3">
+                      <Skeleton className="h-4 w-28" />
+                      <Skeleton className="h-3 w-10" />
+                    </div>
+                    <Skeleton className="h-4 w-full" />
+                    <div className="flex gap-2">
+                      <Skeleton className="h-4 w-14 rounded" />
+                      <Skeleton className="h-4 w-16 rounded" />
+                    </div>
                   </div>
                 </div>
               ))}
@@ -701,7 +710,9 @@ export function ConversationsList({
                       ? "Unread visitor messages will show up here."
                       : filter === "snoozed"
                         ? "Conversations you snooze will return to the inbox when it’s time."
-                        : "Try another inbox view to find a conversation."}
+                        : filter === "tickets"
+                          ? "Create a ticket from any conversation to track follow-up and ownership here."
+                          : "Try another inbox view to find a conversation."}
               </p>
             </div>
             {searchTerm || hasFacetFilters ? (
@@ -795,6 +806,16 @@ export function ConversationsList({
                         <span className="inline-flex rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
                           {getConversationChannelLabel(conversation.channel)}
                         </span>
+                        {conversation.ticket ? (
+                          <span
+                            className="inline-flex items-center gap-1 rounded border border-border/70 bg-background px-1.5 py-0.5 text-xs text-muted-foreground"
+                            title={`${conversation.ticket.title} · ${conversation.ticket.status.toLowerCase()} · ${conversation.ticket.priority.toLowerCase()} priority`}
+                          >
+                            <span className="font-medium text-foreground">Ticket</span>
+                            <span aria-hidden="true">·</span>
+                            {conversation.ticket.status.toLowerCase()}
+                          </span>
+                        ) : null}
                         {conversation.labels.slice(0, 2).map((label) => (
                           <span
                             key={label}

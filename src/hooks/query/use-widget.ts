@@ -45,7 +45,18 @@ export type ConversationFilter =
   | "mine"
   | "open"
   | "closed"
-  | "snoozed";
+  | "snoozed"
+  | "tickets";
+
+export interface TicketSummary {
+  id: string;
+  title: string;
+  status: "OPEN" | "PENDING" | "RESOLVED";
+  priority: "LOW" | "NORMAL" | "HIGH" | "URGENT";
+  assignedMemberId: string | null;
+  assignedMemberName?: string | null;
+  dueAt: string | null;
+}
 
 export interface InboxSavedView {
   id: string;
@@ -193,6 +204,7 @@ export interface WidgetSessionDetail {
   conversationChannel?: string;
   conversationStartedAt?: string;
   conversationSubject?: string;
+  ticket?: TicketSummary | null;
   snoozedUntil?: string | null;
   workspaceTimezone?: string;
   assigneeName?: string | null;
@@ -445,6 +457,7 @@ export interface ConversationSummary {
   subject: string;
   snoozedUntil: string | null;
   labels: string[];
+  ticket?: TicketSummary | null;
 }
 
 export type ConversationDetail = WidgetSessionDetail;
@@ -459,6 +472,7 @@ export interface ConversationsResponse {
     open: number;
     closed: number;
     snoozed: number;
+    tickets: number;
   };
   currentMembershipId: string;
   workspaceTimezone: string;
@@ -967,6 +981,47 @@ export function useAssignConversation() {
         },
       );
       return requireData(data, error, "Failed to update conversation assignee");
+    },
+    onSuccess: () => invalidateConversationQueries(queryClient),
+  });
+}
+
+export function useCreateConversationTicket() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ conversationId, title }: { conversationId: string; title: string }) => {
+      const { data, error } = await api.POST<{ ticket: TicketSummary }>(
+        "/api/dashboard/conversations/{conversation_id}/ticket",
+        {
+          params: { path: { conversation_id: conversationId } },
+          body: { title },
+        },
+      );
+      return requireData(data, error, "Failed to create ticket");
+    },
+    onSuccess: () => invalidateConversationQueries(queryClient),
+  });
+}
+
+export function useUpdateTicket() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      ticketId,
+      ...updates
+    }: {
+      ticketId: string;
+      title?: string;
+      status?: TicketSummary["status"];
+      priority?: TicketSummary["priority"];
+      assignedMemberId?: string | null;
+      dueAt?: string | null;
+    }) => {
+      const { data, error } = await api.PATCH<{ ticket: TicketSummary }>(
+        "/api/dashboard/tickets/{ticket_id}",
+        { params: { path: { ticket_id: ticketId } }, body: updates },
+      );
+      return requireData(data, error, "Failed to update ticket");
     },
     onSuccess: () => invalidateConversationQueries(queryClient),
   });

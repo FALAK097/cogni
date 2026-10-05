@@ -23,7 +23,7 @@ await symlink(join(process.cwd(), "node_modules"), join(outputDirectory, "node_m
 await build({
   stdin: {
     contents: `
-      export { getInboxPage, mapConversationToListItem } from "@/features/conversations/server/queries";
+      export { getConversation, getInboxPage, mapConversationToListItem } from "@/features/conversations/server/queries";
       export { appendConversationMessage } from "@/features/conversations/server/conversation-service";
       export { decodeInboxCursor } from "@/features/conversations/inbox-pagination";
       export { changeConversationLabel, parseConversationLabels } from "@/features/conversations/server/labels";
@@ -60,6 +60,7 @@ const {
   changeConversationLabel,
   decodeInboxCursor,
   getDb,
+  getConversation,
   getInboxPage,
   mapConversationToListItem,
   parseConversationLabels,
@@ -132,6 +133,17 @@ before(async () => {
       ${otherConversationId}, 'Other workspace conversation', ${now}, ${now}, ${JSON.stringify([{ id: randomUUID(), body: "private", authorType: "VISITOR", createdAt: now }])}, ${otherWorkspaceId}, ${otherContactId}, ${new Date(Date.now() + 60 * 60 * 1000).toISOString()}
     )
   `;
+  const ticketId = randomUUID();
+  await raw`
+    INSERT INTO "ticket" ("id", "workspaceId", "conversationId", "contactId", "title", "createdByMembershipId")
+    SELECT ${ticketId}, c."workspaceId", c."id", c."contactId", 'Ticketed request', ${memberId}
+    FROM "conversation" c WHERE c."id" = ${conversationIds[2]}
+  `;
+  await raw`
+    INSERT INTO "ticket" ("id", "workspaceId", "conversationId", "contactId", "title")
+    SELECT ${randomUUID()}, c."workspaceId", c."id", c."contactId", 'Other workspace ticket'
+    FROM "conversation" c WHERE c."id" = ${otherConversationId}
+  `;
 });
 
 after(async () => {
@@ -164,6 +176,7 @@ test("inbox cursors return complete, stable pages and correct unread view counts
     open: 1,
     closed: 1,
     snoozed: 0,
+    tickets: 1,
   });
   assert.deepEqual(
     firstItems.map((item) => item.unreadCount),
@@ -186,6 +199,46 @@ test("inbox cursors return complete, stable pages and correct unread view counts
   );
   assert.equal(secondPage.pagination.hasMore, false);
   assert.equal(secondPage.pagination.nextCursor, null);
+});
+
+test("tickets filter returns only workspace tickets and counts them", async () => {
+  await raw`
+    UPDATE "conversation"
+    SET "snoozedUntil" = ${new Date(Date.now() + 60 * 60 * 1000).toISOString()}
+    WHERE "id" = ${conversationIds[2]}
+  `;
+  try {
+    const result = await getInboxPage(workspaceId, {
+      membershipId: memberId,
+      filter: "tickets",
+      limit: 20,
+      cursor: null,
+    });
+
+    assert.equal(result.counts.tickets, 1);
+    assert.deepEqual(
+      result.conversations.map((conversation) => conversation.id),
+      [conversationIds[2]],
+    );
+    assert.deepEqual(mapConversationToListItem(result.conversations[0]).ticket, {
+      id: (await raw`SELECT "id" FROM "ticket" WHERE "conversationId" = ${conversationIds[2]}`)[0]
+        .id,
+      title: "Ticketed request",
+      status: "OPEN",
+      priority: "NORMAL",
+      assignedMemberId: null,
+      dueAt: null,
+    });
+  } finally {
+    await raw`UPDATE "conversation" SET "snoozedUntil" = NULL WHERE "id" = ${conversationIds[2]}`;
+  }
+});
+
+test("conversation detail exposes a nullable ticket summary", async () => {
+  const ticketed = await getConversation(workspaceId, conversationIds[2]);
+  const withoutTicket = await getConversation(workspaceId, conversationIds[1]);
+  assert.equal(ticketed?.ticket?.title, "Ticketed request");
+  assert.equal(withoutTicket?.ticket, null);
 });
 
 test("unassigned view excludes closed conversations", async () => {
