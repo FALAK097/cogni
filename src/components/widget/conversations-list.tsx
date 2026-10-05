@@ -2,7 +2,6 @@
 
 import { format, isToday, isYesterday } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
-import Link from "next/link";
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { FormEvent, KeyboardEvent as ReactKeyboardEvent } from "react";
@@ -57,7 +56,6 @@ import { getConversationTargetIndex } from "@/features/conversations/list-keyboa
 import type { InboxChannel } from "@/features/conversations/inbox-pagination";
 import { normalizeTimezone } from "@/features/conversations/snooze-schedule";
 import { cn } from "@/lib/utils";
-import { agentHref } from "@/features/navigation/app-routes";
 
 import { scrollPaneClassName } from "./conversation-layout";
 
@@ -656,7 +654,7 @@ export function ConversationsList({
         className={cn("min-h-0 flex-1", scrollPaneClassName)}
       >
         {isResultsBusy ? (
-          <output className="sr-only">
+          <output aria-live="polite" aria-atomic="true" className="sr-only">
             {isSearchPending ? "Searching conversations…" : "Loading conversations…"}
           </output>
         ) : null}
@@ -698,7 +696,7 @@ export function ConversationsList({
                 {searchTerm || hasFacetFilters
                   ? "Try another search or clear the active filters."
                   : filter === "all"
-                    ? "New website chats will appear here. Set up your agent to start receiving conversations."
+                    ? "New website chats will appear here when your agent is live."
                     : filter === "unread"
                       ? "Unread visitor messages will show up here."
                       : filter === "snoozed"
@@ -722,20 +720,11 @@ export function ConversationsList({
               >
                 Clear filters
               </Button>
-            ) : filter === "all" ? (
-              <Button
-                nativeButton={false}
-                render={<Link href={agentHref()} />}
-                variant="outline"
-                size="sm"
-              >
-                Set up your agent
-              </Button>
-            ) : (
+            ) : filter !== "all" ? (
               <Button type="button" variant="outline" size="sm" onClick={onClearFilter}>
                 View all conversations
               </Button>
-            )}
+            ) : null}
           </div>
         ) : (
           <ul

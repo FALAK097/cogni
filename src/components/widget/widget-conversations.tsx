@@ -42,6 +42,7 @@ import {
   EMPTY_CONVERSATION_COMPOSER_DRAFT,
   updateConversationComposerDrafts,
 } from "@/features/conversations/draft-state";
+import { shouldShowInboxFirstRunState } from "@/features/conversations/inbox-state";
 import { cn } from "@/lib/utils";
 import { APP_PAGES, agentHref } from "@/features/navigation/app-routes";
 
@@ -155,7 +156,11 @@ export function WidgetConversations({ canManage }: WidgetConversationsProps) {
   );
 
   const counts = conversationsData?.counts ?? EMPTY_COUNTS;
-  const isWorkspaceInboxEmpty = conversationsLoaded && counts.total === 0;
+  const isWorkspaceInboxEmpty = shouldShowInboxFirstRunState({
+    conversationsLoaded,
+    conversationCount: counts.total,
+    selectedConversationId,
+  });
   const activeView = FILTER_TABS.find((tab) => tab.value === filter);
   const activeViewCount = activeView ? counts[activeView.countKey] : 0;
   const activeCountKind = filter === "snoozed" ? "snoozed" : "unread";
@@ -367,7 +372,7 @@ export function WidgetConversations({ canManage }: WidgetConversationsProps) {
             ) : (
               <div className="flex h-full items-center justify-center p-6">
                 <p className="text-sm text-muted-foreground">
-                  Select a conversation to view messages
+                  Select a conversation to view the thread
                 </p>
               </div>
             )}
@@ -386,7 +391,7 @@ export function WidgetConversations({ canManage }: WidgetConversationsProps) {
             ) : (
               <div className="flex h-full items-center justify-center rounded-xl border border-border/60 bg-card p-4">
                 <p className="text-center text-xs text-muted-foreground">
-                  Contact and conversation details will appear here
+                  Select a conversation to view contact details
                 </p>
               </div>
             )}

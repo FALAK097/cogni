@@ -275,3 +275,10 @@ as labelled tables alongside EvilCharts, adds a concise trend summary and chart-
 control, and reshapes the route skeleton to match the KPI/chart/report grid. Local Oxlint,
 TypeScript, formatting, focused analytics tests (7/7), and the optimized production build pass.
 Visual browser acceptance is still separate from these code and build checks.
+
+The Inbox state pass keeps a deep-linked conversation visible when the workspace count is zero,
+adds a desktop recovery action when a conversation fails to load, and announces list/chat/detail
+loading states without speaking on every background poll. The first-run setup action remains in
+the canonical workspace-empty screen. Focused inbox tests pass 21/21; current combined local
+validation includes lint, typecheck, formatting, and production build. Browser acceptance remains
+unverified for this pass.

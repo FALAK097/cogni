@@ -557,24 +557,36 @@ export function ConversationDetail({
   if (isLoading && !session) {
     if (part === "details") {
       return (
-        <div className={cn("flex h-full flex-col gap-2.5", scrollPaneClassName)}>
-          <Skeleton className="h-28 w-full shrink-0 rounded-xl" />
-          <Skeleton className="h-36 w-full shrink-0 rounded-xl" />
-          <Skeleton className="h-36 w-full shrink-0 rounded-xl" />
-        </div>
+        <output
+          aria-busy="true"
+          aria-label="Loading contact details"
+          className={cn("flex h-full flex-col gap-2.5", scrollPaneClassName)}
+        >
+          <div aria-hidden="true" className="flex h-full flex-col gap-2.5">
+            <Skeleton className="h-28 w-full shrink-0 rounded-xl" />
+            <Skeleton className="h-36 w-full shrink-0 rounded-xl" />
+            <Skeleton className="h-36 w-full shrink-0 rounded-xl" />
+          </div>
+        </output>
       );
     }
 
     return (
-      <div className="flex h-full min-w-0 flex-1 flex-col">
-        <div className="px-5 py-4">
-          <Skeleton className="h-6 w-40" />
+      <output
+        aria-busy="true"
+        aria-label="Loading conversation"
+        className="flex h-full min-w-0 flex-1 flex-col"
+      >
+        <div aria-hidden="true" className="flex h-full min-w-0 flex-1 flex-col">
+          <div className="px-5 py-4">
+            <Skeleton className="h-6 w-40" />
+          </div>
+          <div className="flex-1 space-y-4 p-5">
+            <Skeleton className="h-16 w-2/3" />
+            <Skeleton className="ml-auto h-16 w-1/2" />
+          </div>
         </div>
-        <div className="flex-1 space-y-4 p-5">
-          <Skeleton className="h-16 w-2/3" />
-          <Skeleton className="ml-auto h-16 w-1/2" />
-        </div>
-      </div>
+      </output>
     );
   }
 
@@ -582,7 +594,7 @@ export function ConversationDetail({
     return (
       <div className="flex h-full min-w-0 flex-col overflow-hidden">
         {part === "chat" ? (
-          <header className="shrink-0 px-3 py-2 sm:px-4">
+          <header className="flex shrink-0 items-center justify-between px-3 py-2 sm:px-4">
             <Button
               variant="ghost"
               size="icon"
@@ -592,6 +604,15 @@ export function ConversationDetail({
               aria-label="Back to conversations"
             >
               <ArrowLeft className="size-4" aria-hidden="true" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="hidden min-h-9 lg:inline-flex"
+              onClick={onBack}
+            >
+              Back to conversations
             </Button>
           </header>
         ) : null}
