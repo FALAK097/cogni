@@ -14,7 +14,11 @@ export function SwitchInviteAccountButton({ returnTo }: { returnTo: string }) {
     setError("");
     try {
       const result = await authClient.signOut();
-      if (result.error) throw new Error("Sign out failed");
+      if (result.error) {
+        setError("Could not sign out. Try again before accepting this invite.");
+        setPending(false);
+        return;
+      }
     } catch {
       setError("Could not sign out. Try again before accepting this invite.");
       setPending(false);

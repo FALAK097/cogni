@@ -17,7 +17,7 @@ export const APP_PAGES = {
   settings: {
     href: "/settings",
     label: "Settings",
-    description: "Manage workspace connections.",
+    description: "Manage workspace access and connections.",
   },
 } as const;
 
