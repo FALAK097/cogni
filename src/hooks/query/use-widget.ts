@@ -549,8 +549,8 @@ export function useInboxConversationEvents() {
 
     const controller = new AbortController();
     let cursor: string | null = null;
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
     let retryDelay = 3_500;
+    let nextPollAt = 0;
     let inFlight = false;
 
     const invalidateInbox = () => {
@@ -560,54 +560,57 @@ export function useInboxConversationEvents() {
       });
     };
 
-    const poll = async () => {
-      if (document.visibilityState === "hidden") {
-        timeoutId = setTimeout(poll, 10_000);
-        return;
-      }
-      if (inFlight) return;
+    const poll = () => {
+      if (document.visibilityState === "hidden" || inFlight || Date.now() < nextPollAt) return;
       inFlight = true;
 
-      try {
-        const url = new URL("/api/dashboard/conversations/events", window.location.origin);
-        if (cursor !== null) url.searchParams.set("after", cursor);
-        const response = await fetch(url, {
-          cache: "no-store",
-          credentials: "same-origin",
-          headers: { Accept: "application/json" },
-          signal: controller.signal,
+      const url = new URL("/api/dashboard/conversations/events", window.location.origin);
+      if (cursor !== null) url.searchParams.set("after", cursor);
+
+      void fetch(url, {
+        cache: "no-store",
+        credentials: "same-origin",
+        headers: { Accept: "application/json" },
+        signal: controller.signal,
+      })
+        .then(async (response): Promise<unknown> => {
+          if (!response.ok) throw new Error("Inbox updates are temporarily unavailable.");
+          const payload: unknown = await response.json();
+          return payload;
+        })
+        .then((payload) => {
+          const parsed = parseInboxConversationEventsResponse(payload);
+          if (!parsed) throw new Error("Inbox updates returned an invalid response.");
+
+          if (cursor === null || parsed.reset || parsed.events.length > 0) invalidateInbox();
+          cursor = parsed.cursor;
+          retryDelay = 3_500;
+          nextPollAt = Date.now() + retryDelay;
+        })
+        .catch(() => {
+          if (!controller.signal.aborted) {
+            retryDelay = Math.min(retryDelay * 2, 30_000);
+            nextPollAt = Date.now() + retryDelay;
+          }
+        })
+        .finally(() => {
+          inFlight = false;
         });
-        if (!response.ok) throw new Error("Inbox updates are temporarily unavailable.");
-        const payload: unknown = await response.json();
-        const parsed = parseInboxConversationEventsResponse(payload);
-        if (!parsed) throw new Error("Inbox updates returned an invalid response.");
-
-        if (cursor === null || parsed.reset || parsed.events.length > 0) invalidateInbox();
-        cursor = parsed.cursor;
-        retryDelay = 3_500;
-      } catch {
-        if (!controller.signal.aborted) retryDelay = Math.min(retryDelay * 2, 30_000);
-      } finally {
-        inFlight = false;
-      }
-
-      if (!controller.signal.aborted) timeoutId = setTimeout(poll, retryDelay);
     };
 
     const resume = () => {
-      if (document.visibilityState === "visible" && timeoutId) {
-        clearTimeout(timeoutId);
-        timeoutId = undefined;
+      if (document.visibilityState === "visible") {
         void poll();
       }
     };
 
+    const pollInterval = window.setInterval(poll, 3_500);
     document.addEventListener("visibilitychange", resume);
     void poll();
     return () => {
+      window.clearInterval(pollInterval);
       document.removeEventListener("visibilitychange", resume);
       controller.abort();
-      if (timeoutId) clearTimeout(timeoutId);
     };
   }, [queryClient, workspaceId]);
 }
