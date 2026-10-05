@@ -146,6 +146,13 @@ export async function getWorkspaceInviteByToken(db: Db, token: string) {
 
 export async function listWorkspaceInvites(db: Db, workspaceId: string) {
   return db.query.workspaceInvite.findMany({
+    columns: {
+      id: true,
+      email: true,
+      role: true,
+      expiresAt: true,
+      createdAt: true,
+    },
     where: (invite, { eq, and, isNull }) =>
       and(eq(invite.workspaceId, workspaceId), isNull(invite.acceptedAt)),
     orderBy: (invite, { desc }) => [desc(invite.createdAt)],

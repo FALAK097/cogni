@@ -39,6 +39,7 @@
     "test:integration-action-recovery": "node --test scripts/test-integration-action-recovery.mjs",
     "test:workspace-permissions": "node --test scripts/test-workspace-permissions.mjs",
     "test:workspace-owners": "node --import dotenv/config --test scripts/test-workspace-owner-invariant.mjs",
+    "test:safe-return-path": "node --test scripts/test-safe-return-path.mjs",
     "test:attachment-access": "node --test scripts/test-attachment-access.mjs",
     "test:upload-limits": "node --test scripts/test-upload-limits.mjs",
     "test:inbox-pagination": "node --test scripts/test-inbox-pagination.mjs",

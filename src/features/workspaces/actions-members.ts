@@ -8,6 +8,8 @@ import { z } from "zod";
 import { requireAuth, requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { getAuth } from "@/lib/auth/server";
 import { getDb } from "@/lib/db/client";
+import { env } from "@/lib/env/server";
+import { safeReturnPath } from "@/lib/auth/return-path";
 import {
   removeWorkspaceMember,
   transferWorkspaceOwnership,
@@ -22,6 +24,9 @@ import {
 export type MemberActionState = {
   error?: string;
   savedAt?: number;
+  inviteUrl?: string;
+  inviteEmail?: string;
+  inviteExpiresAt?: string;
 };
 
 const inviteMemberSchema = z.object({
@@ -59,14 +64,6 @@ function activeWorkspaceCookieOptions() {
     secure: process.env.NODE_ENV === "production",
     maxAge: 60 * 60 * 24 * 365,
   };
-}
-
-function safeReturnPath(returnTo: string | undefined) {
-  if (!returnTo || !returnTo.startsWith("/") || returnTo.startsWith("//")) {
-    return "/insights";
-  }
-
-  return returnTo;
 }
 
 export async function inviteMemberAction(
@@ -108,23 +105,35 @@ export async function inviteMemberAction(
     }
   }
 
-  await upsertWorkspaceInvite(db, {
+  const invite = await upsertWorkspaceInvite(db, {
     workspaceId: workspace.id,
     email: parsed.data.email,
     role: parsed.data.role,
   });
 
-  revalidatePath("/dashboard/settings");
-  revalidatePath("/dashboard/settings/members");
-  return { savedAt: Date.now() };
+  if (!invite) return { error: "The invite could not be created. Try again." };
+
+  revalidatePath("/settings");
+  return {
+    savedAt: Date.now(),
+    inviteUrl: new URL(
+      `/invite/${encodeURIComponent(invite.token)}`,
+      env.BETTER_AUTH_URL,
+    ).toString(),
+    inviteEmail: invite.email,
+    inviteExpiresAt: invite.expiresAt,
+  };
 }
 
-export async function updateMemberRoleAction(formData: FormData) {
+export async function updateMemberRoleAction(
+  _previousState: MemberActionState,
+  formData: FormData,
+): Promise<MemberActionState> {
   await requireAuth();
   const context = await requireDashboardContext();
 
   if (context.membership.role !== "OWNER") {
-    return;
+    return { error: "Only workspace owners can change member roles." };
   }
 
   const parsed = updateMemberRoleSchema.safeParse({
@@ -133,7 +142,7 @@ export async function updateMemberRoleAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    return;
+    return { error: "Choose a valid workspace role." };
   }
 
   const { db, membership, workspace } = context;
@@ -145,18 +154,26 @@ export async function updateMemberRoleAction(formData: FormData) {
     parsed.data.role,
   );
 
-  if (!changed) return;
+  if (!changed) {
+    return {
+      error:
+        "That role could not be changed. Confirm the member is still in this workspace and that an owner remains.",
+    };
+  }
 
-  revalidatePath("/dashboard/settings");
-  revalidatePath("/dashboard/settings/members");
+  revalidatePath("/settings");
+  return { savedAt: Date.now() };
 }
 
-export async function removeMemberAction(formData: FormData) {
+export async function removeMemberAction(
+  _previousState: MemberActionState,
+  formData: FormData,
+): Promise<MemberActionState> {
   await requireAuth();
   const context = await requireDashboardContext();
 
   if (context.membership.role !== "OWNER") {
-    return;
+    return { error: "Only workspace owners can remove members." };
   }
 
   const parsed = removeMemberSchema.safeParse({
@@ -164,13 +181,13 @@ export async function removeMemberAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    return;
+    return { error: "Choose a valid workspace member." };
   }
 
   const { db, membership, workspace } = context;
 
   if (parsed.data.membershipId === membership.id) {
-    return;
+    return { error: "You cannot remove yourself from workspace settings." };
   }
 
   const changed = await removeWorkspaceMember(
@@ -180,10 +197,15 @@ export async function removeMemberAction(formData: FormData) {
     parsed.data.membershipId,
   );
 
-  if (!changed) return;
+  if (!changed) {
+    return {
+      error:
+        "That member could not be removed. Confirm they are still in this workspace and that an owner remains.",
+    };
+  }
 
-  revalidatePath("/dashboard/settings");
-  revalidatePath("/dashboard/settings/members");
+  revalidatePath("/settings");
+  return { savedAt: Date.now() };
 }
 
 export async function acceptInviteAction(
@@ -269,7 +291,7 @@ export async function transferOwnershipAction(formData: FormData) {
 
   if (!transferred) return;
 
-  revalidatePath("/dashboard/settings/members");
+  revalidatePath("/settings");
 }
 
 export async function switchWorkspaceAction(formData: FormData) {

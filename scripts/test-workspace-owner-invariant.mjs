@@ -25,7 +25,7 @@ await build({
   stdin: {
     contents: `
       export { updateWorkspaceMemberRole, removeWorkspaceMember, transferWorkspaceOwnership } from "@/features/workspaces/server/owner-management";
-      export { acceptWorkspaceInviteMembership } from "@/features/workspaces/server/members";
+      export { acceptWorkspaceInviteMembership, listWorkspaceInvites } from "@/features/workspaces/server/members";
       export { getDb } from "@/lib/db/client";
       export { workspace, workspaceMember } from "@/lib/db/schema";
     `,
@@ -58,6 +58,7 @@ await build({
 const {
   getDb,
   acceptWorkspaceInviteMembership,
+  listWorkspaceInvites,
   removeWorkspaceMember,
   transferWorkspaceOwnership,
   updateWorkspaceMemberRole,
@@ -201,4 +202,33 @@ test("accepting a stale member invite cannot demote an existing owner", async ()
     WHERE "id" = ${membershipIds[5]} AND "workspaceId" = ${workspaceIds[2]}
   `;
   assert.equal(existingOwner.role, "OWNER");
+});
+
+test("pending invite summaries are workspace-scoped and never return bearer tokens", async () => {
+  const inviteId = randomUUID();
+  const inviteEmail = `pending-${randomUUID()}@example.test`;
+  const inviteToken = randomUUID();
+  const expiresAt = new Date(Date.now() + 60_000).toISOString();
+  await raw`
+    INSERT INTO "workspace_invite" ("id", "email", "role", "token", "expiresAt", "workspaceId")
+    VALUES (${inviteId}, ${inviteEmail}, 'MEMBER', ${inviteToken}, ${expiresAt}, ${workspaceIds[0]})
+  `;
+
+  const [workspaceInvites, otherWorkspaceInvites] = await Promise.all([
+    listWorkspaceInvites(primaryDb, workspaceIds[0]),
+    listWorkspaceInvites(primaryDb, workspaceIds[1]),
+  ]);
+  const invite = workspaceInvites.find((item) => item.id === inviteId);
+
+  assert.ok(invite);
+  assert.equal(invite.email, inviteEmail);
+  assert.equal("token" in invite, false);
+  assert.equal(
+    workspaceInvites.some((item) => item.id === inviteId),
+    true,
+  );
+  assert.equal(
+    otherWorkspaceInvites.some((item) => item.id === inviteId),
+    false,
+  );
 });
