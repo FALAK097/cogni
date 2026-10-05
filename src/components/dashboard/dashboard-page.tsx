@@ -1824,9 +1824,9 @@ export function DashboardPage({
             <div className="mt-4 grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2">
               {isLoading || !engagement
                 ? Array.from({ length: 4 }).map((_, i) => (
-                    <div
+                    <Skeleton
                       key={i}
-                      className="h-24 animate-pulse rounded-lg border border-border/50 bg-transparent"
+                      className="h-24 rounded-lg border border-border/50 bg-transparent"
                     />
                   ))
                 : engagementTiles.map((tile) => (
