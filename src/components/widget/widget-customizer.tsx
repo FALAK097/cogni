@@ -538,7 +538,7 @@ export function WidgetCustomizer({
     };
   }, [config]);
 
-  if (widgetConfigQuery.isError) {
+  if (widgetConfigQuery.isError && !widgetConfigData) {
     return (
       <div className="m-3 rounded-xl border border-border bg-card p-6" role="alert">
         <h2 className="text-base font-semibold">Couldn't load agent settings</h2>
@@ -680,6 +680,25 @@ export function WidgetCustomizer({
       className="flex h-full min-h-0 w-full flex-col gap-2 overflow-hidden p-2 sm:gap-3 sm:p-3"
       style={getWidgetAccentVars(WIDGET_BRAND_COLOR)}
     >
+      {widgetConfigQuery.isError ? (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/70 bg-muted/30 px-3 py-3"
+        >
+          <p className="text-sm text-muted-foreground">
+            Agent settings couldn’t refresh. Showing the last loaded settings.
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void widgetConfigQuery.refetch()}
+            disabled={widgetConfigQuery.isFetching}
+          >
+            {widgetConfigQuery.isFetching ? "Retrying…" : "Try again"}
+          </Button>
+        </div>
+      ) : null}
+
       <div className="flex shrink-0 flex-wrap items-center gap-2">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
           {APP_PAGES.agent.label}

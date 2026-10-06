@@ -68,8 +68,13 @@ export function WidgetIntegrationsPage({ canManage }: { canManage: boolean }) {
         <p className="mt-1 text-sm text-muted-foreground">
           Try again to see which tools are connected.
         </p>
-        <Button className="mt-4" variant="outline" onClick={() => void integrationsQuery.refetch()}>
-          Try again
+        <Button
+          className="mt-4"
+          variant="outline"
+          onClick={() => void integrationsQuery.refetch()}
+          disabled={integrationsQuery.isFetching}
+        >
+          {integrationsQuery.isFetching ? "Retrying…" : "Try again"}
         </Button>
       </div>
     );
@@ -77,6 +82,24 @@ export function WidgetIntegrationsPage({ canManage }: { canManage: boolean }) {
 
   return (
     <div className="space-y-10 pb-10">
+      {integrationsQuery.isError ? (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/70 bg-muted/30 px-3 py-3"
+        >
+          <p className="text-sm text-muted-foreground">
+            Connections couldn’t refresh. Showing the last loaded connections.
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void integrationsQuery.refetch()}
+            disabled={integrationsQuery.isFetching}
+          >
+            {integrationsQuery.isFetching ? "Retrying…" : "Try again"}
+          </Button>
+        </div>
+      ) : null}
       <PendingActionsCard canManage={canManage} />
       {!canManage ? (
         <output className="flex items-start gap-2 rounded-lg border border-border/70 bg-muted/30 px-3 py-2.5 text-sm text-muted-foreground">
