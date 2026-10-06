@@ -131,6 +131,9 @@ const STATUS_COLORS: Record<string, string> = {
 const POPOVER_PANEL_CLASS =
   "w-auto rounded-xl border border-border/50 bg-popover p-4 text-popover-foreground shadow-md ring-1 ring-foreground/10";
 
+const METRIC_INFO_BUTTON_CLASS =
+  "inline-flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card sm:size-9";
+
 const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"] as const;
 
 const EXPORT_SECTIONS = [
@@ -1355,7 +1358,7 @@ export function DashboardPage({
                       render={
                         <button
                           type="button"
-                          className="text-muted-foreground transition-colors hover:text-foreground"
+                          className={METRIC_INFO_BUTTON_CLASS}
                           aria-label="Closed now conversation count information"
                         />
                       }
@@ -1389,7 +1392,7 @@ export function DashboardPage({
                       render={
                         <button
                           type="button"
-                          className="text-muted-foreground transition-colors hover:text-foreground"
+                          className={METRIC_INFO_BUTTON_CLASS}
                           aria-label="Average AI response time information"
                         />
                       }
@@ -1426,7 +1429,7 @@ export function DashboardPage({
                       render={
                         <button
                           type="button"
-                          className="text-muted-foreground transition-colors hover:text-foreground"
+                          className={METRIC_INFO_BUTTON_CLASS}
                           aria-label="Satisfaction score information"
                         />
                       }
