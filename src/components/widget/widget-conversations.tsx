@@ -44,7 +44,7 @@ import {
 } from "@/features/conversations/draft-state";
 import { shouldShowInboxFirstRunState } from "@/features/conversations/inbox-state";
 import { cn } from "@/lib/utils";
-import { APP_PAGES, agentHref } from "@/features/navigation/app-routes";
+import { APP_PAGES, APP_ROUTES, agentHref } from "@/features/navigation/app-routes";
 
 import { ConversationDetail } from "./conversation-detail";
 import { ConversationsList } from "./conversations-list";
@@ -304,8 +304,8 @@ export function WidgetConversations({ canManage }: WidgetConversationsProps) {
             <div>
               <h2 className="text-sm font-semibold text-foreground">Your inbox is ready</h2>
               <p className="mt-1 max-w-sm text-sm leading-relaxed text-muted-foreground">
-                Set up your agent, then install the widget from Deploy to start receiving
-                conversations here.
+                To receive conversations, deploy your website widget from Agent or connect and
+                configure a supported inbound channel in Settings.
               </p>
             </div>
             {canManage ? (
@@ -320,10 +320,16 @@ export function WidgetConversations({ canManage }: WidgetConversationsProps) {
               </Button>
             ) : (
               <p className="max-w-sm text-xs text-muted-foreground">
-                A workspace owner needs to set up the agent and install the widget from Deploy
-                before conversations can arrive.
+                A workspace owner can deploy the website widget from Agent or connect and configure
+                a supported inbound channel in Settings.
               </p>
             )}
+            <Link
+              href={APP_ROUTES.settings}
+              className="min-h-11 inline-flex items-center rounded-md px-3 text-sm font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+            >
+              View connections
+            </Link>
           </section>
         </div>
       ) : (

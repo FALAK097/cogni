@@ -1,12 +1,13 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { z } from "zod";
 
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, Info } from "@/components/icons";
+import { AlertCircle, ArrowLeft, Info } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,7 @@ import { useDisconnectIntegration } from "@/hooks/query";
 import { getIntegrationBySlug } from "@/features/integrations/registry";
 import { integrationDetailResponseSchema } from "@/features/integrations/schemas";
 import { queryKeys } from "@/lib/query-keys";
+import { APP_ROUTES } from "@/features/navigation/app-routes";
 
 async function loadIntegration(slug: string) {
   const response = await fetch(`/api/dashboard/integrations/${slug}`);
@@ -100,8 +102,14 @@ export function IntegrationDetail({ slug, canManage }: { slug: string; canManage
       ) : null}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <Button variant="link" className="h-auto p-0" onClick={() => router.push("/settings")}>
-            ← All integrations
+          <Button
+            nativeButton={false}
+            render={<Link href={APP_ROUTES.settings} />}
+            variant="link"
+            className="h-auto min-h-11 justify-start gap-2 p-0 text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="size-4" aria-hidden="true" />
+            Back to Settings
           </Button>
           <h1 className="mt-3 text-2xl font-semibold">{manifest?.name ?? detail.provider}</h1>
           <p className="text-sm text-muted-foreground">Composio toolkit: {detail.toolkit}</p>
