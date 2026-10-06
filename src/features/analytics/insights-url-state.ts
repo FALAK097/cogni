@@ -1,7 +1,13 @@
 import { endOfDay, format, parseISO, startOfDay } from "date-fns";
 
-import { resolveAnalyticsDateRange } from "@/features/analytics/date-range";
-import type { AnalyticsDateRange } from "@/features/analytics/date-range";
+import {
+  InvalidAnalyticsDateRangeError,
+  resolveAnalyticsDateRange,
+} from "@/features/analytics/date-range";
+import type {
+  AnalyticsDateRange,
+  InvalidAnalyticsDateRangeCode,
+} from "@/features/analytics/date-range";
 
 export type InsightsDateRangeValue = { start: Date; end: Date };
 
@@ -9,6 +15,7 @@ export type ResolvedInsightsDateRange = {
   value: InsightsDateRangeValue;
   dates: Pick<AnalyticsDateRange, "startDate" | "endDate">;
   invalidQuery: boolean;
+  invalidQueryReason: InvalidAnalyticsDateRangeCode | null;
 };
 
 export function resolveInsightsDateQuery(
@@ -17,13 +24,13 @@ export function resolveInsightsDateQuery(
   timezone: string,
   now = new Date(),
 ): ResolvedInsightsDateRange {
-  let invalidQuery = false;
+  let invalidQueryReason: InvalidAnalyticsDateRangeCode | null = null;
   let range: AnalyticsDateRange;
 
   try {
     range = resolveAnalyticsDateRange(from, to, timezone, now);
-  } catch {
-    invalidQuery = true;
+  } catch (error) {
+    invalidQueryReason = error instanceof InvalidAnalyticsDateRangeError ? error.code : "invalid";
     range = resolveAnalyticsDateRange(null, null, timezone, now);
   }
 
@@ -33,7 +40,8 @@ export function resolveInsightsDateQuery(
       end: endOfDay(parseISO(range.endDate)),
     },
     dates: { startDate: range.startDate, endDate: range.endDate },
-    invalidQuery,
+    invalidQuery: invalidQueryReason !== null,
+    invalidQueryReason,
   };
 }
 

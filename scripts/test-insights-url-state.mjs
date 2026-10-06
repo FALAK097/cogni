@@ -52,6 +52,16 @@ test("malformed, incomplete, and reversed query ranges fall back safely", () => 
   }
 });
 
+test("oversized query ranges reset safely with a clear reason", () => {
+  const now = new Date("2026-10-02T01:00:00.000Z");
+  const result = urlState.resolveInsightsDateQuery("2023-01-01", "2024-01-02", "UTC", now);
+
+  assert.equal(result.invalidQuery, true);
+  assert.equal(result.invalidQueryReason, "range_too_long");
+  assert.equal(result.dates.startDate, "2026-09-26");
+  assert.equal(result.dates.endDate, "2026-10-02");
+});
+
 test("custom date ranges serialize as calendar dates and round-trip", () => {
   const now = new Date("2026-10-02T01:00:00.000Z");
   const defaults = urlState.resolveInsightsDateQuery(null, null, "Asia/Kolkata", now);

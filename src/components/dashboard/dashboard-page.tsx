@@ -22,7 +22,7 @@ import {
 import { toZonedTime } from "date-fns-tz";
 import Link from "next/link";
 import type { FormEvent, ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { parseAsString, parseAsStringLiteral, useQueryStates } from "nuqs";
 
 import type { DashboardAnalytics, MetricComparison, TopQuestion } from "@/features/analytics/types";
@@ -66,6 +66,10 @@ import {
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useDashboardAnalytics, useReviewKnowledgeGap } from "@/hooks/query";
+import {
+  isAnalyticsDateRangeWithinLimit,
+  MAX_ANALYTICS_RANGE_DAYS,
+} from "@/features/analytics/date-range";
 import {
   resolveInsightsDateQuery,
   serializeInsightsDateRange,
@@ -592,6 +596,7 @@ function CalendarMonth({
   timezone,
   rangeStart,
   rangeEnd,
+  rangeAnchor,
   onDayClick,
 }: {
   month: Date;
@@ -599,6 +604,7 @@ function CalendarMonth({
   timezone: string;
   rangeStart: Date | null;
   rangeEnd: Date | null;
+  rangeAnchor: Date | null;
   onDayClick: (day: Date) => void;
 }) {
   const days = getMonthDays(month);
@@ -627,12 +633,14 @@ function CalendarMonth({
                 })
               : false;
           const isToday = isSameDay(day, today);
+          const exceedsRangeLimit =
+            rangeAnchor !== null && !isAnalyticsDateRangeWithinLimit(rangeAnchor, day);
 
           return (
             <button
               key={day.toISOString()}
               type="button"
-              disabled={!inMonth || isAfter(day, today)}
+              disabled={!inMonth || isAfter(day, today) || exceedsRangeLimit}
               aria-label={format(day, "EEEE, MMMM d, yyyy")}
               aria-pressed={isStart || isEnd || Boolean(inRange)}
               aria-current={isToday ? "date" : undefined}
@@ -783,8 +791,14 @@ function DateRangePicker({
               timezone={timezone}
               rangeStart={displayStart}
               rangeEnd={displayEnd}
+              rangeAnchor={draftStart && !draftEnd ? draftStart : null}
               onDayClick={handleDayClick}
             />
+            <p aria-live="polite" className="mt-2 text-xs text-muted-foreground">
+              {draftStart && !draftEnd
+                ? `Choose an end date within ${MAX_ANALYTICS_RANGE_DAYS} days of the start.`
+                : `Custom ranges can include up to ${MAX_ANALYTICS_RANGE_DAYS} days.`}
+            </p>
           </div>
         </div>
       </PopoverContent>
@@ -1000,12 +1014,13 @@ export function DashboardPage({
     [insightsQuery.from, insightsQuery.to, workspaceTimezone],
   );
   const dateRange = resolvedDateRange.value;
+  const dateRangeNotice = resolvedDateRange.invalidQuery
+    ? resolvedDateRange.invalidQueryReason === "range_too_long"
+      ? `This link requested more than ${MAX_ANALYTICS_RANGE_DAYS} days. Showing the last 7 days.`
+      : "This link has an invalid date range. Showing the last 7 days."
+    : null;
   const convGranularity = insightsQuery.volume;
   const satGranularity = insightsQuery.satisfaction;
-
-  useEffect(() => {
-    if (resolvedDateRange.invalidQuery) void setInsightsQuery({ from: null, to: null });
-  }, [resolvedDateRange.invalidQuery, setInsightsQuery]);
 
   const updateDateRange = (range: DateRangeValue) => {
     void setInsightsQuery(serializeInsightsDateRange(range, workspaceTimezone));
@@ -1191,6 +1206,15 @@ export function DashboardPage({
             )}
           </div>
         </header>
+
+        {dateRangeNotice ? (
+          <output
+            aria-live="polite"
+            className="rounded-lg border border-border/70 bg-muted/30 px-3 py-2 text-sm text-muted-foreground"
+          >
+            {dateRangeNotice}
+          </output>
+        ) : null}
 
         {hasInitialError ? (
           <div

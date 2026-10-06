@@ -12,7 +12,12 @@ const compiled = await build({
 const analyticsDates = await import(
   `data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString("base64")}`
 );
-const { resolveAnalyticsDateRange, InvalidAnalyticsDateRangeError } = analyticsDates;
+const {
+  isAnalyticsDateRangeWithinLimit,
+  MAX_ANALYTICS_RANGE_DAYS,
+  resolveAnalyticsDateRange,
+  InvalidAnalyticsDateRangeError,
+} = analyticsDates;
 
 test("workspace calendar days map to the correct UTC bounds", () => {
   const range = resolveAnalyticsDateRange("2026-01-10", "2026-01-10", "Asia/Kolkata");
@@ -47,6 +52,24 @@ test("default range follows the workspace date even when the server date differs
   assert.equal(kolkata.endDate, "2026-10-02");
   assert.equal(losAngeles.startDate, "2026-09-25");
   assert.equal(losAngeles.endDate, "2026-10-01");
+});
+
+test("limits analytics ranges to 366 inclusive calendar days", () => {
+  const start = new Date(2023, 0, 1);
+  const finalAllowedDay = new Date(2024, 0, 1);
+  const firstDisallowedDay = new Date(2024, 0, 2);
+
+  assert.equal(MAX_ANALYTICS_RANGE_DAYS, 366);
+  assert.equal(isAnalyticsDateRangeWithinLimit(start, finalAllowedDay), true);
+  assert.equal(isAnalyticsDateRangeWithinLimit(start, firstDisallowedDay), false);
+
+  const range = resolveAnalyticsDateRange("2023-01-01", "2024-01-01", "UTC");
+  assert.equal(range.previousStartDate, "2021-12-31");
+  assert.equal(range.previousEndDate, "2022-12-31");
+  assert.throws(
+    () => resolveAnalyticsDateRange("2023-01-01", "2024-01-02", "UTC"),
+    (error) => error instanceof InvalidAnalyticsDateRangeError && error.code === "range_too_long",
+  );
 });
 
 test("incomplete, malformed, and reversed date ranges are rejected", () => {

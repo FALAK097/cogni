@@ -7,6 +7,7 @@ const state = {
   membershipRole: "MEMBER",
   sideEffects: 0,
   parseAttempts: 0,
+  caseOperations: [],
   requireDashboardContext: async () => ({
     db: { testDatabase: true },
     workspace: { id: "workspace-1" },
@@ -24,7 +25,7 @@ const stubs = {
   "@/features/integrations/server/approval-service": `export const createApprovalRequest = () => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; }; export const decideApprovalRequest = async (input) => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; return { id: input.approvalId, status: input.decision, actionType: "contact.update", payload: "{}", workflowRunId: null, workflowStepId: null }; };`,
   "@/features/integrations/server/tool-executor": `export const executeApprovedTool = async () => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; return { id: "action-1", result: {} }; };`,
   "@/features/agent-tests/input": `export const agentTestCaseInputSchema = { safeParse: (value) => ({ success: true, data: value }) };`,
-  "@/features/agent-tests/server/cases": `export const createAgentTestCase = () => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; }; export const listAgentTestCases = () => []; export class AgentTestCaseTitleConflictError extends Error {}`,
+  "@/features/agent-tests/server/cases": `export const createAgentTestCase = () => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; }; export const listAgentTestCases = () => []; export const updateAgentTestCase = async (...args) => { const state = globalThis.__privilegedRoutePermissionTest; state.sideEffects += 1; state.caseOperations.push({ operation: "update", args }); return { id: args[1] }; }; export const deleteAgentTestCase = async (...args) => { const state = globalThis.__privilegedRoutePermissionTest; state.sideEffects += 1; state.caseOperations.push({ operation: "delete", args }); return true; }; export class AgentTestCaseTitleConflictError extends Error {}`,
   "@/lib/jobs/ingestion": `export const enqueueDocumentProcessing = () => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; };`,
   "@/features/knowledge/server/mime": `export const inferKnowledgeMimeType = () => "text/plain"; export const knowledgeSourceTypeFromMime = () => "TEXT";`,
   "@/lib/storage/index": `export const isAllowedKnowledgeUpload = () => true; export const saveObject = () => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; };`,
@@ -74,6 +75,9 @@ const advanceWorkflowRoute = await loadRoute(
   "src/app/api/dashboard/workflows/[workflow_id]/advance/route.ts",
 );
 const agentTestRoutes = await loadRoute("src/app/api/dashboard/agent-test-cases/route.ts");
+const agentTestCaseRoute = await loadRoute(
+  "src/app/api/dashboard/agent-test-cases/[case_id]/route.ts",
+);
 const knowledgeUploadRoute = await loadRoute(
   "src/app/api/dashboard/knowledge-base/upload/route.ts",
 );
@@ -193,4 +197,62 @@ test("members cannot upload, add, retry, or delete knowledge sources", async () 
     request,
     { params: Promise.resolve({ source_id: "source-1" }) },
   ]);
+});
+
+const agentTestCaseId = "c0000000-0000-4000-8000-000000000001";
+const agentTestCaseParams = { params: Promise.resolve({ case_id: agentTestCaseId }) };
+
+test("members cannot update or delete agent evaluation cases", async () => {
+  state.parseAttempts = 0;
+  const malformedRequest = new Request("https://cogni.test/api/dashboard/agent-test-cases/case-1", {
+    method: "PATCH",
+    body: "{",
+  });
+  malformedRequest.json = async () => {
+    state.parseAttempts += 1;
+    throw new Error("A denied agent test update must not be parsed.");
+  };
+
+  await expectMemberDenied(agentTestCaseRoute.PATCH, [malformedRequest, agentTestCaseParams]);
+  assert.equal(state.parseAttempts, 0);
+  await expectMemberDenied(agentTestCaseRoute.DELETE, [
+    new Request("https://cogni.test/api/dashboard/agent-test-cases/case-1", { method: "DELETE" }),
+    agentTestCaseParams,
+  ]);
+  assert.deepEqual(state.caseOperations, []);
+});
+
+test("owners update and delete agent test cases using the active workspace and validated case id", async () => {
+  state.membershipRole = "OWNER";
+  state.sideEffects = 0;
+  state.caseOperations = [];
+  const updateRequest = new Request("https://cogni.test/api/dashboard/agent-test-cases/case-1", {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      title: "Refund policy",
+      prompt: "Can I get a refund?",
+      expectedOutcome: "Explains policy",
+    }),
+  });
+  const updateResponse = await agentTestCaseRoute.PATCH(updateRequest, agentTestCaseParams);
+  assert.equal(updateResponse.status, 200);
+  assert.deepEqual(state.caseOperations[0], {
+    operation: "update",
+    args: [
+      "workspace-1",
+      agentTestCaseId,
+      { title: "Refund policy", prompt: "Can I get a refund?", expectedOutcome: "Explains policy" },
+    ],
+  });
+
+  const deleteResponse = await agentTestCaseRoute.DELETE(
+    new Request("https://cogni.test/api/dashboard/agent-test-cases/case-1", { method: "DELETE" }),
+    agentTestCaseParams,
+  );
+  assert.equal(deleteResponse.status, 200);
+  assert.deepEqual(state.caseOperations[1], {
+    operation: "delete",
+    args: ["workspace-1", agentTestCaseId],
+  });
 });
