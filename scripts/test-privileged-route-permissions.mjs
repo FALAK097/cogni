@@ -8,8 +8,30 @@ const state = {
   sideEffects: 0,
   parseAttempts: 0,
   caseOperations: [],
+  toolRequiresApproval: false,
+  conversationLookups: 0,
+  conversationScopes: [],
+  actionExecutions: [],
+  approvalCreations: [],
   requireDashboardContext: async () => ({
-    db: { testDatabase: true },
+    db: {
+      testDatabase: true,
+      query: {
+        conversation: {
+          findFirst: async ({ where }) => {
+            const state = globalThis.__privilegedRoutePermissionTest;
+            state.conversationLookups += 1;
+            state.conversationScopes.push(
+              where(
+                { id: "conversation.id", workspaceId: "conversation.workspaceId" },
+                { eq: (field, value) => [field, value], and: (...conditions) => conditions },
+              ),
+            );
+            return { id: "conversation-1" };
+          },
+        },
+      },
+    },
     workspace: { id: "workspace-1" },
     membership: { id: "member-1", role: state.membershipRole },
     session: { user: { id: "user-1" } },
@@ -22,8 +44,9 @@ const stubs = {
   "@/lib/auth/dashboard-context": `export const requireDashboardContext = () => globalThis.__privilegedRoutePermissionTest.requireDashboardContext();`,
   "@/lib/auth/permissions": `export const canManageWorkspace = (role) => role === "OWNER";`,
   "@/lib/workflows/runner": `export const createWorkflowWithSteps = (...args) => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; return args; }; export const completeWorkflowRun = () => {}; export const updateWorkflowStep = () => {};`,
-  "@/features/integrations/server/approval-service": `export const createApprovalRequest = () => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; }; export const decideApprovalRequest = async (input) => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; return { id: input.approvalId, status: input.decision, actionType: "contact.update", payload: "{}", workflowRunId: null, workflowStepId: null }; };`,
-  "@/features/integrations/server/tool-executor": `export const executeApprovedTool = async () => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; return { id: "action-1", result: {} }; };`,
+  "@/features/integrations/server/approval-service": `export const createApprovalRequest = async (input) => { const state = globalThis.__privilegedRoutePermissionTest; state.sideEffects += 1; state.approvalCreations.push(input); return { approval: { id: "approval-1", actionType: input.actionType, riskLevel: "LOW", summary: input.summary, status: "PENDING", expiresAt: "2026-10-07T00:00:00.000Z" }, token: "approval-token" }; }; export const getApprovalToken = () => "approval-token"; export const decideApprovalRequest = async (input) => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; return { id: input.approvalId, status: input.decision, actionType: "contact.update", payload: "{}", workflowRunId: null, workflowStepId: null }; };`,
+  "@/features/integrations/server/tool-executor": `export const executeApprovedTool = async (input) => { const state = globalThis.__privilegedRoutePermissionTest; state.sideEffects += 1; state.actionExecutions.push(input); return { id: "action-1", result: {} }; };`,
+  "@/features/integrations/server/tool-registry": `export const parseToolInput = (actionType, input) => ({ tool: { actionType, requiresApproval: globalThis.__privilegedRoutePermissionTest.toolRequiresApproval }, input });`,
   "@/features/agent-tests/input": `export const agentTestCaseInputSchema = { safeParse: (value) => ({ success: true, data: value }) };`,
   "@/features/agent-tests/server/cases": `export const createAgentTestCase = () => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; }; export const listAgentTestCases = () => []; export const updateAgentTestCase = async (...args) => { const state = globalThis.__privilegedRoutePermissionTest; state.sideEffects += 1; state.caseOperations.push({ operation: "update", args }); return { id: args[1] }; }; export const deleteAgentTestCase = async (...args) => { const state = globalThis.__privilegedRoutePermissionTest; state.sideEffects += 1; state.caseOperations.push({ operation: "delete", args }); return true; }; export class AgentTestCaseTitleConflictError extends Error {}`,
   "@/lib/jobs/ingestion": `export const enqueueDocumentProcessing = () => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; };`,
@@ -89,6 +112,7 @@ const knowledgeSourceRoute = await loadRoute(
 );
 const widgetSettingsRoutes = await loadRoute("src/app/api/dashboard/widget/route.ts");
 const approvalRoute = await loadRoute("src/app/api/dashboard/actions/[approval_id]/route.ts");
+const actionRoutes = await loadRoute("src/app/api/dashboard/actions/route.ts");
 
 const request = new Request("https://cogni.test/api/dashboard/mutation", {
   method: "POST",
@@ -123,6 +147,76 @@ test("members cannot create or advance workflows", async () => {
 
 test("members cannot create agent evaluation cases", async () => {
   await expectMemberDenied(agentTestRoutes.POST);
+});
+
+function actionProposalRequest() {
+  return new Request("https://cogni.test/api/dashboard/actions", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      actionType: "contact.update",
+      input: { contactId: "contact-1" },
+      summary: "Update the customer contact",
+      conversationId: "conversation-1",
+    }),
+  });
+}
+
+test("members cannot directly execute actions that do not require approval", async () => {
+  state.membershipRole = "MEMBER";
+  state.toolRequiresApproval = false;
+  state.sideEffects = 0;
+  state.conversationLookups = 0;
+  state.conversationScopes = [];
+  state.actionExecutions = [];
+  state.approvalCreations = [];
+
+  const response = await actionRoutes.POST(actionProposalRequest());
+
+  assert.equal(response.status, 403);
+  assert.equal(state.conversationLookups, 1);
+  assert.deepEqual(state.conversationScopes, [
+    [
+      ["conversation.id", "conversation-1"],
+      ["conversation.workspaceId", "workspace-1"],
+    ],
+  ]);
+  assert.equal(state.sideEffects, 0);
+  assert.deepEqual(state.actionExecutions, []);
+  assert.deepEqual(state.approvalCreations, []);
+});
+
+test("owners may run direct actions while approval-required actions remain pending", async () => {
+  state.membershipRole = "OWNER";
+  state.toolRequiresApproval = false;
+  state.sideEffects = 0;
+  state.conversationLookups = 0;
+  state.conversationScopes = [];
+  state.actionExecutions = [];
+  state.approvalCreations = [];
+
+  const directResponse = await actionRoutes.POST(actionProposalRequest());
+  assert.equal(directResponse.status, 200);
+  assert.equal((await directResponse.json()).approval, null);
+  assert.equal(state.actionExecutions.length, 1);
+  assert.equal(state.actionExecutions[0].workspaceId, "workspace-1");
+  assert.equal(state.actionExecutions[0].requestedById, "user-1");
+  assert.equal(state.approvalCreations.length, 0);
+
+  state.membershipRole = "MEMBER";
+  state.toolRequiresApproval = true;
+  state.sideEffects = 0;
+  state.actionExecutions = [];
+  state.approvalCreations = [];
+
+  const approvalResponse = await actionRoutes.POST(actionProposalRequest());
+  assert.equal(approvalResponse.status, 200);
+  assert.equal((await approvalResponse.json()).approval.status, "PENDING");
+  assert.equal(state.actionExecutions.length, 0);
+  assert.equal(state.approvalCreations.length, 1);
+  assert.equal(state.approvalCreations[0].workspaceId, "workspace-1");
+  assert.equal(state.approvalCreations[0].conversationId, "conversation-1");
+  assert.equal(state.sideEffects, 1);
 });
 
 test("members cannot parse or decide pending action approvals", async () => {
