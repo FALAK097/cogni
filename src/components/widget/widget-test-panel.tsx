@@ -28,6 +28,7 @@ import {
   matchesAgentTestOutcome,
   type AgentTestExpectedOutcome,
 } from "@/features/agent-tests/input";
+import { runAgentTestCase } from "@/features/agent-tests/run-case";
 
 export type WidgetPreviewEvidence = {
   outcome: "answer" | "handoff" | "error";
@@ -47,12 +48,14 @@ function WidgetTestResult({
   evidence,
   error,
   retryPrompt,
+  retryLabel,
   busy,
   onRetry,
 }: {
   evidence: WidgetPreviewEvidence | null;
   error: string | null;
   retryPrompt: string | null;
+  retryLabel: string;
   busy: boolean;
   onRetry: (prompt: string) => void;
 }) {
@@ -72,7 +75,7 @@ function WidgetTestResult({
               disabled={busy}
               onClick={() => onRetry(retryPrompt)}
             >
-              Retry preview
+              {retryLabel}
             </Button>
           ) : null}
         </div>
@@ -170,6 +173,7 @@ export function WidgetTestPanel({
 }) {
   const [tryError, setTryError] = useState<string | null>(null);
   const [retryPrompt, setRetryPrompt] = useState<string | null>(null);
+  const [retryCase, setRetryCase] = useState<AgentTestCase | null>(null);
   const [editingCase, setEditingCase] = useState<AgentTestCase | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
@@ -197,6 +201,7 @@ export function WidgetTestPanel({
   const tryPrompt = async (prompt: string) => {
     if (isBusy) return null;
     setTryError(null);
+    setRetryCase(null);
     setRetryPrompt(prompt);
     try {
       const previewEvidence = await onTryPrompt(prompt);
@@ -235,25 +240,34 @@ export function WidgetTestPanel({
     setTryError(null);
     setBatchResults({});
     setActiveCaseId(testCase.id);
+    setRetryCase(testCase);
+    setRetryPrompt(testCase.prompt);
     setResettingCaseId(testCase.id);
-    const reset = await onResetPreview().catch(() => false);
+    const result = await runAgentTestCase({
+      resetPreview: onResetPreview,
+      runPrompt: () => onTryPrompt(testCase.prompt),
+      isErrorResult: (previewEvidence) => previewEvidence.outcome === "error",
+    });
     setResettingCaseId(null);
-    if (!reset) {
-      setTryError("The preview couldn't reset. Retry the preview, then run this test again.");
+    if (result.status !== "completed") {
+      setTryError(
+        result.status === "reset_failed"
+          ? "The preview couldn't reset. Retry this saved test to run it again."
+          : "Couldn't complete this test. Retry the saved test to run it again.",
+      );
       setActiveCaseId(null);
       return;
     }
-    const result = await onTryPrompt(testCase.prompt).catch(() => null);
-    if (!result) {
-      setTryError("Couldn't complete this test. Retry the preview, then run it again.");
-      setActiveCaseId(null);
-    }
+    setRetryCase(null);
+    setRetryPrompt(null);
   };
 
   const runAllCases = async () => {
     const savedCases = casesQuery.data?.cases ?? [];
     if (savedCases.length < 2 || isBusy) return;
     setTryError(null);
+    setRetryCase(null);
+    setRetryPrompt(null);
     setActiveCaseId(null);
     setBatchResults({});
     const results = await runAgentTestSuite(savedCases, {
@@ -395,8 +409,9 @@ export function WidgetTestPanel({
         evidence={evidence}
         error={tryError}
         retryPrompt={retryPrompt}
+        retryLabel={retryCase ? "Retry saved test" : "Retry preview"}
         busy={isBusy}
-        onRetry={(prompt) => void tryPrompt(prompt)}
+        onRetry={(prompt) => void (retryCase ? runCase(retryCase) : tryPrompt(prompt))}
       />
       {sendingPrompt ? (
         <output

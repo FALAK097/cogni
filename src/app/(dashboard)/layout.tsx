@@ -28,8 +28,8 @@ export default async function DashboardShellLayout({ children }: { children: Rea
   };
 
   return (
-    <main className="flex w-full flex-1 flex-col overflow-hidden">
+    <div className="flex w-full flex-1 flex-col overflow-hidden">
       <DashboardShell userData={userData}>{children}</DashboardShell>
-    </main>
+    </div>
   );
 }

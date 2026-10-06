@@ -22,6 +22,16 @@ const suiteCompiled = await build({
 const { runAgentTestSuite } = await import(
   `data:text/javascript;base64,${Buffer.from(suiteCompiled.outputFiles[0].text).toString("base64")}`
 );
+const isolatedRunCompiled = await build({
+  entryPoints: ["src/features/agent-tests/run-case.ts"],
+  bundle: true,
+  write: false,
+  format: "esm",
+  platform: "node",
+});
+const { runAgentTestCase } = await import(
+  `data:text/javascript;base64,${Buffer.from(isolatedRunCompiled.outputFiles[0].text).toString("base64")}`
+);
 
 test("agent test cases enforce concise, bounded user input", () => {
   assert.equal(
@@ -136,4 +146,58 @@ test("a failed preview reset marks later checks not run without sending their pr
       ["third", "not_run"],
     ],
   );
+});
+
+test("saved agent test runs reset the preview before sending the prompt", async () => {
+  const order = [];
+  const result = await runAgentTestCase({
+    resetPreview: async () => {
+      order.push("reset");
+      return true;
+    },
+    runPrompt: async () => {
+      order.push("run");
+      return { outcome: "answer", grounded: true };
+    },
+    isErrorResult: (evidence) => evidence.outcome === "error",
+  });
+
+  assert.deepEqual(order, ["reset", "run"]);
+  assert.deepEqual(result, {
+    status: "completed",
+    evidence: { outcome: "answer", grounded: true },
+  });
+});
+
+test("a failed preview reset does not send the saved test prompt", async () => {
+  let promptSent = false;
+  const result = await runAgentTestCase({
+    resetPreview: async () => false,
+    runPrompt: async () => {
+      promptSent = true;
+      return { outcome: "answer", grounded: true };
+    },
+    isErrorResult: (evidence) => evidence.outcome === "error",
+  });
+
+  assert.equal(promptSent, false);
+  assert.deepEqual(result, { status: "reset_failed" });
+});
+
+test("failed and thrown preview results remain retryable errors", async () => {
+  const errorResult = await runAgentTestCase({
+    resetPreview: async () => true,
+    runPrompt: async () => ({ outcome: "error", grounded: false }),
+    isErrorResult: (evidence) => evidence.outcome === "error",
+  });
+  const thrownResult = await runAgentTestCase({
+    resetPreview: async () => true,
+    runPrompt: async () => {
+      throw new Error("private provider details");
+    },
+    isErrorResult: (evidence) => evidence.outcome === "error",
+  });
+
+  assert.deepEqual(errorResult, { status: "run_failed" });
+  assert.deepEqual(thrownResult, { status: "run_failed" });
 });
