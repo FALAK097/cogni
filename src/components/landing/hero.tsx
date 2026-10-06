@@ -457,8 +457,7 @@ export function Hero() {
 
           <p className="text-pretty mx-auto mt-6 max-w-xl text-lg leading-relaxed text-white/85">
             Give customers answers from your sources, with a clear path to your team when they need
-            more.
-            <br className="hidden sm:block" />
+            more. <br className="hidden sm:block" />
             Every conversation stays in one shared inbox.
           </p>
         </div>
