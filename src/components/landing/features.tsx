@@ -233,8 +233,8 @@ function AnalyticsVisual() {
       </p>
       <div className="mb-3 grid grid-cols-3 gap-2">
         {[
-          { label: "Closed", value: "846", up: true, change: "+4.2%" },
-          { label: "Response", value: "2.6s", up: false, change: "-0.8s" },
+          { label: "Closed", value: "846", up: true, change: "+16.7%" },
+          { label: "Response", value: "2.6s", up: false, change: "-8.3%" },
           { label: "Satisfaction", value: "4.7/5", up: true, change: "+0.3" },
         ].map((m) => (
           <div

@@ -680,11 +680,14 @@ export function ConversationsList({
             </Button>
           </div>
         ) : (!hasHydrated || isConversationsPending) && conversations.length === 0 ? (
-          <div aria-hidden="true" className="space-y-1 px-2 pb-2">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <ConversationRowSkeleton key={index} />
-            ))}
-          </div>
+          <output aria-busy="true" aria-label="Loading conversations" className="block">
+            <span className="sr-only">Loading conversations</span>
+            <div aria-hidden="true" className="space-y-1 px-2 pb-2">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <ConversationRowSkeleton key={index} />
+              ))}
+            </div>
+          </output>
         ) : conversations.length === 0 ? (
           <div className="flex h-full min-h-[240px] flex-col items-center justify-center gap-3 px-5 py-8 text-center">
             <span className="flex size-10 items-center justify-center rounded-xl border border-border/60 bg-card text-muted-foreground">
