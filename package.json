@@ -62,6 +62,7 @@
     "test:analytics-no-source-answers": "node --test scripts/test-analytics-no-source-answers.mjs",
     "test:analytics-aggregation": "node --test scripts/test-analytics-aggregation.mjs",
     "test:analytics-date-range": "node --test scripts/test-analytics-date-range.mjs",
+    "test:spreadsheet-export": "node --test scripts/test-spreadsheet-export.mjs",
     "test:insights-url-state": "node --test scripts/test-insights-url-state.mjs",
     "test:workflow-progression": "node --test scripts/test-workflow-progression.mjs",
     "test:rate-limit": "node --test scripts/test-rate-limit.mjs",

@@ -361,7 +361,7 @@ export function WidgetTestPanel({
               >
                 Agent
               </Link>{" "}
-              under Deploy, then return here to test a prompt tailored to your agent.
+              in Agent settings, then return here to test a prompt tailored to your agent.
             </p>
           )}
         </div>

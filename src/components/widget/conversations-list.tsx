@@ -31,7 +31,6 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -58,6 +57,7 @@ import { normalizeTimezone } from "@/features/conversations/snooze-schedule";
 import { cn } from "@/lib/utils";
 
 import { scrollPaneClassName } from "./conversation-layout";
+import { ConversationRowSkeleton } from "./conversation-row-skeleton";
 
 interface ConversationsListProps {
   filter: ConversationFilter;
@@ -645,7 +645,12 @@ export function ConversationsList({
       {isError && conversations.length > 0 ? (
         <div role="alert" className="mx-4 mb-2 space-y-2 text-sm text-muted-foreground">
           <p>Conversations could not refresh. Showing previously loaded results.</p>
-          <Button variant="outline" onClick={() => void refetch()} disabled={isFetching}>
+          <Button
+            variant="outline"
+            className="min-h-11 sm:min-h-9"
+            onClick={() => void refetch()}
+            disabled={isFetching}
+          >
             Retry loading
           </Button>
         </div>
@@ -665,30 +670,20 @@ export function ConversationsList({
             <p role="alert" className="text-sm text-muted-foreground">
               Unable to load conversations. Check your connection and try again.
             </p>
-            <Button variant="outline" onClick={() => void refetch()} disabled={isFetching}>
+            <Button
+              variant="outline"
+              className="min-h-11 sm:min-h-9"
+              onClick={() => void refetch()}
+              disabled={isFetching}
+            >
               Retry loading
             </Button>
           </div>
         ) : (!hasHydrated || isConversationsPending) && conversations.length === 0 ? (
-          <div className="space-y-1 px-2 pb-2">
-            <div aria-hidden="true" className="space-y-1">
-              {Array.from({ length: 6 }).map((_, index) => (
-                <div key={index} className="flex items-start gap-3 rounded-lg px-3 py-3">
-                  <Skeleton className="h-10 w-10 rounded-full" />
-                  <div className="flex-1 space-y-2">
-                    <div className="flex items-center justify-between gap-3">
-                      <Skeleton className="h-4 w-28" />
-                      <Skeleton className="h-3 w-10" />
-                    </div>
-                    <Skeleton className="h-4 w-full" />
-                    <div className="flex gap-2">
-                      <Skeleton className="h-4 w-14 rounded" />
-                      <Skeleton className="h-4 w-16 rounded" />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+          <div aria-hidden="true" className="space-y-1 px-2 pb-2">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <ConversationRowSkeleton key={index} />
+            ))}
           </div>
         ) : conversations.length === 0 ? (
           <div className="flex h-full min-h-[240px] flex-col items-center justify-center gap-3 px-5 py-8 text-center">

@@ -1,3 +1,4 @@
+import { ConversationRowSkeleton } from "@/components/widget/conversation-row-skeleton";
 import { Skeleton } from "@/components/ui/skeleton";
 import { panelBoxClassName } from "@/components/widget/conversation-layout";
 
@@ -15,13 +16,7 @@ function ConversationRowsSkeleton() {
       </div>
       <div aria-hidden="true" className="space-y-1">
         {Array.from({ length: 6 }).map((_, index) => (
-          <div key={index} className="flex items-start gap-3 rounded-lg px-3 py-3">
-            <Skeleton className="size-10 rounded-full" />
-            <div className="min-w-0 flex-1 space-y-2">
-              <Skeleton className="h-4 w-28 max-w-full" />
-              <Skeleton className="h-3 w-full" />
-            </div>
-          </div>
+          <ConversationRowSkeleton key={index} />
         ))}
       </div>
     </div>

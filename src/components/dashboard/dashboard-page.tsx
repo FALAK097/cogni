@@ -26,6 +26,7 @@ import { useEffect, useMemo, useState } from "react";
 import { parseAsString, parseAsStringLiteral, useQueryStates } from "nuqs";
 
 import type { DashboardAnalytics, MetricComparison, TopQuestion } from "@/features/analytics/types";
+import { escapeCsvCell, escapeSpreadsheetHtmlCell } from "@/features/analytics/spreadsheet-export";
 import {
   aggregateWeeklyCounts,
   aggregateWeeklySatisfaction,
@@ -257,11 +258,6 @@ function formatRangeLabel(range: DateRangeValue): string {
   return formatComparisonRange(format(range.start, "yyyy-MM-dd"), format(range.end, "yyyy-MM-dd"));
 }
 
-function escapeCsvCell(value: string): string {
-  if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
-  return value;
-}
-
 function downloadFile(content: string, filename: string, mimeType: string) {
   const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
@@ -424,17 +420,16 @@ function sectionsToCsv(sections: ExportSection[]): string {
 }
 
 function sectionsToExcelHtml(sections: ExportSection[]): string {
-  const escapeHtml = (value: string) =>
-    value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
   let html =
     '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"></head><body>';
   for (const section of sections) {
-    html += `<h2>${escapeHtml(section.title)}</h2><table border="1"><thead><tr>`;
-    html += section.headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("");
+    html += `<h2>${escapeSpreadsheetHtmlCell(section.title)}</h2><table border="1"><thead><tr>`;
+    html += section.headers
+      .map((header) => `<th>${escapeSpreadsheetHtmlCell(header)}</th>`)
+      .join("");
     html += "</tr></thead><tbody>";
     for (const row of section.rows) {
-      html += `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`;
+      html += `<tr>${row.map((cell) => `<td>${escapeSpreadsheetHtmlCell(cell)}</td>`).join("")}</tr>`;
     }
     html += "</tbody></table><br/>";
   }
