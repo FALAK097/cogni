@@ -30,6 +30,10 @@ test("primary labels resolve to matching canonical page URLs", () => {
   );
 });
 
+test("legacy widget routes redirect to the canonical Agent page", () => {
+  assert.equal(routes.LEGACY_REDIRECTS.widget, "/agent");
+});
+
 test("Agent stays on one canonical page while preserving useful section anchors", () => {
   assert.equal(routes.agentHref(), "/agent");
   assert.equal(routes.agentHref("#knowledge"), "/agent#knowledge");

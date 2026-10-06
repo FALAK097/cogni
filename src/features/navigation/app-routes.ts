@@ -28,6 +28,10 @@ export const APP_ROUTES = {
   settings: APP_PAGES.settings.href,
 } as const;
 
+export const LEGACY_REDIRECTS = {
+  widget: APP_ROUTES.agent,
+} as const;
+
 export const AGENT_TABS = ["build", "test", "deploy"] as const;
 export type AgentTab = (typeof AGENT_TABS)[number];
 

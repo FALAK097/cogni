@@ -281,9 +281,7 @@ export function WidgetKnowledgeManager({ canManage }: { canManage: boolean }) {
         canManage={canManage}
         addMenuOpen={addMenuOpen}
         isRefetching={isRefetching}
-        showRetry={sourcesQuery.isError && !isInitialLoading && !sourcesQuery.data}
         onAddMenuOpenChange={setAddMenuOpen}
-        onRetry={() => sourcesQuery.refetch()}
         onSelectAddDialog={startAddDialog}
       />
 
@@ -353,27 +351,17 @@ function KnowledgeToolbar({
   canManage,
   addMenuOpen,
   isRefetching,
-  showRetry,
   onAddMenuOpenChange,
-  onRetry,
   onSelectAddDialog,
 }: {
   canManage: boolean;
   addMenuOpen: boolean;
   isRefetching: boolean;
-  showRetry: boolean;
   onAddMenuOpenChange: (open: boolean) => void;
-  onRetry: () => void;
   onSelectAddDialog: (dialog: Exclude<AddDialog, null>) => void;
 }) {
   return (
     <div className="flex flex-wrap items-center justify-end gap-2">
-      {showRetry ? (
-        <Button size="sm" variant="outline" className="h-9 rounded-full" onClick={onRetry}>
-          <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-          Retry
-        </Button>
-      ) : null}
       {canManage ? (
         <DropdownMenu open={addMenuOpen} onOpenChange={onAddMenuOpenChange}>
           <DropdownMenuTrigger

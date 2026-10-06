@@ -53,6 +53,7 @@ jobs:
       - run: pnpm test:agent-readiness
       - run: pnpm test:agent-tests
       - run: pnpm test:inbox-keyboard-navigation
+      - run: pnpm test:navigation-routes
       - run: pnpm test:knowledge-source-type
       - run: pnpm test:knowledge-source-sync
       - run: pnpm test:widget-stream

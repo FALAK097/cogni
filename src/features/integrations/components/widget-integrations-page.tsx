@@ -6,7 +6,7 @@ import { IntegrationCategorySection } from "@/features/integrations/components/i
 import { PendingActionsCard } from "@/features/integrations/components/pending-actions-card";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
-import { useConnectIntegration, useIntegrations } from "@/hooks/query";
+import { useAuthMe, useConnectIntegration, useIntegrations } from "@/hooks/query";
 import { INTEGRATION_CATEGORIES } from "@/features/integrations/categories";
 import { getAllIntegrations, getIntegrationsByCategory } from "@/features/integrations/registry";
 import { Info } from "@/components/icons";
@@ -14,6 +14,8 @@ import { IntegrationsPageSkeleton } from "@/features/integrations/components/int
 
 export function WidgetIntegrationsPage({ canManage }: { canManage: boolean }) {
   const { toast } = useToast();
+  const authMeQuery = useAuthMe();
+  const activeWorkspaceId = authMeQuery.data?.session?.activeWorkspaceId;
   const integrationsQuery = useIntegrations();
   const connectMutation = useConnectIntegration();
 
@@ -57,8 +59,41 @@ export function WidgetIntegrationsPage({ canManage }: { canManage: boolean }) {
     }
   }
 
-  if (integrationsQuery.isLoading) {
+  if (authMeQuery.isLoading || integrationsQuery.isLoading) {
     return <IntegrationsPageSkeleton />;
+  }
+
+  if (authMeQuery.isError && !authMeQuery.data) {
+    return (
+      <div role="alert" className="rounded-xl border border-border bg-card p-6">
+        <p className="font-medium">Workspace details could not be loaded</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Retry to confirm the active workspace before managing connections.
+        </p>
+        <Button
+          className="mt-4"
+          variant="outline"
+          onClick={() => void authMeQuery.refetch()}
+          disabled={authMeQuery.isFetching}
+        >
+          {authMeQuery.isFetching ? "Retrying…" : "Try again"}
+        </Button>
+      </div>
+    );
+  }
+
+  if (!activeWorkspaceId) {
+    return (
+      <div role="alert" className="rounded-xl border border-border bg-card p-6">
+        <p className="font-medium">No active workspace is selected</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Reload Settings after selecting a workspace to manage its connections.
+        </p>
+        <Button className="mt-4" variant="outline" onClick={() => window.location.reload()}>
+          Reload Settings
+        </Button>
+      </div>
+    );
   }
 
   if (integrationsQuery.isError && !integrationsQuery.data) {
