@@ -13,7 +13,17 @@ export function getAgentPublicationReadiness(input: {
   hasPublishedVersion: boolean;
   hasUnpublishedChanges: boolean;
   authorizedDomainCount: number;
+  isSavingConfiguration: boolean;
 }): AgentPublicationReadiness {
+  if (input.isSavingConfiguration) {
+    return {
+      complete: false,
+      title: "Saving your changes",
+      description: "Your latest settings are being saved. This usually takes a moment.",
+      action: null,
+      actionType: null,
+    };
+  }
   if (!input.hasPublishedVersion) {
     return {
       complete: false,

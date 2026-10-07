@@ -17,6 +17,7 @@ test("new agents stay incomplete until an enabled version is published", () => {
   const readiness = getAgentPublicationReadiness({
     isEnabled: true,
     hasPublishedVersion: false,
+    isSavingConfiguration: false,
     hasUnpublishedChanges: false,
     authorizedDomainCount: 1,
   });
@@ -29,6 +30,7 @@ test("saved draft changes keep the checklist incomplete", () => {
   const readiness = getAgentPublicationReadiness({
     isEnabled: true,
     hasPublishedVersion: true,
+    isSavingConfiguration: false,
     hasUnpublishedChanges: true,
     authorizedDomainCount: 1,
   });
@@ -40,6 +42,7 @@ test("paused agents direct owners to resume visitor access", () => {
   const readiness = getAgentPublicationReadiness({
     isEnabled: false,
     hasPublishedVersion: true,
+    isSavingConfiguration: false,
     hasUnpublishedChanges: false,
     authorizedDomainCount: 1,
   });
@@ -51,6 +54,7 @@ test("published enabled agents complete the checklist item", () => {
   const readiness = getAgentPublicationReadiness({
     isEnabled: true,
     hasPublishedVersion: true,
+    isSavingConfiguration: false,
     hasUnpublishedChanges: false,
     authorizedDomainCount: 1,
   });
@@ -64,6 +68,7 @@ test("published agents require an authorized website before installation", () =>
   const readiness = getAgentPublicationReadiness({
     isEnabled: true,
     hasPublishedVersion: true,
+    isSavingConfiguration: false,
     hasUnpublishedChanges: false,
     authorizedDomainCount: 0,
   });
@@ -71,4 +76,16 @@ test("published agents require an authorized website before installation", () =>
   assert.equal(readiness.title, "Authorize your website");
   assert.equal(readiness.actionType, "domain");
   assert.equal(readiness.action, "Add a domain");
+});
+
+test("configuration saves show progress instead of offering a disabled publish action", () => {
+  const readiness = getAgentPublicationReadiness({
+    isEnabled: true,
+    hasPublishedVersion: false,
+    hasUnpublishedChanges: false,
+    authorizedDomainCount: 0,
+    isSavingConfiguration: true,
+  });
+  assert.equal(readiness.title, "Saving your changes");
+  assert.equal(readiness.actionType, null);
 });

@@ -635,12 +635,9 @@ export function WidgetCustomizer({
   const launchReadiness = getAgentPublicationReadiness({
     isEnabled: config.isEnabled,
     hasPublishedVersion: Boolean(publication?.current),
-    hasUnpublishedChanges: Boolean(
-      publication?.hasUnpublishedChanges ||
-      hasLocalDraftChanges ||
-      saveWidgetConfigMutation.isPending,
-    ),
+    hasUnpublishedChanges: Boolean(publication?.hasUnpublishedChanges),
     authorizedDomainCount: config.allowedDomains.length,
+    isSavingConfiguration: isSavingDraft,
   });
 
   const appearanceConfig: AppearanceConfig = {
@@ -892,7 +889,12 @@ export function WidgetCustomizer({
                   readiness={launchReadiness}
                   onReadinessAction={(action) => {
                     if (action === "resume") updateConfig("isEnabled", true);
-                    if (action === "publish") setActiveTab("build");
+                    if (action === "publish") {
+                      setActiveTab("build");
+                      window.requestAnimationFrame(() => {
+                        document.getElementById("agent-publish")?.focus({ preventScroll: true });
+                      });
+                    }
                   }}
                   isEnabled={config.isEnabled}
                   currentPublication={publication?.current ?? null}
