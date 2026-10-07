@@ -15,6 +15,7 @@ import { BookingSettingsCard } from "@/features/integrations/components/booking-
 import { WidgetKnowledgeManager } from "@/components/workspace/widget-knowledge-manager";
 import { cn } from "@/lib/utils";
 import { APP_PAGES, AGENT_TABS, type AgentTab } from "@/features/navigation/app-routes";
+import { getAgentPublicationReadiness } from "@/features/widget/agent-readiness";
 
 import { toSavePayload, type WidgetCustomizerConfig } from "./widget-settings-payload";
 import { Button } from "@/components/ui/button";
@@ -631,6 +632,17 @@ export function WidgetCustomizer({
     }
   };
 
+  const launchReadiness = getAgentPublicationReadiness({
+    isEnabled: config.isEnabled,
+    hasPublishedVersion: Boolean(publication?.current),
+    hasUnpublishedChanges: Boolean(
+      publication?.hasUnpublishedChanges ||
+      hasLocalDraftChanges ||
+      saveWidgetConfigMutation.isPending,
+    ),
+    authorizedDomainCount: config.allowedDomains.length,
+  });
+
   const appearanceConfig: AppearanceConfig = {
     logoUrl: config.logoUrl ?? "",
     primaryColor: config.primaryColor,
@@ -741,6 +753,7 @@ export function WidgetCustomizer({
         </output>
         {canManage ? (
           <Button
+            id="agent-publish"
             type="button"
             className="min-h-10 rounded-lg"
             disabled={!canPublishChanges}
@@ -876,6 +889,11 @@ export function WidgetCustomizer({
                   />
                 </fieldset>
                 <WidgetInstallationPanel
+                  readiness={launchReadiness}
+                  onReadinessAction={(action) => {
+                    if (action === "resume") updateConfig("isEnabled", true);
+                    if (action === "publish") setActiveTab("build");
+                  }}
                   isEnabled={config.isEnabled}
                   currentPublication={publication?.current ?? null}
                   allowedDomains={config.allowedDomains}

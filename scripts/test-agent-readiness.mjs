@@ -18,6 +18,7 @@ test("new agents stay incomplete until an enabled version is published", () => {
     isEnabled: true,
     hasPublishedVersion: false,
     hasUnpublishedChanges: false,
+    authorizedDomainCount: 1,
   });
   assert.equal(readiness.complete, false);
   assert.equal(readiness.title, "Publish your agent");
@@ -29,6 +30,7 @@ test("saved draft changes keep the checklist incomplete", () => {
     isEnabled: true,
     hasPublishedVersion: true,
     hasUnpublishedChanges: true,
+    authorizedDomainCount: 1,
   });
   assert.equal(readiness.complete, false);
   assert.match(readiness.description, /not included in the published agent/);
@@ -39,9 +41,10 @@ test("paused agents direct owners to resume visitor access", () => {
     isEnabled: false,
     hasPublishedVersion: true,
     hasUnpublishedChanges: false,
+    authorizedDomainCount: 1,
   });
   assert.equal(readiness.complete, false);
-  assert.equal(readiness.action, "Resume widget");
+  assert.equal(readiness.action, "Resume visitor access");
 });
 
 test("published enabled agents complete the checklist item", () => {
@@ -49,9 +52,23 @@ test("published enabled agents complete the checklist item", () => {
     isEnabled: true,
     hasPublishedVersion: true,
     hasUnpublishedChanges: false,
+    authorizedDomainCount: 1,
   });
   assert.equal(readiness.complete, true);
-  assert.equal(readiness.title, "Agent published");
-  assert.match(readiness.description, /ready to install/);
-  assert.doesNotMatch(readiness.description, /available to visitors/);
+  assert.equal(readiness.title, "Ready to install");
+  assert.match(readiness.description, /serve visitors from an authorized website/);
+  assert.equal(readiness.actionType, null);
+});
+
+test("published agents require an authorized website before installation", () => {
+  const readiness = getAgentPublicationReadiness({
+    isEnabled: true,
+    hasPublishedVersion: true,
+    hasUnpublishedChanges: false,
+    authorizedDomainCount: 0,
+  });
+  assert.equal(readiness.complete, false);
+  assert.equal(readiness.title, "Authorize your website");
+  assert.equal(readiness.actionType, "domain");
+  assert.equal(readiness.action, "Add a domain");
 });

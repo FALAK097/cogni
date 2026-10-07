@@ -1,44 +1,60 @@
+export type AgentReadinessAction = "publish" | "resume" | "domain" | null;
+
 export type AgentPublicationReadiness = {
   complete: boolean;
   title: string;
   description: string;
-  action: string;
+  action: string | null;
+  actionType: AgentReadinessAction;
 };
 
 export function getAgentPublicationReadiness(input: {
   isEnabled: boolean;
   hasPublishedVersion: boolean;
   hasUnpublishedChanges: boolean;
+  authorizedDomainCount: number;
 }): AgentPublicationReadiness {
-  if (!input.isEnabled) {
-    return {
-      complete: false,
-      title: "Resume visitor access",
-      description: "Your widget is paused, so visitors cannot start or continue conversations.",
-      action: "Resume widget",
-    };
-  }
   if (!input.hasPublishedVersion) {
     return {
       complete: false,
       title: "Publish your agent",
-      description: "Publish an agent version before it can be installed on your website.",
+      description: "Publish your agent before installing it on your website.",
       action: "Review and publish",
+      actionType: "publish",
     };
   }
   if (input.hasUnpublishedChanges) {
     return {
       complete: false,
-      title: "Publish your changes",
-      description:
-        "Saved draft changes are not included in the published agent until you publish them.",
+      title: "Publish your latest changes",
+      description: "Saved draft changes are not included in the published agent yet.",
       action: "Review and publish",
+      actionType: "publish",
+    };
+  }
+  if (!input.isEnabled) {
+    return {
+      complete: false,
+      title: "Visitor access is paused",
+      description: "Visitors cannot start or continue conversations while the widget is paused.",
+      action: "Resume visitor access",
+      actionType: "resume",
+    };
+  }
+  if (input.authorizedDomainCount === 0) {
+    return {
+      complete: false,
+      title: "Authorize your website",
+      description: "Add at least one authorized domain before installing the widget.",
+      action: "Add a domain",
+      actionType: "domain",
     };
   }
   return {
     complete: true,
-    title: "Agent published",
-    description: "Your current agent version is published and ready to install on your website.",
-    action: "Review deployment",
+    title: "Ready to install",
+    description: "Your published agent can serve visitors from an authorized website.",
+    action: null,
+    actionType: null,
   };
 }

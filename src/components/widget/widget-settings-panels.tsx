@@ -34,6 +34,7 @@ import type {
   WidgetPublicationVersion,
 } from "@/features/widget/domain";
 import { normalizeLogoUrl, widgetModelOptions } from "@/features/widget/domain";
+import type { AgentPublicationReadiness } from "@/features/widget/agent-readiness";
 import { WIDGET_BRAND_COLOR } from "@/lib/widget-accent";
 import { cn } from "@/lib/utils";
 
@@ -902,6 +903,8 @@ export function WidgetSuggestedQuestionsPanel({
 }
 
 export function WidgetInstallationPanel({
+  readiness,
+  onReadinessAction,
   isEnabled,
   currentPublication,
   allowedDomains,
@@ -915,6 +918,8 @@ export function WidgetInstallationPanel({
   onEnabledChange,
   canManage,
 }: {
+  readiness: AgentPublicationReadiness;
+  onReadinessAction: (action: "publish" | "resume") => void;
   isEnabled: boolean;
   currentPublication: WidgetPublicationVersion | null;
   allowedDomains: string[];
@@ -928,6 +933,16 @@ export function WidgetInstallationPanel({
   onEnabledChange: (value: boolean) => void;
   canManage: boolean;
 }) {
+  const domainInputRef = useRef<HTMLInputElement>(null);
+
+  const handleReadinessAction = () => {
+    if (readiness.actionType === "domain") {
+      domainInputRef.current?.focus();
+      return;
+    }
+    if (readiness.actionType) onReadinessAction(readiness.actionType);
+  };
+
   return (
     <>
       <SettingsPanelHeader
@@ -935,47 +950,58 @@ export function WidgetInstallationPanel({
         description="Authorize domains and copy the embed code to your website."
       />
       <div className="space-y-8">
-        <output
-          className="flex items-start gap-3 rounded-lg border border-border/70 bg-muted/30 p-3"
-          aria-label={
-            currentPublication
-              ? `Published agent version ${currentPublication.version}`
-              : "Agent is not published"
-          }
+        <section
+          aria-labelledby="agent-launch-readiness"
+          aria-live="polite"
+          className="flex flex-col gap-3 rounded-lg border border-border/70 bg-muted/30 p-3 sm:flex-row sm:items-center sm:justify-between"
         >
-          <Check
-            className={cn(
-              "mt-0.5 size-4 shrink-0",
-              currentPublication ? "text-primary" : "text-muted-foreground",
-            )}
-            aria-hidden="true"
-          />
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-foreground">
-              {currentPublication
-                ? `Published version ${currentPublication.version}`
-                : "No published version yet"}
-            </p>
-            <p className="mt-0.5 text-sm text-muted-foreground">
+          <div className="flex min-w-0 items-start gap-3">
+            <span
+              className={cn(
+                "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg border bg-card",
+                readiness.complete
+                  ? "border-primary/20 text-primary"
+                  : "border-border text-muted-foreground",
+              )}
+              aria-hidden="true"
+            >
+              {readiness.complete ? (
+                <ShieldCheck className="size-4" />
+              ) : (
+                <Shield className="size-4" />
+              )}
+            </span>
+            <div className="min-w-0">
+              <h3 id="agent-launch-readiness" className="text-sm font-semibold text-foreground">
+                {readiness.title}
+              </h3>
+              <p className="mt-0.5 text-sm text-muted-foreground">{readiness.description}</p>
               {currentPublication ? (
-                <>
-                  Published{" "}
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Version {currentPublication.version} · Published{" "}
                   <time dateTime={currentPublication.publishedAt}>
                     {new Date(currentPublication.publishedAt).toLocaleString(undefined, {
                       dateStyle: "medium",
                       timeStyle: "short",
                     })}
                   </time>
-                  {currentPublication.authorName
-                    ? ` by ${currentPublication.authorName}`
-                    : " · Existing setup"}
-                </>
-              ) : (
-                "Publish your agent and install the widget before visitors can use it."
-              )}
-            </p>
+                  {currentPublication.authorName ? ` by ${currentPublication.authorName}` : ""}
+                </p>
+              ) : null}
+            </div>
           </div>
-        </output>
+          {canManage && readiness.action && readiness.actionType ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="min-h-9 shrink-0 sm:self-center"
+              onClick={handleReadinessAction}
+            >
+              {readiness.action}
+            </Button>
+          ) : null}
+        </section>
         <section className="flex items-start justify-between gap-4 rounded-lg border border-border bg-card p-4">
           <div className="min-w-0">
             <Label
@@ -1002,25 +1028,6 @@ export function WidgetInstallationPanel({
             aria-label="Accept visitor conversations"
           />
         </section>
-        <output className="flex items-start gap-3 rounded-lg border border-border/70 bg-muted/30 p-3">
-          {allowedDomains.length > 0 ? (
-            <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
-          ) : (
-            <Shield className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-          )}
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-foreground">
-              {allowedDomains.length > 0
-                ? "Domain access is restricted"
-                : "Add your website domain first"}
-            </p>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              {allowedDomains.length > 0
-                ? "Only authorized domains can load the widget."
-                : "Production widget requests are rejected until you authorize a domain."}
-            </p>
-          </div>
-        </output>
         <section className="space-y-4">
           <div>
             <h3 className="text-sm font-semibold text-foreground">Authorized domains</h3>
@@ -1041,6 +1048,7 @@ export function WidgetInstallationPanel({
                 https://
               </span>
               <Input
+                ref={domainInputRef}
                 id="authorized-domain"
                 value={domainInput}
                 onChange={(event) => onDomainInputChange(event.target.value)}
