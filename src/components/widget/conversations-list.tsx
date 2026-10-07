@@ -22,6 +22,7 @@ import {
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import {
   Popover,
@@ -291,6 +292,24 @@ export function ConversationsList({
                   : filter === "snoozed"
                     ? "Nothing snoozed"
                     : "No closed conversations";
+  const emptyDescription =
+    searchTerm || hasFacetFilters
+      ? "Try another search or clear the active filters."
+      : filter === "all"
+        ? "New conversations from your website and connected channels will appear here."
+        : filter === "unread"
+          ? "All caught up. New visitor messages will appear here."
+          : filter === "unassigned"
+            ? "Conversations without an owner will show up here."
+            : filter === "mine"
+              ? "Conversations assigned to you will appear here."
+              : filter === "open"
+                ? "Conversations your team leaves open will appear here."
+                : filter === "snoozed"
+                  ? "Conversations you snooze will return to the inbox when it’s time."
+                  : filter === "tickets"
+                    ? "Create a ticket from any conversation to track follow-up and ownership here."
+                    : "Closed conversations will appear here.";
   const hasVisibleSelection = conversations.some(
     (conversation) => conversation.id === selectedConversationId,
   );
@@ -689,35 +708,19 @@ export function ConversationsList({
             </div>
           </output>
         ) : conversations.length === 0 ? (
-          <div className="flex h-full min-h-[240px] flex-col items-center justify-center gap-3 px-5 py-8 text-center">
-            <span className="flex size-10 items-center justify-center rounded-xl border border-border/60 bg-card text-muted-foreground">
-              {searchTerm ? (
-                <Search className="size-[18px]" aria-hidden="true" />
-              ) : (
-                <MessageSquare className="size-[18px]" aria-hidden="true" />
-              )}
-            </span>
-            <div>
-              <p className="text-sm font-medium text-foreground">{emptyTitle}</p>
-              <p className="mt-1 max-w-[240px] text-xs leading-relaxed text-muted-foreground">
-                {searchTerm || hasFacetFilters
-                  ? "Try another search or clear the active filters."
-                  : filter === "all"
-                    ? "Website chats and messages from connected channels will appear here."
-                    : filter === "unread"
-                      ? "Unread visitor messages will show up here."
-                      : filter === "snoozed"
-                        ? "Conversations you snooze will return to the inbox when it’s time."
-                        : filter === "tickets"
-                          ? "Create a ticket from any conversation to track follow-up and ownership here."
-                          : "Try another inbox view to find a conversation."}
-              </p>
-            </div>
+          <EmptyState
+            compact
+            icon={searchTerm ? Search : MessageSquare}
+            title={emptyTitle}
+            description={emptyDescription}
+            className="h-full min-h-[240px] rounded-none border-0 bg-transparent px-5 py-8"
+          >
             {searchTerm || hasFacetFilters ? (
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
+                className="min-h-11 sm:min-h-9"
                 onClick={() => {
                   clearSearch();
                   setChannelFilter(null);
@@ -730,11 +733,17 @@ export function ConversationsList({
                 Clear filters
               </Button>
             ) : filter !== "all" ? (
-              <Button type="button" variant="outline" size="sm" onClick={onClearFilter}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="min-h-11 sm:min-h-9"
+                onClick={onClearFilter}
+              >
                 View all conversations
               </Button>
             ) : null}
-          </div>
+          </EmptyState>
         ) : (
           <ul
             aria-label="Conversations"
