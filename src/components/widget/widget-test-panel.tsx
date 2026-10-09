@@ -5,6 +5,7 @@ import { useState, type FormEvent } from "react";
 import {
   BookOpen,
   CheckCircle2,
+  ExternalLink,
   MessageCircle,
   Pencil,
   Play,
@@ -134,11 +135,21 @@ function WidgetTestResult({
             <ul className="mt-2 space-y-2">
               {evidence.sources.map((source) => (
                 <li
-                  key={source.title}
-                  className="flex items-start gap-2 text-sm leading-relaxed text-muted-foreground"
+                  key={source.documentId ?? source.title}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-card/60 px-3 py-2 text-xs leading-relaxed text-muted-foreground"
                 >
-                  <BookOpen className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                  <span className="break-words">{source.title}</span>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <BookOpen className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
+                    <span className="truncate font-medium text-foreground">{source.title}</span>
+                  </div>
+                  <a
+                    href="#build"
+                    className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+                    title="Inspect source in Knowledge Base"
+                  >
+                    <span>Inspect</span>
+                    <ExternalLink className="size-3" aria-hidden="true" />
+                  </a>
                 </li>
               ))}
             </ul>

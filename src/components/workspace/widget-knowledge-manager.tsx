@@ -230,6 +230,10 @@ export function WidgetKnowledgeManager({ canManage }: { canManage: boolean }) {
   const isRefetching = sourcesQuery.isFetching && !sourcesQuery.isLoading;
   const sorting = parseSortValue(sortBy);
 
+  const readyCount = sources.filter((s) => s.status === "ready" || s.status === "indexed").length;
+  const processingCount = sources.filter((s) => s.status === "processing").length;
+  const failedCount = sources.filter((s) => s.status === "failed").length;
+
   async function handleDeleteConfirm() {
     if (!canManage) return;
     if (!deleteTarget) return;
@@ -281,9 +285,32 @@ export function WidgetKnowledgeManager({ canManage }: { canManage: boolean }) {
         canManage={canManage}
         addMenuOpen={addMenuOpen}
         isRefetching={isRefetching}
+        readyCount={readyCount}
+        processingCount={processingCount}
+        failedCount={failedCount}
         onAddMenuOpenChange={setAddMenuOpen}
         onSelectAddDialog={startAddDialog}
       />
+
+      {failedCount > 0 ? (
+        <div
+          role="alert"
+          className="flex flex-col gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-3.5 text-sm sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="flex items-start gap-2.5">
+            <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
+            <div>
+              <p className="font-semibold text-foreground">
+                {failedCount} knowledge source{failedCount === 1 ? "" : "s"} failed indexing
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Unindexed sources cannot be retrieved for visitor answers. Review error details
+                below and retry ingestion.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {addError ? <ErrorBanner message={addError} onDismiss={() => setAddError(null)} /> : null}
       {sourcesQuery.isError && sourcesQuery.data ? (
@@ -351,45 +378,81 @@ function KnowledgeToolbar({
   canManage,
   addMenuOpen,
   isRefetching,
+  readyCount,
+  processingCount,
+  failedCount,
   onAddMenuOpenChange,
   onSelectAddDialog,
 }: {
   canManage: boolean;
   addMenuOpen: boolean;
   isRefetching: boolean;
+  readyCount: number;
+  processingCount: number;
+  failedCount: number;
   onAddMenuOpenChange: (open: boolean) => void;
   onSelectAddDialog: (dialog: Exclude<AddDialog, null>) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-end gap-2">
-      {canManage ? (
-        <DropdownMenu open={addMenuOpen} onOpenChange={onAddMenuOpenChange}>
-          <DropdownMenuTrigger
-            render={
-              <Button
-                className="h-9 rounded-full px-3 shadow-none sm:px-4"
-                size="default"
-                aria-label="Add knowledge source"
-              >
-                {isRefetching ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Plus className="h-4 w-4" />
-                )}
-                Add Source
-                <ChevronDown className="hidden h-4 w-4 opacity-70 sm:inline" />
-              </Button>
-            }
-          />
-          <DropdownMenuContent align="end" sideOffset={10} className="w-80 p-2">
-            <AddSourceMenu onSelect={onSelectAddDialog} />
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ) : (
-        <span className="rounded-full border border-border/70 px-3 py-2 text-xs text-muted-foreground">
-          Owner access required
-        </span>
-      )}
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge
+          variant="outline"
+          className="gap-1.5 border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-xs text-emerald-700 dark:text-emerald-300"
+        >
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          <span>{readyCount} indexed</span>
+        </Badge>
+        {processingCount > 0 ? (
+          <Badge
+            variant="outline"
+            className="gap-1.5 border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-xs text-sky-700 dark:text-sky-300"
+          >
+            <Loader2 className="h-3 w-3 animate-spin" />
+            <span>{processingCount} processing</span>
+          </Badge>
+        ) : null}
+        {failedCount > 0 ? (
+          <Badge
+            variant="outline"
+            className="gap-1.5 border-destructive/20 bg-destructive/10 px-2.5 py-1 text-xs text-destructive"
+          >
+            <AlertCircle className="h-3 w-3" />
+            <span>{failedCount} failed</span>
+          </Badge>
+        ) : null}
+      </div>
+
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {canManage ? (
+          <DropdownMenu open={addMenuOpen} onOpenChange={onAddMenuOpenChange}>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  className="h-9 rounded-full px-3 shadow-none sm:px-4"
+                  size="default"
+                  aria-label="Add knowledge source"
+                >
+                  {isRefetching ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Plus className="h-4 w-4" />
+                  )}
+                  Add Source
+                  <ChevronDown className="hidden h-4 w-4 opacity-70 sm:inline" />
+                </Button>
+              }
+            />
+            <DropdownMenuContent align="end" sideOffset={10} className="w-80 p-2">
+              <AddSourceMenu onSelect={onSelectAddDialog} />
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <span className="rounded-full border border-border/70 px-3 py-2 text-xs text-muted-foreground">
+            Owner access required
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -507,6 +570,8 @@ function KnowledgeSourcesMobileList({
         const sourceType = source.sourceType.toLowerCase();
         const hasFileLabel = (sourceType === "file" || sourceType === "txt") && fileName;
         const primaryLabel = hasFileLabel ? fileName : source.displayName;
+        const isFailed = source.status === "failed";
+        const isReady = source.status === "ready" || source.status === "indexed";
 
         return (
           <div
@@ -523,11 +588,21 @@ function KnowledgeSourcesMobileList({
                   <SourceTypeBadge sourceType={source.sourceType} />
                   <StatusBadge status={source.status} />
                 </div>
+                {isFailed && source.lastError ? (
+                  <p className="mt-2 flex items-start gap-1.5 rounded-lg border border-destructive/20 bg-destructive/5 p-2 text-xs text-destructive">
+                    <AlertCircle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                    <span className="break-words">{source.lastError}</span>
+                  </p>
+                ) : null}
                 <div className="mt-3 flex items-center justify-between gap-2 text-xs text-muted-foreground">
                   <span>
                     {source.chunkCount > 0 ? `${source.chunkCount} pages` : "No pages indexed"}
                   </span>
-                  <span>{formatUpdatedAt(source.updatedAt)}</span>
+                  <span>
+                    {isReady && source.lastFetchedAt
+                      ? `Synced ${formatUpdatedAt(source.lastFetchedAt)}`
+                      : formatUpdatedAt(source.updatedAt)}
+                  </span>
                 </div>
               </div>
               {canManage ? (
@@ -622,11 +697,22 @@ function KnowledgeSourcesTable({
       id: "updatedAt",
       accessorKey: "updatedAt",
       header: "Last Updated",
-      cell: ({ row }) => (
-        <span className="text-sm text-foreground/75">
-          {formatUpdatedAt(row.original.updatedAt)}
-        </span>
-      ),
+      cell: ({ row }) => {
+        const source = row.original;
+        const isReady = source.status === "ready" || source.status === "indexed";
+        return (
+          <div className="space-y-0.5">
+            <span className="block text-sm text-foreground/75">
+              {formatUpdatedAt(source.updatedAt)}
+            </span>
+            {isReady && source.lastFetchedAt ? (
+              <span className="block text-[11px] text-muted-foreground">
+                Synced {formatUpdatedAt(source.lastFetchedAt)}
+              </span>
+            ) : null}
+          </div>
+        );
+      },
     },
   ];
   if (canManage) {
@@ -771,6 +857,12 @@ function SourceIdentity({ source }: { source: KnowledgeBaseSource }) {
         {secondaryLabel ? (
           <p className="truncate text-[12px] text-muted-foreground">{secondaryLabel}</p>
         ) : null}
+        {source.status === "failed" && source.lastError ? (
+          <p className="flex items-center gap-1.5 text-xs text-destructive">
+            <AlertCircle className="size-3.5 shrink-0" aria-hidden="true" />
+            <span className="line-clamp-1">{source.lastError}</span>
+          </p>
+        ) : null}
       </div>
     </div>
   );
@@ -791,44 +883,77 @@ function SourceActions({
   const canRetry = source.status === "failed";
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="cursor-pointer text-muted-foreground hover:text-foreground"
-            aria-label={`Open actions for ${source.displayName}`}
-          >
-            <Ellipsis className="h-4 w-4" />
-          </Button>
-        }
-      />
-      <DropdownMenuContent align="end" sideOffset={8} className="w-44">
-        {canRetry || canSync ? (
-          <DropdownMenuItem
-            className="cursor-pointer gap-2"
-            disabled={isProcessing}
-            onClick={() => onProcessSource(source, canSync ? "sync" : "retry")}
-          >
-            {isProcessing ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
-            )}
-            {isProcessing ? "Starting…" : canSync ? "Sync now" : "Retry indexing"}
-          </DropdownMenuItem>
-        ) : null}
-        <DropdownMenuItem
-          className="cursor-pointer gap-2 text-destructive"
-          variant="destructive"
-          onClick={() => onDeleteSource(source)}
+    <div className="flex items-center justify-end gap-1.5">
+      {canRetry ? (
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 gap-1.5 px-2.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+          disabled={isProcessing}
+          onClick={() => onProcessSource(source, "retry")}
         >
-          <Trash2 className="h-4 w-4" />
-          Delete
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          {isProcessing ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <RefreshCw className="h-3.5 w-3.5" />
+          )}
+          {isProcessing ? "Retrying…" : "Retry"}
+        </Button>
+      ) : null}
+
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="cursor-pointer text-muted-foreground hover:text-foreground"
+              aria-label={`Open actions for ${source.displayName}`}
+            >
+              <Ellipsis className="h-4 w-4" />
+            </Button>
+          }
+        />
+        <DropdownMenuContent align="end" sideOffset={8} className="w-44">
+          {canSync ? (
+            <DropdownMenuItem
+              className="cursor-pointer gap-2"
+              disabled={isProcessing}
+              onClick={() => onProcessSource(source, "sync")}
+            >
+              {isProcessing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              {isProcessing ? "Starting…" : "Sync now"}
+            </DropdownMenuItem>
+          ) : null}
+          {canRetry ? (
+            <DropdownMenuItem
+              className="cursor-pointer gap-2 text-destructive"
+              disabled={isProcessing}
+              onClick={() => onProcessSource(source, "retry")}
+            >
+              {isProcessing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              {isProcessing ? "Retrying…" : "Retry indexing"}
+            </DropdownMenuItem>
+          ) : null}
+          <DropdownMenuItem
+            className="cursor-pointer gap-2 text-destructive"
+            variant="destructive"
+            onClick={() => onDeleteSource(source)}
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 }
 

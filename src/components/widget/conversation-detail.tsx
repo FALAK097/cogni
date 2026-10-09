@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { format, formatDistanceToNow, isToday, isYesterday } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -1600,6 +1601,16 @@ function MessageBubble({
                   <p className="whitespace-pre-wrap border-t border-border/50 px-2.5 py-2 text-xs leading-relaxed break-words text-muted-foreground [overflow-wrap:anywhere]">
                     {citation.excerpt}
                   </p>
+                  <div className="flex items-center justify-between border-t border-border/40 bg-muted/20 px-2.5 py-1.5 text-[11px] text-muted-foreground">
+                    <span>Source document</span>
+                    <Link
+                      href="/agent#build"
+                      className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+                    >
+                      <span>Inspect in Knowledge</span>
+                      <ExternalLink className="size-3" aria-hidden="true" />
+                    </Link>
+                  </div>
                 </details>
               ))}
             </div>
@@ -1613,12 +1624,14 @@ function MessageBubble({
                 Sources
               </span>
               {parsedMessage.sources.map((source) => (
-                <span
+                <Link
                   key={source}
-                  className="inline-flex max-w-full items-center rounded-md bg-background/80 px-2 py-1 text-xs leading-none text-foreground ring-1 ring-border/60"
+                  href="/agent#build"
+                  className="inline-flex max-w-full items-center gap-1 rounded-md bg-background/80 px-2 py-1 text-xs leading-none text-foreground ring-1 ring-border/60 hover:ring-primary/40"
                 >
                   <span className="truncate">{source}</span>
-                </span>
+                  <ExternalLink className="size-2.5 text-muted-foreground" aria-hidden="true" />
+                </Link>
               ))}
             </div>
           ) : null}

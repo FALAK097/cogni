@@ -41,6 +41,16 @@ A unified 4-stage launch readiness checklist now guides workspace owners from in
 - **UI Components:** Built `AgentLaunchChecklistCard` in `src/components/widget/agent-launch-checklist-card.tsx` supporting both a full checklist with step details and direct actions in the Agent Deploy panel (`WidgetInstallationPanel`), and a compact launch cue in Insights (`DashboardPage`) when no conversation data exists yet.
 - **Test coverage:** Added unit tests in `scripts/test-agent-readiness.mjs` covering new agents, indexing states, test verification, draft publishing, and fully verified launch states (8/8 pass). `react-doctor` scored 100/100 with 0 errors and 0 warnings.
 
+## Knowledge source health and answer evidence
+
+Workspace owners and teammates now have end-to-end visibility into knowledge source health and answer provenance:
+
+- **Source Health Breakdown & Alerting (`src/components/workspace/widget-knowledge-manager.tsx`):** Added a top-level health summary toolbar showing indexed, processing, and failed source counts. An alert banner highlights failed ingestions with instructions and prompt cues.
+- **Actionable Ingestion Failures & Provenance:** Failed sources display their explicit `lastError` message inline in both table and mobile views. Workspace owners have a direct, one-click `Retry` button on failed rows and cards. Ready sources show their last successful fetch time (`lastFetchedAt`) alongside their update timestamp.
+- **Test Evidence Inspection (`src/components/widget/widget-test-panel.tsx`):** Retrieved preview evidence sources link directly into the Knowledge Base (`#build`) so testers can inspect source content and coverage without losing their place.
+- **Inbox Answer Evidence Inspection (`src/components/widget/conversation-detail.tsx`):** Message citations and retrieved source tags link directly to `/agent#build` for teammates to inspect or update documents supporting visitor replies.
+- **Unit and Health Testing (`scripts/test-knowledge-source-health.mjs`):** Added tests verifying health count computations, failure alerting, and error extraction logic (`pnpm test:knowledge-source-health`). React Doctor scored 100/100 across changed components.
+
 ## Required-source retrieval checks
 
 Migration `0017_agent_test_expected_sources.sql` adds an empty-by-default JSONB list of expected source IDs to saved cases. Owners can optionally require up to four ready sources for a sources-retrieved check. Case writes validate UUIDs, uniqueness, workspace ownership, and ready status. Deleted or unready selections remain visible for explicit removal. Source IDs travel only through authenticated preview evidence; title-only legacy evidence cannot satisfy an annotated case.

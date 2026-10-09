@@ -27,7 +27,7 @@ Keep these inside Inbox, Agent and Insights. Settings holds workspace controls a
 | Priority | Opportunity                              | Current starting point                                                           | Smallest useful increment                                                                | Where it belongs                                          |
 | -------- | ---------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------- |
 | Complete | Guided readiness checklist               | 4-stage checklist across knowledge, tests, publish, and install                  | Interactive checklist card with contextual actions in Deploy & Insights cue              | Agent Deploy; temporary setup cue in Insights             |
-| First    | Source health and answer evidence        | Ingestion records, ready-source retrieval and bounded evidence exist             | Last successful ingestion, actionable failure/retry and source evidence linking          | Agent Build; Test evidence; Inbox source detail           |
+| Complete | Source health and answer evidence        | Ingestion records, ready-source retrieval and bounded evidence exist             | Last successful ingestion, actionable failure/retry and source evidence linking          | Agent Build; Test evidence; Inbox source detail           |
 | First    | Explicit handoff expectations            | Pause/takeover/assignment/replies exist                                          | Requested/queued/assigned states and a truthful message about next steps                 | Widget and Inbox                                          |
 | Complete | Conversation-to-test workflow            | Bounded modal with prompt redaction, outcome presets & ready-source requirements | Save from Inbox message or Insights gap directly into Agent Test suite                   | Inbox contextual action & Insights gap → Agent Test       |
 | Next     | Reviewed improvement queue               | Negative feedback and conversation evidence exist; complete queue remains a gap  | Link a failed answer to an owned source/instruction task and a test case                 | Agent Build contextual Improve view; Insights entry point |
@@ -52,6 +52,8 @@ Compute status from durable records and real events. A successful snippet-copy c
 Acceptance: a new design partner reaches an indexed source, an inspected test answer, a published configuration, an authorized website and a real conversation without interpreting infrastructure errors. Keep source ingestion and provider errors actionable.
 
 ### Knowledge health and provenance
+
+_Status (October 2026):_ Implemented. WidgetKnowledgeManager shows a live source health breakdown (ready, indexing, failed), failure alert banners, actionable one-click retry on failed source rows and cards, last-synced timestamps, and exact error messages. Test evidence links retrieved sources directly to the Knowledge Base (#build), and Inbox conversation citations link back to inspect the underlying source document in Knowledge Base.
 
 Show the last successful processing event, current readiness and any failed update. A recent crawl time alone does not prove that content is accurate. Let a teammate inspect the source title and bounded evidence used in the answer; reserve source mutation for authorized roles.
 
