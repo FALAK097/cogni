@@ -7,6 +7,7 @@ import type { Dispatch, FormEvent, SetStateAction } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 import { Streamdown } from "streamdown";
+import { CreateAgentTestCaseDialog } from "@/features/agent-tests/components/create-agent-test-case-dialog";
 import {
   ArrowLeft,
   ArrowRight,
@@ -29,6 +30,7 @@ import {
   MessageSquare,
   Send,
   RotateCcw,
+  Sparkles,
   ThumbsDown,
   ThumbsUp,
   Trash2,
@@ -284,6 +286,7 @@ export function ConversationDetail({
   } | null>(null);
   const [channelReplyDeliveryUncertain, setChannelReplyDeliveryUncertain] = useState(false);
   const [showDetailsSheet, setShowDetailsSheet] = useState(false);
+  const [testDraftPrompt, setTestDraftPrompt] = useState<string | null>(null);
   const [composerMode, setComposerMode] = useState<"reply" | "note">("reply");
   const replyTextareaRef = useRef<HTMLTextAreaElement>(null);
   const backButtonRef = useRef<HTMLButtonElement>(null);
@@ -405,6 +408,7 @@ export function ConversationDetail({
   }, [transcriptMessages]);
 
   const displayName = session ? getDisplayName(session) : "";
+  const firstVisitorQuestion = session?.messages.find((m) => m.role === "user")?.content;
 
   const groupedMessages = useMemo(() => {
     if (!messages) return [];
@@ -1005,6 +1009,12 @@ export function ConversationDetail({
                     Take over
                   </DropdownMenuItem>
                 ) : null}
+                {canManage && firstVisitorQuestion ? (
+                  <DropdownMenuItem onClick={() => setTestDraftPrompt(firstVisitorQuestion)}>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Create test case
+                  </DropdownMenuItem>
+                ) : null}
                 <DropdownMenuItem
                   className={cn(canManage && "text-destructive")}
                   disabled={!canManage}
@@ -1048,6 +1058,8 @@ export function ConversationDetail({
                       message={message}
                       session={session}
                       displayName={displayName}
+                      canManage={canManage}
+                      onCreateTest={(prompt) => setTestDraftPrompt(prompt)}
                     />
                   ))}
                 </div>
@@ -1453,6 +1465,16 @@ export function ConversationDetail({
           </div>
         </div>
       </div>
+      {testDraftPrompt !== null ? (
+        <CreateAgentTestCaseDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setTestDraftPrompt(null);
+          }}
+          defaultPrompt={testDraftPrompt}
+          contextLabel={`conversation with ${displayName}`}
+        />
+      ) : null}
     </div>
   );
 }
@@ -1461,10 +1483,14 @@ function MessageBubble({
   message,
   session,
   displayName,
+  canManage,
+  onCreateTest,
 }: {
   message: WidgetMessage;
   session: ConversationDetailData;
   displayName: string;
+  canManage?: boolean;
+  onCreateTest?: (prompt: string) => void;
 }) {
   const isUser = message.role === "user";
   const isTeam = message.authorType === "TEAM";
@@ -1507,10 +1533,25 @@ function MessageBubble({
               Internal note
             </span>
           ) : null}
+          {isUser && canManage && onCreateTest ? (
+            <button
+              type="button"
+              onClick={() => onCreateTest(message.content)}
+              className="ml-auto inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              aria-label="Create agent test from this question"
+              title="Create agent test from this question"
+            >
+              <Sparkles className="size-3 text-primary" aria-hidden="true" />
+              <span>Create test</span>
+            </button>
+          ) : null}
           <time
             dateTime={message.timestamp}
             title={format(timestamp, "PPpp")}
-            className="ml-auto shrink-0 text-muted-foreground tabular-nums"
+            className={cn(
+              "shrink-0 text-muted-foreground tabular-nums",
+              !isUser || !canManage ? "ml-auto" : "",
+            )}
           >
             {format(timestamp, "p")}
           </time>

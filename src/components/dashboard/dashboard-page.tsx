@@ -84,6 +84,8 @@ import {
   serializeInsightsDateRange,
 } from "@/features/analytics/insights-url-state";
 import { agentHref, APP_PAGES, APP_ROUTES } from "@/features/navigation/app-routes";
+import { CreateAgentTestCaseDialog } from "@/features/agent-tests/components/create-agent-test-case-dialog";
+import type { AgentTestExpectedOutcome } from "@/features/agent-tests/input";
 import { useAddManualTextSource } from "@/hooks/query/use-knowledge-base";
 import {
   buildVerifiedAnswerSource,
@@ -1059,6 +1061,10 @@ export function DashboardPage({
     void setInsightsQuery(serializeInsightsDateRange(range, workspaceTimezone));
   };
   const [feedbackToImprove, setFeedbackToImprove] = useState<ReviewKnowledgeItem | null>(null);
+  const [testDraftToCreate, setTestDraftToCreate] = useState<{
+    question: string;
+    expectedOutcome?: AgentTestExpectedOutcome;
+  } | null>(null);
   const [reviewFilter, setReviewFilter] = useState<"negative" | "unanswered">("negative");
   const [gapFilter, setGapFilter] = useState<"OPEN" | "RESOLVED" | "IGNORED">("OPEN");
 
@@ -1807,16 +1813,33 @@ export function DashboardPage({
                         ) : null}
                       </Link>
                       {canManage ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="mt-1 min-h-11 shrink-0 px-3"
-                          onClick={() => setFeedbackToImprove(item)}
-                          aria-label={`Write a verified answer for: ${item.question}`}
-                        >
-                          Add answer
-                        </Button>
+                        <div className="mt-1 flex shrink-0 flex-col items-end gap-1 sm:flex-row">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="min-h-11 shrink-0 px-3"
+                            onClick={() =>
+                              setTestDraftToCreate({
+                                question: item.question,
+                                expectedOutcome: "grounded_answer",
+                              })
+                            }
+                            aria-label={`Create agent test for: ${item.question}`}
+                          >
+                            Create test
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="min-h-11 shrink-0 px-3"
+                            onClick={() => setFeedbackToImprove(item)}
+                            aria-label={`Write a verified answer for: ${item.question}`}
+                          >
+                            Add answer
+                          </Button>
+                        </div>
                       ) : null}
                     </div>
                   </li>
@@ -1849,16 +1872,35 @@ export function DashboardPage({
                         <div className="mt-1 flex shrink-0 flex-col items-end gap-1">
                           {gapFilter === "OPEN" ? (
                             <>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="min-h-11 px-3"
-                                onClick={() => setFeedbackToImprove(item)}
-                                aria-label={`Write a verified answer for: ${item.question}`}
-                              >
-                                Add answer
-                              </Button>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="min-h-11 px-3"
+                                  onClick={() =>
+                                    setTestDraftToCreate({
+                                      question: item.question,
+                                      expectedOutcome: item.signals.includes("NO_SOURCE_MATCH")
+                                        ? "no_evidence"
+                                        : "grounded_answer",
+                                    })
+                                  }
+                                  aria-label={`Create agent test for: ${item.question}`}
+                                >
+                                  Create test
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="min-h-11 px-3"
+                                  onClick={() => setFeedbackToImprove(item)}
+                                  aria-label={`Write a verified answer for: ${item.question}`}
+                                >
+                                  Add answer
+                                </Button>
+                              </div>
                               <Button
                                 type="button"
                                 variant="ghost"
@@ -2148,6 +2190,18 @@ export function DashboardPage({
               )}
             </DashboardCard>
           </section>
+        ) : null}
+
+        {testDraftToCreate ? (
+          <CreateAgentTestCaseDialog
+            open
+            onOpenChange={(open) => {
+              if (!open) setTestDraftToCreate(null);
+            }}
+            defaultPrompt={testDraftToCreate.question}
+            defaultExpectedOutcome={testDraftToCreate.expectedOutcome}
+            contextLabel="Insights customer question"
+          />
         ) : null}
 
         {feedbackToImprove ? (

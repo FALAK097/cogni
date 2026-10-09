@@ -19,6 +19,32 @@ export const agentTestCaseInputSchema = z
 export type AgentTestCaseInput = z.infer<typeof agentTestCaseInputSchema>;
 export type AgentTestExpectedOutcome = AgentTestCaseInput["expectedOutcome"];
 
+export function buildAgentTestCaseFromQuestion(
+  question: string,
+  options?: {
+    title?: string;
+    expectedOutcome?: AgentTestExpectedOutcome;
+    expectedSourceIds?: string[];
+  },
+): AgentTestCaseInput {
+  const cleanPrompt = question.trim().slice(0, 1_000);
+  const cleanTitle = (
+    options?.title?.trim() ||
+    (cleanPrompt.length > 50 ? `${cleanPrompt.slice(0, 47)}…` : cleanPrompt) ||
+    "Customer question"
+  ).slice(0, 80);
+  const expectedOutcome = options?.expectedOutcome ?? "grounded_answer";
+  return {
+    title: cleanTitle,
+    prompt: cleanPrompt,
+    expectedOutcome,
+    expectedSourceIds:
+      expectedOutcome === "grounded_answer"
+        ? [...new Set(options?.expectedSourceIds ?? [])].slice(0, 4)
+        : [],
+  };
+}
+
 export const agentTestRunInputSchema = z.object({
   runId: z.string().uuid(),
   suiteVersion: z.string().min(2).max(500_000),

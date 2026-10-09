@@ -20,6 +20,16 @@ Migration `0015_agent_test_run_history.sql` adds `agent_test_run`, nonnegative/c
 
 The existing PR already implements the main checkout's empty-state/loading improvements in updated form. Retain compact empty states, differentiated filter/first-use copy, content-shaped accessible skeletons, reduced-motion support, safe retries, and loaded content during background refresh.
 
+## Conversation-to-test and knowledge-gap workflow
+
+Owners can now convert customer questions into repeatable regression tests directly from Inbox triage and Insights knowledge-gap review:
+
+- **Inbox:** Added a contextual "Create test" action to visitor message turns and a "Create test case" action to the conversation menu in `src/components/widget/conversation-detail.tsx`.
+- **Insights:** Added a contextual "Create test" action alongside "Add answer" for negative feedback items and open knowledge gaps in `src/components/dashboard/dashboard-page.tsx`. Gaps with a `NO_SOURCE_MATCH` signal automatically default to the `no_evidence` expected outcome.
+- **Test creation modal:** `CreateAgentTestCaseDialog` in `src/features/agent-tests/components/create-agent-test-case-dialog.tsx` provides bounded title and prompt editing with explicit redaction guidance for sensitive customer details, expected outcome selection (`grounded_answer`, `no_evidence`, `human_handoff`), and required-source selection (up to 4 indexed workspace sources).
+- **Navigation alignment:** `WidgetCustomizer` in `src/components/widget/widget-customizer.tsx` synchronizes its active tab with window hash changes (`agentHref("test")` / `/agent#test`), enabling seamless deep linking from test creation toasts and triage directly into the Agent Test suite.
+- **Validation and tests:** Added `buildAgentTestCaseFromQuestion` in `src/features/agent-tests/input.ts` with comprehensive unit and regression tests in `scripts/test-conversation-to-test.mjs` integrated into `pnpm test:agent-tests` (34/34 passing). React Doctor reported 100/100 across changed React components.
+
 ## Required-source retrieval checks
 
 Migration `0017_agent_test_expected_sources.sql` adds an empty-by-default JSONB list of expected source IDs to saved cases. Owners can optionally require up to four ready sources for a sources-retrieved check. Case writes validate UUIDs, uniqueness, workspace ownership, and ready status. Deleted or unready selections remain visible for explicit removal. Source IDs travel only through authenticated preview evidence; title-only legacy evidence cannot satisfy an annotated case.

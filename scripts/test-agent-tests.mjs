@@ -12,6 +12,7 @@ const compiled = await build({
 const {
   agentTestCaseInputSchema,
   agentTestRunInputSchema,
+  buildAgentTestCaseFromQuestion,
   getAgentTestSuiteVersion,
   matchesAgentTestOutcome,
   summarizeAgentTestRun,
@@ -345,4 +346,36 @@ test("suite evaluation uses required source IDs rather than any-source grounding
     }),
   });
   assert.equal(passed[0].status, "passed");
+});
+
+test("buildAgentTestCaseFromQuestion formats questions into valid test inputs", () => {
+  const parsed = buildAgentTestCaseFromQuestion("  How do I reset my password?  ");
+  assert.equal(parsed.prompt, "How do I reset my password?");
+  assert.equal(parsed.title, "How do I reset my password?");
+  assert.equal(parsed.expectedOutcome, "grounded_answer");
+  assert.deepEqual(parsed.expectedSourceIds, []);
+  assert.equal(agentTestCaseInputSchema.safeParse(parsed).success, true);
+
+  const longQuestion = "a".repeat(200);
+  const fromLong = buildAgentTestCaseFromQuestion(longQuestion);
+  assert.equal(fromLong.title.length <= 80, true);
+  assert.equal(fromLong.title.endsWith("…"), true);
+  assert.equal(fromLong.prompt.length, 200);
+
+  const sourceId = "00000000-0000-4000-8000-000000000001";
+  const withSources = buildAgentTestCaseFromQuestion("Refund policy", {
+    title: "Refunds",
+    expectedOutcome: "grounded_answer",
+    expectedSourceIds: [sourceId, sourceId],
+  });
+  assert.equal(withSources.title, "Refunds");
+  assert.deepEqual(withSources.expectedSourceIds, [sourceId]);
+
+  const handoffCase = buildAgentTestCaseFromQuestion("Talk to human", {
+    expectedOutcome: "human_handoff",
+    expectedSourceIds: [sourceId],
+  });
+  assert.equal(handoffCase.expectedOutcome, "human_handoff");
+  assert.deepEqual(handoffCase.expectedSourceIds, []);
+  assert.equal(agentTestCaseInputSchema.safeParse(handoffCase).success, true);
 });

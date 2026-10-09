@@ -14,7 +14,7 @@ import { WIDGET_PREVIEW_RESPONSE_TIMEOUT_MS } from "@/features/widget/agent-time
 import { BookingSettingsCard } from "@/features/integrations/components/booking-settings-card";
 import { WidgetKnowledgeManager } from "@/components/workspace/widget-knowledge-manager";
 import { cn } from "@/lib/utils";
-import { APP_PAGES, AGENT_TABS, type AgentTab } from "@/features/navigation/app-routes";
+import { APP_PAGES, AGENT_TABS, agentHref, type AgentTab } from "@/features/navigation/app-routes";
 import { getAgentPublicationReadiness } from "@/features/widget/agent-readiness";
 
 import { toSavePayload, type WidgetCustomizerConfig } from "./widget-settings-payload";
@@ -248,6 +248,18 @@ export function WidgetCustomizer({
     configOverridesRef.current = configOverrides;
   }, [configOverrides]);
 
+  useEffect(() => {
+    const syncTabFromHash = () => {
+      const hash = window.location.hash.replace(/^#/, "");
+      if (AGENT_TABS.includes(hash as AgentTab)) {
+        setActiveTab(hash as AgentTab);
+      }
+    };
+    syncTabFromHash();
+    window.addEventListener("hashchange", syncTabFromHash);
+    return () => window.removeEventListener("hashchange", syncTabFromHash);
+  }, []);
+
   const widgetConfigQuery = useWidgetConfig(activeWorkspaceId);
   const { data: widgetConfigData, isLoading } = widgetConfigQuery;
   const saveWidgetConfigMutation = useSaveWidgetConfig();
@@ -337,6 +349,9 @@ export function WidgetCustomizer({
   const handleTabChange = (value: string | number) => {
     if (typeof value !== "string" || !AGENT_TABS.includes(value as AgentTab)) return;
     setActiveTab(value as AgentTab);
+    if (window.location.hash.replace(/^#/, "") !== value) {
+      window.history.replaceState(null, "", agentHref(value));
+    }
   };
 
   const handleArrayChange = (
