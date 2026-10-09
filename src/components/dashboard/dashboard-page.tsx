@@ -86,7 +86,11 @@ import {
 import { agentHref, APP_PAGES, APP_ROUTES } from "@/features/navigation/app-routes";
 import { CreateAgentTestCaseDialog } from "@/features/agent-tests/components/create-agent-test-case-dialog";
 import type { AgentTestExpectedOutcome } from "@/features/agent-tests/input";
-import { useAddManualTextSource } from "@/hooks/query/use-knowledge-base";
+import { useAddManualTextSource, useKnowledgeBaseSources } from "@/hooks/query/use-knowledge-base";
+import { useAgentTestCases, useWidgetConfig } from "@/hooks/query/use-widget";
+import { useActiveWorkspaceId } from "@/hooks/use-auth";
+import { getAgentLaunchChecklist } from "@/features/widget/agent-readiness";
+import { AgentLaunchChecklistCard } from "@/components/widget/agent-launch-checklist-card";
 import {
   buildVerifiedAnswerSource,
   buildVerifiedAnswerTitle,
@@ -1091,6 +1095,39 @@ export function DashboardPage({
       : "";
   const conversationCount = analytics?.kpis.totalConversations.value ?? 0;
   const isEmptyPeriod = !isLoading && analytics !== undefined && conversationCount === 0;
+  const activeWorkspaceId = useActiveWorkspaceId() ?? "";
+  const isFirstUseWorkspace =
+    isEmptyPeriod &&
+    analytics !== undefined &&
+    analytics.kpis.totalConversations.previousValue === 0;
+
+  const knowledgeSourcesQuery = useKnowledgeBaseSources(undefined, {
+    enabled: isFirstUseWorkspace,
+  });
+  const testCasesQuery = useAgentTestCases();
+  const widgetConfigQuery = useWidgetConfig(activeWorkspaceId);
+
+  const sources = knowledgeSourcesQuery.data?.sources ?? [];
+  const readySourcesCount = sources.filter((s) => s.status === "ready").length;
+  const processingSourcesCount = sources.filter((s) => s.status === "processing").length;
+  const testCasesCount = testCasesQuery.data?.cases?.length ?? 0;
+  const hasTestRun = Boolean(agentTestRunsQuery.data?.hasAnyRuns);
+  const widgetConfig = widgetConfigQuery.data;
+
+  const launchChecklist = useMemo(() => {
+    return getAgentLaunchChecklist({
+      readySourcesCount,
+      processingSourcesCount,
+      testCasesCount,
+      hasTestRun,
+      isEnabled: widgetConfig?.isEnabled ?? true,
+      hasPublishedVersion: Boolean(widgetConfig?.publication?.current),
+      hasUnpublishedChanges: Boolean(widgetConfig?.publication?.hasUnpublishedChanges),
+      authorizedDomainCount: widgetConfig?.allowedDomains?.length ?? 0,
+      hasObservedSession: false,
+      isSavingConfiguration: false,
+    });
+  }, [readySourcesCount, processingSourcesCount, testCasesCount, hasTestRun, widgetConfig]);
   const hasLowConversationVolume =
     !isLoading && analytics !== undefined && conversationCount > 0 && conversationCount < 5;
   const gapItems = analytics
@@ -1354,23 +1391,26 @@ export function DashboardPage({
         ) : null}
 
         {isEmptyPeriod && analytics ? (
-          <section className="flex flex-col gap-4 rounded-xl border border-border/60 bg-card/60 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-            <div className="flex min-w-0 items-start gap-3">
-              <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <HugeiconsIcon icon={Message01Icon} strokeWidth={2} className="size-[18px]" />
-              </span>
-              <div className="min-w-0">
-                <h2 className="text-sm font-semibold tracking-tight">
-                  No conversations in the selected period
-                </h2>
-                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                  {analytics.kpis.totalConversations.previousValue > 0
-                    ? `The previous comparable period had ${formatNumber(analytics.kpis.totalConversations.previousValue)} ${analytics.kpis.totalConversations.previousValue === 1 ? "conversation" : "conversations"}.`
-                    : "Try a wider date range, or add a knowledge source so your agent is ready for its first conversation."}
-                </p>
+          analytics.kpis.totalConversations.previousValue > 0 ? (
+            <section className="flex flex-col gap-4 rounded-xl border border-border/60 bg-card/60 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+              <div className="flex min-w-0 items-start gap-3">
+                <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <HugeiconsIcon icon={Message01Icon} strokeWidth={2} className="size-[18px]" />
+                </span>
+                <div className="min-w-0">
+                  <h2 className="text-sm font-semibold tracking-tight">
+                    No conversations in the selected period
+                  </h2>
+                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                    The previous comparable period had{" "}
+                    {formatNumber(analytics.kpis.totalConversations.previousValue)}{" "}
+                    {analytics.kpis.totalConversations.previousValue === 1
+                      ? "conversation"
+                      : "conversations"}
+                    .
+                  </p>
+                </div>
               </div>
-            </div>
-            {analytics.kpis.totalConversations.previousValue > 0 ? (
               <Button
                 type="button"
                 variant="outline"
@@ -1385,18 +1425,26 @@ export function DashboardPage({
               >
                 View previous period
               </Button>
-            ) : (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-9 shrink-0"
-                render={<Link href={agentHref("knowledge")} />}
-              >
-                Add a knowledge source
-              </Button>
-            )}
-          </section>
+            </section>
+          ) : (
+            <AgentLaunchChecklistCard
+              checklist={launchChecklist}
+              compact
+              onNavigateTab={(tab) => {
+                window.location.href = agentHref(tab);
+              }}
+              onPublish={() => {
+                window.location.href = agentHref("build");
+              }}
+              onResume={() => {
+                window.location.href = agentHref("deploy");
+              }}
+              onFocusDomain={() => {
+                window.location.href = agentHref("deploy");
+              }}
+              canManage={canManage}
+            />
+          )
         ) : null}
 
         {hasLowConversationVolume ? (

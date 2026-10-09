@@ -9,7 +9,7 @@ const compiled = await build({
   format: "esm",
   platform: "node",
 });
-const { getAgentPublicationReadiness } = await import(
+const { getAgentPublicationReadiness, getAgentLaunchChecklist } = await import(
   `data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString("base64")}`
 );
 
@@ -78,14 +78,81 @@ test("published agents require an authorized website before installation", () =>
   assert.equal(readiness.action, "Add a domain");
 });
 
-test("configuration saves show progress instead of offering a disabled publish action", () => {
-  const readiness = getAgentPublicationReadiness({
+test("launch checklist calculates four stages and overall progress correctly for new agent", () => {
+  const checklist = getAgentLaunchChecklist({
+    readySourcesCount: 0,
+    processingSourcesCount: 0,
+    testCasesCount: 0,
+    hasTestRun: false,
     isEnabled: true,
     hasPublishedVersion: false,
     hasUnpublishedChanges: false,
     authorizedDomainCount: 0,
-    isSavingConfiguration: true,
+    hasObservedSession: false,
+    isSavingConfiguration: false,
   });
-  assert.equal(readiness.title, "Saving your changes");
-  assert.equal(readiness.actionType, null);
+
+  assert.equal(checklist.complete, false);
+  assert.equal(checklist.totalCount, 4);
+  assert.equal(checklist.completedCount, 0);
+  assert.equal(checklist.percent, 0);
+  assert.equal(checklist.currentStep?.id, "knowledge");
+  assert.equal(checklist.currentStep?.actionLabel, "Add knowledge");
+});
+
+test("launch checklist marks knowledge in_progress when sources are still indexing", () => {
+  const checklist = getAgentLaunchChecklist({
+    readySourcesCount: 0,
+    processingSourcesCount: 2,
+    testCasesCount: 0,
+    hasTestRun: false,
+    isEnabled: true,
+    hasPublishedVersion: false,
+    hasUnpublishedChanges: false,
+    authorizedDomainCount: 1,
+    hasObservedSession: false,
+    isSavingConfiguration: false,
+  });
+
+  const knowledgeStep = checklist.steps.find((s) => s.id === "knowledge");
+  assert.equal(knowledgeStep?.status, "in_progress");
+  assert.match(knowledgeStep?.description ?? "", /2 source\(s\) are currently processing/);
+});
+
+test("launch checklist advances through stages as knowledge, tests, publish, and install complete", () => {
+  const partialChecklist = getAgentLaunchChecklist({
+    readySourcesCount: 3,
+    processingSourcesCount: 0,
+    testCasesCount: 2,
+    hasTestRun: true,
+    isEnabled: true,
+    hasPublishedVersion: false,
+    hasUnpublishedChanges: false,
+    authorizedDomainCount: 1,
+    hasObservedSession: false,
+    isSavingConfiguration: false,
+  });
+
+  assert.equal(partialChecklist.completedCount, 2);
+  assert.equal(partialChecklist.percent, 50);
+  assert.equal(partialChecklist.currentStep?.id, "publish");
+  assert.equal(partialChecklist.currentStep?.actionLabel, "Review and publish");
+
+  const fullyCompleteChecklist = getAgentLaunchChecklist({
+    readySourcesCount: 3,
+    processingSourcesCount: 0,
+    testCasesCount: 2,
+    hasTestRun: true,
+    isEnabled: true,
+    hasPublishedVersion: true,
+    hasUnpublishedChanges: false,
+    authorizedDomainCount: 1,
+    hasObservedSession: true,
+    isSavingConfiguration: false,
+  });
+
+  assert.equal(fullyCompleteChecklist.complete, true);
+  assert.equal(fullyCompleteChecklist.completedCount, 4);
+  assert.equal(fullyCompleteChecklist.percent, 100);
+  assert.equal(fullyCompleteChecklist.currentStep, null);
 });

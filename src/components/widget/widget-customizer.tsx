@@ -15,7 +15,16 @@ import { BookingSettingsCard } from "@/features/integrations/components/booking-
 import { WidgetKnowledgeManager } from "@/components/workspace/widget-knowledge-manager";
 import { cn } from "@/lib/utils";
 import { APP_PAGES, AGENT_TABS, agentHref, type AgentTab } from "@/features/navigation/app-routes";
-import { getAgentPublicationReadiness } from "@/features/widget/agent-readiness";
+import {
+  getAgentPublicationReadiness,
+  getAgentLaunchChecklist,
+} from "@/features/widget/agent-readiness";
+import { useKnowledgeBaseSources } from "@/hooks/query/use-knowledge-base";
+import {
+  useAgentTestCases,
+  useAgentTestRunHistory,
+  useWidgetSessions,
+} from "@/hooks/query/use-widget";
 
 import { toSavePayload, type WidgetCustomizerConfig } from "./widget-settings-payload";
 import { Button } from "@/components/ui/button";
@@ -261,6 +270,12 @@ export function WidgetCustomizer({
   }, []);
 
   const widgetConfigQuery = useWidgetConfig(activeWorkspaceId);
+  const knowledgeSourcesQuery = useKnowledgeBaseSources(undefined, {
+    enabled: Boolean(activeWorkspaceId),
+  });
+  const testCasesQuery = useAgentTestCases();
+  const testRunsQuery = useAgentTestRunHistory("", "");
+  const sessionsQuery = useWidgetSessions({ limit: 1 });
   const { data: widgetConfigData, isLoading } = widgetConfigQuery;
   const saveWidgetConfigMutation = useSaveWidgetConfig();
   const publishWidgetConfigMutation = usePublishWidgetConfig();
@@ -647,6 +662,28 @@ export function WidgetCustomizer({
     }
   };
 
+  const sources = knowledgeSourcesQuery.data?.sources ?? [];
+  const readySourcesCount = sources.filter((s) => s.status === "ready").length;
+  const processingSourcesCount = sources.filter((s) => s.status === "processing").length;
+  const testCasesCount = testCasesQuery.data?.cases?.length ?? 0;
+  const hasTestRun = Boolean(testRunsQuery.data?.hasAnyRuns);
+  const hasObservedSession = Boolean(
+    sessionsQuery.data?.pagination?.total && sessionsQuery.data.pagination.total > 0,
+  );
+
+  const launchChecklist = getAgentLaunchChecklist({
+    readySourcesCount,
+    processingSourcesCount,
+    testCasesCount,
+    hasTestRun,
+    isEnabled: config.isEnabled,
+    hasPublishedVersion: Boolean(publication?.current),
+    hasUnpublishedChanges: Boolean(publication?.hasUnpublishedChanges),
+    authorizedDomainCount: config.allowedDomains.length,
+    hasObservedSession,
+    isSavingConfiguration: isSavingDraft,
+  });
+
   const launchReadiness = getAgentPublicationReadiness({
     isEnabled: config.isEnabled,
     hasPublishedVersion: Boolean(publication?.current),
@@ -902,6 +939,8 @@ export function WidgetCustomizer({
                 </fieldset>
                 <WidgetInstallationPanel
                   readiness={launchReadiness}
+                  launchChecklist={launchChecklist}
+                  onNavigateTab={(tab) => handleTabChange(tab)}
                   onReadinessAction={(action) => {
                     if (action === "resume") updateConfig("isEnabled", true);
                     if (action === "publish") {
