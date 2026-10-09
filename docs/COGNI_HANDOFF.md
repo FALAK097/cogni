@@ -29,6 +29,12 @@ The existing PR already implements the main checkout's empty-state/loading impro
 
 Recheck the PR head and current CI/deployment checks before treating these changes as deployed.
 
+## Ongoing support-loop iteration
+
+An active goal continues PR #48 through correctness, evaluation, and authenticated runtime acceptance. The widget response monitor now awaits its initial workspace-scoped state read before exposing model text and interrupts on resolved, escalated, paused, missing, or unreadable conversations. Subsequent checks remain once per second; this does not establish a zero-latency streaming takeover guarantee. Checks do not overlap, and response completion/cancellation stops polling and ignores an in-flight result.
+
+Ten deterministic monitor regressions join the existing 12 SSE/SDK tests under `test:widget-stream`, including the public widget client rejecting interrupted responses without recording successful completion. The transcript/database concurrency suite remains the separate persistence gate.
+
 ## Checkout preservation
 
 Implementation was reconciled in `/Users/falakgala/.codex/worktrees/cogni-pr48-complete/cogni`, branch `agent/pr48-complete`, based on PR head `c2af319`. Its grouped commit is pushed to `agent/omnichannel-agent-platform` after validation.

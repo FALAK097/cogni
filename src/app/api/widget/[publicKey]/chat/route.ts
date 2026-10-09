@@ -1,3 +1,7 @@
+import {
+  monitorWidgetConversation,
+  shouldStopWidgetResponse,
+} from "@/features/widget/server/conversation-monitor";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
@@ -461,12 +465,7 @@ export async function POST(
             and(eq(fields.id, conversationId), eq(fields.workspaceId, widget.workspace.id)),
           columns: { aiPaused: true, status: true },
         });
-    if (
-      !isPreview &&
-      (!latestConversationState ||
-        latestConversationState.aiPaused ||
-        latestConversationState.status === "ESCALATED")
-    ) {
+    if (!isPreview && shouldStopWidgetResponse(latestConversationState ?? null)) {
       return respondWithText(handoffReply);
     }
 
@@ -593,35 +592,17 @@ export async function POST(
       },
     });
 
-    let monitoring = !isPreview;
-    let checkInProgress = false;
-    let pauseMonitor: ReturnType<typeof setInterval> | null = null;
-    const stopMonitoring = () => {
-      monitoring = false;
-      if (pauseMonitor) clearInterval(pauseMonitor);
-    };
-    const checkForHumanTakeover = async () => {
-      if (!monitoring || checkInProgress) return;
-      checkInProgress = true;
-      try {
-        const latest = await db.query.conversation.findFirst({
-          where: (fields, { eq, and }) =>
-            and(eq(fields.id, conversationId), eq(fields.workspaceId, widget.workspace.id)),
-          columns: { aiPaused: true, status: true },
+    const stopMonitoring = isPreview
+      ? () => {}
+      : await monitorWidgetConversation({
+          readState: async () =>
+            (await db.query.conversation.findFirst({
+              where: (fields, { eq, and }) =>
+                and(eq(fields.id, conversationId), eq(fields.workspaceId, widget.workspace.id)),
+              columns: { aiPaused: true, status: true },
+            })) ?? null,
+          interrupt: result.interruptForTakeover,
         });
-        if (monitoring && (!latest || latest.aiPaused || latest.status === "ESCALATED")) {
-          result.interruptForTakeover();
-        }
-      } catch {
-        if (monitoring) result.interruptForTakeover();
-      } finally {
-        checkInProgress = false;
-      }
-    };
-    if (!isPreview) {
-      pauseMonitor = setInterval(() => void checkForHumanTakeover(), 1_000);
-      void checkForHumanTakeover();
-    }
 
     return withWidgetCors(
       new Response(

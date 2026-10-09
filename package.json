@@ -15,7 +15,7 @@
     "format": "pnpm fmt",
     "format:check": "pnpm fmt:check",
     "typecheck": "tsc --noEmit",
-    "test:widget-stream": "node --test scripts/test-widget-stream.mjs",
+    "test:widget-stream": "node --test scripts/test-widget-stream.mjs scripts/test-widget-conversation-monitor.mjs",
     "test:widget-history-route": "node --test scripts/test-widget-history-route.mjs",
     "test:widget-documents-route": "node --test scripts/test-widget-documents-route.mjs",
     "test:widget-message-rendering": "node --test scripts/test-widget-message-rendering.mjs",
