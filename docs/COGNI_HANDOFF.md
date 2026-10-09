@@ -43,6 +43,8 @@ An active goal continues PR #48 through correctness, evaluation, and authenticat
 
 Ten deterministic monitor regressions join the existing 12 SSE/SDK tests under `test:widget-stream`, including the public widget client rejecting interrupted responses without recording successful completion. The transcript/database concurrency suite remains the separate persistence gate.
 
+AI persistence and channel delivery now independently reject `ESCALATED` conversations even if `aiPaused` is false. The check applies both to the atomic transcript UPDATE and the locked provider-delivery transaction; the channel intake also stops before agent work. A PostgreSQL regression verifies rejected AI appends, `recordAiMessage`, no provider call, and allowed teammate replies after escalation. This aligns final writes with the existing widget stream monitor and avoids relying on the pause flag alone.
+
 ## Checkout preservation
 
 Implementation was reconciled in `/Users/falakgala/.codex/worktrees/cogni-pr48-complete/cogni`, branch `agent/pr48-complete`, based on PR head `c2af319`. Its grouped commit is pushed to `agent/omnichannel-agent-platform` after validation.

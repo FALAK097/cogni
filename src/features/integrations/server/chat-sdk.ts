@@ -88,7 +88,8 @@ export function createChannelBot({
     if (
       !activeConversation ||
       activeConversation.aiPaused ||
-      activeConversation.status === "CLOSED"
+      activeConversation.status === "CLOSED" ||
+      activeConversation.status === "ESCALATED"
     ) {
       return;
     }

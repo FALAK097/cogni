@@ -129,7 +129,13 @@ export async function deliverAiReplyIfActive({
       .from(conversation)
       .where(and(eq(conversation.id, conversationId), eq(conversation.workspaceId, workspaceId)))
       .limit(1);
-    if (!current || current.aiPaused || current.status === "CLOSED") return false;
+    if (
+      !current ||
+      current.aiPaused ||
+      current.status === "CLOSED" ||
+      current.status === "ESCALATED"
+    )
+      return false;
 
     const appended = await appendConversationMessage({
       db: transaction,
@@ -186,7 +192,11 @@ export async function appendConversationMessage({
       eq(conversation.workspaceId, workspaceId),
     ];
     if (requireAiActive) {
-      conditions.push(eq(conversation.aiPaused, false), ne(conversation.status, "CLOSED"));
+      conditions.push(
+        eq(conversation.aiPaused, false),
+        ne(conversation.status, "CLOSED"),
+        ne(conversation.status, "ESCALATED"),
+      );
     }
 
     const [updatedConversation] = await transaction

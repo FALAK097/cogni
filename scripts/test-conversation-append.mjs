@@ -421,6 +421,73 @@ test("channel AI delivery is suppressed when takeover commits first", async () =
   assert.equal(deliveryCalled, false);
 });
 
+test("escalation blocks AI persistence and provider delivery even when pause is false", async () => {
+  await raw`UPDATE "conversation" SET "aiPaused" = false, "status" = 'ESCALATED' WHERE "id" = ${conversationId}`;
+  const message = {
+    id: randomUUID(),
+    body: "An AI reply after handoff",
+    authorType: "AI",
+    visibility: "PUBLIC",
+    replyToMessageId: randomUUID(),
+    createdAt: new Date().toISOString(),
+  };
+  assert.equal(
+    await appendConversationMessage({
+      db: appDatabases[0],
+      workspaceId,
+      conversationId,
+      message,
+      requireAiActive: true,
+    }),
+    null,
+  );
+  assert.equal(
+    await recordAiMessage({
+      db: appDatabases[0],
+      conversationId,
+      text: message.body,
+      replyToMessageId: message.replyToMessageId,
+    }),
+    null,
+  );
+  let deliveryCalls = 0;
+  assert.equal(
+    await deliverAiReplyIfActive({
+      db: appDatabases[0],
+      workspaceId,
+      conversationId,
+      message,
+      deliver: async () => {
+        deliveryCalls += 1;
+      },
+    }),
+    false,
+  );
+  assert.equal(deliveryCalls, 0);
+  const [row] = await raw`SELECT "messages" FROM "conversation" WHERE "id" = ${conversationId}`;
+  assert.equal(
+    JSON.parse(row.messages).some(
+      (entry) => entry.id === message.id || entry.replyToMessageId === message.replyToMessageId,
+    ),
+    false,
+  );
+  // Human replies remain available after handoff.
+  assert.ok(
+    await appendConversationMessage({
+      db: appDatabases[0],
+      workspaceId,
+      conversationId,
+      message: {
+        id: randomUUID(),
+        body: "A teammate can help",
+        authorType: "TEAM",
+        visibility: "PUBLIC",
+        createdAt: new Date().toISOString(),
+      },
+    }),
+  );
+});
+
 test("channel AI delivery rolls back its transcript write when provider delivery fails", async () => {
   await raw`UPDATE "conversation" SET "aiPaused" = false, "status" = 'OPEN' WHERE "id" = ${conversationId}`;
   const message = {
