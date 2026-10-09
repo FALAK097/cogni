@@ -57,10 +57,18 @@ The original main checkout `/Users/falakgala/projects/cogni` remains at `df4818b
 
 ## Remaining release gates
 
-A fresh collaborative browser tab recovered automation and verified the user's signed-in Vercel project dashboard and the latest preview landing page. Cogni's preview showed its Google sign-in page; clicking sign-in did not establish an authenticated app session. The desktop automation host subsequently disconnected and explicitly reported no available host. Authenticated desktop/mobile, keyboard/focus, and runtime UI acceptance remain unverified. Use the shared preview or Codex in-app browser, never external Chrome.
+A fresh collaborative browser tab recovered automation and verified the user's signed-in Vercel project dashboard and the latest preview landing page. Cogni's preview showed its Google sign-in page; clicking sign-in did not establish an authenticated app session. The desktop automation host subsequently disconnected and explicitly reported no available host. The sign-in attempt subsequently surfaced `Invalid origin`. A branch-specific Vercel Preview override now sets `BETTER_AUTH_URL` to `https://cogni-git-agent-omnichannel-agent-platform-falaks-projects.vercel.app`; the saved UI confirmed only `agent/omnichannel-agent-platform` is targeted. A new branch deployment is required to activate it. Authenticated desktop/mobile, keyboard/focus, and runtime UI acceptance remain unverified. Use the shared preview or Codex in-app browser, never external Chrome.
 
 Production migration/provider readiness is a separate release action. The local database check does not prove the application database or Neon has migrations 0015–0017. Verify the deployed schema before accepting the saved history runtime.
 
 [Issue #32](https://github.com/FALAK097/cogni/issues/32) remains open for its calibrated evaluation baseline and authenticated browser acceptance. The new history chart alone does not complete those gates. Do not add navigation or expand into unrelated helpdesk features to satisfy them.
 
 Read `AGENTS.md` and the relevant Next.js docs in `node_modules/next/dist/docs/` before further changes. Preserve workspace membership boundaries and schema invariants. Complete related work before one grouped Conventional Commit; keep build, CI, deploy, provider setup, and browser evidence distinct.
+
+## Independent review and preview auth
+
+A fresh reviewer independently audited `c2af319..7d82173`, found no actionable defects, and reran 73 focused regressions, including real PostgreSQL concurrency/tenant and SDK-to-SSE failure checks. The verdict was Approve for the changed code, not GitHub approval or readiness acceptance.
+
+Use the stable branch preview for Google OAuth testing. Its callback URI is `https://cogni-git-agent-omnichannel-agent-platform-falaks-projects.vercel.app/api/auth/callback/google`. Google must register that exact URI for the Preview OAuth client. Merely trusting preview origins while retaining a different auth base URL does not establish a working callback/session. Do not allow `*.vercel.app`, disable origin checking, or share production cookies as a workaround. Production environment settings and database migrations were not changed.
+
+Better Auth's [dynamic-base-URL guidance](https://better-auth.com/docs/guides/dynamic-base-url) explains strict host validation; its [OAuth Proxy guide](https://better-auth.com/docs/plugins/oauth-proxy) requires coordinated plugin/version/secret setup on both callback and preview servers. No OAuth proxy was installed: this PR's preview uses its own stable callback host.
