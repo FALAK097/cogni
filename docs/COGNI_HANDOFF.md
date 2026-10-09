@@ -45,6 +45,8 @@ Ten deterministic monitor regressions join the existing 12 SSE/SDK tests under `
 
 AI persistence and channel delivery now independently reject `ESCALATED` conversations even if `aiPaused` is false. The check applies both to the atomic transcript UPDATE and the locked provider-delivery transaction; the channel intake also stops before agent work. A PostgreSQL regression verifies rejected AI appends, `recordAiMessage`, no provider call, and allowed teammate replies after escalation. This aligns final writes with the existing widget stream monitor and avoids relying on the pause flag alone.
 
+Final model-answer persistence also opts into rejecting inactive conversations. If takeover, escalation, or closure wins the final database write after the last stream poll, the completion callback throws instead of acknowledging an unsaved answer. The agent completion fails before marking the run successful, and the existing SSE error path prevents the visitor client from treating partial text as a completed response. Local PostgreSQL-to-SSE regressions cover paused, escalated, and closed states. Fixed handoff notices keep their existing best-effort persistence path; this change applies to generated answers.
+
 ## Checkout preservation
 
 Implementation was reconciled in `/Users/falakgala/.codex/worktrees/cogni-pr48-complete/cogni`, branch `agent/pr48-complete`, based on PR head `c2af319`. Its grouped commit is pushed to `agent/omnichannel-agent-platform` after validation.

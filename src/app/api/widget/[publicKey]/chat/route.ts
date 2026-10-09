@@ -533,16 +533,17 @@ export async function POST(
           }
           return;
         }
-        const persistedMessage = isPreview
-          ? null
-          : await recordAiMessage({
-              db,
-              conversationId,
-              text,
-              replyToMessageId: visitorMessageId,
-              citations,
-              retrievalOutcome,
-            });
+        if (!isPreview) {
+          await recordAiMessage({
+            db,
+            conversationId,
+            text,
+            replyToMessageId: visitorMessageId,
+            citations,
+            retrievalOutcome,
+            rejectInactive: true,
+          });
+        }
         if (run) {
           await completeAgentRun({
             db,
@@ -552,16 +553,6 @@ export async function POST(
             finishReason,
             sources,
           });
-        }
-        if (!isPreview && !persistedMessage) {
-          logInfo("widget.ai.response.suppressed", {
-            workspaceId: widget.workspace.id,
-            widgetId: widget.id,
-            conversationId,
-            agentRunId: run?.id ?? null,
-            reason: "conversation_inactive",
-          });
-          return;
         }
         logInfo("widget.ai.response.completed", {
           workspaceId: widget.workspace.id,

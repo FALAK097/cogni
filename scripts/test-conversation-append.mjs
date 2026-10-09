@@ -8,6 +8,7 @@ import { after, before, test } from "node:test";
 import { randomUUID } from "node:crypto";
 import { build } from "esbuild";
 import postgres from "postgres";
+import { readWidgetTextStream } from "../public/widget/sse.js";
 
 process.env.SKIP_ENV_VALIDATION ??= "true";
 
@@ -33,6 +34,7 @@ await build({
         setConversationStatus,
         setAiMessageFeedback,
       } from "@/features/conversations/server/conversation-service";
+      export { createWidgetSseStream } from "@/features/widget/server/widget-utils";
       export { runDbWriteOperation } from "@/lib/db/client";
       import { drizzle } from "drizzle-orm/postgres-js";
       import * as schema from "@/lib/db/schema";
@@ -75,6 +77,7 @@ const {
   setConversationStatus,
   setAiMessageFeedback,
   runDbWriteOperation,
+  createWidgetSseStream,
   createTestDb,
 } = await import(`${pathToFileURL(outputFile).href}?build=${randomUUID()}`);
 const raw = postgres(databaseUrl, { max: 2 });
@@ -267,6 +270,7 @@ test("AI citation metadata is persisted with bounded, deduplicated source eviden
     text: "The return window is 30 days.\n\nSources:\n- Returns policy",
     replyToMessageId,
     retrievalOutcome: "SOURCES_FOUND",
+    rejectInactive: true,
     citations: [
       {
         documentId: "returns-policy",
@@ -486,6 +490,41 @@ test("escalation blocks AI persistence and provider delivery even when pause is 
       },
     }),
   );
+});
+
+test("takeover at final persistence rejects stream completion without a successful client callback", async () => {
+  for (const [status, paused] of [
+    ["OPEN", true],
+    ["ESCALATED", false],
+    ["CLOSED", false],
+  ]) {
+    await raw`UPDATE "conversation" SET "aiPaused" = ${paused}, "status" = ${status} WHERE "id" = ${conversationId}`;
+    let completed = false;
+    const stream = createWidgetSseStream(
+      (async function* () {
+        yield "An answer generated before takeover";
+      })(),
+      {
+        onComplete: async () => {
+          await recordAiMessage({
+            db: appDatabases[0],
+            conversationId,
+            text: "An answer generated before takeover",
+            replyToMessageId: randomUUID(),
+            rejectInactive: true,
+          });
+        },
+      },
+    );
+    await assert.rejects(
+      readWidgetTextStream(stream, () => {}).then((text) => {
+        completed = true;
+        return text;
+      }),
+      /could not complete/,
+    );
+    assert.equal(completed, false);
+  }
 });
 
 test("channel AI delivery rolls back its transcript write when provider delivery fails", async () => {

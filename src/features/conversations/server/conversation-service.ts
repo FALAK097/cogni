@@ -762,6 +762,7 @@ export async function recordAiMessage({
   replyToMessageId,
   citations,
   retrievalOutcome,
+  rejectInactive = false,
 }: {
   db: Db;
   conversationId: string;
@@ -769,6 +770,7 @@ export async function recordAiMessage({
   replyToMessageId: string;
   citations?: MessageCitation[];
   retrievalOutcome?: "SOURCES_FOUND" | "NO_MATCH";
+  rejectInactive?: boolean;
 }) {
   return runDbWriteOperation(db, async (tx) => {
     const conversationData = await tx.query.conversation.findFirst({
@@ -814,7 +816,10 @@ export async function recordAiMessage({
       requireAiActive: true,
     });
 
-    if (!appended) return null;
+    if (!appended) {
+      if (rejectInactive) throw new Error("The conversation stopped accepting AI replies.");
+      return null;
+    }
     return appended.message;
   });
 }
