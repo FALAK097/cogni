@@ -121,7 +121,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { SVGProps, ComponentType, ComponentProps } from "react";
 
-const DEFAULT_ICON_STROKE_WIDTH = 0.8;
+const DEFAULT_ICON_STROKE_WIDTH = 1.5;
 
 export type Hugeicon = ComponentType<SVGProps<SVGSVGElement> & { size?: number }>;
 

@@ -1,0 +1,86 @@
+"use client";
+
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
+import { api, requireData } from "@/lib/api/client";
+import { useActiveWorkspaceId } from "@/hooks/use-auth";
+import { getAllIntegrations } from "@/features/integrations/registry";
+import { workspaceIntegrationSchema } from "@/features/integrations/schemas";
+import { queryKeys } from "@/lib/query-keys";
+
+export function useIntegrations() {
+  const activeWorkspaceId = useActiveWorkspaceId();
+
+  return useQuery({
+    queryKey: activeWorkspaceId
+      ? queryKeys.integrations.workspace(activeWorkspaceId)
+      : queryKeys.integrations.list(),
+    queryFn: async () => {
+      if (!activeWorkspaceId) {
+        return { integrations: getAllIntegrations(), workspaceIntegrations: [] };
+      }
+
+      const { data, error } = await api.GET<unknown>("/api/dashboard/integrations");
+      const workspaceIntegrations = workspaceIntegrationSchema
+        .array()
+        .parse(requireData(data, error, "Failed to fetch workspace integrations"));
+
+      return {
+        integrations: getAllIntegrations(),
+        workspaceIntegrations: workspaceIntegrations.map((entry) => ({
+          ...entry,
+          slug: entry.integrationSlug ?? entry.slug,
+        })),
+      };
+    },
+    enabled: Boolean(activeWorkspaceId),
+    staleTime: 0,
+  });
+}
+
+export function useConnectIntegration() {
+  const queryClient = useQueryClient();
+  const activeWorkspaceId = useActiveWorkspaceId();
+
+  return useMutation({
+    mutationFn: async ({
+      slug,
+    }: {
+      slug: string;
+      credentials?: Record<string, unknown>;
+      metadata?: Record<string, unknown>;
+    }) => {
+      if (!activeWorkspaceId) throw new Error("No active workspace");
+      const { data, error } = await api.POST<{ ok: boolean; redirectUrl: string }>(
+        "/api/dashboard/integrations",
+        {
+          body: { slug },
+        },
+      );
+      const result = requireData(data, error, "Failed to connect integration");
+      window.location.assign(result.redirectUrl);
+      return result;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.integrations.all });
+    },
+  });
+}
+
+export function useDisconnectIntegration() {
+  const queryClient = useQueryClient();
+  const activeWorkspaceId = useActiveWorkspaceId();
+
+  return useMutation({
+    mutationFn: async (slug: string) => {
+      if (!activeWorkspaceId) throw new Error("No active workspace");
+      const { data, error } = await api.DELETE<{ ok: boolean }>("/api/dashboard/integrations", {
+        params: { query: { slug } },
+      });
+      return requireData(data, error, "Failed to disconnect integration");
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.integrations.all });
+    },
+  });
+}

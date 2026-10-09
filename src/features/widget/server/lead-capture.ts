@@ -1,25 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { runDbWriteOperation, type Db } from "@/lib/db/client";
-import { eq, type SQL } from "drizzle-orm";
-import {
-  contact as contactTable,
-  lead as leadTable,
-  visitorSession as visitorSessionTable,
-  widgetLeadCapture as widgetLeadCaptureTable,
-} from "@/lib/db/schema";
+import { and, eq } from "drizzle-orm";
 
-export async function submitWidgetLeadCapture({
-  db,
-  visitorSessionId,
-  workspaceId,
-  name,
-  email,
-  phone,
-  conversationSummary,
-  triggerType,
-  triggerValue,
-  messageCount,
-}: {
+import { runDbWriteOperation, type Db } from "@/lib/db/client";
+import { contact, visitorSession } from "@/lib/db/schema";
+
+type CaptureInput = {
   db: Db;
   visitorSessionId: string;
   workspaceId: string;
@@ -30,137 +15,74 @@ export async function submitWidgetLeadCapture({
   triggerType: string;
   triggerValue?: string | null;
   messageCount: number;
-}) {
-  return runDbWriteOperation(db, async (tx) => {
+};
+
+export async function submitWidgetLeadCapture(input: CaptureInput) {
+  return runDbWriteOperation(input.db, async (tx) => {
     const session = await tx.query.visitorSession.findFirst({
-      where: (fields, { eq }) => eq(fields.id, visitorSessionId),
+      where: (fields, { eq }) => eq(fields.id, input.visitorSessionId),
+      with: { widget: { columns: { workspaceId: true } } },
     });
-    if (!session) {
+    if (!session || session.widget.workspaceId !== input.workspaceId) {
       throw new Error("Session not found");
     }
 
-    let contact = email
+    const capturedAt = new Date().toISOString();
+    const existing = input.email
       ? await tx.query.contact.findFirst({
-          where: (fields, { eq, and }) =>
-            and(eq(fields.workspaceId, workspaceId), eq(fields.email, email)),
+          where: (fields, { and, eq }) =>
+            and(eq(fields.workspaceId, input.workspaceId), eq(fields.email, input.email!)),
         })
       : null;
+    const captureContext = JSON.stringify({
+      triggerType: input.triggerType,
+      triggerValue: input.triggerValue ?? null,
+      messageCount: input.messageCount,
+      conversationSummary: input.conversationSummary ?? null,
+    });
 
-    if (!contact) {
-      const [newContact] = await tx
-        .insert(contactTable)
-        .values({
-          id: randomUUID(),
-          workspaceId,
-          name: name || "Visitor",
-          email: email ?? null,
-          updatedAt: new Date().toISOString(),
-        })
-        .returning();
-      contact = newContact;
-    } else if (name && contact.name !== name) {
-      const [updatedContact] = await tx
-        .update(contactTable)
-        .set({ name, updatedAt: new Date().toISOString() })
-        .where(eq(contactTable.id, contact.id))
-        .returning();
-      contact = updatedContact;
-    }
-
-    let lead: typeof leadTable.$inferSelect | null = null;
-    const orConds: SQL[] = [];
-    if (email) orConds.push(eq(leadTable.email, email));
-    if (phone) orConds.push(eq(leadTable.phone, phone));
-
-    if (orConds.length > 0) {
-      lead = await tx.query.lead
-        .findFirst({
-          where: (fields, { eq, and, or }) =>
-            and(eq(fields.workspaceId, workspaceId), or(...orConds)),
-        })
-        .then((result) => result ?? null);
-    }
-
-    if (!lead) {
-      const [newLead] = await tx
-        .insert(leadTable)
-        .values({
-          id: randomUUID(),
-          workspaceId,
-          contactId: contact.id,
-          name: name || contact.name,
-          email: email ?? contact.email,
-          phone: phone ?? null,
-          source: "WIDGET",
-          status: "new",
-          capturedFromChat: true,
-          chatSessionId: session.browserSessionId,
-          chatSummary: conversationSummary ?? null,
-          updatedAt: new Date().toISOString(),
-        })
-        .returning();
-      lead = newLead;
-    } else {
-      const [updatedLead] = await tx
-        .update(leadTable)
-        .set({
-          contactId: contact.id,
-          source: "WIDGET",
-          name: name || lead.name,
-          email: email ?? lead.email,
-          phone: phone ?? lead.phone,
-          capturedFromChat: true,
-          chatSessionId: session.browserSessionId,
-          chatSummary: conversationSummary ?? lead.chatSummary,
-          updatedAt: new Date().toISOString(),
-        })
-        .where(eq(leadTable.id, lead.id))
-        .returning();
-      lead = updatedLead;
-    }
-
-    if (!lead) {
-      throw new Error("Failed to create or find lead");
-    }
+    const [savedContact] = existing
+      ? await tx
+          .update(contact)
+          .set({
+            name: input.name || existing.name,
+            phone: input.phone ?? existing.phone,
+            source: "WIDGET",
+            capturedAt,
+            captureContext,
+            updatedAt: capturedAt,
+          })
+          .where(and(eq(contact.id, existing.id), eq(contact.workspaceId, input.workspaceId)))
+          .returning()
+      : await tx
+          .insert(contact)
+          .values({
+            id: randomUUID(),
+            workspaceId: input.workspaceId,
+            name: input.name || "Visitor",
+            email: input.email ?? null,
+            phone: input.phone ?? null,
+            source: "WIDGET",
+            capturedAt,
+            captureContext,
+            updatedAt: capturedAt,
+          })
+          .returning();
+    if (!savedContact) throw new Error("Contact capture failed");
 
     await tx
-      .update(visitorSessionTable)
+      .update(visitorSession)
       .set({
-        contactId: contact.id,
-        updatedAt: new Date().toISOString(),
+        contactId: savedContact.id,
+        name: input.name,
+        email: input.email ?? null,
+        phone: input.phone ?? null,
+        leadCapturedAt: capturedAt,
+        updatedAt: capturedAt,
       })
-      .where(eq(visitorSessionTable.id, visitorSessionId));
+      .where(eq(visitorSession.id, input.visitorSessionId));
 
-    const [capture] = await tx
-      .insert(widgetLeadCaptureTable)
-      .values({
-        id: randomUUID(),
-        visitorSessionId,
-        leadId: lead.id,
-        triggerType,
-        triggerValue: triggerValue ?? null,
-        formSubmittedAt: new Date().toISOString(),
-        abandoned: false,
-        messageCountAtCapture: messageCount,
-        conversationSummary: conversationSummary ?? null,
-        updatedAt: new Date().toISOString(),
-      })
-      .onConflictDoUpdate({
-        target: widgetLeadCaptureTable.visitorSessionId,
-        set: {
-          leadId: lead.id,
-          triggerType,
-          triggerValue: triggerValue ?? null,
-          formSubmittedAt: new Date().toISOString(),
-          abandoned: false,
-          messageCountAtCapture: messageCount,
-          conversationSummary: conversationSummary ?? null,
-          updatedAt: new Date().toISOString(),
-        },
-      })
-      .returning();
-
-    return { lead, contact, capture };
+    return { contact: savedContact };
   });
 }
 
@@ -185,27 +107,22 @@ export async function detectLeadCaptureTrigger({
   messageCount: number;
   sessionStartedAt: Date;
 }) {
-  if (!enableLeadCapture) {
-    return { triggered: false, reason: "Lead capture disabled" };
-  }
-
-  const existing = await db.query.widgetLeadCapture.findFirst({
-    where: (fields, { eq }) => eq(fields.visitorSessionId, visitorSessionId),
+  if (!enableLeadCapture) return { triggered: false, reason: "Lead capture disabled" };
+  const session = await db.query.visitorSession.findFirst({
+    where: (fields, { eq }) => eq(fields.id, visitorSessionId),
+    columns: { leadCapturedAt: true },
   });
-
-  if (existing?.formSubmittedAt) {
-    return { triggered: false, reason: "Lead already captured in this session" };
+  if (session?.leadCapturedAt) {
+    return { triggered: false, reason: "Contact already captured in this session" };
   }
-
-  if (currentMessage && leadCaptureKeywords.length > 0) {
+  if (currentMessage) {
     const lowered = currentMessage.toLowerCase();
     const keyword = leadCaptureKeywords.find((item) => lowered.includes(item.toLowerCase()));
     if (keyword) {
       return { triggered: true, reason: "keyword", triggerType: "keyword", triggerValue: keyword };
     }
   }
-
-  const minutesElapsed = (Date.now() - sessionStartedAt.getTime()) / (1000 * 60);
+  const minutesElapsed = (Date.now() - sessionStartedAt.getTime()) / 60_000;
   if (minutesElapsed >= leadCaptureMinutesThreshold) {
     return {
       triggered: true,
@@ -214,7 +131,6 @@ export async function detectLeadCaptureTrigger({
       triggerValue: String(leadCaptureMinutesThreshold),
     };
   }
-
   if (messageCount >= leadCaptureMessageThreshold) {
     return {
       triggered: true,
@@ -223,6 +139,5 @@ export async function detectLeadCaptureTrigger({
       triggerValue: String(leadCaptureMessageThreshold),
     };
   }
-
   return { triggered: false, reason: "No trigger conditions met" };
 }

@@ -23,7 +23,6 @@ dev.db-*
 /out/
 /.open-next/
 /.wrangler/
-cloudflare-env.d.ts
 .dev.vars
 .dev.vars.*
 
@@ -35,6 +34,7 @@ cloudflare-env.d.ts
 # misc
 .DS_Store
 *.pem
+/.firecrawl/
 
 # debug
 npm-debug.log*
@@ -52,3 +52,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+workers/**/worker-configuration.d.ts
+
+.playwright-mcp/

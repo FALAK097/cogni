@@ -27,7 +27,8 @@ export function FinalCta() {
           </h2>
 
           <p className="text-pretty mx-auto mt-6 max-w-lg text-lg leading-relaxed text-white/75">
-            Join 1,200+ modern teams delivering exceptional support at scale. Free to start.
+            Build an AI agent from your knowledge and give your team one place to manage customer
+            conversations.
           </p>
 
           <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">

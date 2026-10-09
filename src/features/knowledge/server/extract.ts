@@ -4,7 +4,9 @@ import { eq } from "drizzle-orm";
 import { documentChunk as documentChunkTable } from "@/lib/db/schema";
 import { readObject } from "@/lib/storage/index";
 import { chunkText, stripHtml } from "@/features/knowledge/server/chunk";
+import { extractPdfText } from "@/features/knowledge/server/extract-pdf";
 import { uploadCloudflareSearchDocument } from "@/lib/search/cloudflare-search";
+import { fetchPublicText } from "@/features/knowledge/server/safe-fetch";
 
 export async function extractDocumentText({
   sourceType,
@@ -18,11 +20,15 @@ export async function extractDocumentText({
   mimeType?: string | null;
 }) {
   if (sourceType === "URL" && sourceUrl) {
-    const response = await fetch(sourceUrl, { signal: AbortSignal.timeout(15_000) });
-    if (!response.ok) {
+    const html = await fetchPublicText(
+      sourceUrl,
+      ["text/html", "text/plain", "application/xhtml+xml"],
+      1_000_000,
+      15_000,
+    );
+    if (html === null) {
       throw new Error("Could not fetch the URL.");
     }
-    const html = await response.text();
     return stripHtml(html);
   }
 
@@ -38,11 +44,7 @@ export async function extractDocumentText({
   }
 
   if (sourceType === "PDF") {
-    const { PDFParse } = await import("pdf-parse");
-    const parser = new PDFParse({ data: bytes });
-    const parsed = await parser.getText();
-    await parser.destroy();
-    return parsed.text.trim();
+    return extractPdfText(bytes);
   }
 
   if (sourceType === "DOCX") {

@@ -53,7 +53,7 @@ export function CollapseMenuButton({
     <Collapsible open={isExpanded} onOpenChange={setIsCollapsed} className="mb-1 w-full">
       <div
         className={cn(
-          "relative mb-1 flex h-10 overflow-hidden rounded-xl transition-colors hover:bg-muted dark:hover:bg-muted/50",
+          "relative mb-1 flex h-11 lg:h-10 overflow-hidden rounded-xl transition-colors hover:bg-muted dark:hover:bg-muted/50",
           isMenuActive && "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
         )}
       >
@@ -130,7 +130,7 @@ export function CollapseMenuButton({
                 nativeButton={false}
                 render={<Link href={href} onClick={() => closeMobileSidebar()} />}
                 className={cn(
-                  "mb-1 h-9 w-full justify-start rounded-md bg-transparent px-3 text-left transition-colors",
+                  "mb-1 h-11 lg:h-9 w-full justify-start rounded-md bg-transparent px-3 text-left transition-colors",
                   isSubmenuItemActive && "hover:bg-transparent",
                 )}
               >

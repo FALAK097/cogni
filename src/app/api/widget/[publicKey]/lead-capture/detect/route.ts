@@ -1,4 +1,3 @@
-import { parseJsonArray } from "@/features/widget/domain";
 import { detectLeadCaptureTrigger } from "@/features/widget/server/lead-capture";
 import {
   assertPublicWidgetAccess,
@@ -45,10 +44,10 @@ export async function POST(
   const result = await detectLeadCaptureTrigger({
     db,
     visitorSessionId: authorized.session.id,
-    enableLeadCapture: access.widget.enableLeadCapture,
-    leadCaptureKeywords: parseJsonArray(access.widget.leadCaptureKeywords),
-    leadCaptureMinutesThreshold: access.widget.leadCaptureMinutesThreshold,
-    leadCaptureMessageThreshold: access.widget.leadCaptureMessageThreshold,
+    enableLeadCapture: access.settings.enableLeadCapture,
+    leadCaptureKeywords: access.settings.leadCaptureKeywords,
+    leadCaptureMinutesThreshold: access.settings.leadCaptureMinutesThreshold,
+    leadCaptureMessageThreshold: access.settings.leadCaptureMessageThreshold,
     currentMessage: body.currentMessage,
     messageCount: body.messageCount ?? authorized.session.messageCount,
     sessionStartedAt: new Date(authorized.session.createdAt),

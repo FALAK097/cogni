@@ -1,9 +1,10 @@
-import { BookOpen, LayoutGrid, MessageCircle, MessageSquare, Plug } from "@/components/icons";
+import { Bot, ChartNoAxesCombined, MessageSquare } from "@/components/icons";
+import { APP_PAGES, APP_ROUTES } from "@/features/navigation/app-routes";
 
 export type MenuItem = {
   href: string;
   label: string;
-  icon: typeof LayoutGrid;
+  icon: typeof Bot;
   submenus: { href: string; label: string; active?: boolean }[];
   active?: boolean;
 };
@@ -21,33 +22,21 @@ export function getStaticMenuList(): MenuList {
       groupLabel: "",
       menus: [
         {
-          href: "/dashboard",
-          label: "Dashboard",
-          icon: LayoutGrid,
-          submenus: [],
-        },
-        {
-          href: "/conversations",
-          label: "Conversations",
+          href: APP_ROUTES.inbox,
+          label: APP_PAGES.inbox.label,
           icon: MessageSquare,
           submenus: [],
         },
         {
-          href: "/widget",
-          label: "Widget",
-          icon: MessageCircle,
+          href: APP_ROUTES.agent,
+          label: APP_PAGES.agent.label,
+          icon: Bot,
           submenus: [],
         },
         {
-          href: "/integrations",
-          label: "Integrations",
-          icon: Plug,
-          submenus: [],
-        },
-        {
-          href: "/knowledge-base",
-          label: "Knowledge Base",
-          icon: BookOpen,
+          href: APP_ROUTES.insights,
+          label: APP_PAGES.insights.label,
+          icon: ChartNoAxesCombined,
           submenus: [],
         },
       ],

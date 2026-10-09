@@ -154,6 +154,12 @@ export function injectStyles() {
 			transform: scale(1.05);
 		}
 
+		#widget-container button:focus-visible,
+		#widget-container a:focus-visible {
+			outline: 2px solid Highlight;
+			outline-offset: 2px;
+		}
+
 		.oc-launcher svg {
 			width: ${config.launcherSize === "lg" ? "28px" : config.launcherSize === "sm" ? "20px" : "24px"};
 			height: ${config.launcherSize === "lg" ? "28px" : config.launcherSize === "sm" ? "20px" : "24px"};
@@ -323,7 +329,8 @@ export function injectStyles() {
 			display: flex;
 			flex-direction: column;
 			gap: 4px;
-			max-width: 85%;
+			min-width: 0;
+			max-width: min(85%, 100%);
 		}
 
 		.oc-message.user {
@@ -334,13 +341,41 @@ export function injectStyles() {
 			align-self: flex-start;
 		}
 
+		.oc-message.team {
+			align-self: flex-start;
+		}
+
+		.oc-screen-reader-only {
+			position: absolute;
+			width: 1px;
+			height: 1px;
+			padding: 0;
+			margin: -1px;
+			overflow: hidden;
+			clip: rect(0, 0, 0, 0);
+			white-space: nowrap;
+			border: 0;
+		}
+
 		.oc-bubble {
+			min-width: 0;
+			max-width: 100%;
 			padding: 12px 16px;
 			border-radius: 12px;
 			font-family: inherit;
 			font-size: 1em;
 			line-height: 1.625;
 			box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+			overflow-wrap: anywhere;
+			word-break: normal;
+		}
+
+		.oc-bubble pre,
+		.oc-bubble code {
+			max-width: 100%;
+			white-space: pre-wrap;
+			overflow-wrap: anywhere;
+			word-break: normal;
 		}
 
 		.oc-message.user .oc-bubble {
@@ -350,6 +385,12 @@ export function injectStyles() {
 		}
 
 		.oc-message.bot .oc-bubble {
+			background-color: ${config.botBubbleColor};
+			color: ${config.botBubbleTextColor};
+			border-bottom-left-radius: 2px;
+		}
+
+		.oc-message.team .oc-bubble {
 			background-color: ${config.botBubbleColor};
 			color: ${config.botBubbleTextColor};
 			border-bottom-left-radius: 2px;
@@ -478,6 +519,34 @@ export function injectStyles() {
 			color: ${config.theme === "dark" ? "#71717a" : "#71717a"};
 		}
 
+		.oc-team-avatar {
+			width: 24px;
+			height: 24px;
+			border-radius: 50%;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			flex-shrink: 0;
+			background: ${config.theme === "dark" ? "#27272a" : "#f4f4f5"};
+			color: ${config.theme === "dark" ? "#d4d4d8" : "#52525b"};
+			font-size: 9px;
+			font-weight: 600;
+			letter-spacing: 0.02em;
+		}
+
+		.oc-team-label {
+			font-size: 10px;
+			color: ${config.theme === "dark" ? "#71717a" : "#a1a1aa"};
+		}
+
+		.oc-team-header .oc-bot-name {
+			max-width: 140px;
+			min-width: 0;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+
 		.oc-timestamp {
 			font-size: 10px;
 			color: ${config.theme === "dark" ? "#71717a" : "#a1a1aa"};
@@ -499,7 +568,7 @@ export function injectStyles() {
 		}
 
 		.oc-feedback-btn {
-			padding: 4px 6px;
+			padding: 6px;
 			border: 1px solid ${config.theme === "dark" ? "#3f3f46" : "#e4e4e7"};
 			border-radius: 6px;
 			background: transparent;
@@ -508,14 +577,27 @@ export function injectStyles() {
 			align-items: center;
 			justify-content: center;
 			color: ${config.theme === "dark" ? "#71717a" : "#a1a1aa"};
-			transition: all 0.15s ease;
-			min-width: 28px;
-			min-height: 28px;
+			transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+			min-width: 36px;
+			min-height: 36px;
 		}
 
 		.oc-feedback-btn:hover {
 			background: ${config.theme === "dark" ? "#27272a" : "#f4f4f5"};
 			color: ${config.theme === "dark" ? "#a1a1aa" : "#71717a"};
+		}
+
+		.oc-feedback-btn:focus-visible,
+		.oc-feedback-option:focus-visible,
+		.oc-feedback-modal-btn:focus-visible {
+			outline: 2px solid ${config.primaryColor};
+			outline-offset: 2px;
+		}
+
+		.oc-feedback-btn:disabled,
+		.oc-feedback-modal-btn:disabled {
+			cursor: wait;
+			opacity: 0.6;
 		}
 
 		.oc-feedback-btn.active {
@@ -553,8 +635,23 @@ export function injectStyles() {
 			transition: opacity 0.2s ease;
 		}
 
+		.oc-feedback-thanks.error {
+			color: ${config.theme === "dark" ? "#fca5a5" : "#b91c1c"};
+		}
+
 		.oc-feedback-thanks.show {
 			opacity: 1;
+		}
+
+		@media (prefers-reduced-motion: reduce) {
+			#widget-container *,
+			#widget-container *::before,
+			#widget-container *::after {
+				animation-duration: 0.01ms !important;
+				animation-iteration-count: 1 !important;
+				scroll-behavior: auto !important;
+				transition-duration: 0.01ms !important;
+			}
 		}
 
 		/* Feedback Reason Modal */
@@ -580,6 +677,19 @@ export function injectStyles() {
 			margin-bottom: 8px;
 		}
 
+		.oc-feedback-input-label {
+			display: block;
+			margin: 4px 0 8px;
+			font-size: 11px;
+			font-weight: 500;
+			color: ${config.theme === "dark" ? "#d4d4d8" : "#52525b"};
+		}
+
+		.oc-feedback-input-label span {
+			font-weight: 400;
+			color: ${config.theme === "dark" ? "#a1a1aa" : "#71717a"};
+		}
+
 		.oc-feedback-modal-options {
 			display: flex;
 			flex-wrap: wrap;
@@ -588,6 +698,7 @@ export function injectStyles() {
 		}
 
 		.oc-feedback-option {
+			min-height: 32px;
 			padding: 6px 10px;
 			font-size: 11px;
 			border: 1px solid ${config.theme === "dark" ? "#3f3f46" : "#e4e4e7"};
@@ -595,7 +706,7 @@ export function injectStyles() {
 			background: transparent;
 			color: ${config.theme === "dark" ? "#a1a1aa" : "#71717a"};
 			cursor: pointer;
-			transition: all 0.15s ease;
+			transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
 		}
 
 		.oc-feedback-option:hover,
@@ -619,8 +730,9 @@ export function injectStyles() {
 		}
 
 		.oc-feedback-textarea:focus {
-			outline: none;
 			border-color: ${config.primaryColor};
+			outline: 2px solid ${config.primaryColor};
+			outline-offset: 1px;
 		}
 
 		.oc-feedback-modal-actions {
@@ -630,11 +742,12 @@ export function injectStyles() {
 		}
 
 		.oc-feedback-modal-btn {
+			min-height: 36px;
 			padding: 6px 12px;
 			font-size: 11px;
 			border-radius: 6px;
 			cursor: pointer;
-			transition: all 0.15s ease;
+			transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, opacity 150ms ease;
 		}
 
 		.oc-feedback-modal-btn.cancel {
@@ -717,13 +830,14 @@ export function injectStyles() {
 			border: 1px solid ${config.theme === "dark" ? "#3f3f46" : "#e4e4e7"};
 			background: ${config.theme === "dark" ? "linear-gradient(135deg, #1f1f23, #18181b)" : "linear-gradient(135deg, #ffffff, #fafafa)"};
 			box-shadow: ${config.theme === "dark" ? "0 2px 8px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.06)"};
-			transition: all 0.2s ease;
+			transition: border-color 150ms ease, box-shadow 150ms ease;
 		}
 
-		.oc-document-card:hover {
-			border-color: ${config.primaryColor}50;
-			box-shadow: ${config.theme === "dark" ? `0 4px 16px rgba(0,0,0,0.4), 0 0 0 1px ${config.primaryColor}30` : `0 4px 16px rgba(0,0,0,0.1), 0 0 0 1px ${config.primaryColor}20`};
-			transform: translateY(-2px);
+		@media (hover: hover) and (pointer: fine) {
+			.oc-document-card:hover {
+				border-color: ${config.primaryColor}50;
+				box-shadow: ${config.theme === "dark" ? `0 4px 16px rgba(0,0,0,0.4), 0 0 0 1px ${config.primaryColor}30` : `0 4px 16px rgba(0,0,0,0.1), 0 0 0 1px ${config.primaryColor}20`};
+			}
 		}
 
 		.oc-document-icon {
@@ -781,27 +895,38 @@ export function injectStyles() {
 			display: flex;
 			align-items: center;
 			justify-content: center;
-			width: 36px;
-			height: 36px;
+			width: 44px;
+			height: 44px;
 			border-radius: 10px;
 			border: none;
 			background: linear-gradient(135deg, ${config.primaryColor}, ${config.primaryColor}dd);
 			color: white;
 			cursor: pointer;
-			transition: all 0.2s ease;
+			transition: background 150ms ease, box-shadow 150ms ease;
 			flex-shrink: 0;
 			box-shadow: 0 2px 6px ${config.primaryColor}30;
 		}
 
 		.oc-document-download:hover {
 			background: linear-gradient(135deg, ${config.primaryColor}ee, ${config.primaryColor}cc);
-			transform: scale(1.08);
 			box-shadow: 0 4px 12px ${config.primaryColor}40;
+		}
+
+		.oc-document-download:focus-visible {
+			outline: 2px solid ${config.primaryColor};
+			outline-offset: 2px;
 		}
 
 		.oc-document-download svg {
 			width: 18px;
 			height: 18px;
+		}
+
+		@media (prefers-reduced-motion: reduce) {
+			.oc-document-card,
+			.oc-document-download {
+				transition: none;
+			}
 		}
 
 		.oc-footer {
@@ -1032,6 +1157,16 @@ export function injectStyles() {
 		@keyframes oc-fadeIn {
 			from { opacity: 0; transform: translateY(-4px); }
 			to { opacity: 1; transform: translateY(0); }
+		}
+
+		@media (prefers-reduced-motion: reduce) {
+			#widget-container *,
+			#widget-container *::before,
+			#widget-container *::after {
+				animation: none !important;
+				transition-duration: 0.01ms !important;
+				scroll-behavior: auto !important;
+			}
 		}
 
 		.oc-menu-item {

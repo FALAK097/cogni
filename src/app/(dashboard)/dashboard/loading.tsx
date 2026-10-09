@@ -5,7 +5,7 @@ export default function DashboardLoading() {
   return (
     <ContentLayout>
       <div className="container mx-auto">
-        <DashboardSkeleton />
+        <DashboardSkeleton label="Loading Overview" />
       </div>
     </ContentLayout>
   );

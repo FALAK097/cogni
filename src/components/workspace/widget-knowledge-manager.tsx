@@ -3,16 +3,17 @@
 import { formatDistanceToNow } from "date-fns";
 import { parseAsStringLiteral, useQueryState } from "nuqs";
 import {
+  createSortedRowModel,
+  rowSortingFeature,
   type ColumnDef,
   flexRender,
-  getCoreRowModel,
-  getSortedRowModel,
+  tableFeatures,
   type Header,
-  useReactTable,
+  sortFn_alphanumeric,
+  useTable,
   type SortingState,
 } from "@tanstack/react-table";
 import { type ComponentType, type FormEvent, type RefObject, useRef, useState } from "react";
-import { create } from "zustand";
 import { z } from "zod";
 
 import {
@@ -68,6 +69,7 @@ import {
   useDeleteKnowledgeBaseSource,
   useImportSitemapSource,
   useKnowledgeBaseSources,
+  useProcessKnowledgeBaseSource,
   useUploadRagDocument,
 } from "@/hooks/query/use-knowledge-base";
 import { cn } from "@/lib/utils";
@@ -86,6 +88,12 @@ const SORT_VALUES = [
   "updatedAt.asc",
   "updatedAt.desc",
 ] as const;
+
+const knowledgeTableFeatures = tableFeatures({
+  rowSortingFeature,
+  sortedRowModel: createSortedRowModel(),
+  sortFns: { alphanumeric: sortFn_alphanumeric },
+});
 
 type SortValue = (typeof SORT_VALUES)[number];
 type SortColumn = "displayName" | "sourceType" | "status" | "chunkCount" | "updatedAt";
@@ -167,36 +175,6 @@ const FALLBACK_STATUS = {
   className: "border-slate-500/15 bg-slate-500/10 text-slate-700 dark:text-slate-300",
 };
 
-type KnowledgeManagerState = {
-  addDialog: AddDialog;
-  addMenuOpen: boolean;
-  deleteTarget: KnowledgeBaseSource | null;
-  deleteError: string | null;
-  addError: string | null;
-  setAddDialog: (value: AddDialog) => void;
-  setAddMenuOpen: (value: boolean) => void;
-  setDeleteTarget: (value: KnowledgeBaseSource | null) => void;
-  setDeleteError: (value: string | null) => void;
-  setAddError: (value: string | null) => void;
-  startAddDialog: (value: Exclude<AddDialog, null>) => void;
-  closeDeleteDialog: () => void;
-};
-
-const useKnowledgeManagerStore = create<KnowledgeManagerState>((set) => ({
-  addDialog: null,
-  addMenuOpen: false,
-  deleteTarget: null,
-  deleteError: null,
-  addError: null,
-  setAddDialog: (value) => set({ addDialog: value }),
-  setAddMenuOpen: (value) => set({ addMenuOpen: value }),
-  setDeleteTarget: (value) => set({ deleteTarget: value }),
-  setDeleteError: (value) => set({ deleteError: value }),
-  setAddError: (value) => set({ addError: value }),
-  startAddDialog: (value) => set({ addDialog: value, addMenuOpen: false, addError: null }),
-  closeDeleteDialog: () => set({ deleteTarget: null, deleteError: null }),
-}));
-
 function getSourceTypeMeta(sourceType: string): SourceTypeMeta {
   return SOURCE_TYPE_META[sourceType.toLowerCase()] ?? FALLBACK_SOURCE_TYPE;
 }
@@ -235,22 +213,16 @@ function formatSortValue(state: SortingState): SortValue {
   return `${first.id}.${first.desc ? "desc" : "asc"}` as SortValue;
 }
 
-export function WidgetKnowledgeManager() {
+export function WidgetKnowledgeManager({ canManage }: { canManage: boolean }) {
   const sourcesQuery = useKnowledgeBaseSources("default");
   const deleteMutation = useDeleteKnowledgeBaseSource();
+  const processMutation = useProcessKnowledgeBaseSource();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const addDialog = useKnowledgeManagerStore((store) => store.addDialog);
-  const addMenuOpen = useKnowledgeManagerStore((store) => store.addMenuOpen);
-  const deleteTarget = useKnowledgeManagerStore((store) => store.deleteTarget);
-  const deleteError = useKnowledgeManagerStore((store) => store.deleteError);
-  const addError = useKnowledgeManagerStore((store) => store.addError);
-  const setAddDialog = useKnowledgeManagerStore((store) => store.setAddDialog);
-  const setAddMenuOpen = useKnowledgeManagerStore((store) => store.setAddMenuOpen);
-  const setDeleteTarget = useKnowledgeManagerStore((store) => store.setDeleteTarget);
-  const setDeleteError = useKnowledgeManagerStore((store) => store.setDeleteError);
-  const setAddError = useKnowledgeManagerStore((store) => store.setAddError);
-  const startAddDialog = useKnowledgeManagerStore((store) => store.startAddDialog);
-  const closeDeleteDialog = useKnowledgeManagerStore((store) => store.closeDeleteDialog);
+  const [addDialog, setAddDialog] = useState<AddDialog>(null);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<KnowledgeBaseSource | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [addError, setAddError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useQueryState("kbSort", sortParser);
 
   const sources = sourcesQuery.data?.sources ?? [];
@@ -258,7 +230,12 @@ export function WidgetKnowledgeManager() {
   const isRefetching = sourcesQuery.isFetching && !sourcesQuery.isLoading;
   const sorting = parseSortValue(sortBy);
 
+  const readyCount = sources.filter((s) => s.status === "ready" || s.status === "indexed").length;
+  const processingCount = sources.filter((s) => s.status === "processing").length;
+  const failedCount = sources.filter((s) => s.status === "failed").length;
+
   async function handleDeleteConfirm() {
+    if (!canManage) return;
     if (!deleteTarget) return;
     setDeleteError(null);
     try {
@@ -278,22 +255,92 @@ export function WidgetKnowledgeManager() {
     setAddError(message);
   }
 
+  async function handleProcessSource(source: KnowledgeBaseSource, action: "retry" | "sync") {
+    if (!canManage) return;
+    setAddError(null);
+    try {
+      await processMutation.mutateAsync({ sourceId: source.id, action });
+    } catch (error) {
+      const actionLabel = action === "sync" ? "sync" : "retry";
+      const message = error instanceof Error ? error.message : `Failed to ${actionLabel} source`;
+      setAddError(`Couldn’t ${actionLabel} “${source.displayName}”: ${message}`);
+    }
+  }
+
+  function startAddDialog(value: Exclude<AddDialog, null>) {
+    if (!canManage) return;
+    setAddDialog(value);
+    setAddMenuOpen(false);
+    setAddError(null);
+  }
+
+  function closeDeleteDialog() {
+    setDeleteTarget(null);
+    setDeleteError(null);
+  }
+
   return (
-    <div className="space-y-6 pb-10">
+    <div className="space-y-6">
       <KnowledgeToolbar
+        canManage={canManage}
         addMenuOpen={addMenuOpen}
         isRefetching={isRefetching}
-        showRetry={sourcesQuery.isError && !isInitialLoading}
+        readyCount={readyCount}
+        processingCount={processingCount}
+        failedCount={failedCount}
         onAddMenuOpenChange={setAddMenuOpen}
-        onRetry={() => sourcesQuery.refetch()}
         onSelectAddDialog={startAddDialog}
       />
 
+      {failedCount > 0 ? (
+        <div
+          role="alert"
+          className="flex flex-col gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-3.5 text-sm sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="flex items-start gap-2.5">
+            <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
+            <div>
+              <p className="font-semibold text-foreground">
+                {failedCount} knowledge source{failedCount === 1 ? "" : "s"} failed indexing
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Unindexed sources cannot be retrieved for visitor answers. Review error details
+                below and retry ingestion.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {addError ? <ErrorBanner message={addError} onDismiss={() => setAddError(null)} /> : null}
+      {sourcesQuery.isError && sourcesQuery.data ? (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm text-muted-foreground"
+        >
+          <span>Couldn’t refresh knowledge sources. Showing the last loaded version.</span>
+          <Button
+            size="sm"
+            variant="outline"
+            className="min-h-9"
+            disabled={isRefetching}
+            onClick={() => void sourcesQuery.refetch()}
+          >
+            {isRefetching ? "Retrying…" : "Retry"}
+          </Button>
+        </div>
+      ) : null}
+      {!canManage ? (
+        <output className="block rounded-lg border border-border/70 bg-muted/30 px-3 py-2.5 text-sm text-muted-foreground">
+          You can review source health. Only workspace owners can add, sync, retry, or delete
+          sources.
+        </output>
+      ) : null}
 
       <KnowledgeSourcesPanel
+        canManage={canManage}
         isInitialLoading={isInitialLoading}
-        isError={sourcesQuery.isError}
+        isError={sourcesQuery.isError && !sourcesQuery.data}
         isRefetching={isRefetching}
         sources={sources}
         sorting={sorting}
@@ -301,6 +348,10 @@ export function WidgetKnowledgeManager() {
         onAddFirstSource={() => setAddDialog("url")}
         onSortChange={handleSortChange}
         onDeleteSource={setDeleteTarget}
+        retryingSourceId={
+          processMutation.isPending ? (processMutation.variables?.sourceId ?? null) : null
+        }
+        onProcessSource={(source, action) => void handleProcessSource(source, action)}
       />
 
       <KnowledgeDialogs
@@ -324,55 +375,90 @@ export function WidgetKnowledgeManager() {
 }
 
 function KnowledgeToolbar({
+  canManage,
   addMenuOpen,
   isRefetching,
-  showRetry,
+  readyCount,
+  processingCount,
+  failedCount,
   onAddMenuOpenChange,
-  onRetry,
   onSelectAddDialog,
 }: {
+  canManage: boolean;
   addMenuOpen: boolean;
   isRefetching: boolean;
-  showRetry: boolean;
+  readyCount: number;
+  processingCount: number;
+  failedCount: number;
   onAddMenuOpenChange: (open: boolean) => void;
-  onRetry: () => void;
   onSelectAddDialog: (dialog: Exclude<AddDialog, null>) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-end gap-2">
-      {showRetry ? (
-        <Button size="sm" variant="outline" className="h-9 rounded-full" onClick={onRetry}>
-          <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-          Retry
-        </Button>
-      ) : null}
-      <DropdownMenu open={addMenuOpen} onOpenChange={onAddMenuOpenChange}>
-        <DropdownMenuTrigger
-          render={
-            <Button
-              className="h-9 rounded-full px-3 shadow-none sm:px-4"
-              size="default"
-              aria-label="Add knowledge source"
-            >
-              {isRefetching ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Plus className="h-4 w-4" />
-              )}
-              Add Source
-              <ChevronDown className="hidden h-4 w-4 opacity-70 sm:inline" />
-            </Button>
-          }
-        />
-        <DropdownMenuContent align="end" sideOffset={10} className="w-80 p-2">
-          <AddSourceMenu onSelect={onSelectAddDialog} />
-        </DropdownMenuContent>
-      </DropdownMenu>
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge
+          variant="outline"
+          className="gap-1.5 border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-xs text-emerald-700 dark:text-emerald-300"
+        >
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          <span>{readyCount} indexed</span>
+        </Badge>
+        {processingCount > 0 ? (
+          <Badge
+            variant="outline"
+            className="gap-1.5 border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-xs text-sky-700 dark:text-sky-300"
+          >
+            <Loader2 className="h-3 w-3 animate-spin" />
+            <span>{processingCount} processing</span>
+          </Badge>
+        ) : null}
+        {failedCount > 0 ? (
+          <Badge
+            variant="outline"
+            className="gap-1.5 border-destructive/20 bg-destructive/10 px-2.5 py-1 text-xs text-destructive"
+          >
+            <AlertCircle className="h-3 w-3" />
+            <span>{failedCount} failed</span>
+          </Badge>
+        ) : null}
+      </div>
+
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {canManage ? (
+          <DropdownMenu open={addMenuOpen} onOpenChange={onAddMenuOpenChange}>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  className="h-9 rounded-full px-3 shadow-none sm:px-4"
+                  size="default"
+                  aria-label="Add knowledge source"
+                >
+                  {isRefetching ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Plus className="h-4 w-4" />
+                  )}
+                  Add Source
+                  <ChevronDown className="hidden h-4 w-4 opacity-70 sm:inline" />
+                </Button>
+              }
+            />
+            <DropdownMenuContent align="end" sideOffset={10} className="w-80 p-2">
+              <AddSourceMenu onSelect={onSelectAddDialog} />
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <span className="rounded-full border border-border/70 px-3 py-2 text-xs text-muted-foreground">
+            Owner access required
+          </span>
+        )}
+      </div>
     </div>
   );
 }
 
 function KnowledgeSourcesPanel({
+  canManage,
   isInitialLoading,
   isError,
   isRefetching,
@@ -382,7 +468,10 @@ function KnowledgeSourcesPanel({
   onAddFirstSource,
   onSortChange,
   onDeleteSource,
+  onProcessSource,
+  retryingSourceId,
 }: {
+  canManage: boolean;
   isInitialLoading: boolean;
   isError: boolean;
   isRefetching: boolean;
@@ -392,6 +481,8 @@ function KnowledgeSourcesPanel({
   onAddFirstSource: () => void;
   onSortChange: (updater: SortingState | ((old: SortingState) => SortingState)) => void;
   onDeleteSource: (source: KnowledgeBaseSource) => void;
+  onProcessSource: (source: KnowledgeBaseSource, action: "retry" | "sync") => void;
+  retryingSourceId: string | null;
 }) {
   return (
     <div className="overflow-hidden rounded-[20px] border border-border/60 bg-transparent shadow-none [--card-spacing:0rem]">
@@ -400,15 +491,24 @@ function KnowledgeSourcesPanel({
       ) : isError ? (
         <QueryErrorState onRetry={onRetry} />
       ) : sources.length === 0 ? (
-        <KnowledgeEmptyState onAddFirstSource={onAddFirstSource} />
+        <KnowledgeEmptyState canManage={canManage} onAddFirstSource={onAddFirstSource} />
       ) : (
         <>
-          <KnowledgeSourcesMobileList sources={sources} onDeleteSource={onDeleteSource} />
+          <KnowledgeSourcesMobileList
+            canManage={canManage}
+            sources={sources}
+            onDeleteSource={onDeleteSource}
+            onProcessSource={onProcessSource}
+            retryingSourceId={retryingSourceId}
+          />
           <KnowledgeSourcesTable
+            canManage={canManage}
             sources={sources}
             sorting={sorting}
             onSortChange={onSortChange}
             onDeleteSource={onDeleteSource}
+            onProcessSource={onProcessSource}
+            retryingSourceId={retryingSourceId}
           />
           <KnowledgeSourcesFooter
             visibleCount={sources.length}
@@ -421,7 +521,13 @@ function KnowledgeSourcesPanel({
   );
 }
 
-function KnowledgeEmptyState({ onAddFirstSource }: { onAddFirstSource: () => void }) {
+function KnowledgeEmptyState({
+  canManage,
+  onAddFirstSource,
+}: {
+  canManage: boolean;
+  onAddFirstSource: () => void;
+}) {
   return (
     <div className="p-6">
       <EmptyState
@@ -429,21 +535,31 @@ function KnowledgeEmptyState({ onAddFirstSource }: { onAddFirstSource: () => voi
         title="No knowledge sources yet"
         description="Add a website URL, upload documents, or paste text to teach your AI assistant how to answer questions."
       >
-        <Button size="sm" className="h-9 rounded-xl shadow-none" onClick={onAddFirstSource}>
-          <Plus className="mr-1.5 h-4 w-4" />
-          Add Source
-        </Button>
+        {canManage ? (
+          <Button size="sm" className="h-9 rounded-xl shadow-none" onClick={onAddFirstSource}>
+            <Plus className="mr-1.5 h-4 w-4" />
+            Add Source
+          </Button>
+        ) : (
+          <p className="text-sm text-muted-foreground">Ask a workspace owner to add a source.</p>
+        )}
       </EmptyState>
     </div>
   );
 }
 
 function KnowledgeSourcesMobileList({
+  canManage,
   sources,
   onDeleteSource,
+  onProcessSource,
+  retryingSourceId,
 }: {
+  canManage: boolean;
   sources: KnowledgeBaseSource[];
   onDeleteSource: (source: KnowledgeBaseSource) => void;
+  onProcessSource: (source: KnowledgeBaseSource, action: "retry" | "sync") => void;
+  retryingSourceId: string | null;
 }) {
   return (
     <div className="space-y-3 p-4 md:hidden">
@@ -454,6 +570,8 @@ function KnowledgeSourcesMobileList({
         const sourceType = source.sourceType.toLowerCase();
         const hasFileLabel = (sourceType === "file" || sourceType === "txt") && fileName;
         const primaryLabel = hasFileLabel ? fileName : source.displayName;
+        const isFailed = source.status === "failed";
+        const isReady = source.status === "ready" || source.status === "indexed";
 
         return (
           <div
@@ -470,14 +588,31 @@ function KnowledgeSourcesMobileList({
                   <SourceTypeBadge sourceType={source.sourceType} />
                   <StatusBadge status={source.status} />
                 </div>
+                {isFailed && source.lastError ? (
+                  <p className="mt-2 flex items-start gap-1.5 rounded-lg border border-destructive/20 bg-destructive/5 p-2 text-xs text-destructive">
+                    <AlertCircle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                    <span className="break-words">{source.lastError}</span>
+                  </p>
+                ) : null}
                 <div className="mt-3 flex items-center justify-between gap-2 text-xs text-muted-foreground">
                   <span>
                     {source.chunkCount > 0 ? `${source.chunkCount} pages` : "No pages indexed"}
                   </span>
-                  <span>{formatUpdatedAt(source.updatedAt)}</span>
+                  <span>
+                    {isReady && source.lastFetchedAt
+                      ? `Synced ${formatUpdatedAt(source.lastFetchedAt)}`
+                      : formatUpdatedAt(source.updatedAt)}
+                  </span>
                 </div>
               </div>
-              <SourceActions source={source} onDeleteSource={onDeleteSource} />
+              {canManage ? (
+                <SourceActions
+                  source={source}
+                  onDeleteSource={onDeleteSource}
+                  onProcessSource={onProcessSource}
+                  isProcessing={retryingSourceId === source.id}
+                />
+              ) : null}
             </div>
           </div>
         );
@@ -511,19 +646,25 @@ function KnowledgeSourcesFooter({
 }
 
 function KnowledgeSourcesTable({
+  canManage,
   sources,
   sorting,
   onSortChange,
   onDeleteSource,
+  onProcessSource,
+  retryingSourceId,
 }: {
+  canManage: boolean;
   sources: KnowledgeBaseSource[];
   sorting: SortingState;
   onSortChange: (updater: SortingState | ((old: SortingState) => SortingState)) => void;
   onDeleteSource: (source: KnowledgeBaseSource) => void;
+  onProcessSource: (source: KnowledgeBaseSource, action: "retry" | "sync") => void;
+  retryingSourceId: string | null;
 }) {
   "use no memo";
 
-  const columns: ColumnDef<KnowledgeBaseSource>[] = [
+  const columns: ColumnDef<typeof knowledgeTableFeatures, KnowledgeBaseSource>[] = [
     {
       id: "displayName",
       accessorKey: "displayName",
@@ -556,28 +697,46 @@ function KnowledgeSourcesTable({
       id: "updatedAt",
       accessorKey: "updatedAt",
       header: "Last Updated",
-      cell: ({ row }) => (
-        <span className="text-sm text-foreground/75">
-          {formatUpdatedAt(row.original.updatedAt)}
-        </span>
-      ),
+      cell: ({ row }) => {
+        const source = row.original;
+        const isReady = source.status === "ready" || source.status === "indexed";
+        return (
+          <div className="space-y-0.5">
+            <span className="block text-sm text-foreground/75">
+              {formatUpdatedAt(source.updatedAt)}
+            </span>
+            {isReady && source.lastFetchedAt ? (
+              <span className="block text-[11px] text-muted-foreground">
+                Synced {formatUpdatedAt(source.lastFetchedAt)}
+              </span>
+            ) : null}
+          </div>
+        );
+      },
     },
-    {
+  ];
+  if (canManage) {
+    columns.push({
       id: "actions",
       header: "Actions",
       enableSorting: false,
-      cell: ({ row }) => <SourceActions source={row.original} onDeleteSource={onDeleteSource} />,
-    },
-  ];
+      cell: ({ row }) => (
+        <SourceActions
+          source={row.original}
+          onDeleteSource={onDeleteSource}
+          onProcessSource={onProcessSource}
+          isProcessing={retryingSourceId === row.original.id}
+        />
+      ),
+    });
+  }
 
-  // react-doctor-disable-next-line react-hooks-js/incompatible-library -- TanStack Table owns row/header model functions here by design.
-  const table = useReactTable({
+  const table = useTable({
+    features: knowledgeTableFeatures,
     data: sources,
     columns,
     state: { sorting },
     onSortingChange: onSortChange,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
   });
   const rows = table.getRowModel().rows;
 
@@ -629,7 +788,7 @@ function KnowledgeSourcesTable({
           ) : (
             rows.map((row) => (
               <TableRow key={row.id} className="border-border/60 hover:bg-muted/30">
-                {row.getVisibleCells().map((cell) => (
+                {row.getAllCells().map((cell) => (
                   <TableCell
                     key={cell.id}
                     className={cn(
@@ -649,7 +808,11 @@ function KnowledgeSourcesTable({
   );
 }
 
-function SortHeader({ header }: { header: Header<KnowledgeBaseSource, unknown> }) {
+function SortHeader({
+  header,
+}: {
+  header: Header<typeof knowledgeTableFeatures, KnowledgeBaseSource, unknown>;
+}) {
   const sortDirection = header.column.getIsSorted();
 
   return (
@@ -694,6 +857,12 @@ function SourceIdentity({ source }: { source: KnowledgeBaseSource }) {
         {secondaryLabel ? (
           <p className="truncate text-[12px] text-muted-foreground">{secondaryLabel}</p>
         ) : null}
+        {source.status === "failed" && source.lastError ? (
+          <p className="flex items-center gap-1.5 text-xs text-destructive">
+            <AlertCircle className="size-3.5 shrink-0" aria-hidden="true" />
+            <span className="line-clamp-1">{source.lastError}</span>
+          </p>
+        ) : null}
       </div>
     </div>
   );
@@ -702,35 +871,89 @@ function SourceIdentity({ source }: { source: KnowledgeBaseSource }) {
 function SourceActions({
   source,
   onDeleteSource,
+  onProcessSource,
+  isProcessing,
 }: {
   source: KnowledgeBaseSource;
   onDeleteSource: (source: KnowledgeBaseSource) => void;
+  onProcessSource: (source: KnowledgeBaseSource, action: "retry" | "sync") => void;
+  isProcessing: boolean;
 }) {
+  const canSync = source.status === "ready" && ["website", "sitemap"].includes(source.sourceType);
+  const canRetry = source.status === "failed";
+
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="cursor-pointer text-muted-foreground hover:text-foreground"
-            aria-label={`Open actions for ${source.displayName}`}
-          >
-            <Ellipsis className="h-4 w-4" />
-          </Button>
-        }
-      />
-      <DropdownMenuContent align="end" sideOffset={8} className="w-44">
-        <DropdownMenuItem
-          className="cursor-pointer gap-2 text-destructive"
-          variant="destructive"
-          onClick={() => onDeleteSource(source)}
+    <div className="flex items-center justify-end gap-1.5">
+      {canRetry ? (
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 gap-1.5 px-2.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+          disabled={isProcessing}
+          onClick={() => onProcessSource(source, "retry")}
         >
-          <Trash2 className="h-4 w-4" />
-          Delete
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          {isProcessing ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <RefreshCw className="h-3.5 w-3.5" />
+          )}
+          {isProcessing ? "Retrying…" : "Retry"}
+        </Button>
+      ) : null}
+
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="cursor-pointer text-muted-foreground hover:text-foreground"
+              aria-label={`Open actions for ${source.displayName}`}
+            >
+              <Ellipsis className="h-4 w-4" />
+            </Button>
+          }
+        />
+        <DropdownMenuContent align="end" sideOffset={8} className="w-44">
+          {canSync ? (
+            <DropdownMenuItem
+              className="cursor-pointer gap-2"
+              disabled={isProcessing}
+              onClick={() => onProcessSource(source, "sync")}
+            >
+              {isProcessing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              {isProcessing ? "Starting…" : "Sync now"}
+            </DropdownMenuItem>
+          ) : null}
+          {canRetry ? (
+            <DropdownMenuItem
+              className="cursor-pointer gap-2 text-destructive"
+              disabled={isProcessing}
+              onClick={() => onProcessSource(source, "retry")}
+            >
+              {isProcessing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              {isProcessing ? "Retrying…" : "Retry indexing"}
+            </DropdownMenuItem>
+          ) : null}
+          <DropdownMenuItem
+            className="cursor-pointer gap-2 text-destructive"
+            variant="destructive"
+            onClick={() => onDeleteSource(source)}
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 }
 

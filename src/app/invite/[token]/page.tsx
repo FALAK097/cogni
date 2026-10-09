@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 
 import { AcceptInviteForm } from "@/features/workspaces/components/accept-invite-form";
+import { SwitchInviteAccountButton } from "@/features/workspaces/components/switch-invite-account-button";
 import { getWorkspaceInviteByToken } from "@/features/workspaces/server/members";
 import { getAuth } from "@/lib/auth/server";
 import { getDb } from "@/lib/db/client";
@@ -19,6 +20,8 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
     }),
   ]);
   const invite = await getWorkspaceInviteByToken(getDb(), token);
+  // Invite validity is intentionally evaluated against this request's current time.
+  // oxlint-disable-next-line react/purity -- This server page is request-scoped and is not memoized.
   const now = new Date();
 
   return (
@@ -43,9 +46,24 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
               Expires on {new Date(invite.expiresAt).toLocaleString()}.
             </p>
             {!session ? (
-              <p className="mt-5 text-sm text-muted-foreground">
-                Sign in with <strong>{invite.email}</strong> to accept this invite.
-              </p>
+              <div className="mt-5 space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Sign in with <strong>{invite.email}</strong> to accept this invite.
+                </p>
+                <Link
+                  href={`/sign-in?callbackURL=${encodeURIComponent(`/invite/${token}`)}`}
+                  className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground outline-none transition-colors hover:bg-primary/90 focus-visible:ring-3 focus-visible:ring-ring/40"
+                >
+                  Sign in with Google
+                </Link>
+              </div>
+            ) : session.user.email.toLowerCase() !== invite.email.toLowerCase() ? (
+              <div className="mt-5 space-y-2">
+                <p role="alert" className="text-sm text-destructive">
+                  This invite is for {invite.email}, but you’re signed in as {session.user.email}.
+                </p>
+                <SwitchInviteAccountButton returnTo={`/invite/${token}`} />
+              </div>
             ) : (
               <div className="mt-5">
                 <AcceptInviteForm token={invite.token} />

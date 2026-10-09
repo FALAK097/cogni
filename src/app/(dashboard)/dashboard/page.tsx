@@ -1,17 +1,12 @@
-import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
-import { DashboardPage } from "@/components/dashboard/dashboard-page";
-import { ContentLayout } from "@/components/app-nav/content-layout";
-import { SITE_NAME } from "@/lib/constants";
+import { APP_ROUTES, queryStringFromSearchParams } from "@/features/navigation/app-routes";
 
-export const metadata: Metadata = {
-  title: `Dashboard | ${SITE_NAME}`,
-};
-
-export default function DashboardHomePage() {
-  return (
-    <ContentLayout className="bg-transparent py-6">
-      <DashboardPage />
-    </ContentLayout>
-  );
+export default async function LegacyDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const query = queryStringFromSearchParams(await searchParams);
+  redirect(`${APP_ROUTES.insights}${query ? `?${query}` : ""}`);
 }

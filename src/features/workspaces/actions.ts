@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 
+import { APP_ROUTES } from "@/features/navigation/app-routes";
 import { requireAuth, requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { workspace as workspaceTable } from "@/lib/db/schema";
 
@@ -52,8 +53,8 @@ export async function updateWorkspaceSettingsAction(
     })
     .where(eq(workspaceTable.id, workspace.id));
 
-  revalidatePath("/dashboard");
-  revalidatePath("/dashboard/settings");
+  revalidatePath(APP_ROUTES.insights);
+  revalidatePath(APP_ROUTES.settings);
 
   return { savedAt: Date.now() };
 }

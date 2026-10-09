@@ -60,6 +60,31 @@ export type WidgetWidgetConfig = {
 
 export type WidgetSettings = WidgetWidgetConfig;
 
+export type WidgetBookingConfig = {
+  enabled: boolean;
+  timezone: string;
+  durationMinutes: number;
+  minimumNoticeMinutes: number;
+  workingHours: { start: string; end: string; weekdays: number[] };
+};
+
+export type WidgetPublishedConfig = Omit<
+  WidgetWidgetConfig,
+  "workspaceId" | "publicKey" | "isEnabled" | "authorizedDomains"
+> & { booking: WidgetBookingConfig };
+
+export type WidgetPublicationVersion = {
+  version: number;
+  publishedAt: string;
+  authorName: string | null;
+};
+
+export type WidgetPublicationStatus = {
+  current: WidgetPublicationVersion | null;
+  versions: WidgetPublicationVersion[];
+  hasUnpublishedChanges: boolean;
+};
+
 export type WidgetPublicConfig = {
   workspaceId: string;
   publicKey: string;

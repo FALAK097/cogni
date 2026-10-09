@@ -1,6 +1,5 @@
 import { z } from "zod";
-import { eq } from "drizzle-orm";
-import type { MessageJson } from "@/features/conversations/server/conversation-service";
+import { setAiMessageFeedback } from "@/features/conversations/server/conversation-service";
 import {
   assertPublicWidgetAccess,
   assertPreviewWidgetAccess,
@@ -13,7 +12,6 @@ import {
 } from "@/features/widget/server/widget-utils";
 import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
 import { getDb } from "@/lib/db/client";
-import { conversation as conversationTable } from "@/lib/db/schema";
 
 const feedbackSchema = z.object({
   messageId: z.string().min(1),
@@ -52,34 +50,33 @@ export async function POST(
 
   const conversation = await db.query.conversation.findFirst({
     where: (fields, { eq, and, ne }) =>
-      and(eq(fields.visitorSessionId, authorized.session.id), ne(fields.status, "CLOSED")),
+      and(
+        eq(fields.visitorSessionId, authorized.session.id),
+        eq(fields.workspaceId, access.widget.workspaceId),
+        eq(fields.widgetId, access.widget.id),
+        ne(fields.status, "CLOSED"),
+      ),
   });
 
   if (!conversation) {
     return Response.json({ error: "Active conversation not found." }, { status: 404 });
   }
 
-  const list = JSON.parse(conversation.messages || "[]") as MessageJson[];
-  const msgIndex = list.findIndex((m) => m.id === body.messageId);
+  const feedbackAt = new Date().toISOString();
+  const updated = await setAiMessageFeedback({
+    db,
+    conversationId: conversation.id,
+    workspaceId: access.widget.workspaceId,
+    visitorSessionId: authorized.session.id,
+    messageId: body.messageId,
+    feedback: body.feedback,
+    reason: body.reason,
+    feedbackAt,
+  });
 
-  if (msgIndex === -1) {
+  if (!updated) {
     return Response.json({ error: "Message not found." }, { status: 404 });
   }
-
-  list[msgIndex] = {
-    ...list[msgIndex],
-    feedback: body.feedback,
-    feedbackReason: body.reason,
-    feedbackAt: new Date().toISOString(),
-  };
-
-  await db
-    .update(conversationTable)
-    .set({
-      messages: JSON.stringify(list),
-      updatedAt: new Date().toISOString(),
-    })
-    .where(eq(conversationTable.id, conversation.id));
 
   const origin = getRequestOrigin(request);
   return withWidgetCors(

@@ -1,14 +1,12 @@
-import { WidgetConversations } from "@/components/widget/widget-conversations";
-import { SITE_NAME } from "@/lib/constants";
-import { requireDashboardContext } from "@/lib/auth/dashboard-context";
+import { redirect } from "next/navigation";
 
-export const metadata = {
-  title: `Conversations | ${SITE_NAME}`,
-  description: "View widget conversations",
-};
+import { queryStringFromSearchParams, APP_ROUTES } from "@/features/navigation/app-routes";
 
-export default async function ConversationsPage() {
-  await requireDashboardContext();
-
-  return <WidgetConversations />;
+export default async function LegacyConversationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const query = queryStringFromSearchParams(await searchParams);
+  redirect(`${APP_ROUTES.inbox}${query ? `?${query}` : ""}`);
 }

@@ -4,43 +4,9 @@ import Image from "next/image";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SectionLayout } from "./section-layout";
 
-/**
- * All icons sourced from /public/assets/icons/.
- * Light-variant files (cal-com-light, pipedrive-light, resend-light, typeform-light)
- * are excluded: they render invisibly on a white background.
- */
-const INTEGRATIONS = [
-  { name: "Gmail", src: "/assets/icons/gmail.svg" },
-  { name: "Slack", src: "/assets/icons/slack.svg" },
-  { name: "HubSpot", src: "/assets/icons/hubspot.png" },
-  { name: "Salesforce", src: "/assets/icons/salesforce.svg" },
-  { name: "Stripe", src: "/assets/icons/stripe.svg" },
-  { name: "Zapier", src: "/assets/icons/zapier.webp" },
-  { name: "WhatsApp", src: "/assets/icons/whatsapp.svg" },
-  { name: "Telegram", src: "/assets/icons/telegram.svg" },
-  { name: "Facebook", src: "/assets/icons/facebook.png" },
-  { name: "Meta", src: "/assets/icons/meta.png" },
-  { name: "Messenger", src: "/assets/icons/messenger.webp" },
-  { name: "Dropbox", src: "/assets/icons/dropbox.svg" },
-  { name: "Microsoft Teams", src: "/assets/icons/microsoft-teams.svg" },
-  { name: "Microsoft OneDrive", src: "/assets/icons/microsoft-onedrive.svg" },
-  { name: "Google", src: "/assets/icons/google.svg" },
-  { name: "Google Calendar", src: "/assets/icons/google-calendar.svg" },
-  { name: "Google Drive", src: "/assets/icons/drive.svg" },
-  { name: "Calendly", src: "/assets/icons/calendly.png" },
-  { name: "Cal.com", src: "/assets/icons/cal-com.svg" },
-  { name: "Brevo", src: "/assets/icons/brevo.svg" },
-  { name: "Mailchimp", src: "/assets/icons/mailchimp.jpeg" },
-  { name: "Resend", src: "/assets/icons/resend-dark.svg" },
-  { name: "SendGrid", src: "/assets/icons/sendgrid.webp" },
-  { name: "Typeform", src: "/assets/icons/typeform.svg" },
-  { name: "Tally", src: "/assets/icons/tally.jpeg" },
-  { name: "Jotform", src: "/assets/icons/jotform.svg" },
-  { name: "Pipedrive", src: "/assets/icons/pipedrive.png" },
-  { name: "Polar", src: "/assets/icons/polar.svg" },
-  { name: "Razorpay", src: "/assets/icons/razorpay.png" },
-  { name: "Zoho", src: "/assets/icons/zoho.png" },
-] as const;
+import { getAllIntegrations } from "@/features/integrations/registry";
+
+const INTEGRATIONS = getAllIntegrations();
 
 export function Integrations() {
   return (
@@ -57,8 +23,8 @@ export function Integrations() {
             for your stack.
           </h2>
           <p className="text-pretty mt-5 text-lg leading-relaxed text-gray-600">
-            Save time and start faster with pre-built integrations for every tool your support team
-            already uses.
+            Connect supported tools for agent actions and team workflows. Inbound messaging requires
+            additional provider configuration.
           </p>
         </div>
 
@@ -73,7 +39,7 @@ export function Integrations() {
                   }
                 >
                   <Image
-                    src={item.src}
+                    src={item.icon}
                     alt={item.name}
                     width={36}
                     height={36}

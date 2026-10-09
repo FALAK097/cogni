@@ -1,8 +1,15 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
+import { and, desc, eq } from "drizzle-orm";
 import type { Db } from "@/lib/db/client";
-import { widget as widgetTable } from "@/lib/db/schema";
+import { user as userTable, widget as widgetTable, widgetPublication } from "@/lib/db/schema";
+import { bookingSettingsInputSchema } from "@/features/integrations/server/booking";
+import {
+  createWidgetPublicationSnapshot,
+  mergeWidgetPublication,
+  parseWidgetPublicationSnapshot,
+} from "@/features/widget/publication";
 import {
   hostnameMatches,
   normalizeFontFamily,
@@ -18,6 +25,8 @@ import {
   type WidgetModelProvider,
   type WidgetPosition,
   type WidgetSettings,
+  type WidgetPublicationStatus,
+  type WidgetPublishedConfig,
   type WidgetShadowSize,
   type WidgetTheme,
 } from "@/features/widget/domain";
@@ -45,6 +54,23 @@ export async function ensureWorkspaceWidget(db: Db, workspaceId: string) {
 
 export function toWidgetSettings(widget: WidgetRecord): WidgetSettings {
   return toWidgetWidgetConfig(widget);
+}
+
+export function toWidgetPublishedConfig(widget: WidgetRecord): WidgetPublishedConfig {
+  return createWidgetPublicationSnapshot(
+    toWidgetWidgetConfig(widget),
+    toWidgetBookingConfig(widget),
+  ).config;
+}
+
+export function toWidgetBookingConfig(widget: WidgetRecord) {
+  return bookingSettingsInputSchema.parse({
+    enabled: widget.bookingEnabled,
+    timezone: widget.bookingTimezone,
+    durationMinutes: widget.bookingDurationMinutes,
+    minimumNoticeMinutes: widget.bookingMinimumNoticeMinutes,
+    workingHours: JSON.parse(widget.bookingWorkingHours) as unknown,
+  });
 }
 
 export function toWidgetWidgetConfig(widget: WidgetRecord): WidgetWidgetConfig {
@@ -96,14 +122,10 @@ export function toWidgetWidgetConfig(widget: WidgetRecord): WidgetWidgetConfig {
   };
 }
 
-export function toWidgetPublicConfig(
-  widget: NonNullable<Awaited<ReturnType<typeof getPublicWidget>>>,
-): WidgetPublicConfig {
-  const settings = toWidgetWidgetConfig(widget as WidgetRecord);
-
+export function toWidgetPublicConfig(settings: WidgetWidgetConfig): WidgetPublicConfig {
   return {
-    workspaceId: widget.workspaceId,
-    publicKey: widget.publicKey,
+    workspaceId: settings.workspaceId,
+    publicKey: settings.publicKey,
     position: settings.position,
     theme: settings.theme,
     agentName: settings.displayName,
@@ -139,6 +161,63 @@ export function toWidgetPublicConfig(
     brochureSuggestionText: settings.brochureSuggestionText,
     allowedDomains: settings.authorizedDomains,
   };
+}
+
+export async function getPublishedWidgetConfig(db: Db, widget: WidgetRecord) {
+  if (widget.publishedVersion < 1) return null;
+  const [publication] = await db
+    .select({ config: widgetPublication.config })
+    .from(widgetPublication)
+    .where(
+      and(
+        eq(widgetPublication.widgetId, widget.id),
+        eq(widgetPublication.version, widget.publishedVersion),
+      ),
+    )
+    .limit(1);
+  return parseWidgetPublicationSnapshot(publication?.config)?.config ?? null;
+}
+
+export async function getWidgetPublicationStatus(
+  db: Db,
+  widget: WidgetRecord,
+): Promise<WidgetPublicationStatus> {
+  const versions = await db
+    .select({
+      version: widgetPublication.version,
+      publishedAt: widgetPublication.publishedAt,
+      authorName: userTable.name,
+    })
+    .from(widgetPublication)
+    .leftJoin(userTable, eq(widgetPublication.createdByUserId, userTable.id))
+    .where(eq(widgetPublication.widgetId, widget.id))
+    .orderBy(desc(widgetPublication.version))
+    .limit(5);
+  const current = versions.find((version) => version.version === widget.publishedVersion) ?? null;
+  const publishedConfig = await getPublishedWidgetConfig(db, widget);
+  let hasUnpublishedChanges = publishedConfig === null;
+  if (publishedConfig) {
+    try {
+      hasUnpublishedChanges =
+        JSON.stringify(publishedConfig) !== JSON.stringify(toWidgetPublishedConfig(widget));
+    } catch {
+      hasUnpublishedChanges = true;
+    }
+  }
+  return { current, versions, hasUnpublishedChanges };
+}
+
+export function settingsFromPublishedConfig(
+  widget: WidgetRecord,
+  publishedConfig: WidgetPublishedConfig,
+): WidgetWidgetConfig {
+  const draft = toWidgetWidgetConfig(widget);
+  return mergeWidgetPublication(publishedConfig, {
+    workspaceId: draft.workspaceId,
+    publicKey: draft.publicKey,
+    isEnabled: draft.isEnabled,
+    authorizedDomains: draft.authorizedDomains,
+  });
 }
 
 export async function getPublicWidget(db: Db, publicKey: string) {

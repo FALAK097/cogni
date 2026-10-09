@@ -1,15 +1,37 @@
 "use client";
 
+import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { z } from "zod";
 
 import { api, requireData } from "@/lib/api/client";
 import { queryKeys } from "@/lib/query-keys";
-import type { WidgetWidgetConfig, WidgetBorderRadiusStyle } from "@/features/widget/domain";
+import { useActiveWorkspaceId } from "@/hooks/use-auth";
+import type { InboxChannel } from "@/features/conversations/inbox-pagination";
+import type {
+  WidgetWidgetConfig,
+  WidgetBorderRadiusStyle,
+  WidgetPublicationStatus,
+} from "@/features/widget/domain";
+import { toast } from "@/components/ui/use-toast";
+import type {
+  AgentTestCaseInput,
+  AgentTestRunHistory,
+  AgentTestRunInput,
+} from "@/features/agent-tests/input";
+import { parseInboxConversationEventsResponse } from "@/features/conversations/inbox-events";
 
 export type DashboardWidgetConfig = Omit<WidgetWidgetConfig, "borderRadius"> & {
   agentName: string;
   allowedDomains: string[];
   borderRadius: WidgetBorderRadiusStyle;
+  publication: WidgetPublicationStatus;
+};
+
+export type AgentTestCase = AgentTestCaseInput & {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export interface IpData {
@@ -21,7 +43,42 @@ export interface IpData {
   timezone?: string;
 }
 
-export type ConversationFilter = "all" | "unassigned" | "mine" | "open" | "closed";
+export type ConversationFilter =
+  | "all"
+  | "unread"
+  | "unassigned"
+  | "mine"
+  | "open"
+  | "closed"
+  | "snoozed"
+  | "tickets";
+
+export interface TicketSummary {
+  id: string;
+  title: string;
+  status: "OPEN" | "PENDING" | "RESOLVED";
+  priority: "LOW" | "NORMAL" | "HIGH" | "URGENT";
+  assignedMemberId: string | null;
+  assignedMemberName?: string | null;
+  dueAt: string | null;
+}
+
+export interface InboxSavedView {
+  id: string;
+  name: string;
+  filter: ConversationFilter;
+  channel: InboxChannel | null;
+  assigneeFilter: string;
+  labelFilter: string | null;
+  createdByMembershipId: string | null;
+}
+
+export interface InboxMacro {
+  id: string;
+  name: string;
+  content: string;
+  createdByMembershipId: string | null;
+}
 
 export interface WidgetSessionSummary {
   id: string;
@@ -60,11 +117,21 @@ export interface WidgetMessage {
   feedback?: "positive" | "negative" | null;
   feedbackReason?: string | null;
   feedbackAt?: string | null;
+  citations?: Array<{ documentId: string; title: string; excerpt: string }>;
   isInternal: boolean;
   metadata?: {
     type?: string;
     documents?: Array<{ fileName: string; description?: string; fileUrl: string }>;
   };
+}
+
+export interface WidgetAttachment {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  size: number;
+  createdAt: string;
+  url: string;
 }
 
 export interface WidgetContactNote {
@@ -78,6 +145,7 @@ export interface WidgetInternalNote {
   id: string;
   body: string;
   createdAt: string;
+  authorName: string;
 }
 
 export interface WidgetPreviousConversation {
@@ -85,6 +153,26 @@ export interface WidgetPreviousConversation {
   subject: string;
   status: string;
   lastMessageAt: string;
+}
+
+export interface WidgetWorkflowRun {
+  id: string;
+  name: string;
+  status: string;
+  input: Record<string, unknown> | null;
+  errorMessage: string | null;
+  startedAt: string;
+  finishedAt: string | null;
+  steps: {
+    id: string;
+    position: number;
+    name: string;
+    kind: string;
+    status: string;
+    errorMessage: string | null;
+    startedAt: string | null;
+    finishedAt: string | null;
+  }[];
 }
 
 export interface WidgetSessionDetail {
@@ -102,16 +190,28 @@ export interface WidgetSessionDetail {
   lastActivityAt: string;
   ipData?: IpData | null;
   messages: WidgetMessage[];
+  attachments?: WidgetAttachment[];
   contactName?: string | null;
   contactEmail?: string | null;
   contactId?: string | null;
   contactExternalId?: string | null;
   contactCreatedAt?: string | null;
   contactLastSeenAt?: string | null;
+  contactPhone?: string | null;
+  contactTags?: string[];
+  conversationLabels?: string[];
+  contactSource?: string | null;
+  contactCapturedAt?: string | null;
+  contactCaptureContext?: Record<string, unknown> | null;
   conversationId?: string | null;
   conversationStatus?: string;
+  aiPaused?: boolean;
   conversationChannel?: string;
   conversationStartedAt?: string;
+  conversationSubject?: string;
+  ticket?: TicketSummary | null;
+  snoozedUntil?: string | null;
+  workspaceTimezone?: string;
   assigneeName?: string | null;
   assigneeId?: string | null;
   agentName?: string;
@@ -119,6 +219,7 @@ export interface WidgetSessionDetail {
   previousConversations?: WidgetPreviousConversation[];
   contactNotes?: WidgetContactNote[];
   internalNotes?: WidgetInternalNote[];
+  workflows?: WidgetWorkflowRun[];
 }
 
 export interface WidgetSessionsResponse {
@@ -176,6 +277,41 @@ export function useSaveWidgetConfig() {
     },
     onSuccess: (data, variables) => {
       queryClient.setQueryData(queryKeys.widget.config(variables.workspaceId), data);
+    },
+  });
+}
+
+export function usePublishWidgetConfig() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      workspaceId,
+      restoreVersion,
+    }: {
+      workspaceId: string;
+      restoreVersion?: number;
+    }) => {
+      const response = await fetch("/api/dashboard/widget/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(restoreVersion ? { restoreVersion } : {}),
+      });
+      const result: unknown = await response.json().catch(() => null);
+      if (!response.ok) {
+        const message =
+          typeof result === "object" &&
+          result !== null &&
+          "error" in result &&
+          typeof result.error === "string"
+            ? result.error
+            : "Could not publish agent changes.";
+        throw new Error(message);
+      }
+      return { workspaceId, config: result as DashboardWidgetConfig };
+    },
+    onSuccess: ({ workspaceId, config }) => {
+      queryClient.setQueryData(queryKeys.widget.config(workspaceId), config);
     },
   });
 }
@@ -313,13 +449,20 @@ export interface ConversationSummary {
   contactName: string;
   contactEmail: string | null;
   status: string;
+  aiPaused: boolean;
   assigneeName: string | null;
   assigneeId: string | null;
   unreadCount: number;
+  lastUnreadVisitorMessageId: string | null;
   preview: string;
   lastMessageAt: string;
   country: string | null;
   city: string | null;
+  channel: string;
+  subject: string;
+  snoozedUntil: string | null;
+  labels: string[];
+  ticket?: TicketSummary | null;
 }
 
 export type ConversationDetail = WidgetSessionDetail;
@@ -327,59 +470,528 @@ export type ConversationDetail = WidgetSessionDetail;
 export interface ConversationsResponse {
   conversations: ConversationSummary[];
   counts: {
+    total: number;
     all: number;
     unassigned: number;
     mine: number;
     open: number;
     closed: number;
+    snoozed: number;
+    tickets: number;
   };
   currentMembershipId: string;
+  workspaceTimezone: string;
   pagination: {
-    page: number;
     limit: number;
-    total: number;
-    pages: number;
+    hasMore: boolean;
+    nextCursor: string | null;
   };
+}
+
+export interface WorkspaceMemberOption {
+  id: string;
+  name: string;
+}
+
+export function useWorkspaceMembers() {
+  const workspaceId = useActiveWorkspaceId() ?? "";
+
+  return useQuery<{ members: WorkspaceMemberOption[] }>({
+    queryKey: queryKeys.workspaces.members(workspaceId),
+    enabled: Boolean(workspaceId),
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await api.GET<{ members: WorkspaceMemberOption[] }>(
+        "/api/dashboard/workspace-members",
+      );
+      return requireData(data, error, "Failed to fetch workspace members");
+    },
+  });
 }
 
 export function useConversations(
   options: {
-    page?: number;
     limit?: number;
+    cursor?: string | null;
     search?: string;
     filter?: ConversationFilter;
+    channel?: InboxChannel;
+    assignee?: string;
+    label?: string;
   } = {},
 ) {
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  const search = options.search?.trim() || null;
+  const cursor = options.cursor ?? null;
+
   return useQuery<ConversationsResponse>({
     queryKey: [
-      ...queryKeys.conversations.list(),
-      options.page ?? 1,
+      ...queryKeys.conversations.list(workspaceId),
       options.limit ?? 20,
-      options.search ?? null,
+      cursor,
+      search,
       options.filter ?? "all",
+      options.channel ?? "all-channels",
+      options.assignee ?? "all-assignees",
+      options.label ?? "all-labels",
     ],
     queryFn: async () => {
       const { data, error } = await api.GET<ConversationsResponse>("/api/conversations", {
         params: {
           query: {
-            page: options.page ?? 1,
             limit: options.limit ?? 20,
-            ...(options.search ? { search: options.search } : {}),
+            ...(cursor ? { cursor } : {}),
+            ...(search ? { search } : {}),
             ...(options.filter && options.filter !== "all" ? { filter: options.filter } : {}),
+            ...(options.channel ? { channel: options.channel } : {}),
+            ...(options.assignee ? { assignee: options.assignee } : {}),
+            ...(options.label ? { label: options.label } : {}),
           },
         },
       });
       return requireData(data, error, "Failed to fetch conversations");
     },
-    placeholderData: (previousData) => previousData,
+    enabled: Boolean(workspaceId),
+    placeholderData: (previousData, previousQuery) =>
+      previousQuery?.queryKey[2] === workspaceId ? previousData : undefined,
     refetchInterval: 8_000,
     refetchOnWindowFocus: true,
   });
 }
 
+export function useInboxConversationEvents() {
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!workspaceId) return;
+
+    const controller = new AbortController();
+    let cursor: string | null = null;
+    let retryDelay = 3_500;
+    let nextPollAt = 0;
+    let inFlight = false;
+
+    const invalidateInbox = () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.list(workspaceId) });
+      void queryClient.invalidateQueries({
+        queryKey: [...queryKeys.conversations.all, "detail", workspaceId],
+      });
+    };
+
+    const poll = () => {
+      if (document.visibilityState === "hidden" || inFlight || Date.now() < nextPollAt) return;
+      inFlight = true;
+
+      const url = new URL("/api/dashboard/conversations/events", window.location.origin);
+      if (cursor !== null) url.searchParams.set("after", cursor);
+
+      void fetch(url, {
+        cache: "no-store",
+        credentials: "same-origin",
+        headers: { Accept: "application/json" },
+        signal: controller.signal,
+      })
+        .then(async (response): Promise<unknown> => {
+          if (!response.ok) throw new Error("Inbox updates are temporarily unavailable.");
+          const payload: unknown = await response.json();
+          return payload;
+        })
+        .then((payload) => {
+          const parsed = parseInboxConversationEventsResponse(payload);
+          if (!parsed) throw new Error("Inbox updates returned an invalid response.");
+
+          if (cursor === null || parsed.reset || parsed.events.length > 0) invalidateInbox();
+          cursor = parsed.cursor;
+          retryDelay = 3_500;
+          nextPollAt = Date.now() + retryDelay;
+        })
+        .catch(() => {
+          if (!controller.signal.aborted) {
+            retryDelay = Math.min(retryDelay * 2, 30_000);
+            nextPollAt = Date.now() + retryDelay;
+          }
+        })
+        .finally(() => {
+          inFlight = false;
+        });
+    };
+
+    const resume = () => {
+      if (document.visibilityState === "visible") {
+        void poll();
+      }
+    };
+
+    const pollInterval = window.setInterval(poll, 3_500);
+    document.addEventListener("visibilitychange", resume);
+    void poll();
+    return () => {
+      window.clearInterval(pollInterval);
+      document.removeEventListener("visibilitychange", resume);
+      controller.abort();
+    };
+  }, [queryClient, workspaceId]);
+}
+
+export function useInboxSavedViews() {
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useQuery<{ views: InboxSavedView[] }>({
+    queryKey: queryKeys.conversations.savedViews(workspaceId),
+    enabled: Boolean(workspaceId),
+    queryFn: async () => {
+      const { data, error } = await api.GET<{ views: InboxSavedView[] }>(
+        "/api/dashboard/inbox-views",
+      );
+      return requireData(data, error, "Failed to fetch saved inbox views");
+    },
+  });
+}
+
+export function useCreateInboxSavedView() {
+  const queryClient = useQueryClient();
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useMutation({
+    mutationFn: async (view: Omit<InboxSavedView, "id" | "createdByMembershipId">) => {
+      const response = await fetch("/api/dashboard/inbox-views", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(view),
+      });
+      const result: { view?: InboxSavedView; error?: string } = await response
+        .json()
+        .catch(() => ({}));
+      if (!response.ok || !result.view) {
+        throw new Error(result.error ?? "Failed to save inbox view.");
+      }
+      return result.view;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.conversations.savedViews(workspaceId),
+      });
+    },
+  });
+}
+
+export function useDeleteInboxSavedView() {
+  const queryClient = useQueryClient();
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useMutation({
+    mutationFn: async (viewId: string) => {
+      const response = await fetch(`/api/dashboard/inbox-views/${viewId}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        const result: { error?: string } = await response.json().catch(() => ({}));
+        throw new Error(result.error ?? "Failed to delete inbox view.");
+      }
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.conversations.savedViews(workspaceId),
+      });
+    },
+  });
+}
+
+export function useInboxMacros() {
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useQuery<{ macros: InboxMacro[] }>({
+    queryKey: queryKeys.conversations.macros(workspaceId),
+    enabled: Boolean(workspaceId),
+    queryFn: async () => {
+      const response = await fetch("/api/dashboard/inbox-macros");
+      const result: { macros?: InboxMacro[]; error?: string } = await response
+        .json()
+        .catch(() => ({}));
+      if (!response.ok || !result.macros) {
+        throw new Error(result.error ?? "Failed to load saved replies.");
+      }
+      return { macros: result.macros };
+    },
+  });
+}
+
+export function useCreateInboxMacro() {
+  const queryClient = useQueryClient();
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useMutation({
+    mutationFn: async (input: { name: string; content: string }) => {
+      const response = await fetch("/api/dashboard/inbox-macros", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      const result: { macro?: InboxMacro; error?: string } = await response
+        .json()
+        .catch(() => ({}));
+      if (!response.ok || !result.macro) {
+        throw new Error(result.error ?? "Failed to save reply.");
+      }
+      return result.macro;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.conversations.macros(workspaceId),
+      });
+    },
+  });
+}
+
+export function useUpdateInboxMacro() {
+  const queryClient = useQueryClient();
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useMutation({
+    mutationFn: async ({
+      macroId,
+      ...input
+    }: {
+      macroId: string;
+      name: string;
+      content: string;
+    }) => {
+      const response = await fetch(`/api/dashboard/inbox-macros/${encodeURIComponent(macroId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      const result: { macro?: InboxMacro; error?: string } = await response
+        .json()
+        .catch(() => ({}));
+      if (!response.ok || !result.macro) {
+        throw new Error(result.error ?? "Failed to update saved reply.");
+      }
+      return result.macro;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.conversations.macros(workspaceId),
+      });
+    },
+  });
+}
+
+export function useDeleteInboxMacro() {
+  const queryClient = useQueryClient();
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useMutation({
+    mutationFn: async (macroId: string) => {
+      const response = await fetch(`/api/dashboard/inbox-macros/${encodeURIComponent(macroId)}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        const result: { error?: string } = await response.json().catch(() => ({}));
+        throw new Error(result.error ?? "Failed to delete saved reply.");
+      }
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.conversations.macros(workspaceId),
+      });
+    },
+  });
+}
+
+export function useAgentTestCases() {
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useQuery<{ cases: AgentTestCase[] }>({
+    queryKey: queryKeys.widget.agentTests(workspaceId),
+    enabled: Boolean(workspaceId),
+    queryFn: async () => {
+      const response = await fetch("/api/dashboard/agent-test-cases");
+      const result: { cases?: AgentTestCase[]; error?: string } = await response
+        .json()
+        .catch(() => ({}));
+      if (!response.ok || !result.cases)
+        throw new Error(result.error ?? "Failed to load agent tests.");
+      return { cases: result.cases };
+    },
+  });
+}
+
+export function useAgentTestRunHistory(startDate: string, endDate: string) {
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useQuery<AgentTestRunHistory>({
+    queryKey: queryKeys.widget.agentTestRuns.list(workspaceId, startDate, endDate),
+    enabled: Boolean(workspaceId),
+    queryFn: async () => {
+      const params = new URLSearchParams({ startDate, endDate });
+      const response = await fetch(`/api/dashboard/agent-test-runs?${params.toString()}`);
+      const body: unknown = await response.json().catch(() => null);
+      const parsed = z
+        .object({
+          hasAnyRuns: z.boolean(),
+          runs: z.array(
+            z.object({
+              id: z.string().uuid(),
+              createdAt: z.string().datetime({ offset: true }),
+              suiteDigest: z
+                .string()
+                .regex(/^[a-f0-9]{64}$/)
+                .nullable(),
+              caseCount: z.number().int().nonnegative(),
+              passedCount: z.number().int().nonnegative(),
+              mismatchCount: z.number().int().nonnegative(),
+              errorCount: z.number().int().nonnegative(),
+              notRunCount: z.number().int().nonnegative(),
+            }),
+          ),
+        })
+        .safeParse(body);
+      if (!response.ok || !parsed.success) {
+        const error = z.object({ error: z.string() }).safeParse(body);
+        throw new Error(error.success ? error.data.error : "Failed to load saved test history.");
+      }
+      return parsed.data;
+    },
+  });
+}
+
+export function useRecordAgentTestRun() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: AgentTestRunInput) => {
+      const response = await fetch("/api/dashboard/agent-test-runs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      const result: { run?: { id?: string }; error?: string } = await response
+        .json()
+        .catch(() => ({}));
+      if (!response.ok || !result.run?.id) {
+        throw new Error(result.error ?? "Could not save this test run to Insights.");
+      }
+      return result.run;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.widget.agentTestRuns.all });
+    },
+  });
+}
+
+export function useSaveAgentTestCase() {
+  const queryClient = useQueryClient();
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useMutation({
+    mutationFn: async (input: AgentTestCaseInput & { id?: string }) => {
+      const response = await fetch(
+        input.id
+          ? `/api/dashboard/agent-test-cases/${encodeURIComponent(input.id)}`
+          : "/api/dashboard/agent-test-cases",
+        {
+          method: input.id ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: input.title,
+            prompt: input.prompt,
+            expectedOutcome: input.expectedOutcome,
+            expectedSourceIds: input.expectedSourceIds,
+          }),
+        },
+      );
+      const result: { case?: AgentTestCase; error?: string } = await response
+        .json()
+        .catch(() => ({}));
+      if (!response.ok || !result.case)
+        throw new Error(result.error ?? "Failed to save agent test.");
+      return result.case;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.widget.agentTests(workspaceId) });
+    },
+  });
+}
+
+export function useDeleteAgentTestCase() {
+  const queryClient = useQueryClient();
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useMutation({
+    mutationFn: async (caseId: string) => {
+      const response = await fetch(
+        `/api/dashboard/agent-test-cases/${encodeURIComponent(caseId)}`,
+        { method: "DELETE" },
+      );
+      const result: { error?: string } = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error ?? "Failed to delete agent test.");
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.widget.agentTests(workspaceId) });
+    },
+  });
+}
+
+export function useUpdateContactTag() {
+  const queryClient = useQueryClient();
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useMutation({
+    mutationFn: async (input: {
+      conversationId: string;
+      action: "add" | "remove";
+      tag: string;
+    }) => {
+      const response = await fetch(
+        `/api/dashboard/conversations/${encodeURIComponent(input.conversationId)}/contact-tags`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: input.action, tag: input.tag }),
+        },
+      );
+      const result: { tags?: string[]; error?: string } = await response.json().catch(() => ({}));
+      if (!response.ok || !result.tags) {
+        throw new Error(result.error ?? "Could not update contact tags.");
+      }
+      return { conversationId: input.conversationId, tags: result.tags };
+    },
+    onSuccess: ({ conversationId, tags }) => {
+      queryClient.setQueryData<ConversationDetail>(
+        queryKeys.conversations.detail(workspaceId, conversationId),
+        (current) => (current ? { ...current, contactTags: tags } : current),
+      );
+    },
+  });
+}
+
+export function useUpdateConversationLabel() {
+  const queryClient = useQueryClient();
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useMutation({
+    mutationFn: async (input: {
+      conversationId: string;
+      action: "add" | "remove";
+      label: string;
+    }) => {
+      const response = await fetch(
+        `/api/dashboard/conversations/${encodeURIComponent(input.conversationId)}/labels`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: input.action, label: input.label }),
+        },
+      );
+      const result: { labels?: string[]; error?: string } = await response.json().catch(() => ({}));
+      if (!response.ok || !result.labels) {
+        throw new Error(result.error ?? "Could not update conversation labels.");
+      }
+      return { conversationId: input.conversationId, labels: result.labels };
+    },
+    onSuccess: ({ conversationId, labels }) => {
+      queryClient.setQueryData<ConversationDetail>(
+        queryKeys.conversations.detail(workspaceId, conversationId),
+        (current) => (current ? { ...current, conversationLabels: labels } : current),
+      );
+      void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.list(workspaceId) });
+    },
+  });
+}
+
 export function useConversation(conversationId: string) {
+  const workspaceId = useActiveWorkspaceId() ?? "";
   return useQuery<ConversationDetail>({
-    queryKey: queryKeys.conversations.detail(conversationId),
+    queryKey: queryKeys.conversations.detail(workspaceId, conversationId),
     queryFn: async () => {
       const { data, error } = await api.GET<ConversationDetail>(
         "/api/conversations/{conversation_id}",
@@ -389,7 +1001,7 @@ export function useConversation(conversationId: string) {
       );
       return requireData(data, error, "Failed to fetch conversation");
     },
-    enabled: Boolean(conversationId),
+    enabled: Boolean(conversationId && workspaceId),
     refetchInterval: 5_000,
     refetchOnWindowFocus: true,
   });
@@ -414,7 +1026,149 @@ export function useDeleteConversation() {
   });
 }
 
+export function useTakeOverConversation() {
+  return useConversationStateAction("takeover");
+}
+
 export function useAssignConversation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      conversationId,
+      assignedMemberId,
+    }: {
+      conversationId: string;
+      assignedMemberId: string | null;
+    }) => {
+      const { data, error } = await api.PATCH<{ ok: boolean }>(
+        "/api/conversations/{conversation_id}",
+        {
+          params: { path: { conversation_id: conversationId } },
+          body: { action: "assign_to_member", assignedMemberId },
+        },
+      );
+      return requireData(data, error, "Failed to update conversation assignee");
+    },
+    onSuccess: () => invalidateConversationQueries(queryClient),
+  });
+}
+
+export function useCreateConversationTicket() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ conversationId, title }: { conversationId: string; title: string }) => {
+      const { data, error } = await api.POST<{ ticket: TicketSummary }>(
+        "/api/dashboard/conversations/{conversation_id}/ticket",
+        {
+          params: { path: { conversation_id: conversationId } },
+          body: { title },
+        },
+      );
+      return requireData(data, error, "Failed to create ticket");
+    },
+    onSuccess: () => invalidateConversationQueries(queryClient),
+  });
+}
+
+export function useUpdateTicket() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      ticketId,
+      ...updates
+    }: {
+      ticketId: string;
+      title?: string;
+      status?: TicketSummary["status"];
+      priority?: TicketSummary["priority"];
+      assignedMemberId?: string | null;
+      dueAt?: string | null;
+    }) => {
+      const { data, error } = await api.PATCH<{ ticket: TicketSummary }>(
+        "/api/dashboard/tickets/{ticket_id}",
+        { params: { path: { ticket_id: ticketId } }, body: updates },
+      );
+      return requireData(data, error, "Failed to update ticket");
+    },
+    onSuccess: () => invalidateConversationQueries(queryClient),
+  });
+}
+
+export function useSetConversationAiPaused() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ conversationId, paused }: { conversationId: string; paused: boolean }) => {
+      const { data, error } = await api.PATCH<{ ok: boolean }>(
+        "/api/conversations/{conversation_id}",
+        {
+          params: { path: { conversation_id: conversationId } },
+          body: { action: "set_ai_paused", paused },
+        },
+      );
+      return requireData(data, error, "Failed to update AI replies");
+    },
+    onSuccess: () => invalidateConversationQueries(queryClient),
+  });
+}
+
+export function useSetConversationStatus() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      conversationId,
+      status,
+    }: {
+      conversationId: string;
+      status: "CLOSED" | "OPEN";
+    }) => {
+      const { data, error } = await api.PATCH<{ ok: boolean }>(
+        "/api/conversations/{conversation_id}",
+        {
+          params: { path: { conversation_id: conversationId } },
+          body: { action: status === "CLOSED" ? "close" : "reopen" },
+        },
+      );
+      return requireData(data, error, "Failed to update conversation status");
+    },
+    onSuccess: () => invalidateConversationQueries(queryClient),
+  });
+}
+
+export function useSetConversationSnooze() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      conversationId,
+      snoozedUntil,
+    }: {
+      conversationId: string;
+      snoozedUntil: string | null;
+    }) => {
+      const { data, error } = await api.PATCH<{ ok: boolean; snoozedUntil: string | null }>(
+        "/api/conversations/{conversation_id}",
+        {
+          params: { path: { conversation_id: conversationId } },
+          body: {
+            action: snoozedUntil ? "snooze" : "unsnooze",
+            ...(snoozedUntil ? { snoozedUntil } : {}),
+          },
+        },
+      );
+      return requireData(data, error, "Failed to update snooze");
+    },
+    onSuccess: () => invalidateConversationQueries(queryClient),
+  });
+}
+
+function invalidateConversationQueries(queryClient: ReturnType<typeof useQueryClient>) {
+  void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all });
+}
+
+function useConversationStateAction(action: "assign" | "takeover") {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -423,16 +1177,19 @@ export function useAssignConversation() {
         "/api/conversations/{conversation_id}",
         {
           params: { path: { conversation_id: conversationId } },
-          body: { action: "assign" },
+          body: { action },
         },
       );
-      return requireData(data, error, "Failed to assign conversation");
+      return requireData(
+        data,
+        error,
+        action === "takeover"
+          ? "Failed to take over conversation"
+          : "Failed to assign conversation",
+      );
     },
-    onSuccess: (_data, conversationId) => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all });
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.conversations.detail(conversationId),
-      });
+    onSuccess: () => {
+      invalidateConversationQueries(queryClient);
     },
   });
 }
@@ -441,21 +1198,32 @@ export function useMarkConversationRead() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (conversationId: string) => {
+    mutationFn: async ({
+      conversationId,
+      throughMessageId,
+    }: {
+      conversationId: string;
+      throughMessageId: string;
+    }) => {
       const { data, error } = await api.PATCH<{ ok: boolean }>(
         "/api/conversations/{conversation_id}",
         {
           params: { path: { conversation_id: conversationId } },
-          body: { action: "read" },
+          body: { action: "read", readThroughMessageId: throughMessageId },
         },
       );
       return requireData(data, error, "Failed to mark conversation as read");
     },
-    onSuccess: (_data, conversationId) => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all });
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.conversations.detail(conversationId),
+    onSuccess: () => {
+      invalidateConversationQueries(queryClient);
+    },
+    onError: () => {
+      toast({
+        title: "Couldn’t confirm the conversation was marked as read",
+        description: "It remains unread. Reopen the conversation to try again.",
+        variant: "destructive",
       });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all });
     },
   });
 }
@@ -482,11 +1250,8 @@ export function useSendConversationMessage() {
       );
       return requireData(data, error, "Failed to send message");
     },
-    onSuccess: (_data, variables) => {
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.conversations.detail(variables.conversationId),
-      });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all });
+    onSuccess: () => {
+      invalidateConversationQueries(queryClient);
     },
   });
 }

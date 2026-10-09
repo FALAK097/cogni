@@ -1,0 +1,2 @@
+ALTER TABLE "conversation" ADD COLUMN "snoozedUntil" timestamp with time zone;--> statement-breakpoint
+CREATE INDEX "conversation_workspaceId_snoozedUntil_idx" ON "conversation" USING btree ("workspaceId","snoozedUntil");
