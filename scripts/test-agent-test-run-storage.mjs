@@ -26,7 +26,7 @@ const stubs = {
   "@/lib/db/schema": `
     export const agentTestCase = { workspaceId: "case.workspaceId", id: "case.id" };
     export const agentTestRun = {
-      id: "run.id", resultDigest: "run.resultDigest", workspaceId: "run.workspaceId",
+      id: "run.id", resultDigest: "run.resultDigest", suiteDigest: "run.suiteDigest", workspaceId: "run.workspaceId",
       createdAt: "run.createdAt", caseCount: "run.caseCount", passedCount: "run.passedCount",
       mismatchCount: "run.mismatchCount", errorCount: "run.errorCount", notRunCount: "run.notRunCount",
     };
@@ -115,6 +115,7 @@ function makeDb() {
                           ({
                             id,
                             createdAt,
+                            suiteDigest = null,
                             caseCount,
                             passedCount,
                             mismatchCount,
@@ -123,6 +124,7 @@ function makeDb() {
                           }) => ({
                             id,
                             createdAt,
+                            suiteDigest,
                             caseCount,
                             passedCount,
                             mismatchCount,
@@ -220,6 +222,8 @@ test("run persistence verifies cases in the active workspace and stores aggregat
   assert.equal("prompt" in row, false);
   assert.equal("transcript" in row, false);
   assert.equal("resultDigest" in row, true);
+  assert.match(row.suiteDigest, /^[a-f0-9]{64}$/);
+  assert.equal("suiteVersion" in row, false);
 });
 
 test("run persistence rejects results for another or changed suite before writing", async () => {
@@ -377,4 +381,32 @@ test("history includes the start, excludes the end and keeps the latest 50 chron
     boundary.map((run) => run.id),
     ["run-00"],
   );
+});
+
+test("suite fingerprints stay stable across results and change when the saved suite changes", async () => {
+  reset();
+  await recordAgentTestRun("workspace-a", "member-a", runInput, state.db);
+  await recordAgentTestRun(
+    "workspace-a",
+    "member-a",
+    {
+      ...runInput,
+      runId: "run-2",
+      results: [
+        { id: "case-1", status: "mismatch" },
+        { id: "case-2", status: "error" },
+      ],
+    },
+    state.db,
+  );
+  assert.equal(state.records.get("run-1").suiteDigest, state.records.get("run-2").suiteDigest);
+  state.savedCases[0].updatedAt = "2026-10-07T12:01:00.000Z";
+  const suiteVersion = JSON.stringify(state.savedCases.map(({ id, updatedAt }) => [id, updatedAt]));
+  await recordAgentTestRun(
+    "workspace-a",
+    "member-a",
+    { ...runInput, runId: "run-3", suiteVersion },
+    state.db,
+  );
+  assert.notEqual(state.records.get("run-1").suiteDigest, state.records.get("run-3").suiteDigest);
 });

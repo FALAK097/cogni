@@ -42,6 +42,7 @@ export async function recordAgentTestRun(
   }
 
   const counts = summarizeAgentTestRun(input.results);
+  const suiteDigest = createHash("sha256").update(input.suiteVersion).digest("hex");
   const resultDigest = createHash("sha256")
     .update(
       JSON.stringify({
@@ -57,6 +58,7 @@ export async function recordAgentTestRun(
       workspaceId,
       createdByMembershipId: membershipId,
       resultDigest,
+      suiteDigest,
       ...counts,
     })
     .onConflictDoNothing()
@@ -97,6 +99,7 @@ export async function listAgentTestRuns(
     .select({
       id: agentTestRun.id,
       createdAt: agentTestRun.createdAt,
+      suiteDigest: agentTestRun.suiteDigest,
       caseCount: agentTestRun.caseCount,
       passedCount: agentTestRun.passedCount,
       mismatchCount: agentTestRun.mismatchCount,

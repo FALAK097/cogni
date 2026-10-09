@@ -37,6 +37,7 @@ export type AgentTestRunSummary = {
 export type AgentTestRunHistoryItem = AgentTestRunSummary & {
   id: string;
   createdAt: string;
+  suiteDigest: string | null;
 };
 
 export type AgentTestRunHistory = {

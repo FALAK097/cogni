@@ -30,7 +30,7 @@
     "test:privileged-route-permissions": "node --test scripts/test-privileged-route-permissions.mjs scripts/test-conversation-assignment-route.mjs scripts/test-conversation-delete-route.mjs",
     "test:widget-settings": "node --test scripts/test-widget-settings.mjs",
     "test:widget-settings-state": "node --test scripts/test-widget-settings-state.mjs",
-    "test:agent-tests": "node --test scripts/test-agent-tests.mjs scripts/test-agent-test-runs-route.mjs scripts/test-agent-test-run-storage.mjs",
+    "test:agent-tests": "node --test scripts/test-agent-tests.mjs scripts/test-agent-test-runs-route.mjs scripts/test-agent-test-run-storage.mjs scripts/test-agent-test-history.mjs",
     "test:agent-test-history-db": "node --test scripts/test-agent-test-run-db.mjs",
     "test:agent-readiness": "node --test scripts/test-agent-readiness.mjs",
     "test:conversation-append": "node --test scripts/test-conversation-append.mjs scripts/test-dashboard-session-patch.mjs",

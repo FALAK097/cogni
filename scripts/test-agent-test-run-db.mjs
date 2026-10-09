@@ -86,6 +86,7 @@ test("Postgres history isolates tenants, deduplicates concurrent saves, validate
     const rows = await raw`SELECT * FROM agent_test_run WHERE "workspaceId" = ${workspaceId}`;
     assert.equal(rows.length, 1);
     assert.equal(rows[0].passedCount, 1);
+    assert.match(rows[0].suiteDigest, /^[a-f0-9]{64}$/);
     const history = await listAgentTestRuns(workspaceId, new Date(0), new Date("2100-01-01"));
     assert.equal(
       z.string().datetime({ offset: true }).safeParse(history[0].createdAt).success,
@@ -116,6 +117,21 @@ test("Postgres history isolates tenants, deduplicates concurrent saves, validate
       recordAgentTestRun(workspaceId, memberId, { ...input, runId: randomUUID() }),
       AgentTestSuiteChangedError,
     );
+    const updatedCases = await listAgentTestCases(workspaceId);
+    const revisedRunId = randomUUID();
+    await recordAgentTestRun(workspaceId, memberId, {
+      ...input,
+      runId: revisedRunId,
+      suiteVersion: getAgentTestSuiteVersion(updatedCases),
+    });
+    const revised = await listAgentTestRuns(workspaceId, new Date(0), new Date("2100-01-01"));
+    assert.notEqual(
+      revised.find((run) => run.id === runId).suiteDigest,
+      revised.find((run) => run.id === revisedRunId).suiteDigest,
+    );
+    await raw`UPDATE agent_test_run SET "suiteDigest" = NULL WHERE id = ${runId} AND "workspaceId" = ${workspaceId}`;
+    const legacy = await listAgentTestRuns(workspaceId, new Date(0), new Date("2100-01-01"));
+    assert.equal(legacy.find((run) => run.id === runId).suiteDigest, null);
   } finally {
     await raw`DELETE FROM workspace WHERE id IN (${workspaceId}, ${foreignId})`;
     await raw`DELETE FROM "user" WHERE id = ${userId}`;

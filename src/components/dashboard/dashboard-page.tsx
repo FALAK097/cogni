@@ -35,6 +35,10 @@ import { InsightsTrendChart } from "@/components/dashboard/insights-trend-chart"
 import { EvilPieChart } from "@/components/evilcharts/charts/recharts-pie-chart";
 import type { ChartConfig } from "@/components/evilcharts/ui/recharts-chart";
 import { Button } from "@/components/ui/button";
+import {
+  AGENT_TEST_HISTORY_VIEWS,
+  selectAgentTestRunHistory,
+} from "@/features/agent-tests/history";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -169,6 +173,7 @@ const INSIGHTS_QUERY_PARSERS = {
   to: parseAsString,
   volume: parseAsStringLiteral(["daily", "weekly"] as const).withDefault("daily"),
   satisfaction: parseAsStringLiteral(["daily", "weekly"] as const).withDefault("daily"),
+  tests: parseAsStringLiteral(AGENT_TEST_HISTORY_VIEWS).withDefault("all"),
 };
 
 const DATE_RANGE_PRESETS: { id: DateRangePreset; label: string }[] = [
@@ -417,11 +422,12 @@ function buildExportSections(
   if (selected.has("agentTestRuns")) {
     sections.push({
       title: "Saved Agent Test Runs",
-      headers: ["Run time", "Pass rate", "Completed checks", "Errors", "Not run"],
+      headers: ["Run time", "Suite version", "Pass rate", "Completed checks", "Errors", "Not run"],
       rows: agentTestRuns.map((run) => {
         const evaluated = run.passedCount + run.mismatchCount;
         return [
           run.createdAt,
+          run.suiteDigest ?? "Unversioned",
           evaluated > 0 ? `${((run.passedCount / evaluated) * 100).toFixed(0)}%` : "—",
           String(evaluated),
           String(run.errorCount),
@@ -1124,7 +1130,11 @@ export function DashboardPage({
       responses: point.responses,
     }));
   }, [analytics?.satisfactionOverTime, satGranularity]);
-  const agentTestRuns = agentTestRunsQuery.data?.runs;
+  const testHistory = useMemo(
+    () => selectAgentTestRunHistory(agentTestRunsQuery.data?.runs ?? [], insightsQuery.tests),
+    [agentTestRunsQuery.data?.runs, insightsQuery.tests],
+  );
+  const agentTestRuns = testHistory.runs;
   const agentTestRunChartData = useMemo(
     () =>
       (agentTestRuns ?? []).map((run) => {
@@ -1980,10 +1990,11 @@ export function DashboardPage({
                   </h2>
                   <p className="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground">
                     Share of completed saved checks that met their expected behavior on each run.
-                    Showing the latest 50 runs in this date range. Errors and checks not run are
-                    excluded. Check edits can change the suite represented by each run, so treat
-                    this as a run-by-run snapshot, not a directly comparable quality trend, a
-                    confidence score, or a measure of live conversations.
+                    History is limited to the latest 50 runs in this date range before filtering.
+                    Errors and checks not run are excluded. Filter to the latest suite to compare
+                    the same saved checks. Agent and knowledge changes are not versioned here. These
+                    outcomes check retrieval and handoff behavior, not answer correctness,
+                    confidence, or live conversations.
                   </p>
                 </div>
                 {latestAgentTestRun ? (
@@ -2004,6 +2015,33 @@ export function DashboardPage({
                   </p>
                 ) : null}
               </div>
+              {(agentTestRunsQuery.data?.runs.length ?? 0) > 0 ? (
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                  <label className="flex flex-wrap items-center gap-2 text-xs font-medium">
+                    Compare tests
+                    <select
+                      className="h-9 max-w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+                      value={insightsQuery.tests}
+                      onChange={(event) =>
+                        void setInsightsQuery({
+                          tests: event.target.value === "latest-suite" ? "latest-suite" : "all",
+                        })
+                      }
+                    >
+                      <option value="all">All suite versions</option>
+                      <option value="latest-suite">Latest suite in this period</option>
+                    </select>
+                  </label>
+                  <p className="text-xs text-muted-foreground" aria-live="polite">
+                    {agentTestRuns.length} of {agentTestRunsQuery.data?.runs.length ?? 0} loaded
+                    runs · {testHistory.versionCount} suite{" "}
+                    {testHistory.versionCount === 1 ? "version" : "versions"}
+                    {testHistory.unversionedCount > 0
+                      ? ` · ${testHistory.unversionedCount} unversioned`
+                      : ""}
+                  </p>
+                </div>
+              ) : null}
               {agentTestRunsQuery.isError && agentTestRunsQuery.data ? (
                 <output aria-live="polite" className="mt-3 block text-xs text-muted-foreground">
                   Saved test history couldn’t refresh. Showing the last loaded results.
@@ -2035,6 +2073,24 @@ export function DashboardPage({
                   >
                     {agentTestRunsQuery.isFetching ? "Retrying…" : "Try again"}
                   </Button>
+                </div>
+              ) : insightsQuery.tests === "latest-suite" &&
+                (agentTestRunsQuery.data?.runs.length ?? 0) > 0 &&
+                testHistory.latestSuiteDigest === null ? (
+                <div className="mt-5">
+                  <EmptyState
+                    compact
+                    title="These runs have no suite version"
+                    description="Earlier runs were saved before suite versioning. View all runs, or run your saved checks again to record a version."
+                  >
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void setInsightsQuery({ tests: "all" })}
+                    >
+                      View all runs
+                    </Button>
+                  </EmptyState>
                 </div>
               ) : (agentTestRuns?.length ?? 0) === 0 ? (
                 <div className="mt-5">

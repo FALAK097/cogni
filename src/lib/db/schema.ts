@@ -432,6 +432,7 @@ export const agentTestRun = pgTable(
   {
     id: text().primaryKey().notNull(),
     resultDigest: text().notNull(),
+    suiteDigest: text(),
     caseCount: integer().notNull(),
     passedCount: integer().notNull(),
     mismatchCount: integer().notNull(),

@@ -14,6 +14,8 @@ Insights shows saved test pass-rate snapshots for the latest 50 runs in the sele
 
 The read API establishes workspace membership; writes require an owner. Responses use private/no-store caching. Input validation rejects duplicate case IDs and bounds suite/run sizes; the request body is capped at 1 MiB. Storage checks the complete saved suite/version and rejects changed suites and conflicting IDs without returning another workspace's record. History timestamps are normalized to ISO strings for the client contract.
 
+Migration `0016_agent_test_suite_versions.sql` adds a nullable SHA-256 suite fingerprint. New runs fingerprint the validated saved-case IDs and edit timestamps; no test content is stored. Insights has a URL-backed all-suites/latest-suite-in-period comparison control, version and unversioned counts, and suite identity in exports. Filtering happens after the latest-50 cap. Legacy runs remain unversioned and are excluded from same-suite comparisons. Agent configuration and source revisions still are not captured, and this does not constitute calibrated answer-quality evaluation.
+
 Migration `0015_agent_test_run_history.sql` adds `agent_test_run`, nonnegative/count-sum checks, workspace/creator foreign keys, and the workspace/date index. Do not apply it to production Neon without an explicit release instruction. A suite change after validation can still occur before the insert; the stored aggregate describes the suite checked at validation, not a locked evaluation baseline.
 
 The existing PR already implements the main checkout's empty-state/loading improvements in updated form. Retain compact empty states, differentiated filter/first-use copy, content-shaped accessible skeletons, reduced-motion support, safe retries, and loaded content during background refresh.
@@ -23,7 +25,7 @@ The existing PR already implements the main checkout's empty-state/loading impro
 - Oxlint, TypeScript, Oxfmt across the repository, and diff checks passed.
 - 37 focused Agent Test/history, analytics range/aggregation, Insights URL-state, and spreadsheet-export tests passed.
 - A real PostgreSQL regression test covers concurrent duplicate saves, tenant isolation, suite-change rejection, date boundaries, and the ISO timestamp client contract. It runs in CI via `test:agent-test-history-db` and requires a local database URL.
-- Drizzle generation found no schema/snapshot drift. All 16 migrations applied to a fresh disposable local database, `cogni_pr48_validation_20261009`.
+- Drizzle generation found no schema/snapshot drift. All 17 migrations applied to a fresh disposable local database, `cogni_pr48_validation_20261009`.
 - Widget bundling and Next.js production build passed with environment validation skipped. This proves compilation, not provider setup or customer acceptance.
 - React Doctor reported 100/100 for the changed React files.
 

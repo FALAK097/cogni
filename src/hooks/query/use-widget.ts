@@ -826,6 +826,10 @@ export function useAgentTestRunHistory(startDate: string, endDate: string) {
             z.object({
               id: z.string().uuid(),
               createdAt: z.string().datetime({ offset: true }),
+              suiteDigest: z
+                .string()
+                .regex(/^[a-f0-9]{64}$/)
+                .nullable(),
               caseCount: z.number().int().nonnegative(),
               passedCount: z.number().int().nonnegative(),
               mismatchCount: z.number().int().nonnegative(),
