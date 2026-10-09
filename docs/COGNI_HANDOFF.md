@@ -47,6 +47,8 @@ AI persistence and channel delivery now independently reject `ESCALATED` convers
 
 Final model-answer persistence also opts into rejecting inactive conversations. If takeover, escalation, or closure wins the final database write after the last stream poll, the completion callback throws instead of acknowledging an unsaved answer. The agent completion fails before marking the run successful, and the existing SSE error path prevents the visitor client from treating partial text as a completed response. Local PostgreSQL-to-SSE regressions cover paused, escalated, and closed states. Fixed handoff notices keep their existing best-effort persistence path; this change applies to generated answers.
 
+A repeatable opt-in synthetic model baseline now exercises production `streamWidgetAgent` with fixed retrieval fixtures and actions disabled. Live OpenAI `gpt-4o-mini` calls completed five cases using locally configured credentials, without touching application data or external actions. Source-injection testing exposed omission of a real policy contact address; the prompt now explicitly treats retrieved knowledge as untrusted reference facts and rejects assistant-directed commands inside it. A rerun recovered the correct address. See [baseline evidence](./validation/widget-agent-baseline-2026-10-09.md) for observed answers, review limits, and reproduction. This is provider/model evidence and an evaluation harness foundation, not calibrated production quality or retrieval/provider deployment proof.
+
 ## Checkout preservation
 
 Implementation was reconciled in `/Users/falakgala/.codex/worktrees/cogni-pr48-complete/cogni`, branch `agent/pr48-complete`, based on PR head `c2af319`. Its grouped commit is pushed to `agent/omnichannel-agent-platform` after validation.
@@ -55,7 +57,7 @@ The original main checkout `/Users/falakgala/projects/cogni` remains at `df4818b
 
 ## Remaining release gates
 
-The collaborative in-app browser previously reached Vercel's login gate. The user subsequently authorized the shared GitHub/Vercel session, but preview automation now times out before attaching; neither current page nor sign-in state has been inspected. Authenticated desktop/mobile, keyboard/focus, and runtime UI acceptance remain unverified. Use the shared preview or Codex in-app browser, never external Chrome.
+A fresh collaborative browser tab recovered automation and verified the user's signed-in Vercel project dashboard and the latest preview landing page. Cogni's preview showed its Google sign-in page; clicking sign-in did not establish an authenticated app session. The desktop automation host subsequently disconnected and explicitly reported no available host. Authenticated desktop/mobile, keyboard/focus, and runtime UI acceptance remain unverified. Use the shared preview or Codex in-app browser, never external Chrome.
 
 Production migration/provider readiness is a separate release action. The local database check does not prove the application database or Neon has migrations 0015–0017. Verify the deployed schema before accepting the saved history runtime.
 
