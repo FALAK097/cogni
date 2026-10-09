@@ -5,8 +5,14 @@ import { EvilAreaChart } from "@/components/evilcharts/charts/recharts-area-char
 import type { ChartConfig } from "@/components/evilcharts/ui/recharts-chart";
 import { cn } from "@/lib/utils";
 
-type TrendPoint = { label: string; value: number | null; responses?: number };
+type TrendPoint = {
+  label: string;
+  value: number | null;
+  responses?: number;
+  details?: Record<string, number>;
+};
 type YAxisDomain = readonly [number, number | "auto"];
+type TrendDetailColumn = { key: string; label: string };
 
 const formatDefaultValue = (value: number) => value.toLocaleString();
 const formatDefaultLabel = (label: string) => label;
@@ -25,6 +31,8 @@ export function InsightsTrendChart({
   seriesLabel = ariaLabel,
   yAxisDomain = [0, "auto"],
   showResponseCount = false,
+  countLabels,
+  detailColumns = [],
   allowDecimals = true,
 }: {
   data: TrendPoint[];
@@ -37,6 +45,8 @@ export function InsightsTrendChart({
   seriesLabel?: string;
   yAxisDomain?: YAxisDomain;
   showResponseCount?: boolean;
+  countLabels?: { singular: string; plural: string };
+  detailColumns?: TrendDetailColumn[];
   allowDecimals?: boolean;
   ariaLabel: string;
 }) {
@@ -135,17 +145,24 @@ export function InsightsTrendChart({
               formatter={(value, _name, item) => {
                 if (value === null || value === undefined) return "No response";
                 const formattedValue = valueFormatter(Number(value));
-                if (
-                  !showResponseCount ||
-                  typeof item.payload !== "object" ||
-                  item.payload === null
-                ) {
-                  return formattedValue;
+                const payload =
+                  typeof item.payload === "object" && item.payload !== null
+                    ? (item.payload as Record<string, unknown>)
+                    : {};
+                const responses = payload.responses;
+                let summary = formattedValue;
+                if (typeof responses === "number" && showResponseCount) {
+                  summary = `${formattedValue} / 5 · ${responses} ${responses === 1 ? "response" : "responses"}`;
+                } else if (typeof responses === "number" && countLabels) {
+                  summary = `${formattedValue} · ${responses} ${responses === 1 ? countLabels.singular : countLabels.plural}`;
                 }
-                const responses = (item.payload as Record<string, unknown>).responses;
-                return typeof responses === "number"
-                  ? `${formattedValue} / 5 · ${responses} ${responses === 1 ? "response" : "responses"}`
-                  : formattedValue;
+                const details = detailColumns.flatMap((column) => {
+                  const count = payload.details;
+                  if (typeof count !== "object" || count === null) return [];
+                  const value = (count as Record<string, unknown>)[column.key];
+                  return typeof value === "number" ? [`${column.label}: ${value}`] : [];
+                });
+                return [summary, ...details].join(" · ");
               }}
             />
             <EvilAreaChart.Area
@@ -177,11 +194,16 @@ export function InsightsTrendChart({
                   <th scope="col" className="px-3 py-2">
                     {seriesLabel}
                   </th>
-                  {showResponseCount ? (
+                  {showResponseCount || countLabels ? (
                     <th scope="col" className="px-3 py-2 text-right">
-                      Responses
+                      {countLabels?.plural ?? "Responses"}
                     </th>
                   ) : null}
+                  {detailColumns.map((column) => (
+                    <th key={column.key} scope="col" className="px-3 py-2 text-right">
+                      {column.label}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
@@ -193,9 +215,14 @@ export function InsightsTrendChart({
                     <td className="px-3 py-2">
                       {point.value === null ? "—" : valueFormatter(point.value)}
                     </td>
-                    {showResponseCount ? (
+                    {showResponseCount || countLabels ? (
                       <td className="px-3 py-2 text-right tabular-nums">{point.responses ?? 0}</td>
                     ) : null}
+                    {detailColumns.map((column) => (
+                      <td key={column.key} className="px-3 py-2 text-right tabular-nums">
+                        {point.details?.[column.key] ?? 0}
+                      </td>
+                    ))}
                   </tr>
                 ))}
               </tbody>

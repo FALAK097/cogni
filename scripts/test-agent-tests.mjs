@@ -9,7 +9,13 @@ const compiled = await build({
   format: "esm",
   platform: "node",
 });
-const { agentTestCaseInputSchema, matchesAgentTestOutcome } = await import(
+const {
+  agentTestCaseInputSchema,
+  agentTestRunInputSchema,
+  getAgentTestSuiteVersion,
+  matchesAgentTestOutcome,
+  summarizeAgentTestRun,
+} = await import(
   `data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString("base64")}`
 );
 const suiteCompiled = await build({
@@ -72,6 +78,47 @@ test("saved test expectations match only the observed preview evidence", () => {
   assert.equal(
     matchesAgentTestOutcome("no_evidence", { outcome: "answer", grounded: true }),
     false,
+  );
+});
+
+test("saved test run summaries keep errors and checks not run out of the pass-rate denominator", () => {
+  const results = [
+    { id: "00000000-0000-4000-8000-000000000001", status: "passed" },
+    { id: "00000000-0000-4000-8000-000000000002", status: "mismatch" },
+    { id: "00000000-0000-4000-8000-000000000003", status: "error" },
+    { id: "00000000-0000-4000-8000-000000000004", status: "not_run" },
+  ];
+  const parsed = agentTestRunInputSchema.safeParse({
+    runId: "00000000-0000-4000-8000-000000000005",
+    suiteVersion: "[]",
+    results,
+  });
+
+  assert.equal(parsed.success, true);
+  assert.deepEqual(summarizeAgentTestRun(results), {
+    caseCount: 4,
+    passedCount: 1,
+    mismatchCount: 1,
+    errorCount: 1,
+    notRunCount: 1,
+  });
+  assert.equal(
+    agentTestRunInputSchema.safeParse({
+      runId: "00000000-0000-4000-8000-000000000005",
+      suiteVersion: "[]",
+      results: [results[0], results[0]],
+    }).success,
+    false,
+  );
+  assert.equal(
+    getAgentTestSuiteVersion([
+      { id: "case-b", updatedAt: "2026-10-07T12:00:00.000Z" },
+      { id: "case-a", updatedAt: "2026-10-07T12:00:00.000Z" },
+    ]),
+    getAgentTestSuiteVersion([
+      { id: "case-a", updatedAt: "2026-10-07T12:00:00.000Z" },
+      { id: "case-b", updatedAt: "2026-10-07T12:00:00.000Z" },
+    ]),
   );
 });
 

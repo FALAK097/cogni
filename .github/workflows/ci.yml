@@ -52,6 +52,7 @@ jobs:
       - run: pnpm test:privileged-route-permissions
       - run: pnpm test:agent-readiness
       - run: pnpm test:agent-tests
+      - run: pnpm test:agent-test-history-db
       - run: pnpm test:inbox-keyboard-navigation
       - run: pnpm test:navigation-routes
       - run: pnpm test:knowledge-source-type

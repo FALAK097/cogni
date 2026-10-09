@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { z } from "zod";
 
 import { api, requireData } from "@/lib/api/client";
 import { queryKeys } from "@/lib/query-keys";
@@ -13,7 +14,11 @@ import type {
   WidgetPublicationStatus,
 } from "@/features/widget/domain";
 import { toast } from "@/components/ui/use-toast";
-import type { AgentTestCaseInput } from "@/features/agent-tests/input";
+import type {
+  AgentTestCaseInput,
+  AgentTestRunHistory,
+  AgentTestRunInput,
+} from "@/features/agent-tests/input";
 import { parseInboxConversationEventsResponse } from "@/features/conversations/inbox-events";
 
 export type DashboardWidgetConfig = Omit<WidgetWidgetConfig, "borderRadius"> & {
@@ -801,6 +806,64 @@ export function useAgentTestCases() {
       if (!response.ok || !result.cases)
         throw new Error(result.error ?? "Failed to load agent tests.");
       return { cases: result.cases };
+    },
+  });
+}
+
+export function useAgentTestRunHistory(startDate: string, endDate: string) {
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useQuery<AgentTestRunHistory>({
+    queryKey: queryKeys.widget.agentTestRuns.list(workspaceId, startDate, endDate),
+    enabled: Boolean(workspaceId),
+    queryFn: async () => {
+      const params = new URLSearchParams({ startDate, endDate });
+      const response = await fetch(`/api/dashboard/agent-test-runs?${params.toString()}`);
+      const body: unknown = await response.json().catch(() => null);
+      const parsed = z
+        .object({
+          hasAnyRuns: z.boolean(),
+          runs: z.array(
+            z.object({
+              id: z.string().uuid(),
+              createdAt: z.string().datetime({ offset: true }),
+              caseCount: z.number().int().nonnegative(),
+              passedCount: z.number().int().nonnegative(),
+              mismatchCount: z.number().int().nonnegative(),
+              errorCount: z.number().int().nonnegative(),
+              notRunCount: z.number().int().nonnegative(),
+            }),
+          ),
+        })
+        .safeParse(body);
+      if (!response.ok || !parsed.success) {
+        const error = z.object({ error: z.string() }).safeParse(body);
+        throw new Error(error.success ? error.data.error : "Failed to load saved test history.");
+      }
+      return parsed.data;
+    },
+  });
+}
+
+export function useRecordAgentTestRun() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: AgentTestRunInput) => {
+      const response = await fetch("/api/dashboard/agent-test-runs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      const result: { run?: { id?: string }; error?: string } = await response
+        .json()
+        .catch(() => ({}));
+      if (!response.ok || !result.run?.id) {
+        throw new Error(result.error ?? "Could not save this test run to Insights.");
+      }
+      return result.run;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.widget.agentTestRuns.all });
     },
   });
 }

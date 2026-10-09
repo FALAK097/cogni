@@ -427,6 +427,40 @@ export const agentTestCase = pgTable(
   ],
 );
 
+export const agentTestRun = pgTable(
+  "agent_test_run",
+  {
+    id: text().primaryKey().notNull(),
+    resultDigest: text().notNull(),
+    caseCount: integer().notNull(),
+    passedCount: integer().notNull(),
+    mismatchCount: integer().notNull(),
+    errorCount: integer().notNull(),
+    notRunCount: integer().notNull(),
+    createdAt: timestampString()
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+    workspaceId: text()
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    createdByMembershipId: text().references(() => workspaceMember.id, {
+      onDelete: "set null",
+      onUpdate: "cascade",
+    }),
+  },
+  (table) => [
+    index("agent_test_run_workspace_createdAt_idx").on(table.workspaceId, table.createdAt),
+    check(
+      "agent_test_run_counts_nonnegative_check",
+      sql`${table.caseCount} > 0 and ${table.passedCount} >= 0 and ${table.mismatchCount} >= 0 and ${table.errorCount} >= 0 and ${table.notRunCount} >= 0`,
+    ),
+    check(
+      "agent_test_run_counts_match_check",
+      sql`${table.caseCount} = ${table.passedCount} + ${table.mismatchCount} + ${table.errorCount} + ${table.notRunCount}`,
+    ),
+  ],
+);
+
 export const knowledgeGapReviewStatus = pgEnum("knowledge_gap_review_status", [
   "OPEN",
   "RESOLVED",

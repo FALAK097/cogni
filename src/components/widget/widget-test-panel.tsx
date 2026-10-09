@@ -21,10 +21,12 @@ import { runAgentTestSuite, type AgentTestSuiteResult } from "@/features/agent-t
 import {
   useAgentTestCases,
   useDeleteAgentTestCase,
+  useRecordAgentTestRun,
   useSaveAgentTestCase,
   type AgentTestCase,
 } from "@/hooks/query";
 import {
+  getAgentTestSuiteVersion,
   matchesAgentTestOutcome,
   type AgentTestExpectedOutcome,
 } from "@/features/agent-tests/input";
@@ -191,12 +193,17 @@ export function WidgetTestPanel({
   const casesQuery = useAgentTestCases();
   const saveCase = useSaveAgentTestCase();
   const deleteCase = useDeleteAgentTestCase();
+  const recordRun = useRecordAgentTestRun();
   const handoffTerms = getHandoffTerms(escalationKeywords);
   const visibleTerms = handoffTerms.slice(0, 5);
   const visibleSuggestions = [...new Set(suggestions.map((suggestion) => suggestion.trim()))]
     .filter((suggestion) => suggestion.length > 0 && suggestion.length <= 500)
     .slice(0, 3);
-  const isBusy = sendingPrompt !== null || resettingCaseId !== null || batchProgress !== null;
+  const isBusy =
+    sendingPrompt !== null ||
+    resettingCaseId !== null ||
+    batchProgress !== null ||
+    recordRun.isPending;
 
   const tryPrompt = async (prompt: string) => {
     if (isBusy) return null;
@@ -264,7 +271,7 @@ export function WidgetTestPanel({
 
   const runAllCases = async () => {
     const savedCases = casesQuery.data?.cases ?? [];
-    if (savedCases.length < 2 || isBusy) return;
+    if (savedCases.length === 0 || isBusy) return;
     setTryError(null);
     setRetryCase(null);
     setRetryPrompt(null);
@@ -278,10 +285,28 @@ export function WidgetTestPanel({
       onResult: (result) => setBatchResults((current) => ({ ...current, [result.id]: result })),
     });
     setBatchProgress(null);
+    let historyError: string | null = null;
+    if (canManage && results.length > 0) {
+      try {
+        await recordRun.mutateAsync({
+          runId: crypto.randomUUID(),
+          suiteVersion: getAgentTestSuiteVersion(savedCases),
+          results: results.map(({ id, status }) => ({ id, status })),
+        });
+      } catch {
+        historyError =
+          "The tests finished, but their summary couldn’t be saved to Insights. Run the suite again to retry.";
+      }
+    }
     if (results.some((result) => result.status === "error" || result.status === "not_run")) {
       setTryError(
-        "Some tests couldn't run because the preview did not complete. Review each result.",
+        [
+          "Some tests couldn’t run because the preview did not complete. Review each result.",
+          ...(historyError ? [historyError] : []),
+        ].join(" "),
       );
+    } else if (historyError) {
+      setTryError(historyError);
     }
   };
 
@@ -437,7 +462,7 @@ export function WidgetTestPanel({
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            {canManage && (casesQuery.data?.cases.length ?? 0) > 1 ? (
+            {canManage && (casesQuery.data?.cases.length ?? 0) > 0 ? (
               <Button
                 type="button"
                 size="sm"
@@ -446,7 +471,8 @@ export function WidgetTestPanel({
                 onClick={() => void runAllCases()}
                 disabled={isBusy}
               >
-                <Play className="size-3.5" aria-hidden="true" /> Run all
+                <Play className="size-3.5" aria-hidden="true" />
+                {recordRun.isPending ? "Saving…" : "Run all"}
               </Button>
             ) : null}
             {canManage ? (

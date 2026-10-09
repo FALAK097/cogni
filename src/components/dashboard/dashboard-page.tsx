@@ -19,7 +19,7 @@ import {
   subDays,
   subMonths,
 } from "date-fns";
-import { toZonedTime } from "date-fns-tz";
+import { formatInTimeZone, toZonedTime } from "date-fns-tz";
 import Link from "next/link";
 import type { FormEvent, ReactNode } from "react";
 import { useMemo, useState } from "react";
@@ -35,6 +35,7 @@ import { InsightsTrendChart } from "@/components/dashboard/insights-trend-chart"
 import { EvilPieChart } from "@/components/evilcharts/charts/recharts-pie-chart";
 import type { ChartConfig } from "@/components/evilcharts/ui/recharts-chart";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -65,7 +66,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useDashboardAnalytics, useReviewKnowledgeGap } from "@/hooks/query";
+import {
+  useAgentTestRunHistory,
+  useDashboardAnalytics,
+  useReviewKnowledgeGap,
+} from "@/hooks/query";
 import {
   isAnalyticsDateRangeWithinLimit,
   MAX_ANALYTICS_RANGE_DAYS,
@@ -149,6 +154,7 @@ const EXPORT_SECTIONS = [
   { id: "topQuestions", label: "Top questions" },
   { id: "userEngagement", label: "Conversation activity" },
   { id: "satisfactionOverTime", label: "Satisfaction over time" },
+  { id: "agentTestRuns", label: "Saved test runs" },
 ] as const;
 
 type ExportSectionId = (typeof EXPORT_SECTIONS)[number]["id"];
@@ -275,6 +281,7 @@ function downloadFile(content: string, filename: string, mimeType: string) {
 function buildExportSections(
   analytics: DashboardAnalytics,
   selected: Set<ExportSectionId>,
+  agentTestRuns: NonNullable<ReturnType<typeof useAgentTestRunHistory>["data"]>["runs"],
 ): ExportSection[] {
   const sections: ExportSection[] = [];
   const pct = (value: number | null) =>
@@ -407,6 +414,23 @@ function buildExportSections(
     });
   }
 
+  if (selected.has("agentTestRuns")) {
+    sections.push({
+      title: "Saved Agent Test Runs",
+      headers: ["Run time", "Pass rate", "Completed checks", "Errors", "Not run"],
+      rows: agentTestRuns.map((run) => {
+        const evaluated = run.passedCount + run.mismatchCount;
+        return [
+          run.createdAt,
+          evaluated > 0 ? `${((run.passedCount / evaluated) * 100).toFixed(0)}%` : "—",
+          String(evaluated),
+          String(run.errorCount),
+          String(run.notRunCount),
+        ];
+      }),
+    });
+  }
+
   return sections;
 }
 
@@ -443,6 +467,7 @@ function sectionsToExcelHtml(sections: ExportSection[]): string {
 
 function runDashboardExport(
   analytics: DashboardAnalytics,
+  agentTestRuns: NonNullable<ReturnType<typeof useAgentTestRunHistory>["data"]>["runs"],
   dateRange: DateRangeValue,
   formatType: ExportFormat,
   selected: Record<ExportSectionId, boolean>,
@@ -450,7 +475,7 @@ function runDashboardExport(
   const ids = EXPORT_SECTIONS.map((section) => section.id).filter((id) => selected[id]);
   if (ids.length === 0) return false;
 
-  const sections = buildExportSections(analytics, new Set(ids));
+  const sections = buildExportSections(analytics, new Set(ids), agentTestRuns);
   const baseName = `insights-${format(dateRange.start, "yyyy-MM-dd")}-${format(dateRange.end, "yyyy-MM-dd")}`;
 
   if (formatType === "csv") {
@@ -808,10 +833,12 @@ function DateRangePicker({
 
 function ExportMenu({
   analytics,
+  agentTestRuns,
   dateRange,
   disabled,
 }: {
   analytics: DashboardAnalytics;
+  agentTestRuns: NonNullable<ReturnType<typeof useAgentTestRunHistory>["data"]>["runs"];
   dateRange: DateRangeValue;
   disabled: boolean;
 }) {
@@ -831,7 +858,7 @@ function ExportMenu({
   };
 
   const handleExport = () => {
-    const ok = runDashboardExport(analytics, dateRange, formatType, selected);
+    const ok = runDashboardExport(analytics, agentTestRuns, dateRange, formatType, selected);
     if (ok) setOpen(false);
   };
 
@@ -1038,6 +1065,7 @@ export function DashboardPage({
   );
 
   const analyticsQuery = useDashboardAnalytics(queryParams);
+  const agentTestRunsQuery = useAgentTestRunHistory(queryParams.startDate, queryParams.endDate);
   const reviewKnowledgeGap = useReviewKnowledgeGap();
   const { toast } = useToast();
   const analytics = analyticsQuery.data;
@@ -1096,6 +1124,29 @@ export function DashboardPage({
       responses: point.responses,
     }));
   }, [analytics?.satisfactionOverTime, satGranularity]);
+  const agentTestRuns = agentTestRunsQuery.data?.runs;
+  const agentTestRunChartData = useMemo(
+    () =>
+      (agentTestRuns ?? []).map((run) => {
+        const evaluatedCount = run.passedCount + run.mismatchCount;
+        return {
+          label: run.createdAt,
+          value: evaluatedCount > 0 ? Math.round((run.passedCount / evaluatedCount) * 100) : null,
+          responses: evaluatedCount,
+          details: {
+            passed: run.passedCount,
+            mismatches: run.mismatchCount,
+            errors: run.errorCount,
+            notRun: run.notRunCount,
+          },
+        };
+      }),
+    [agentTestRuns],
+  );
+  const latestAgentTestRun = agentTestRuns?.at(-1);
+  const latestEvaluatedCount = latestAgentTestRun
+    ? latestAgentTestRun.passedCount + latestAgentTestRun.mismatchCount
+    : 0;
   const hasSatisfactionResponses = (analytics?.satisfactionOverTime ?? []).some(
     (point) => point.responses > 0,
   );
@@ -1190,8 +1241,13 @@ export function DashboardPage({
             {analytics ? (
               <ExportMenu
                 analytics={analytics}
+                agentTestRuns={agentTestRuns ?? []}
                 dateRange={dateRange}
-                disabled={analyticsQuery.isFetching}
+                disabled={
+                  analyticsQuery.isFetching ||
+                  agentTestRunsQuery.isFetching ||
+                  (agentTestRunsQuery.isError && !agentTestRunsQuery.data)
+                }
               />
             ) : (
               <Button
@@ -1907,6 +1963,136 @@ export function DashboardPage({
             )}
           </DashboardCard>
         </section>
+
+        {!hasInitialError ? (
+          <section
+            aria-labelledby="agent-test-trend-heading"
+            aria-busy={agentTestRunsQuery.isFetching}
+          >
+            <DashboardCard className="p-5 sm:p-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h2
+                    id="agent-test-trend-heading"
+                    className="text-sm font-semibold tracking-tight"
+                  >
+                    Saved test pass rate
+                  </h2>
+                  <p className="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground">
+                    Share of completed saved checks that met their expected behavior on each run.
+                    Showing the latest 50 runs in this date range. Errors and checks not run are
+                    excluded. Check edits can change the suite represented by each run, so treat
+                    this as a run-by-run snapshot, not a directly comparable quality trend, a
+                    confidence score, or a measure of live conversations.
+                  </p>
+                </div>
+                {latestAgentTestRun ? (
+                  <p className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                    Latest:{" "}
+                    {latestEvaluatedCount > 0
+                      ? `${latestAgentTestRun.passedCount}/${latestEvaluatedCount} passed`
+                      : "no completed checks"}
+                    {latestAgentTestRun.mismatchCount > 0
+                      ? ` · ${latestAgentTestRun.mismatchCount} mismatches`
+                      : ""}
+                    {latestAgentTestRun.errorCount > 0
+                      ? ` · ${latestAgentTestRun.errorCount} errors`
+                      : ""}
+                    {latestAgentTestRun.notRunCount > 0
+                      ? ` · ${latestAgentTestRun.notRunCount} not run`
+                      : ""}
+                  </p>
+                ) : null}
+              </div>
+              {agentTestRunsQuery.isError && agentTestRunsQuery.data ? (
+                <output aria-live="polite" className="mt-3 block text-xs text-muted-foreground">
+                  Saved test history couldn’t refresh. Showing the last loaded results.
+                </output>
+              ) : null}
+              {isLoading || agentTestRunsQuery.isLoading ? (
+                <output
+                  aria-live="polite"
+                  aria-label="Loading saved test history"
+                  aria-busy="true"
+                  className="mt-5 block"
+                >
+                  <span className="sr-only">Loading saved test history</span>
+                  <Skeleton className="h-52 w-full rounded-lg border border-border/50 bg-transparent" />
+                </output>
+              ) : agentTestRunsQuery.isError && !agentTestRunsQuery.data ? (
+                <div
+                  role="alert"
+                  className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/70 bg-muted/30 px-3 py-3"
+                >
+                  <p className="text-sm text-muted-foreground">
+                    Saved test history couldn’t be loaded.
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void agentTestRunsQuery.refetch()}
+                    disabled={agentTestRunsQuery.isFetching}
+                  >
+                    {agentTestRunsQuery.isFetching ? "Retrying…" : "Try again"}
+                  </Button>
+                </div>
+              ) : (agentTestRuns?.length ?? 0) === 0 ? (
+                <div className="mt-5">
+                  <EmptyState
+                    compact
+                    title={
+                      agentTestRunsQuery.data?.hasAnyRuns
+                        ? "No saved test runs in this period"
+                        : "No saved test runs yet"
+                    }
+                    description={
+                      agentTestRunsQuery.data?.hasAnyRuns
+                        ? "Choose a wider Insights date range to include earlier runs, or run your checks now."
+                        : canManage
+                          ? "Create reusable checks in Agent → Test, then run the suite to start a history."
+                          : "A workspace owner can run saved checks in Agent → Test to start a history."
+                    }
+                  >
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      nativeButton={false}
+                      render={<Link href={agentHref("saved-tests-heading")} />}
+                    >
+                      Open Agent tests
+                    </Button>
+                  </EmptyState>
+                </div>
+              ) : (
+                <InsightsTrendChart
+                  className="mt-4"
+                  data={agentTestRunChartData}
+                  empty={agentTestRunChartData.every((point) => point.value === null)}
+                  emptyMessage="These runs had no completed checks. Run the suite after the preview is ready."
+                  labelFormatter={(value) =>
+                    formatInTimeZone(
+                      new Date(value),
+                      normalizeTimezone(workspaceTimezone),
+                      "MMM d, h:mm a",
+                    )
+                  }
+                  valueFormatter={(value) => `${Math.round(value)}%`}
+                  seriesLabel="Saved test pass rate"
+                  countLabels={{ singular: "completed check", plural: "completed checks" }}
+                  detailColumns={[
+                    { key: "passed", label: "Passed" },
+                    { key: "mismatches", label: "Mismatches" },
+                    { key: "errors", label: "Errors" },
+                    { key: "notRun", label: "Not run" },
+                  ]}
+                  yAxisDomain={[0, 100]}
+                  allowDecimals={false}
+                  ariaLabel="Saved test pass rate by run"
+                />
+              )}
+            </DashboardCard>
+          </section>
+        ) : null}
 
         {feedbackToImprove ? (
           <FeedbackKnowledgeDialog

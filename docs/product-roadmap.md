@@ -163,8 +163,10 @@ program and proprietary AI quality is an ongoing product program, not a single P
 9. **Implemented in PR #48:** Agent draft/publish lifecycle with immutable, workspace-scoped versions,
    owner-only publishing, published runtime snapshots, immediate domain/enable safety controls,
    author/timestamp history and rollback-as-new-version. Repeatable grounded-answer/no-answer/handoff
-   cases are also available in Test; production model-quality evaluation remains a later gate.
-10. **Partially implemented in PR #48:** Insights groups unanswered questions, completed AI answers with no source match, and negative feedback; owners can create verified Q&A sources and track gap review state. Open unanswered questions appear after 24 hours without a public reply; closed conversations appear immediately. Add calibrated evaluation and quality trends; issue #32 remains open.
+   cases and owner-only saved-suite runs are also available. Insights shows workspace-scoped snapshots of
+   saved-test pass rates for the latest 50 runs in the selected period, with errors and not-run checks separate; the history stores aggregate
+   counts only and is not a confidence or live-conversation quality score.
+10. **Partially implemented in PR #48:** Insights groups unanswered questions, completed AI answers with no source match, and negative feedback; owners can create verified Q&A sources and track gap review state. Open unanswered questions appear after 24 hours without a public reply; closed conversations appear immediately. Issue #32 remains open for authenticated browser acceptance and the later calibrated evaluation baseline.
 
 Each slice includes domain/API/query/UI changes, permission checks, failure recovery, focused
 behavioral tests where risk warrants them, `pnpm lint`, `pnpm typecheck`, formatting and build,
