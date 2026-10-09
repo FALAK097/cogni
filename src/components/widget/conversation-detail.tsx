@@ -10,6 +10,12 @@ import { z } from "zod";
 import { Streamdown } from "streamdown";
 import { CreateAgentTestCaseDialog } from "@/features/agent-tests/components/create-agent-test-case-dialog";
 import {
+  getConversationHandoffStatus,
+  generateHandoffBrief,
+  formatHandoffBriefAsNote,
+} from "@/features/conversations/handoff-expectations";
+import {
+  AlertCircle,
   ArrowLeft,
   ArrowRight,
   Bot,
@@ -35,6 +41,7 @@ import {
   ThumbsDown,
   ThumbsUp,
   Trash2,
+  UserCheck,
   UserPlus,
   X,
 } from "@/components/icons";
@@ -410,6 +417,20 @@ export function ConversationDetail({
 
   const displayName = session ? getDisplayName(session) : "";
   const firstVisitorQuestion = session?.messages.find((m) => m.role === "user")?.content;
+  const membersQuery = useWorkspaceMembers();
+  const assignedMemberName =
+    membersQuery.data?.members.find((member) => member.id === session?.assigneeId)?.name ??
+    session?.assigneeName;
+
+  const handoffStatus = useMemo(
+    () =>
+      getConversationHandoffStatus({
+        status: session?.conversationStatus,
+        aiPaused: session?.aiPaused,
+        assigneeName: assignedMemberName,
+      }),
+    [session?.conversationStatus, session?.aiPaused, assignedMemberName],
+  );
 
   const groupedMessages = useMemo(() => {
     if (!messages) return [];
@@ -700,6 +721,10 @@ export function ConversationDetail({
           session={session}
           displayName={displayName}
           onSelectConversation={onSelectConversation}
+          onInsertBriefNote={(note) => {
+            setComposerMode("note");
+            setNoteText(note);
+          }}
         />
       </div>
     );
@@ -897,6 +922,10 @@ export function ConversationDetail({
                     session={session}
                     displayName={displayName}
                     onSelectConversation={onSelectConversation}
+                    onInsertBriefNote={(note) => {
+                      setComposerMode("note");
+                      setNoteText(note);
+                    }}
                   />
                 </div>
               </SheetContent>
@@ -1045,6 +1074,71 @@ export function ConversationDetail({
             className={cn("h-full", scrollPaneClassName)}
           >
             <div className="mx-auto max-w-3xl space-y-5 px-3 py-3 sm:px-4">
+              {handoffStatus.state === "queued" ? (
+                <output
+                  aria-label="Human handoff requested"
+                  className="block rounded-xl border border-amber-300/80 bg-amber-50/70 p-3.5 text-xs text-amber-900 shadow-sm dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200"
+                >
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-start gap-2.5">
+                      <AlertCircle
+                        className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400"
+                        aria-hidden="true"
+                      />
+                      <div className="space-y-0.5">
+                        <p className="font-semibold text-foreground">
+                          Human handoff requested · Queued for teammate
+                        </p>
+                        <p className="text-muted-foreground">
+                          Visitor requested a human or matched escalation criteria. AI replies are
+                          paused.
+                        </p>
+                      </div>
+                    </div>
+                    {!isAssignedToMe ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="default"
+                        className="h-8 shrink-0 gap-1.5 self-start sm:self-auto"
+                        onClick={handleAssign}
+                        disabled={takeOverMutation.isPending}
+                      >
+                        <UserPlus className="size-3.5" aria-hidden="true" />
+                        Take over & reply
+                      </Button>
+                    ) : null}
+                  </div>
+                </output>
+              ) : handoffStatus.state === "assigned" ? (
+                <output
+                  aria-label="Assigned to teammate"
+                  className="block rounded-xl border border-blue-200/80 bg-blue-50/60 p-3 text-xs text-blue-900 shadow-sm dark:border-blue-900/60 dark:bg-blue-950/20 dark:text-blue-200"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <UserCheck
+                        className="size-4 shrink-0 text-blue-600 dark:text-blue-400"
+                        aria-hidden="true"
+                      />
+                      <span className="font-medium">
+                        Assigned to {assignedMemberName ?? session.assigneeName} · Teammate response
+                        expected
+                      </span>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                      onClick={() => handleToggleAi(true)}
+                    >
+                      Resume AI
+                    </Button>
+                  </div>
+                </output>
+              ) : null}
+
               {groupedMessages.map((group) => (
                 <div key={group.date} className="space-y-4">
                   <div className="flex items-center justify-center px-1">
@@ -1722,10 +1816,12 @@ function SessionDetailsContent({
   session,
   displayName,
   onSelectConversation,
+  onInsertBriefNote,
 }: {
   session: ConversationDetailData;
   displayName: string;
   onSelectConversation: (conversationId: string) => void;
+  onInsertBriefNote?: (note: string) => void;
 }) {
   const { toast } = useToast();
   const membersQuery = useWorkspaceMembers();
@@ -1745,6 +1841,46 @@ function SessionDetailsContent({
   const assignedMemberName = membersQuery.data?.members.find(
     (member) => member.id === session.assigneeId,
   )?.name;
+
+  const handoffStatus = useMemo(
+    () =>
+      getConversationHandoffStatus({
+        status: session.conversationStatus,
+        aiPaused: session.aiPaused,
+        assigneeName: assignedMemberName ?? session.assigneeName,
+      }),
+    [session.conversationStatus, session.aiPaused, assignedMemberName, session.assigneeName],
+  );
+
+  const handoffBrief = useMemo(
+    () =>
+      generateHandoffBrief({
+        firstQuestion: session.messages?.find((m) => m.role === "user")?.content ?? null,
+        lastVisitorMessage:
+          session.messages?.filter((m) => m.role === "user").at(-1)?.content ?? null,
+        visitorName: session.contactName,
+        visitorEmail: session.contactEmail,
+        visitorPhone: session.contactPhone,
+        sources: Array.from(
+          new Set(
+            session.messages
+              ?.flatMap((m) => m.citations?.map((c) => c.title) ?? [])
+              .filter(Boolean) ?? [],
+          ),
+        ),
+        isAssigned: Boolean(session.assigneeId),
+        assigneeName: assignedMemberName ?? session.assigneeName,
+      }),
+    [
+      session.messages,
+      session.contactName,
+      session.contactEmail,
+      session.contactPhone,
+      session.assigneeId,
+      assignedMemberName,
+      session.assigneeName,
+    ],
+  );
 
   const handleAssigneeChange = (value: string | null) => {
     if (!value || assignConversation.isPending) return;
@@ -2359,6 +2495,81 @@ function SessionDetailsContent({
                 </div>
               </div>
             )}
+          </div>
+          <div className="my-2 rounded-lg border border-border/70 bg-muted/20 p-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <FileText className="size-3.5 text-primary" aria-hidden="true" />
+                <p className="text-xs font-semibold text-foreground">Handoff Brief</p>
+              </div>
+              <Badge variant="outline" className="text-[10px]">
+                {handoffStatus.state === "assigned"
+                  ? "Assigned"
+                  : handoffStatus.state === "queued"
+                    ? "Queued"
+                    : "Active"}
+              </Badge>
+            </div>
+            <div className="space-y-2 text-xs">
+              <div>
+                <span className="block text-[11px] font-medium text-muted-foreground">
+                  Customer Intent
+                </span>
+                <p className="mt-0.5 leading-relaxed text-foreground">
+                  {handoffBrief.customerIntent}
+                </p>
+              </div>
+              {handoffBrief.verifiedDetails.length > 0 ? (
+                <div>
+                  <span className="block text-[11px] font-medium text-muted-foreground">
+                    Verified Details
+                  </span>
+                  <p className="mt-0.5 text-muted-foreground">
+                    {handoffBrief.verifiedDetails.join(" · ")}
+                  </p>
+                </div>
+              ) : null}
+              {handoffBrief.sourcesConsulted.length > 0 ? (
+                <div>
+                  <span className="block text-[11px] font-medium text-muted-foreground">
+                    Sources Consulted
+                  </span>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {handoffBrief.sourcesConsulted.map((source) => (
+                      <Link
+                        key={source}
+                        href="/agent#build"
+                        className="inline-flex max-w-44 items-center gap-1 rounded bg-background px-1.5 py-0.5 text-[11px] text-foreground ring-1 ring-border/60 hover:text-primary"
+                      >
+                        <span className="truncate">{source}</span>
+                        <ExternalLink
+                          className="size-2.5 text-muted-foreground"
+                          aria-hidden="true"
+                        />
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              <div>
+                <span className="block text-[11px] font-medium text-muted-foreground">
+                  Recommended Action
+                </span>
+                <p className="mt-0.5 text-muted-foreground">{handoffBrief.recommendedNextStep}</p>
+              </div>
+              {onInsertBriefNote ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-1 h-8 w-full text-xs"
+                  onClick={() => onInsertBriefNote(formatHandoffBriefAsNote(handoffBrief))}
+                >
+                  <Plus className="mr-1.5 size-3" aria-hidden="true" />
+                  Copy Brief to Private Note
+                </Button>
+              ) : null}
+            </div>
           </div>
           <DetailRow label="Assignee">
             <Select value={session.assigneeId ?? "unassigned"} onValueChange={handleAssigneeChange}>

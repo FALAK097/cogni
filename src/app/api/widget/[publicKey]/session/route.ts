@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
+import { getConversationHandoffStatus } from "@/features/conversations/handoff-expectations";
 import { getVisitorConversationMessages } from "@/features/conversations/server/conversation-service";
 import { getHasWidgetConversationCond } from "@/features/widget/server/widget-data-filters";
 import { assertPublicWidgetAccess, bearerToken } from "@/features/widget/server/widget-public";
@@ -134,6 +135,33 @@ export async function POST(
       })
     : [];
 
+  const linkedConversation = visitorSession
+    ? await db.query.conversation.findFirst({
+        where: (fields, { eq, and }) =>
+          and(
+            eq(fields.workspaceId, widget.workspace.id),
+            eq(fields.visitorSessionId, visitorSession.id),
+          ),
+        with: {
+          workspaceMember: {
+            with: {
+              user: {
+                columns: { name: true },
+              },
+            },
+          },
+        },
+      })
+    : null;
+
+  const handoff = linkedConversation
+    ? getConversationHandoffStatus({
+        status: linkedConversation.status,
+        aiPaused: linkedConversation.aiPaused,
+        assigneeName: linkedConversation.workspaceMember?.user?.name ?? null,
+      })
+    : null;
+
   const response = Response.json({
     sessionId: visitorSession?.id ?? null,
     browserSessionId,
@@ -164,6 +192,14 @@ export async function POST(
           leadCapturedAt: visitorSession.leadCapturedAt
             ? new Date(visitorSession.leadCapturedAt).toISOString()
             : null,
+        }
+      : null,
+    handoff: handoff
+      ? {
+          state: handoff.state,
+          label: handoff.label,
+          description: handoff.description,
+          assigneeName: handoff.assigneeName,
         }
       : null,
     messages: toWidgetHistoryMessages(messages),

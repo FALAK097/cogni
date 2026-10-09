@@ -103,3 +103,13 @@ A fresh reviewer independently audited `c2af319..7d82173`, found no actionable d
 Use the stable branch preview for Google OAuth testing. Its callback URI is `https://cogni-git-agent-omnichannel-agent-platform-falaks-projects.vercel.app/api/auth/callback/google`. Google must register that exact URI for the Preview OAuth client. Merely trusting preview origins while retaining a different auth base URL does not establish a working callback/session. Do not allow `*.vercel.app`, disable origin checking, or share production cookies as a workaround. Production environment settings and database migrations were not changed.
 
 Better Auth's [dynamic-base-URL guidance](https://better-auth.com/docs/guides/dynamic-base-url) explains strict host validation; its [OAuth Proxy guide](https://better-auth.com/docs/plugins/oauth-proxy) requires coordinated plugin/version/secret setup on both callback and preview servers. No OAuth proxy was installed: this PR's preview uses its own stable callback host.
+
+## Explicit handoff expectations and structured brief
+
+When visitors request human assistance or match escalation criteria, the platform now provides clear expectations and structured context:
+
+- **Handoff Lifecycle States (`src/features/conversations/handoff-expectations.ts`):** Identifies `queued` (unassigned in queue awaiting human pickup), `assigned` (assigned to teammate, AI paused), `bot` (AI active), and `closed` states.
+- **Truthful Visitor Expectations (`src/app/api/widget/[publicKey]/session/route.ts`):** The public widget session delivers real-time handoff state metadata to visitors without generic promises or fake online indicators.
+- **Inbox Handoff Cue Banner (`src/components/widget/conversation-detail.tsx`):** The transcript displays a high-priority, accessible (`<output>`) status banner when a conversation is queued for teammate response (with a direct "Take over & reply" button) or assigned (with quick "Resume AI" controls).
+- **Structured Handoff Brief:** The Details sidebar synthesizes a structured brief covering Customer Intent, Verified Contact Details, Sources Consulted (with direct `#build` links into Knowledge), and Recommended Next Steps, with a 1-click action to populate the internal team note composer.
+- **Unit and Regression Tests:** `scripts/test-handoff-expectations.mjs` verifies queued, assigned, bot, and brief formatting logic (5/5 passing). React Doctor scored 100/100 Great.

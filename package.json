@@ -34,6 +34,7 @@
     "test:agent-test-history-db": "node --test scripts/test-agent-test-run-db.mjs",
     "test:agent-readiness": "node --test scripts/test-agent-readiness.mjs",
     "test:knowledge-source-health": "node --test scripts/test-knowledge-source-health.mjs",
+    "test:handoff-expectations": "node --test scripts/test-handoff-expectations.mjs",
     "test:conversation-append": "node --test scripts/test-conversation-append.mjs scripts/test-dashboard-session-patch.mjs",
     "test:conversation-assignment-route": "node --test scripts/test-conversation-assignment-route.mjs",
     "test:ticket-lifecycle-route": "node --test scripts/test-ticket-lifecycle-routes.mjs",
