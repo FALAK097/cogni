@@ -20,12 +20,18 @@ Migration `0015_agent_test_run_history.sql` adds `agent_test_run`, nonnegative/c
 
 The existing PR already implements the main checkout's empty-state/loading improvements in updated form. Retain compact empty states, differentiated filter/first-use copy, content-shaped accessible skeletons, reduced-motion support, safe retries, and loaded content during background refresh.
 
+## Required-source retrieval checks
+
+Migration `0017_agent_test_expected_sources.sql` adds an empty-by-default JSONB list of expected source IDs to saved cases. Owners can optionally require up to four ready sources for a sources-retrieved check. Case writes validate UUIDs, uniqueness, workspace ownership, and ready status. Deleted or unready selections remain visible for explicit removal. Source IDs travel only through authenticated preview evidence; title-only legacy evidence cannot satisfy an annotated case.
+
+Individual checks and Run all require every selected document ID to appear in retrieved evidence. Additional retrieved sources are allowed. This is retrieval coverage, not a judge of answer correctness or citation faithfulness. Existing unannotated cases keep their behavior. Case edits advance their database timestamps, changing suite identity. Case write bodies are bounded to 16 KiB, and responses disable caching. PostgreSQL regression coverage includes foreign, unready, missing, and deleted sources and annotation removal. Preview-evidence transport checks now run in CI.
+
 ## Local verification
 
 - Oxlint, TypeScript, Oxfmt across the repository, and diff checks passed.
-- 37 focused Agent Test/history, analytics range/aggregation, Insights URL-state, and spreadsheet-export tests passed.
+- 48 focused Agent Test/history, source-evidence transport, preview isolation, and route permission tests passed for the required-source slice.
 - A real PostgreSQL regression test covers concurrent duplicate saves, tenant isolation, suite-change rejection, date boundaries, and the ISO timestamp client contract. It runs in CI via `test:agent-test-history-db` and requires a local database URL.
-- Drizzle generation found no schema/snapshot drift. All 17 migrations applied to a fresh disposable local database, `cogni_pr48_validation_20261009`.
+- Drizzle generation found no schema/snapshot drift. All 18 migrations applied to a fresh disposable local database, `cogni_pr48_validation_20261009`.
 - Widget bundling and Next.js production build passed with environment validation skipped. This proves compilation, not provider setup or customer acceptance.
 - React Doctor reported 100/100 for the changed React files.
 
@@ -45,9 +51,9 @@ The original main checkout `/Users/falakgala/projects/cogni` remains at `df4818b
 
 ## Remaining release gates
 
-The collaborative in-app browser reached Vercel's login gate when opening the protected preview. Authenticated desktop/mobile, keyboard/focus, and runtime UI acceptance remain unverified. Use the shared preview or Codex in-app browser, never external Chrome.
+The collaborative in-app browser previously reached Vercel's login gate. The user subsequently authorized the shared GitHub/Vercel session, but preview automation now times out before attaching; neither current page nor sign-in state has been inspected. Authenticated desktop/mobile, keyboard/focus, and runtime UI acceptance remain unverified. Use the shared preview or Codex in-app browser, never external Chrome.
 
-Production migration/provider readiness is a separate release action. The local database check does not prove the application database or Neon has migration 0015. Verify the deployed schema before accepting the saved history runtime.
+Production migration/provider readiness is a separate release action. The local database check does not prove the application database or Neon has migrations 0015–0017. Verify the deployed schema before accepting the saved history runtime.
 
 [Issue #32](https://github.com/FALAK097/cogni/issues/32) remains open for its calibrated evaluation baseline and authenticated browser acceptance. The new history chart alone does not complete those gates. Do not add navigation or expand into unrelated helpdesk features to satisfy them.
 

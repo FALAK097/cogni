@@ -1,10 +1,20 @@
 import { z } from "zod";
 
-export const agentTestCaseInputSchema = z.object({
-  title: z.string().trim().min(1).max(80),
-  prompt: z.string().trim().min(1).max(1_000),
-  expectedOutcome: z.enum(["grounded_answer", "no_evidence", "human_handoff"]),
-});
+export const agentTestCaseInputSchema = z
+  .object({
+    title: z.string().trim().min(1).max(80),
+    prompt: z.string().trim().min(1).max(1_000),
+    expectedOutcome: z.enum(["grounded_answer", "no_evidence", "human_handoff"]),
+    expectedSourceIds: z
+      .array(z.string().uuid())
+      .max(4)
+      .default([])
+      .refine((ids) => new Set(ids).size === ids.length),
+  })
+  .refine(
+    (input) => input.expectedOutcome === "grounded_answer" || input.expectedSourceIds.length === 0,
+    { message: "Expected sources apply only to source retrieval checks." },
+  );
 
 export type AgentTestCaseInput = z.infer<typeof agentTestCaseInputSchema>;
 export type AgentTestExpectedOutcome = AgentTestCaseInput["expectedOutcome"];
@@ -65,10 +75,19 @@ export function summarizeAgentTestRun(results: AgentTestRunInput["results"]): Ag
 
 export function matchesAgentTestOutcome(
   expected: AgentTestExpectedOutcome,
-  evidence: { outcome: "answer" | "handoff" | "error"; grounded: boolean },
+  evidence: {
+    outcome: "answer" | "handoff" | "error";
+    grounded: boolean;
+    sources?: readonly { documentId?: string }[];
+  },
+  expectedSourceIds: readonly string[] = [],
 ) {
   if (evidence.outcome === "error") return false;
   if (expected === "human_handoff") return evidence.outcome === "handoff";
   if (evidence.outcome !== "answer") return false;
-  return expected === "grounded_answer" ? evidence.grounded : !evidence.grounded;
+  if (expected === "no_evidence") return !evidence.grounded;
+  if (!evidence.grounded) return false;
+  return expectedSourceIds.every((id) =>
+    evidence.sources?.some((source) => source.documentId === id),
+  );
 }

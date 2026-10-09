@@ -46,6 +46,7 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test:widget-timeouts
       - run: pnpm test:widget-preview-container
+      - run: pnpm test:widget-preview-evidence
       - run: pnpm test:widget-publication
       - run: pnpm test:widget-publication-db
       - run: pnpm test:widget-publish-route

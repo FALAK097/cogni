@@ -13,6 +13,7 @@ import {
 } from "@/components/icons";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
+import { useKnowledgeBaseSources } from "@/hooks/query/use-knowledge-base";
 import { Skeleton } from "@/components/ui/skeleton";
 import { agentHref } from "@/features/navigation/app-routes";
 import { Input } from "@/components/ui/input";
@@ -35,7 +36,7 @@ import { runAgentTestCase } from "@/features/agent-tests/run-case";
 export type WidgetPreviewEvidence = {
   outcome: "answer" | "handoff" | "error";
   grounded: boolean;
-  sources: { title: string }[];
+  sources: { documentId?: string; title: string }[];
   prompt?: string;
 };
 
@@ -182,6 +183,8 @@ export function WidgetTestPanel({
   const [prompt, setPrompt] = useState("");
   const [expectedOutcome, setExpectedOutcome] =
     useState<AgentTestExpectedOutcome>("grounded_answer");
+  const [expectedSourceIds, setExpectedSourceIds] = useState<string[]>([]);
+  const sourcesQuery = useKnowledgeBaseSources(null, { enabled: showForm });
   const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
   const [resettingCaseId, setResettingCaseId] = useState<string | null>(null);
   const [batchProgress, setBatchProgress] = useState<{
@@ -231,6 +234,7 @@ export function WidgetTestPanel({
     setTitle("");
     setPrompt("");
     setExpectedOutcome("grounded_answer");
+    setExpectedSourceIds([]);
     setShowForm(true);
   };
 
@@ -239,6 +243,7 @@ export function WidgetTestPanel({
     setTitle(testCase.title);
     setPrompt(testCase.prompt);
     setExpectedOutcome(testCase.expectedOutcome);
+    setExpectedSourceIds(testCase.expectedSourceIds ?? []);
     setShowForm(true);
   };
 
@@ -318,6 +323,7 @@ export function WidgetTestPanel({
         title,
         prompt,
         expectedOutcome,
+        expectedSourceIds: expectedOutcome === "grounded_answer" ? expectedSourceIds : [],
       });
       setShowForm(false);
       setTryError(null);
@@ -331,7 +337,7 @@ export function WidgetTestPanel({
       <header className="space-y-1.5">
         <h2 className="text-base font-semibold tracking-tight">Test your agent</h2>
         <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
-          Try a customer question in the preview, then check which knowledge sources the answer used
+          Try a customer question in the preview, then check which knowledge sources were retrieved
           or whether a handoff rule matched.
         </p>
       </header>
@@ -559,7 +565,7 @@ export function WidgetTestPanel({
           {casesQuery.data?.cases.map((testCase) => {
             const outcomeLabel =
               testCase.expectedOutcome === "grounded_answer"
-                ? "Grounded answer"
+                ? "Sources retrieved"
                 : testCase.expectedOutcome === "no_evidence"
                   ? "No evidence"
                   : "Human handoff";
@@ -570,14 +576,23 @@ export function WidgetTestPanel({
                 ? evidence
                 : null);
             const passed = evaluated
-              ? matchesAgentTestOutcome(testCase.expectedOutcome, evaluated)
+              ? matchesAgentTestOutcome(
+                  testCase.expectedOutcome,
+                  evaluated,
+                  testCase.expectedSourceIds ?? [],
+                )
               : false;
             return (
               <li key={testCase.id} className="rounded-lg border border-border/60 p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="break-words text-sm font-medium">{testCase.title}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{outcomeLabel}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {outcomeLabel}
+                      {testCase.expectedSourceIds.length > 0
+                        ? ` · ${testCase.expectedSourceIds.length} required ${testCase.expectedSourceIds.length === 1 ? "source" : "sources"}`
+                        : ""}
+                    </p>
                     <p className="mt-2 line-clamp-2 break-words text-sm text-muted-foreground">
                       {testCase.prompt}
                     </p>
@@ -690,11 +705,92 @@ export function WidgetTestPanel({
                   setExpectedOutcome(event.target.value as AgentTestExpectedOutcome)
                 }
               >
-                <option value="grounded_answer">Grounded answer</option>
+                <option value="grounded_answer">Sources retrieved</option>
                 <option value="no_evidence">No evidence</option>
                 <option value="human_handoff">Human handoff</option>
               </select>
             </label>
+            {expectedOutcome === "grounded_answer" ? (
+              <fieldset className="space-y-2">
+                <legend className="text-sm font-medium">Required sources (optional)</legend>
+                <p className="text-xs text-muted-foreground">
+                  All selected sources must be retrieved. Up to four; this checks source coverage,
+                  not answer correctness.
+                </p>
+                {sourcesQuery.isLoading ? (
+                  <output className="text-xs text-muted-foreground">Loading sources…</output>
+                ) : null}
+                {sourcesQuery.isError ? (
+                  <div role="alert" className="flex flex-wrap items-center gap-2 text-xs">
+                    <span>Sources couldn’t be loaded.</span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void sourcesQuery.refetch()}
+                      disabled={sourcesQuery.isFetching}
+                    >
+                      Try again
+                    </Button>
+                  </div>
+                ) : null}
+                <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-border/60 p-2">
+                  {(sourcesQuery.data?.sources ?? [])
+                    .filter((source) => source.status === "ready")
+                    .map((source) => (
+                      <label key={source.id} className="flex min-h-9 items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={expectedSourceIds.includes(source.id)}
+                          disabled={
+                            !expectedSourceIds.includes(source.id) && expectedSourceIds.length >= 4
+                          }
+                          onChange={(event) =>
+                            setExpectedSourceIds((ids) =>
+                              event.target.checked
+                                ? [...ids, source.id]
+                                : ids.filter((id) => id !== source.id),
+                            )
+                          }
+                          className="size-4 shrink-0 accent-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                        />
+                        <span className="break-words">{source.displayName}</span>
+                      </label>
+                    ))}
+                  {sourcesQuery.isSuccess &&
+                  !sourcesQuery.data.sources.some((source) => source.status === "ready") ? (
+                    <p className="text-xs text-muted-foreground">
+                      No ready sources yet. Add and index knowledge in Agent before requiring a
+                      source.
+                    </p>
+                  ) : null}
+                  {expectedSourceIds
+                    .filter(
+                      (id) =>
+                        sourcesQuery.isSuccess &&
+                        !sourcesQuery.data.sources.some(
+                          (source) => source.id === id && source.status === "ready",
+                        ),
+                    )
+                    .map((id) => (
+                      <label
+                        key={id}
+                        className="flex min-h-9 items-center gap-2 text-sm text-muted-foreground"
+                      >
+                        <input
+                          type="checkbox"
+                          checked
+                          onChange={() =>
+                            setExpectedSourceIds((ids) => ids.filter((value) => value !== id))
+                          }
+                          className="size-4 shrink-0 accent-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                        />
+                        <span>Unavailable source — uncheck to remove</span>
+                      </label>
+                    ))}
+                </div>
+              </fieldset>
+            ) : null}
             <div className="flex justify-end gap-2">
               <Button type="button" size="sm" variant="ghost" onClick={() => setShowForm(false)}>
                 Cancel

@@ -39,7 +39,11 @@ export function isPreviewEvidence(value: unknown): value is WidgetPreviewEvidenc
         typeof source === "object" &&
         source !== null &&
         "title" in source &&
-        typeof source.title === "string",
+        typeof source.title === "string" &&
+        (!("documentId" in source) ||
+          (typeof source.documentId === "string" &&
+            source.documentId.length > 0 &&
+            source.documentId.length <= 128)),
     )
   ) {
     return false;

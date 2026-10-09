@@ -1,10 +1,10 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
 import { getDb, type Db } from "@/lib/db/client";
-import { agentTestCase } from "@/lib/db/schema";
+import { agentTestCase, document } from "@/lib/db/schema";
 import type { AgentTestCaseInput } from "../input";
 
 export class AgentTestCaseTitleConflictError extends Error {
@@ -12,6 +12,28 @@ export class AgentTestCaseTitleConflictError extends Error {
     super("A test with that name already exists in this workspace.");
     this.name = "AgentTestCaseTitleConflictError";
   }
+}
+
+export class AgentTestSourceUnavailableError extends Error {
+  constructor() {
+    super("Choose ready knowledge sources from this workspace, or remove unavailable sources.");
+    this.name = "AgentTestSourceUnavailableError";
+  }
+}
+
+async function validateExpectedSources(workspaceId: string, ids: string[], db: Db) {
+  if (ids.length === 0) return;
+  const sources = await db
+    .select({ id: document.id })
+    .from(document)
+    .where(
+      and(
+        eq(document.workspaceId, workspaceId),
+        eq(document.status, "READY"),
+        inArray(document.id, ids),
+      ),
+    );
+  if (sources.length !== ids.length) throw new AgentTestSourceUnavailableError();
 }
 
 function hasErrorCode(error: unknown, code: string, depth = 0): boolean {
@@ -28,6 +50,7 @@ export async function listAgentTestCases(workspaceId: string, db: Db = getDb()) 
       title: true,
       prompt: true,
       expectedOutcome: true,
+      expectedSourceIds: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -41,6 +64,7 @@ export async function createAgentTestCase(
   input: AgentTestCaseInput,
   db: Db = getDb(),
 ) {
+  await validateExpectedSources(workspaceId, input.expectedSourceIds ?? [], db);
   try {
     const [testCase] = await db
       .insert(agentTestCase)
@@ -49,15 +73,17 @@ export async function createAgentTestCase(
         title: input.title,
         prompt: input.prompt,
         expectedOutcome: input.expectedOutcome,
+        expectedSourceIds: input.expectedSourceIds ?? [],
         workspaceId,
         createdByMembershipId: membershipId,
-        updatedAt: new Date().toISOString(),
+        updatedAt: sql`CURRENT_TIMESTAMP`,
       })
       .returning({
         id: agentTestCase.id,
         title: agentTestCase.title,
         prompt: agentTestCase.prompt,
         expectedOutcome: agentTestCase.expectedOutcome,
+        expectedSourceIds: agentTestCase.expectedSourceIds,
         createdAt: agentTestCase.createdAt,
         updatedAt: agentTestCase.updatedAt,
       });
@@ -74,16 +100,22 @@ export async function updateAgentTestCase(
   input: AgentTestCaseInput,
   db: Db = getDb(),
 ) {
+  await validateExpectedSources(workspaceId, input.expectedSourceIds ?? [], db);
   try {
     const [testCase] = await db
       .update(agentTestCase)
-      .set({ ...input, updatedAt: new Date().toISOString() })
+      .set({
+        ...input,
+        expectedSourceIds: input.expectedSourceIds ?? [],
+        updatedAt: sql`GREATEST(${agentTestCase.updatedAt} + INTERVAL '1 microsecond', CURRENT_TIMESTAMP)`,
+      })
       .where(and(eq(agentTestCase.id, caseId), eq(agentTestCase.workspaceId, workspaceId)))
       .returning({
         id: agentTestCase.id,
         title: agentTestCase.title,
         prompt: agentTestCase.prompt,
         expectedOutcome: agentTestCase.expectedOutcome,
+        expectedSourceIds: agentTestCase.expectedSourceIds,
         createdAt: agentTestCase.createdAt,
         updatedAt: agentTestCase.updatedAt,
       });

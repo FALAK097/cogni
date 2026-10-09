@@ -20,7 +20,7 @@ await build({
   stdin: {
     contents: `export { getDb } from "@/lib/db/client";
       export * from "@/features/agent-tests/server/runs";
-      export { listAgentTestCases } from "@/features/agent-tests/server/cases";
+      export { listAgentTestCases, createAgentTestCase, updateAgentTestCase, AgentTestSourceUnavailableError } from "@/features/agent-tests/server/cases";
       export { getAgentTestSuiteVersion } from "@/features/agent-tests/input";`,
     resolveDir: process.cwd(),
     sourcefile: "agent-test-history-db-entry.ts",
@@ -53,6 +53,9 @@ const {
   listAgentTestRuns,
   hasAgentTestRuns,
   listAgentTestCases,
+  createAgentTestCase,
+  updateAgentTestCase,
+  AgentTestSourceUnavailableError,
   getAgentTestSuiteVersion,
   AgentTestRunConflictError,
   AgentTestSuiteChangedError,
@@ -132,6 +135,64 @@ test("Postgres history isolates tenants, deduplicates concurrent saves, validate
     await raw`UPDATE agent_test_run SET "suiteDigest" = NULL WHERE id = ${runId} AND "workspaceId" = ${workspaceId}`;
     const legacy = await listAgentTestRuns(workspaceId, new Date(0), new Date("2100-01-01"));
     assert.equal(legacy.find((run) => run.id === runId).suiteDigest, null);
+    const sourceId = randomUUID();
+    const foreignSourceId = randomUUID();
+    const processingId = randomUUID();
+    await raw`INSERT INTO document (id, title, "sourceType", status, "updatedAt", "workspaceId") VALUES (${sourceId}, 'Policy', 'TEXT', 'READY', ${now}, ${workspaceId}), (${foreignSourceId}, 'Foreign policy', 'TEXT', 'READY', ${now}, ${foreignId}), (${processingId}, 'Indexing', 'TEXT', 'PROCESSING', ${now}, ${workspaceId})`;
+    const sourceInput = {
+      title: "Expected policy",
+      prompt: "Policy?",
+      expectedOutcome: "grounded_answer",
+      expectedSourceIds: [sourceId],
+    };
+    const sourceCase = await createAgentTestCase(workspaceId, memberId, sourceInput);
+    assert.deepEqual(sourceCase.expectedSourceIds, [sourceId]);
+    assert.deepEqual(
+      (await listAgentTestCases(workspaceId)).find((entry) => entry.id === sourceCase.id)
+        .expectedSourceIds,
+      [sourceId],
+    );
+    for (const unavailableId of [foreignSourceId, processingId, randomUUID()]) {
+      await assert.rejects(
+        createAgentTestCase(workspaceId, memberId, {
+          ...sourceInput,
+          expectedSourceIds: [unavailableId],
+        }),
+        AgentTestSourceUnavailableError,
+      );
+      await assert.rejects(
+        updateAgentTestCase(workspaceId, sourceCase.id, {
+          ...sourceInput,
+          expectedSourceIds: [unavailableId],
+        }),
+        AgentTestSourceUnavailableError,
+      );
+    }
+    assert.equal(
+      await updateAgentTestCase(foreignId, sourceCase.id, {
+        ...sourceInput,
+        expectedSourceIds: [],
+      }),
+      null,
+    );
+    const updatedSourceCase = await updateAgentTestCase(workspaceId, sourceCase.id, {
+      ...sourceInput,
+      expectedSourceIds: [],
+    });
+    assert.deepEqual(updatedSourceCase.expectedSourceIds, []);
+    assert.notEqual(updatedSourceCase.updatedAt, sourceCase.updatedAt);
+    const updatedAgain = await updateAgentTestCase(workspaceId, sourceCase.id, sourceInput);
+    assert.notEqual(updatedAgain.updatedAt, updatedSourceCase.updatedAt);
+    await raw`DELETE FROM document WHERE id = ${sourceId} AND "workspaceId" = ${workspaceId}`;
+    await assert.rejects(
+      updateAgentTestCase(workspaceId, sourceCase.id, sourceInput),
+      AgentTestSourceUnavailableError,
+    );
+    const removed = await updateAgentTestCase(workspaceId, sourceCase.id, {
+      ...sourceInput,
+      expectedSourceIds: [],
+    });
+    assert.deepEqual(removed.expectedSourceIds, []);
   } finally {
     await raw`DELETE FROM workspace WHERE id IN (${workspaceId}, ${foreignId})`;
     await raw`DELETE FROM "user" WHERE id = ${userId}`;

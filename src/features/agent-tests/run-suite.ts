@@ -5,11 +5,13 @@ export type AgentTestSuiteCase = {
   title: string;
   prompt: string;
   expectedOutcome: AgentTestExpectedOutcome;
+  expectedSourceIds?: string[];
 };
 
 export type AgentTestSuiteEvidence = {
   outcome: "answer" | "handoff" | "error";
   grounded: boolean;
+  sources?: { documentId?: string }[];
 };
 
 export type AgentTestSuiteResult = {
@@ -66,7 +68,11 @@ export async function runAgentTestSuite(
       status:
         !evidence || evidence.outcome === "error"
           ? "error"
-          : matchesAgentTestOutcome(testCase.expectedOutcome, evidence)
+          : matchesAgentTestOutcome(
+                testCase.expectedOutcome,
+                evidence,
+                testCase.expectedSourceIds ?? [],
+              )
             ? "passed"
             : "mismatch",
       ...(evidence ? { evidence } : {}),

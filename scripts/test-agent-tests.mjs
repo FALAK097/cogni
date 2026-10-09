@@ -248,3 +248,101 @@ test("failed and thrown preview results remain retryable errors", async () => {
   assert.deepEqual(errorResult, { status: "run_failed" });
   assert.deepEqual(thrownResult, { status: "run_failed" });
 });
+
+test("required sources reject unrelated or title-only evidence and require every selected source", () => {
+  const outcome = "grounded_answer";
+  assert.equal(
+    matchesAgentTestOutcome(
+      outcome,
+      { outcome: "answer", grounded: true, sources: [{ documentId: "wrong" }] },
+      ["policy"],
+    ),
+    false,
+  );
+  assert.equal(
+    matchesAgentTestOutcome(outcome, { outcome: "answer", grounded: true, sources: [{}] }, [
+      "policy",
+    ]),
+    false,
+  );
+  assert.equal(
+    matchesAgentTestOutcome(
+      outcome,
+      { outcome: "answer", grounded: true, sources: [{ documentId: "policy" }] },
+      ["policy", "billing"],
+    ),
+    false,
+  );
+  assert.equal(
+    matchesAgentTestOutcome(
+      outcome,
+      {
+        outcome: "answer",
+        grounded: true,
+        sources: [{ documentId: "policy" }, { documentId: "billing" }, { documentId: "extra" }],
+      },
+      ["policy", "billing"],
+    ),
+    true,
+  );
+  assert.equal(
+    matchesAgentTestOutcome(outcome, { outcome: "handoff", grounded: false }, ["policy"]),
+    false,
+  );
+});
+
+test("expected source annotations are bounded, distinct UUIDs and apply only to retrieval checks", () => {
+  const base = { title: "Sources", prompt: "Policy?", expectedOutcome: "grounded_answer" };
+  const id = "00000000-0000-4000-8000-000000000021";
+  assert.deepEqual(agentTestCaseInputSchema.parse(base).expectedSourceIds, []);
+  assert.equal(
+    agentTestCaseInputSchema.safeParse({ ...base, expectedSourceIds: [id] }).success,
+    true,
+  );
+  for (const expectedSourceIds of [
+    [id, id],
+    ["not-an-id"],
+    Array.from(
+      { length: 5 },
+      (_, index) => `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+    ),
+  ]) {
+    assert.equal(agentTestCaseInputSchema.safeParse({ ...base, expectedSourceIds }).success, false);
+  }
+  for (const expectedOutcome of ["no_evidence", "human_handoff"])
+    assert.equal(
+      agentTestCaseInputSchema.safeParse({ ...base, expectedOutcome, expectedSourceIds: [id] })
+        .success,
+      false,
+    );
+});
+
+test("suite evaluation uses required source IDs rather than any-source grounding", async () => {
+  const cases = [
+    {
+      id: "check",
+      title: "Billing",
+      prompt: "Billing?",
+      expectedOutcome: "grounded_answer",
+      expectedSourceIds: ["billing"],
+    },
+  ];
+  const mismatch = await runAgentTestSuite(cases, {
+    resetPreview: async () => true,
+    runPrompt: async () => ({
+      outcome: "answer",
+      grounded: true,
+      sources: [{ documentId: "unrelated" }],
+    }),
+  });
+  assert.equal(mismatch[0].status, "mismatch");
+  const passed = await runAgentTestSuite(cases, {
+    resetPreview: async () => true,
+    runPrompt: async () => ({
+      outcome: "answer",
+      grounded: true,
+      sources: [{ documentId: "billing" }],
+    }),
+  });
+  assert.equal(passed[0].status, "passed");
+});

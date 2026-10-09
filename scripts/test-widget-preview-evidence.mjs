@@ -95,3 +95,22 @@ test("preview evidence keeps only a bounded prompt for matching a saved preview 
     undefined,
   );
 });
+
+test("preview source IDs survive transport for expected-source evaluation without extra provider data", () => {
+  const result = previewEvidence.parseWidgetPreviewEvidence(
+    encode({
+      outcome: "answer",
+      grounded: true,
+      sources: [
+        { title: "Policy", documentId: "policy-id", content: "private chunk" },
+        { title: "Legacy" },
+        { title: "Oversized", documentId: "x".repeat(129) },
+      ],
+    }),
+  );
+  assert.deepEqual(result.sources, [
+    { title: "Policy", documentId: "policy-id" },
+    { title: "Legacy" },
+    { title: "Oversized" },
+  ]);
+});

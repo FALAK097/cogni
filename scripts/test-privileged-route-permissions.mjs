@@ -48,7 +48,7 @@ const stubs = {
   "@/features/integrations/server/tool-executor": `export const executeApprovedTool = async (input) => { const state = globalThis.__privilegedRoutePermissionTest; state.sideEffects += 1; state.actionExecutions.push(input); return { id: "action-1", result: {} }; };`,
   "@/features/integrations/server/tool-registry": `export const parseToolInput = (actionType, input) => ({ tool: { actionType, requiresApproval: globalThis.__privilegedRoutePermissionTest.toolRequiresApproval }, input });`,
   "@/features/agent-tests/input": `export const agentTestCaseInputSchema = { safeParse: (value) => ({ success: true, data: value }) };`,
-  "@/features/agent-tests/server/cases": `export const createAgentTestCase = () => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; }; export const listAgentTestCases = () => []; export const updateAgentTestCase = async (...args) => { const state = globalThis.__privilegedRoutePermissionTest; state.sideEffects += 1; state.caseOperations.push({ operation: "update", args }); return { id: args[1] }; }; export const deleteAgentTestCase = async (...args) => { const state = globalThis.__privilegedRoutePermissionTest; state.sideEffects += 1; state.caseOperations.push({ operation: "delete", args }); return true; }; export class AgentTestCaseTitleConflictError extends Error {}`,
+  "@/features/agent-tests/server/cases": `export const createAgentTestCase = () => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; }; export const listAgentTestCases = () => []; export const updateAgentTestCase = async (...args) => { const state = globalThis.__privilegedRoutePermissionTest; state.sideEffects += 1; state.caseOperations.push({ operation: "update", args }); return { id: args[1] }; }; export const deleteAgentTestCase = async (...args) => { const state = globalThis.__privilegedRoutePermissionTest; state.sideEffects += 1; state.caseOperations.push({ operation: "delete", args }); return true; }; export class AgentTestCaseTitleConflictError extends Error {}; export class AgentTestSourceUnavailableError extends Error {}`,
   "@/lib/jobs/ingestion": `export const enqueueDocumentProcessing = () => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; };`,
   "@/features/knowledge/server/mime": `export const inferKnowledgeMimeType = () => "text/plain"; export const knowledgeSourceTypeFromMime = () => "TEXT";`,
   "@/lib/storage/index": `export const isAllowedKnowledgeUpload = () => true; export const saveObject = () => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; };`,
@@ -349,4 +349,24 @@ test("owners update and delete agent test cases using the active workspace and v
     operation: "delete",
     args: ["workspace-1", agentTestCaseId],
   });
+});
+
+test("owner case writes reject oversized bodies before saving and disable caching", async () => {
+  state.membershipRole = "OWNER";
+  state.caseOperations = [];
+  for (const [handler, args] of [
+    [agentTestRoutes.POST, []],
+    [agentTestCaseRoute.PATCH, [agentTestCaseParams]],
+  ]) {
+    const response = await handler(
+      new Request("https://cogni.test/api/dashboard/agent-test-cases", {
+        method: args.length ? "PATCH" : "POST",
+        body: JSON.stringify({ prompt: "x".repeat(20_000) }),
+      }),
+      ...args,
+    );
+    assert.equal(response.status, 413);
+    assert.equal(response.headers.get("cache-control"), "private, no-store, max-age=0");
+  }
+  assert.deepEqual(state.caseOperations, []);
 });

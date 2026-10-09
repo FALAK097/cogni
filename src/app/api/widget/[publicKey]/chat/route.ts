@@ -115,7 +115,7 @@ const chatRequestSchema = z.object({
 type WidgetPreviewEvidence = {
   outcome: "answer" | "handoff";
   grounded: boolean;
-  sources: { title: string }[];
+  sources: { documentId: string; title: string }[];
   prompt: string;
 };
 
@@ -138,7 +138,8 @@ function streamHeaders(
       encodeURIComponent(
         JSON.stringify({
           ...previewEvidence,
-          sources: previewEvidence.sources.slice(0, 4).map(({ title }) => ({
+          sources: previewEvidence.sources.slice(0, 4).map(({ documentId, title }) => ({
+            documentId,
             title: title.slice(0, 160),
           })),
         }),

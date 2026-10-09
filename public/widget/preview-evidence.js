@@ -34,7 +34,14 @@ export function parseWidgetPreviewEvidence(headerValue) {
           source.title.trim().length > 0,
       )
       .slice(0, MAX_SOURCE_COUNT)
-      .map((source) => ({ title: source.title.trim().slice(0, MAX_TITLE_LENGTH) }));
+      .map((source) => ({
+        title: source.title.trim().slice(0, MAX_TITLE_LENGTH),
+        ...(typeof source.documentId === "string" &&
+        source.documentId.length > 0 &&
+        source.documentId.length <= 128
+          ? { documentId: source.documentId }
+          : {}),
+      }));
 
     if (value.grounded !== sources.length > 0) return null;
     if (value.outcome === "handoff" && (value.grounded || sources.length > 0)) return null;

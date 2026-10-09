@@ -888,6 +888,7 @@ export function useSaveAgentTestCase() {
             title: input.title,
             prompt: input.prompt,
             expectedOutcome: input.expectedOutcome,
+            expectedSourceIds: input.expectedSourceIds,
           }),
         },
       );

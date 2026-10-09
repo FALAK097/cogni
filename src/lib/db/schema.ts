@@ -406,6 +406,7 @@ export const agentTestCase = pgTable(
     title: text().notNull(),
     prompt: text().notNull(),
     expectedOutcome: agentTestExpectedOutcome().notNull(),
+    expectedSourceIds: jsonb().$type<string[]>().default([]).notNull(),
     createdAt: timestampString()
       .default(sql`(CURRENT_TIMESTAMP)`)
       .notNull(),
