@@ -30,6 +30,17 @@ Owners can now convert customer questions into repeatable regression tests direc
 - **Navigation alignment:** `WidgetCustomizer` in `src/components/widget/widget-customizer.tsx` synchronizes its active tab with window hash changes (`agentHref("test")` / `/agent#test`), enabling seamless deep linking from test creation toasts and triage directly into the Agent Test suite.
 - **Validation and tests:** Added `buildAgentTestCaseFromQuestion` in `src/features/agent-tests/input.ts` with comprehensive unit and regression tests in `scripts/test-conversation-to-test.mjs` integrated into `pnpm test:agent-tests` (34/34 passing). React Doctor reported 100/100 across changed React components.
 
+## Guided launch readiness checklist
+
+A unified 4-stage launch readiness checklist now guides workspace owners from initial setup to a live, verified agent:
+
+- **Stage 1 (Knowledge):** Verifies indexed knowledge base sources. Detects sources actively processing and displays indexing progress.
+- **Stage 2 (Test suite):** Confirms regression test cases exist and that a test run has been executed against preview to verify groundedness, missing-knowledge handling, and handoffs.
+- **Stage 3 (Publication):** Enforces that an enabled agent configuration is published and alerts when unpublished draft changes or paused visitor access require action.
+- **Stage 4 (Installation):** Validates authorized domains and embed snippet installation, confirming live visitor session activity.
+- **UI Components:** Built `AgentLaunchChecklistCard` in `src/components/widget/agent-launch-checklist-card.tsx` supporting both a full checklist with step details and direct actions in the Agent Deploy panel (`WidgetInstallationPanel`), and a compact launch cue in Insights (`DashboardPage`) when no conversation data exists yet.
+- **Test coverage:** Added unit tests in `scripts/test-agent-readiness.mjs` covering new agents, indexing states, test verification, draft publishing, and fully verified launch states (8/8 pass). `react-doctor` scored 100/100 with 0 errors and 0 warnings.
+
 ## Required-source retrieval checks
 
 Migration `0017_agent_test_expected_sources.sql` adds an empty-by-default JSONB list of expected source IDs to saved cases. Owners can optionally require up to four ready sources for a sources-retrieved check. Case writes validate UUIDs, uniqueness, workspace ownership, and ready status. Deleted or unready selections remain visible for explicit removal. Source IDs travel only through authenticated preview evidence; title-only legacy evidence cannot satisfy an annotated case.

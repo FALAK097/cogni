@@ -26,7 +26,7 @@ Keep these inside Inbox, Agent and Insights. Settings holds workspace controls a
 
 | Priority | Opportunity                              | Current starting point                                                           | Smallest useful increment                                                                | Where it belongs                                          |
 | -------- | ---------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| First    | Guided readiness checklist               | Source states, Agent steps, publish/domain controls exist                        | One actionable setup state spanning knowledge → test → publish → installation            | Agent Deploy; temporary setup cue in Insights             |
+| Complete | Guided readiness checklist               | 4-stage checklist across knowledge, tests, publish, and install                  | Interactive checklist card with contextual actions in Deploy & Insights cue              | Agent Deploy; temporary setup cue in Insights             |
 | First    | Source health and answer evidence        | Ingestion records, ready-source retrieval and bounded evidence exist             | Last successful ingestion, actionable failure/retry and source evidence linking          | Agent Build; Test evidence; Inbox source detail           |
 | First    | Explicit handoff expectations            | Pause/takeover/assignment/replies exist                                          | Requested/queued/assigned states and a truthful message about next steps                 | Widget and Inbox                                          |
 | Complete | Conversation-to-test workflow            | Bounded modal with prompt redaction, outcome presets & ready-source requirements | Save from Inbox message or Insights gap directly into Agent Test suite                   | Inbox contextual action & Insights gap → Agent Test       |
@@ -42,6 +42,8 @@ Keep these inside Inbox, Agent and Insights. Settings holds workspace controls a
 ## Feature definitions and acceptance
 
 ### Guided launch readiness
+
+_Status (October 2026):_ Implemented. 4-stage readiness checklist computes live progress across knowledge base indexing, regression test verification, configuration publication, and authorized domain installation. Provides interactive checklist card in Agent Deploy with direct actions and a compact progress cue on empty Insights page.
 
 The owner sees which task prevents launch and can act on it directly. For example: knowledge is still processing; an unanswered-question test needs review; there is no published agent; the intended domain is not authorized; or the loader has not been observed.
 
