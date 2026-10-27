@@ -58,7 +58,10 @@ const NAV_ITEMS: {
 const WIDGET_CARD_CLASS = "rounded-xl border border-border";
 
 const WIDGET_SETTINGS_CARD_CLASS = `${WIDGET_CARD_CLASS} overflow-hidden`;
-async function waitForPreviewWidget(prompt: string): Promise<WidgetPreviewEvidence | null> {
+async function waitForPreviewWidget(
+  prompt: string,
+  binding?: { runId: string; caseId: string },
+): Promise<WidgetPreviewEvidence | null> {
   for (let attempt = 0; attempt < 50; attempt += 1) {
     const sendPreviewMessage = window.Widget?.sendPreviewMessage;
     if (sendPreviewMessage) {
@@ -82,14 +85,20 @@ async function waitForPreviewWidget(prompt: string): Promise<WidgetPreviewEviden
         };
         const onEvidence = (event: Event) => {
           const detail = (event as CustomEvent<unknown>).detail;
-          if (!isPreviewEvidence(detail) || detail.prompt !== prompt) return;
+          if (
+            !isPreviewEvidence(detail) ||
+            detail.prompt !== prompt ||
+            (binding && (detail.runId !== binding.runId || detail.caseId !== binding.caseId))
+          ) {
+            return;
+          }
           receivedEvidence = detail;
           finishWhenReady();
         };
 
         window.addEventListener("cogni:widget-preview-evidence", onEvidence);
         timeoutId = window.setTimeout(() => finish(null), WIDGET_PREVIEW_RESPONSE_TIMEOUT_MS);
-        void sendPreviewMessage(prompt).then(
+        void sendPreviewMessage(prompt, binding?.runId, binding?.caseId).then(
           (sent) => {
             sendFinished = true;
             sendSucceeded = sent;
@@ -300,24 +309,27 @@ export function WidgetCustomizer({
     !isSavingDraft &&
     !publishWidgetConfigMutation.isPending;
 
-  const tryPreviewPrompt = useCallback((prompt: string) => {
-    setPreviewEvidence(null);
-    setPreviewTestFailed(false);
-    setLastPreviewPrompt(prompt);
-    setSendingTestPrompt(prompt);
-    setShowMobilePreview(true);
-    return waitForPreviewWidget(prompt)
-      .then((evidence) => {
-        setPreviewTestFailed(evidence === null);
-        if (window.matchMedia("(max-width: 1023px)").matches) {
-          window.requestAnimationFrame(() =>
-            mobileTestResultRef.current?.focus({ preventScroll: true }),
-          );
-        }
-        return evidence;
-      })
-      .finally(() => setSendingTestPrompt(null));
-  }, []);
+  const tryPreviewPrompt = useCallback(
+    (prompt: string, binding?: { runId: string; caseId: string }) => {
+      setPreviewEvidence(null);
+      setPreviewTestFailed(false);
+      setLastPreviewPrompt(prompt);
+      setSendingTestPrompt(prompt);
+      setShowMobilePreview(true);
+      return waitForPreviewWidget(prompt, binding)
+        .then((evidence) => {
+          setPreviewTestFailed(evidence === null);
+          if (window.matchMedia("(max-width: 1023px)").matches) {
+            window.requestAnimationFrame(() =>
+              mobileTestResultRef.current?.focus({ preventScroll: true }),
+            );
+          }
+          return evidence;
+        })
+        .finally(() => setSendingTestPrompt(null));
+    },
+    [],
+  );
 
   const resetPreview = useCallback(async () => {
     setPreviewEvidence(null);

@@ -89,11 +89,50 @@ export const agentTestEvaluationContextSchema = z.object({
       z.object({
         id: z.string().uuid(),
         status: z.enum(["passed", "mismatch", "error", "not_run"]),
+        caseUpdatedAt: z.string().datetime({ offset: true }),
         sources: z.array(agentTestSourceRevisionSchema).max(4),
       }),
     )
     .max(5_000),
 });
+
+export const createAgentTestImprovementSchema = z.object({
+  runId: z.string().uuid(),
+  caseId: z.string().uuid(),
+  rationale: z.string().trim().min(1).max(2_000),
+});
+
+export const updateAgentTestImprovementSchema = z.object({
+  status: z.enum(["RESOLVED", "DISMISSED"]),
+  reviewNote: z.string().trim().max(2_000).nullable().optional(),
+});
+
+export type AgentTestImprovementStatus = "OPEN" | "RESOLVED" | "DISMISSED";
+
+export type AgentTestImprovement = {
+  id: string;
+  runId: string;
+  caseId: string;
+  caseSnapshot: {
+    title: string;
+    prompt: string;
+    expectedOutcome: "grounded_answer" | "no_evidence" | "human_handoff";
+    expectedSourceIds: string[];
+  };
+  evaluationReferences: {
+    configBasis: "widget-draft-revision-v1";
+    configFingerprint: string;
+    modelProvider: "OPENAI" | "GOOGLE";
+    modelName: string;
+    sources: { documentId: string; revisionId: string | null; revisionNumber: number | null }[];
+  };
+  failureSourceIds: string[];
+  rationale: string;
+  status: AgentTestImprovementStatus;
+  createdAt: string;
+  reviewedAt: string | null;
+  reviewNote: string | null;
+};
 
 export type AgentTestEvaluationContext = z.infer<typeof agentTestEvaluationContextSchema>;
 

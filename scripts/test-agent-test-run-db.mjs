@@ -81,10 +81,22 @@ test("Postgres history isolates tenants, deduplicates concurrent saves, validate
     await raw`INSERT INTO workspace_member (id, role, "updatedAt", "userId", "workspaceId") VALUES (${memberId}, 'OWNER', ${now}, ${userId}, ${workspaceId})`;
     await raw`INSERT INTO agent_test_case (id, title, prompt, "expectedOutcome", "updatedAt", "workspaceId") VALUES (${caseId}, 'Check', 'Private prompt', 'grounded_answer', ${now}, ${workspaceId})`;
     const cases = await listAgentTestCases(workspaceId);
+    const signedEvidence = signEvidence({
+      runId,
+      caseId,
+      workspaceId,
+      prompt: "Private prompt",
+      outcome: "answer",
+      grounded: true,
+      modelProvider: "GOOGLE",
+      modelName: "gemini-2.0-flash",
+      configFingerprint: "a".repeat(64),
+      sources: [],
+    });
     const input = {
       runId,
       suiteVersion: getAgentTestSuiteVersion(cases),
-      results: [{ id: caseId, status: "passed" }],
+      results: [{ id: caseId, status: "passed", signedEvidence }],
     };
     const [first, duplicate] = await Promise.all([
       recordAgentTestRun(workspaceId, memberId, input),
@@ -102,10 +114,32 @@ test("Postgres history isolates tenants, deduplicates concurrent saves, validate
       "API timestamps must satisfy the Insights client contract",
     );
     assert.equal("prompt" in rows[0], false);
+    const clientRelabel = await recordAgentTestRun(workspaceId, memberId, {
+      ...input,
+      results: [{ id: caseId, status: "mismatch", signedEvidence }],
+    });
+    assert.deepEqual(clientRelabel, first, "client status labels do not alter persisted results");
     await assert.rejects(
       recordAgentTestRun(workspaceId, memberId, {
         ...input,
-        results: [{ id: caseId, status: "mismatch" }],
+        results: [
+          {
+            id: caseId,
+            status: "passed",
+            signedEvidence: signEvidence({
+              runId,
+              caseId,
+              workspaceId,
+              prompt: "Private prompt",
+              outcome: "answer",
+              grounded: false,
+              modelProvider: "GOOGLE",
+              modelName: "gemini-2.0-flash",
+              configFingerprint: "a".repeat(64),
+              sources: [],
+            }),
+          },
+        ],
       }),
       AgentTestRunConflictError,
     );
@@ -175,6 +209,8 @@ test("Postgres history isolates tenants, deduplicates concurrent saves, validate
             ? [{ documentId: sourceId, revisionId, revisionNumber: 1 }]
             : [],
         signedEvidence: signEvidence({
+          runId: contextualRunId,
+          caseId: testCase.id,
           workspaceId,
           prompt: testCase.prompt,
           outcome: "answer",

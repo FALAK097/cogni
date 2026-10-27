@@ -16,10 +16,15 @@ import type {
 import { toast } from "@/components/ui/use-toast";
 import type {
   AgentTestCaseInput,
+  AgentTestImprovement,
   AgentTestRunHistory,
   AgentTestRunInput,
 } from "@/features/agent-tests/input";
-import { agentTestEvaluationContextSchema } from "@/features/agent-tests/input";
+import {
+  agentTestEvaluationContextSchema,
+  createAgentTestImprovementSchema,
+  updateAgentTestImprovementSchema,
+} from "@/features/agent-tests/input";
 import { parseInboxConversationEventsResponse } from "@/features/conversations/inbox-events";
 
 export type DashboardWidgetConfig = Omit<WidgetWidgetConfig, "borderRadius"> & {
@@ -870,6 +875,123 @@ export function useRecordAgentTestRun() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.widget.agentTestRuns.all });
+    },
+  });
+}
+
+const agentTestImprovementResponseSchema = z.object({
+  id: z.string().uuid(),
+  runId: z.string().uuid(),
+  caseId: z.string().uuid(),
+  caseSnapshot: z.object({
+    title: z.string(),
+    prompt: z.string(),
+    expectedOutcome: z.enum(["grounded_answer", "no_evidence", "human_handoff"]),
+    expectedSourceIds: z.array(z.string().uuid()),
+  }),
+  evaluationReferences: z.object({
+    configBasis: z.literal("widget-draft-revision-v1"),
+    configFingerprint: z.string().regex(/^[a-f0-9]{64}$/u),
+    modelProvider: z.enum(["OPENAI", "GOOGLE"]),
+    modelName: z.string().min(1),
+    sources: z.array(
+      z.object({
+        documentId: z.string().uuid(),
+        revisionId: z.string().uuid().nullable(),
+        revisionNumber: z.number().int().positive().nullable(),
+      }),
+    ),
+  }),
+  failureSourceIds: z.array(z.string().uuid()),
+  rationale: z.string(),
+  status: z.enum(["OPEN", "RESOLVED", "DISMISSED"]),
+  createdAt: z.string().datetime({ offset: true }),
+  reviewedAt: z.string().datetime({ offset: true }).nullable(),
+  reviewNote: z.string().nullable(),
+});
+
+export function useAgentTestImprovements() {
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useQuery<{ items: AgentTestImprovement[] }>({
+    queryKey: queryKeys.widget.agentTestImprovements(workspaceId),
+    enabled: Boolean(workspaceId),
+    queryFn: async () => {
+      const response = await fetch("/api/dashboard/agent-test-improvements");
+      const body: unknown = await response.json().catch(() => null);
+      const parsed = z
+        .object({ items: z.array(agentTestImprovementResponseSchema) })
+        .safeParse(body);
+      if (!response.ok || !parsed.success) {
+        const error = z.object({ error: z.string() }).safeParse(body);
+        throw new Error(error.success ? error.data.error : "Could not load the review queue.");
+      }
+      return parsed.data as { items: AgentTestImprovement[] };
+    },
+  });
+}
+
+export function useCreateAgentTestImprovement() {
+  const queryClient = useQueryClient();
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useMutation({
+    mutationFn: async (input: { runId: string; caseId: string; rationale: string }) => {
+      const parsed = createAgentTestImprovementSchema.safeParse(input);
+      if (!parsed.success) throw new Error("Improvement details are invalid.");
+      const response = await fetch("/api/dashboard/agent-test-improvements", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(parsed.data),
+      });
+      const body: unknown = await response.json().catch(() => null);
+      const result = z.object({ item: agentTestImprovementResponseSchema }).safeParse(body);
+      if (!response.ok || !result.success) {
+        const error = z.object({ error: z.string() }).safeParse(body);
+        throw new Error(error.success ? error.data.error : "Could not create this review item.");
+      }
+      return result.data.item;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.widget.agentTestImprovements(workspaceId),
+      });
+    },
+  });
+}
+
+export function useReviewAgentTestImprovement() {
+  const queryClient = useQueryClient();
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useMutation({
+    mutationFn: async (input: {
+      id: string;
+      status: "RESOLVED" | "DISMISSED";
+      reviewNote?: string | null;
+    }) => {
+      const parsed = updateAgentTestImprovementSchema.safeParse({
+        status: input.status,
+        reviewNote: input.reviewNote,
+      });
+      if (!parsed.success) throw new Error("Review details are invalid.");
+      const response = await fetch(
+        `/api/dashboard/agent-test-improvements/${encodeURIComponent(input.id)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(parsed.data),
+        },
+      );
+      const body: unknown = await response.json().catch(() => null);
+      const result = z.object({ item: agentTestImprovementResponseSchema }).safeParse(body);
+      if (!response.ok || !result.success) {
+        const error = z.object({ error: z.string() }).safeParse(body);
+        throw new Error(error.success ? error.data.error : "Could not update this review item.");
+      }
+      return result.data.item;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.widget.agentTestImprovements(workspaceId),
+      });
     },
   });
 }

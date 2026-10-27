@@ -40,6 +40,8 @@ export const queryKeys = {
       list: (workspaceId: string, startDate: string, endDate: string) =>
         [...widgetBaseKey, "agent-test-runs", workspaceId, startDate, endDate] as const,
     },
+    agentTestImprovements: (workspaceId: string) =>
+      [...queryKeys.widget.all, "agent-test-improvements", workspaceId] as const,
     sessions: () => [...queryKeys.widget.all, "sessions"] as const,
     session: (id: string) => [...queryKeys.widget.all, "session", id] as const,
     config: (workspaceId: string) => [...queryKeys.widget.all, "config", workspaceId] as const,

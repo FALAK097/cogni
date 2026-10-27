@@ -85,6 +85,7 @@ import {
 } from "@/features/analytics/insights-url-state";
 import { agentHref, APP_PAGES, APP_ROUTES } from "@/features/navigation/app-routes";
 import { CreateAgentTestCaseDialog } from "@/features/agent-tests/components/create-agent-test-case-dialog";
+import { AgentTestImprovementQueue } from "@/features/agent-tests/components/agent-test-improvement-queue";
 import type { AgentTestExpectedOutcome } from "@/features/agent-tests/input";
 import { useAddManualTextSource, useKnowledgeBaseSources } from "@/hooks/query/use-knowledge-base";
 import { useAgentTestCases, useWidgetConfig } from "@/hooks/query/use-widget";
@@ -1178,6 +1179,50 @@ export function DashboardPage({
     [agentTestRunsQuery.data?.runs, insightsQuery.tests],
   );
   const agentTestRuns = testHistory.runs;
+  const currentTestCases = useMemo(
+    () => new Map((testCasesQuery.data?.cases ?? []).map((testCase) => [testCase.id, testCase])),
+    [testCasesQuery.data?.cases],
+  );
+  const { failedCases: failedAgentTestCases, unavailableFailureCount } = useMemo(() => {
+    const failures: {
+      runId: string;
+      caseId: string;
+      title: string;
+      prompt: string;
+      expectedOutcome: AgentTestExpectedOutcome;
+      expectedSourceIds: string[];
+      sourceIds: string[];
+      failedAt: string;
+    }[] = [];
+    let unavailable = 0;
+    for (const run of [...agentTestRuns].reverse()) {
+      const cases = run.evaluationContext?.cases;
+      if (!cases) {
+        unavailable += run.mismatchCount;
+        continue;
+      }
+      for (const testCase of cases) {
+        if (testCase.status !== "mismatch") continue;
+        const savedCase = currentTestCases.get(testCase.id);
+        if (!savedCase || new Date(savedCase.updatedAt).toISOString() !== testCase.caseUpdatedAt) {
+          unavailable += 1;
+          continue;
+        }
+        failures.push({
+          runId: run.id,
+          caseId: savedCase.id,
+          title: savedCase.title,
+          prompt: savedCase.prompt,
+          expectedOutcome: savedCase.expectedOutcome,
+          expectedSourceIds: savedCase.expectedSourceIds,
+          sourceIds: [...new Set(testCase.sources.map((source) => source.documentId))],
+          failedAt: run.createdAt,
+        });
+      }
+      if (failures.length >= 12) break;
+    }
+    return { failedCases: failures.slice(0, 12), unavailableFailureCount: unavailable };
+  }, [agentTestRuns, currentTestCases]);
   const agentTestRunChartData = useMemo(
     () =>
       (agentTestRuns ?? []).map((run) => {
@@ -2240,6 +2285,13 @@ export function DashboardPage({
                   ariaLabel="Saved test pass rate by run"
                 />
               )}
+              {canManage ? (
+                <AgentTestImprovementQueue
+                  failedCases={failedAgentTestCases}
+                  unavailableFailureCount={unavailableFailureCount}
+                  canReview={canManage}
+                />
+              ) : null}
             </DashboardCard>
           </section>
         ) : null}

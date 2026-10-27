@@ -117,6 +117,29 @@ test("preview evidence keeps only a bounded prompt for matching a saved preview 
   );
 });
 
+test("preview evidence preserves signed run and case correlation IDs", () => {
+  const runId = "00000000-0000-4000-8000-000000000003";
+  const caseId = "00000000-0000-4000-8000-000000000004";
+  const result = previewEvidence.parseWidgetPreviewEvidence(
+    encode({
+      outcome: "answer",
+      grounded: false,
+      sources: [],
+      runId,
+      caseId,
+      prompt: "Saved prompt",
+    }),
+  );
+  assert.equal(result.runId, runId);
+  assert.equal(result.caseId, caseId);
+  assert.equal(
+    previewEvidence.parseWidgetPreviewEvidence(
+      encode({ outcome: "answer", grounded: false, sources: [], runId }),
+    ),
+    null,
+  );
+});
+
 test("preview source IDs survive transport for expected-source evaluation without extra provider data", () => {
   const result = previewEvidence.parseWidgetPreviewEvidence(
     encode({

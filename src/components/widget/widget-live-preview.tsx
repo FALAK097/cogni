@@ -54,7 +54,7 @@ declare global {
       open: () => void;
       close: () => void;
       resetPreview: () => Promise<boolean>;
-      sendPreviewMessage: (message: string) => Promise<boolean>;
+      sendPreviewMessage: (message: string, runId?: string, caseId?: string) => Promise<boolean>;
       on: (event: string, listener: (event: Event) => void) => void;
       off: (event: string, listener: (event: Event) => void) => void;
     };

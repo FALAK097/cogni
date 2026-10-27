@@ -18,7 +18,7 @@ const { createPreviewMessageSender } = await import(
 );
 
 function createFixture(sendMessage = async () => {}) {
-  const calls = { sent: [], opened: 0 };
+  const calls = { sent: [], bindings: [], opened: 0 };
   const state = {
     preview: true,
     isInitialized: true,
@@ -29,9 +29,10 @@ function createFixture(sendMessage = async () => {}) {
   const sendPreviewMessage = createPreviewMessageSender({
     state,
     show: () => calls.opened++,
-    sendMessage: async () => {
+    sendMessage: async (binding) => {
       calls.sent.push(state.input.value);
-      await sendMessage();
+      calls.bindings.push(binding);
+      await sendMessage(binding);
     },
   });
   return { calls, sendPreviewMessage, state };
@@ -43,6 +44,13 @@ test("preview test sends while the empty-input send button is disabled", async (
   assert.deepEqual(fixture.calls.sent, ["What services do you offer?"]);
   assert.equal(fixture.calls.opened, 1);
   assert.equal(fixture.state.previewMessagePending, false);
+});
+
+test("preview test forwards its run and case binding to the widget request", async () => {
+  const fixture = createFixture();
+  const binding = { runId: "run-1", caseId: "case-1" };
+  assert.equal(await fixture.sendPreviewMessage("Question", binding.runId, binding.caseId), true);
+  assert.deepEqual(fixture.calls.bindings, [binding]);
 });
 
 test("preview test rejects unavailable, empty, and oversized prompts", async () => {

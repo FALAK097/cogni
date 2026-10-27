@@ -40,6 +40,8 @@ const stubs = {
 };
 
 function signEvidence({
+  runId = "run-1",
+  caseId = "case-1",
   prompt = "Private test prompt",
   modelProvider = "GOOGLE",
   modelName = "gemini-2.0-flash",
@@ -50,6 +52,8 @@ function signEvidence({
     left.documentId.localeCompare(right.documentId),
   );
   const payload = {
+    runId,
+    caseId,
     workspaceId: "workspace-a",
     prompt,
     outcome: "answer",
@@ -226,12 +230,16 @@ function reset() {
       updatedAt: "2026-10-07T12:00:00.000Z",
       prompt: "Private test prompt",
       workspaceId: "workspace-a",
+      expectedOutcome: "grounded_answer",
+      expectedSourceIds: [],
     },
     {
       id: "case-2",
       updatedAt: "2026-10-07T12:00:00.000Z",
       prompt: "Private test prompt",
       workspaceId: "workspace-a",
+      expectedOutcome: "human_handoff",
+      expectedSourceIds: [],
     },
   ];
   state.records = new Map();
@@ -262,9 +270,9 @@ test("run persistence verifies cases in the active workspace and stores aggregat
   assert.deepEqual(saved, {
     id: "run-1",
     caseCount: 2,
-    passedCount: 1,
+    passedCount: 0,
     mismatchCount: 0,
-    errorCount: 1,
+    errorCount: 2,
     notRunCount: 0,
   });
   assert.deepEqual(state.caseWhere, { op: "eq", field: "case.workspaceId", value: "workspace-a" });
@@ -277,15 +285,17 @@ test("run persistence verifies cases in the active workspace and stores aggregat
   assert.match(row.suiteDigest, /^[a-f0-9]{64}$/);
   assert.equal("suiteVersion" in row, false);
   assert.equal(row.evaluationContext, null);
-  const legacyCompatibleDigest = createHash("sha256")
+  const canonicalDigest = createHash("sha256")
     .update(
       JSON.stringify({
         suiteVersion: runInput.suiteVersion,
-        results: [...runInput.results].sort((a, b) => a.id.localeCompare(b.id)),
+        results: runInput.results
+          .map(({ id }) => ({ id, status: "error" }))
+          .sort((a, b) => a.id.localeCompare(b.id)),
       }),
     )
     .digest("hex");
-  assert.equal(row.resultDigest, legacyCompatibleDigest);
+  assert.equal(row.resultDigest, canonicalDigest);
 });
 
 test("signed evidence overrides forged client metadata and stores only scoped source revisions", async () => {
@@ -313,6 +323,7 @@ test("signed evidence overrides forged client metadata and stores only scoped so
         },
       ],
       signedEvidence: signEvidence({
+        caseId: result.id,
         configFingerprint: "a".repeat(64),
         sources: [{ documentId, revisionId, revisionNumber: 3 }],
       }),
@@ -330,6 +341,125 @@ test("signed evidence overrides forged client metadata and stores only scoped so
   assert.equal(JSON.stringify(context).includes("secret"), false);
 });
 
+test("signed evidence recomputes forged mismatch statuses and aggregate digest", async () => {
+  reset();
+  const documentId = "00000000-0000-4000-8000-000000000001";
+  const input = {
+    ...runInput,
+    results: runInput.results.map((result) => ({
+      ...result,
+      status: "mismatch",
+      modelProvider: "GOOGLE",
+      modelName: "gemini-2.0-flash",
+      configFingerprint: "a".repeat(64),
+      sources:
+        result.id === "case-1" ? [{ documentId, revisionId: null, revisionNumber: null }] : [],
+      signedEvidence: signEvidence({
+        caseId: result.id,
+        sources:
+          result.id === "case-1" ? [{ documentId, revisionId: null, revisionNumber: null }] : [],
+      }),
+    })),
+  };
+
+  const saved = await recordAgentTestRun("workspace-a", "member-a", input, state.db);
+  const row = state.records.get("run-1");
+  assert.deepEqual(saved, {
+    id: "run-1",
+    caseCount: 2,
+    passedCount: 1,
+    mismatchCount: 1,
+    errorCount: 0,
+    notRunCount: 0,
+  });
+  assert.deepEqual(
+    row.evaluationContext.cases.map(({ id, status }) => ({ id, status })),
+    [
+      { id: "case-1", status: "passed" },
+      { id: "case-2", status: "mismatch" },
+    ],
+  );
+  const expectedDigest = createHash("sha256")
+    .update(
+      JSON.stringify({
+        suiteVersion: input.suiteVersion,
+        results: [
+          { id: "case-1", status: "passed" },
+          { id: "case-2", status: "mismatch" },
+        ],
+        evaluationContext: row.evaluationContext,
+      }),
+    )
+    .digest("hex");
+  assert.equal(row.resultDigest, expectedDigest);
+});
+
+test("missing signed evidence classifies forged mismatches as errors", async () => {
+  reset();
+  const input = {
+    ...runInput,
+    results: runInput.results.map((result) => ({ ...result, status: "mismatch" })),
+  };
+
+  const saved = await recordAgentTestRun("workspace-a", "member-a", input, state.db);
+  assert.equal(state.records.get("run-1").evaluationContext, null);
+  assert.deepEqual(saved, {
+    id: "run-1",
+    caseCount: 2,
+    passedCount: 0,
+    mismatchCount: 0,
+    errorCount: 2,
+    notRunCount: 0,
+  });
+});
+
+test("signed preview evidence cannot be replayed for another run or case", async () => {
+  reset();
+  const replayedAcrossRuns = {
+    ...runInput,
+    runId: "run-2",
+    results: [
+      {
+        id: "case-1",
+        status: "mismatch",
+        signedEvidence: signEvidence({ caseId: "case-1" }),
+      },
+      { id: "case-2", status: "mismatch" },
+    ],
+  };
+  const runResult = await recordAgentTestRun(
+    "workspace-a",
+    "member-a",
+    replayedAcrossRuns,
+    state.db,
+  );
+  assert.equal(state.records.get("run-2").evaluationContext, null);
+  assert.equal(runResult.mismatchCount, 0);
+  assert.equal(runResult.errorCount, 2);
+
+  reset();
+  const replayedAcrossCases = {
+    ...runInput,
+    results: [
+      { id: "case-1", status: "mismatch" },
+      {
+        id: "case-2",
+        status: "mismatch",
+        signedEvidence: signEvidence({ caseId: "case-1" }),
+      },
+    ],
+  };
+  const caseResult = await recordAgentTestRun(
+    "workspace-a",
+    "member-a",
+    replayedAcrossCases,
+    state.db,
+  );
+  assert.equal(state.records.get("run-1").evaluationContext, null);
+  assert.equal(caseResult.mismatchCount, 0);
+  assert.equal(caseResult.errorCount, 2);
+});
+
 test("tampered signed preview evidence cannot create evaluation context", async () => {
   reset();
   const signedEvidence = signEvidence({ modelProvider: "OPENAI", modelName: "gpt-4o-mini" });
@@ -337,6 +467,7 @@ test("tampered signed preview evidence cannot create evaluation context", async 
     ...runInput,
     results: runInput.results.map((result) => ({
       ...result,
+      status: "mismatch",
       modelProvider: "OPENAI",
       modelName: "gpt-4o-mini",
       configFingerprint: "a".repeat(64),
@@ -344,8 +475,29 @@ test("tampered signed preview evidence cannot create evaluation context", async 
       signedEvidence: `${signedEvidence.slice(0, -1)}x`,
     })),
   };
-  await recordAgentTestRun("workspace-a", "member-a", input, state.db);
+  const saved = await recordAgentTestRun("workspace-a", "member-a", input, state.db);
   assert.equal(state.records.get("run-1").evaluationContext, null);
+  assert.deepEqual(saved, {
+    id: "run-1",
+    caseCount: 2,
+    passedCount: 0,
+    mismatchCount: 0,
+    errorCount: 2,
+    notRunCount: 0,
+  });
+  assert.equal(
+    state.records.get("run-1").resultDigest,
+    createHash("sha256")
+      .update(
+        JSON.stringify({
+          suiteVersion: input.suiteVersion,
+          results: input.results
+            .map(({ id }) => ({ id, status: "error" }))
+            .sort((a, b) => a.id.localeCompare(b.id)),
+        }),
+      )
+      .digest("hex"),
+  );
 });
 
 test("signed preview evidence paired with a different saved prompt cannot create context", async () => {
@@ -360,6 +512,7 @@ test("signed preview evidence paired with a different saved prompt cannot create
       configFingerprint: "a".repeat(64),
       sources: [],
       signedEvidence: signEvidence({
+        caseId: result.id,
         prompt: "Private test prompt",
         modelProvider: "OPENAI",
         modelName: "gpt-4o-mini",
@@ -390,6 +543,7 @@ test("evaluation context is withheld when a source revision belongs to another w
       configFingerprint: "b".repeat(64),
       sources: [{ documentId, revisionId, revisionNumber: 3 }],
       signedEvidence: signEvidence({
+        caseId: result.id,
         modelProvider: "OPENAI",
         modelName: "gpt-4o-mini",
         configFingerprint: "b".repeat(64),
@@ -412,6 +566,7 @@ test("evaluation context is withheld when the draft changes during the suite", a
       configFingerprint: index === 0 ? "c".repeat(64) : "d".repeat(64),
       sources: [],
       signedEvidence: signEvidence({
+        caseId: result.id,
         modelProvider: "OPENAI",
         modelName: "gpt-4o-mini",
         configFingerprint: index === 0 ? "c".repeat(64) : "d".repeat(64),
@@ -439,6 +594,7 @@ test("evaluation context retains retrieved sources without an immutable revision
         },
       ],
       signedEvidence: signEvidence({
+        caseId: result.id,
         modelProvider: "OPENAI",
         modelName: "gpt-4o-mini",
         configFingerprint: "e".repeat(64),
@@ -495,8 +651,20 @@ test("run IDs are idempotent and conflicting retries are rejected", async () => 
       {
         ...runInput,
         results: [
-          { id: "case-1", status: "mismatch" },
-          { id: "case-2", status: "error" },
+          {
+            id: "case-1",
+            status: "mismatch",
+            signedEvidence: signEvidence({
+              sources: [
+                {
+                  documentId: "00000000-0000-4000-8000-000000000001",
+                  revisionId: null,
+                  revisionNumber: null,
+                },
+              ],
+            }),
+          },
+          { id: "case-2", status: "error", signedEvidence: signEvidence({ caseId: "case-2" }) },
         ],
       },
       state.db,
@@ -526,6 +694,7 @@ test("run ID is idempotent when cases and source references are reordered", asyn
       configFingerprint: "a".repeat(64),
       sources: [firstSource, secondSource],
       signedEvidence: signEvidence({
+        caseId: result.id,
         modelProvider: "OPENAI",
         modelName: "gpt-4o-mini",
         sources: [firstSource, secondSource],
@@ -538,6 +707,7 @@ test("run ID is idempotent when cases and source references are reordered", asyn
       ...result,
       sources: [...result.sources].reverse(),
       signedEvidence: signEvidence({
+        caseId: result.id,
         modelProvider: "OPENAI",
         modelName: "gpt-4o-mini",
         sources: [...result.sources].reverse(),
@@ -580,6 +750,7 @@ test("run ID rejects a retry with changed but valid signed evaluation context", 
       id: result.id,
       status: result.status,
       signedEvidence: signEvidence({
+        caseId: result.id,
         modelProvider: "OPENAI",
         modelName: "gpt-4o-mini",
         configFingerprint: "a".repeat(64),
