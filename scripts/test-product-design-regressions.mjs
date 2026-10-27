@@ -2,13 +2,14 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 
-const [conversationDetail, dashboardShell, productDesign, designSystem, conversations] =
+const [conversationDetail, dashboardShell, productDesign, designSystem, conversations, navbar] =
   await Promise.all([
     readFile("src/components/widget/conversation-detail.tsx", "utf8"),
     readFile("src/components/app-nav/dashboard-shell.tsx", "utf8"),
     readFile("docs/product-design.md", "utf8"),
     readFile("docs/design/product-design-system.md", "utf8"),
     readFile("src/components/widget/widget-conversations.tsx", "utf8"),
+    readFile("src/components/landing/navbar.tsx", "utf8"),
   ]);
 
 test("conversation detail keeps channel and recipient context visible for replies", () => {
@@ -33,4 +34,6 @@ test("design references agree on the current neutral primary and preserve intera
   assert.match(productDesign, /locally hosted Inter/);
   assert.doesNotMatch(productDesign, /Keep Geist/);
   assert.doesNotMatch(conversations, /countKind|activeCountKind/);
+  assert.match(navbar, /const isActive = activeSection === section/);
+  assert.doesNotMatch(navbar, /const isActive = false/);
 });

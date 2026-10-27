@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Menu } from "@/components/icons";
 import { ThemeLogo } from "@/components/theme-logo";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -15,8 +15,34 @@ const NAV_LINKS = [
   { label: "FAQ", href: "#faq", section: "faq" },
 ] as const;
 
+const SECTION_IDS = NAV_LINKS.map((link) => link.section);
+
+function useActiveSection(sectionIds: readonly string[]) {
+  const [activeSection, setActiveSection] = useState<string | null>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visibleSection = entries.find((entry) => entry.isIntersecting);
+        if (visibleSection) setActiveSection(visibleSection.target.id);
+      },
+      { rootMargin: "-20% 0px -65% 0px", threshold: 0 },
+    );
+
+    for (const sectionId of sectionIds) {
+      const section = document.getElementById(sectionId);
+      if (section) observer.observe(section);
+    }
+
+    return () => observer.disconnect();
+  }, [sectionIds]);
+
+  return activeSection;
+}
+
 export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const activeSection = useActiveSection(SECTION_IDS);
 
   return (
     <header className="sticky inset-x-0 top-0 z-50 border-b border-border bg-background/95">
@@ -28,8 +54,8 @@ export function Navbar() {
 
         {/* Nav links with active highlight — desktop */}
         <div className="hidden flex-1 items-center gap-1 md:flex">
-          {NAV_LINKS.map(({ label, href }) => {
-            const isActive = false;
+          {NAV_LINKS.map(({ label, href, section }) => {
+            const isActive = activeSection === section;
             return (
               <a
                 key={label}
@@ -80,8 +106,8 @@ export function Navbar() {
                 </SheetTitle>
               </SheetHeader>
               <nav className="flex flex-col gap-1 px-3 py-4">
-                {NAV_LINKS.map(({ label, href }) => {
-                  const isActive = false;
+                {NAV_LINKS.map(({ label, href, section }) => {
+                  const isActive = activeSection === section;
                   return (
                     <a
                       key={label}
