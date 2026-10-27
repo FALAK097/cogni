@@ -2,8 +2,13 @@ import { NextResponse } from "next/server";
 import { eq, and, inArray, like } from "drizzle-orm";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { document as documentTable, workflowRun } from "@/lib/db/schema";
+import { runDbWriteOperation } from "@/lib/db/client";
 import { enqueueDocumentProcessing } from "@/lib/jobs/ingestion";
 import { deleteObject } from "@/lib/storage";
+import {
+  drainSearchItemCleanup,
+  markDocumentRevisionsDeleted,
+} from "@/features/knowledge/server/source-revisions";
 import { z } from "zod";
 import { canManageWorkspace } from "@/lib/auth/permissions";
 
@@ -99,25 +104,29 @@ export async function DELETE(_request: Request, context: RouteContext) {
   }
   if (source.storageKey) await deleteObject(source.storageKey);
 
-  await db
-    .update(workflowRun)
-    .set({
-      status: "CANCELLED",
-      errorMessage: "Knowledge source was deleted.",
-      finishedAt: new Date().toISOString(),
-    })
-    .where(
-      and(
-        eq(workflowRun.workspaceId, workspace.id),
-        eq(workflowRun.name, "document.process"),
-        like(workflowRun.idempotencyKey, `%${sourceId}%`),
-        inArray(workflowRun.status, ["QUEUED", "FAILED"]),
-      ),
-    );
+  await runDbWriteOperation(db, async (transaction) => {
+    await markDocumentRevisionsDeleted(transaction, workspace.id, sourceId);
+    await transaction
+      .update(workflowRun)
+      .set({
+        status: "CANCELLED",
+        errorMessage: "Knowledge source was deleted.",
+        finishedAt: new Date().toISOString(),
+      })
+      .where(
+        and(
+          eq(workflowRun.workspaceId, workspace.id),
+          eq(workflowRun.name, "document.process"),
+          like(workflowRun.idempotencyKey, `%${sourceId}%`),
+          inArray(workflowRun.status, ["QUEUED", "FAILED"]),
+        ),
+      );
 
-  await db
-    .delete(documentTable)
-    .where(and(eq(documentTable.id, sourceId), eq(documentTable.workspaceId, workspace.id)));
+    await transaction
+      .delete(documentTable)
+      .where(and(eq(documentTable.id, sourceId), eq(documentTable.workspaceId, workspace.id)));
+  });
+  await drainSearchItemCleanup(db, 20, workspace.id);
 
   return NextResponse.json({ ok: true });
 }

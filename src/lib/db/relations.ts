@@ -13,6 +13,8 @@ import {
   widget,
   attachment,
   document,
+  documentRevision,
+  searchItemCleanup,
   documentChunk,
   workspaceInvite,
   integration,
@@ -67,6 +69,8 @@ export const workspaceRelations = relations(workspace, ({ many }) => ({
   widgets: many(widget),
   attachments: many(attachment),
   documents: many(document),
+  documentRevisions: many(documentRevision),
+  searchItemCleanups: many(searchItemCleanup),
   workspaceInvites: many(workspaceInvite),
   integrations: many(integration),
   notifications: many(notification),
@@ -190,6 +194,20 @@ export const documentRelations = relations(document, ({ one, many }) => ({
     references: [workspace.id],
   }),
   documentChunks: many(documentChunk),
+}));
+
+export const documentRevisionRelations = relations(documentRevision, ({ one }) => ({
+  workspace: one(workspace, {
+    fields: [documentRevision.workspaceId],
+    references: [workspace.id],
+  }),
+}));
+
+export const searchItemCleanupRelations = relations(searchItemCleanup, ({ one }) => ({
+  workspace: one(workspace, {
+    fields: [searchItemCleanup.workspaceId],
+    references: [workspace.id],
+  }),
 }));
 
 export const documentChunkRelations = relations(documentChunk, ({ one }) => ({

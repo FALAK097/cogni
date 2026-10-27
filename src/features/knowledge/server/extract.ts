@@ -1,12 +1,35 @@
 import { randomUUID } from "node:crypto";
 import type { Db } from "@/lib/db/client";
-import { eq } from "drizzle-orm";
-import { documentChunk as documentChunkTable } from "@/lib/db/schema";
+import { and, eq } from "drizzle-orm";
+import {
+  document as documentTable,
+  documentChunk as documentChunkTable,
+  documentRevision,
+  searchItemCleanup,
+} from "@/lib/db/schema";
+import { runDbWriteOperation } from "@/lib/db/client";
 import { readObject } from "@/lib/storage/index";
 import { chunkText, stripHtml } from "@/features/knowledge/server/chunk";
 import { extractPdfText } from "@/features/knowledge/server/extract-pdf";
-import { uploadCloudflareSearchDocument } from "@/lib/search/cloudflare-search";
+import {
+  deleteCloudflareSearchItem,
+  isCloudflareSearchConfigured,
+  uploadCloudflareSearchDocument,
+} from "@/lib/search/cloudflare-search";
 import { fetchPublicText } from "@/features/knowledge/server/safe-fetch";
+import {
+  drainSearchItemCleanup,
+  enqueueSearchItemCleanup,
+  enqueueSearchItemCleanupInTransaction,
+  hashSourceContent,
+  recordDocumentRevisionInTransaction,
+  releaseSearchItemCleanupReservation,
+  renewSearchItemCleanupReservationInTransaction,
+  reserveSearchItemCleanup,
+  type SourceRevisionWriteResult,
+} from "@/features/knowledge/server/source-revisions";
+import { logError } from "@/lib/logging/logger";
+import { shouldPersistSearchItemIdentity } from "@/features/knowledge/server/search-item-cleanup-policy";
 
 export async function extractDocumentText({
   sourceType,
@@ -61,31 +84,267 @@ export async function indexDocumentContent(
   documentId: string,
   text: string,
   workspaceId: string,
-) {
+): Promise<SourceRevisionWriteResult> {
   const chunks = chunkText(text);
   if (chunks.length === 0) {
     throw new Error("No extractable text found.");
   }
 
-  const document = await db.query.document.findFirst({
-    where: (fields, { eq }) => eq(fields.id, documentId),
-    columns: { title: true },
-  });
+  let uploadAttempted = false;
+  let uploadedItemId: string | null = null;
+  let attemptedItemKey = `${documentId}.txt`;
+  let reservationId: string | null = null;
+  let requestedRevisionId: string | undefined;
 
-  await db.delete(documentChunkTable).where(eq(documentChunkTable.documentId, documentId));
+  if (isCloudflareSearchConfigured()) {
+    const contentSha256 = hashSourceContent(text);
+    const intent = await runDbWriteOperation(db, async (transaction) => {
+      const [source] = await transaction
+        .select({ id: documentTable.id })
+        .from(documentTable)
+        .where(and(eq(documentTable.id, documentId), eq(documentTable.workspaceId, workspaceId)))
+        .for("update");
+      if (!source) throw new Error("Knowledge source was not found in this workspace.");
 
-  const chunkValues = chunks.map((content, position) => ({
-    id: randomUUID(),
-    documentId,
-    content,
-    position,
-  }));
-  await db.insert(documentChunkTable).values(chunkValues);
+      const [current] = await transaction
+        .select({
+          id: documentRevision.id,
+          contentSha256: documentRevision.contentSha256,
+          providerItemId: documentRevision.providerItemId,
+          providerItemKey: documentRevision.providerItemKey,
+        })
+        .from(documentRevision)
+        .where(
+          and(
+            eq(documentRevision.workspaceId, workspaceId),
+            eq(documentRevision.documentId, documentId),
+            eq(documentRevision.status, "CURRENT"),
+          ),
+        )
+        .limit(1);
 
-  await uploadCloudflareSearchDocument({
-    documentId,
-    workspaceId,
-    title: document?.title ?? "Document",
-    text,
-  });
+      if (current?.contentSha256 === contentSha256 && current.providerItemId) return null;
+
+      // Always reserve a fresh id. recordDocumentRevisionInTransaction ignores it for unchanged
+      // content, while a competing extraction can make this content a new revision before upload.
+      const revisionId = randomUUID();
+      const itemKey =
+        current?.contentSha256 === contentSha256
+          ? (current.providerItemKey ?? `${documentId}.${revisionId}.txt`)
+          : `${documentId}.${revisionId}.txt`;
+      return { revisionId, itemKey };
+    });
+
+    if (intent) {
+      // The cleanup intent is committed separately from the transaction that uploads and records
+      // the provider item. Its lease prevents cleanup from racing a normal upload attempt.
+      reservationId = await reserveSearchItemCleanup(db, {
+        workspaceId,
+        documentId,
+        itemKey: intent.itemKey,
+      });
+      requestedRevisionId = intent.revisionId;
+      attemptedItemKey = intent.itemKey;
+    }
+  }
+
+  try {
+    const result = await runDbWriteOperation(db, async (transaction) => {
+      const [source] = await transaction
+        .select({ id: documentTable.id, title: documentTable.title })
+        .from(documentTable)
+        .where(and(eq(documentTable.id, documentId), eq(documentTable.workspaceId, workspaceId)))
+        .for("update");
+      if (!source) throw new Error("Knowledge source was not found in this workspace.");
+
+      const [previous] = await transaction
+        .select({
+          id: documentRevision.id,
+          providerItemId: documentRevision.providerItemId,
+          providerItemKey: documentRevision.providerItemKey,
+        })
+        .from(documentRevision)
+        .where(
+          and(
+            eq(documentRevision.workspaceId, workspaceId),
+            eq(documentRevision.documentId, documentId),
+            eq(documentRevision.status, "CURRENT"),
+          ),
+        )
+        .limit(1);
+
+      const revision = await recordDocumentRevisionInTransaction(transaction, {
+        workspaceId,
+        documentId,
+        content: text,
+        revisionId: requestedRevisionId,
+      });
+      if (revision.status === "unsupported-source") {
+        throw new Error(`Knowledge source type ${revision.sourceType} cannot be versioned.`);
+      }
+
+      const [storedRevision] = await transaction
+        .select({
+          providerItemId: documentRevision.providerItemId,
+          providerItemKey: documentRevision.providerItemKey,
+        })
+        .from(documentRevision)
+        .where(
+          and(
+            eq(documentRevision.id, revision.revisionId),
+            eq(documentRevision.workspaceId, workspaceId),
+            eq(documentRevision.documentId, documentId),
+          ),
+        )
+        .limit(1);
+
+      const itemKey = reservationId
+        ? attemptedItemKey
+        : (storedRevision?.providerItemKey ?? `${documentId}.${revision.revisionId}.txt`);
+      attemptedItemKey = itemKey;
+      let providerItemId = storedRevision?.providerItemId ?? null;
+
+      if (isCloudflareSearchConfigured() && !providerItemId) {
+        if (
+          reservationId &&
+          !(await renewSearchItemCleanupReservationInTransaction(transaction, {
+            workspaceId,
+            documentId,
+            reservationId,
+          }))
+        ) {
+          throw new Error("Search item upload reservation expired before upload.");
+        }
+        uploadAttempted = true;
+        providerItemId = await uploadCloudflareSearchDocument({
+          documentId,
+          workspaceId,
+          title: source.title,
+          text,
+          itemKey,
+        });
+        uploadedItemId = providerItemId;
+      }
+
+      if (
+        shouldPersistSearchItemIdentity({
+          revisionStatus: revision.status,
+          currentItemId: storedRevision?.providerItemId,
+          currentItemKey: storedRevision?.providerItemKey,
+          nextItemId: providerItemId,
+        })
+      ) {
+        await transaction
+          .update(documentRevision)
+          .set({ providerItemId, providerItemKey: itemKey })
+          .where(
+            and(
+              eq(documentRevision.id, revision.revisionId),
+              eq(documentRevision.workspaceId, workspaceId),
+              eq(documentRevision.documentId, documentId),
+            ),
+          );
+      }
+
+      if (
+        previous &&
+        (revision.status === "created" || (!previous.providerItemKey && providerItemId))
+      ) {
+        await enqueueSearchItemCleanupInTransaction(transaction, {
+          workspaceId,
+          documentId,
+          itemId: previous.providerItemId ?? undefined,
+          itemKey: previous.providerItemKey ?? `${documentId}.txt`,
+        });
+      } else if (!previous && revision.status === "created") {
+        await enqueueSearchItemCleanupInTransaction(transaction, {
+          workspaceId,
+          documentId,
+          itemKey: `${documentId}.txt`,
+        });
+      }
+
+      if (reservationId) {
+        await transaction
+          .delete(searchItemCleanup)
+          .where(
+            and(
+              eq(searchItemCleanup.id, reservationId),
+              eq(searchItemCleanup.workspaceId, workspaceId),
+            ),
+          );
+      }
+
+      await transaction
+        .delete(documentChunkTable)
+        .where(eq(documentChunkTable.documentId, documentId));
+
+      const chunkValues = chunks.map((content, position) => ({
+        id: randomUUID(),
+        documentId,
+        content,
+        position,
+      }));
+      await transaction.insert(documentChunkTable).values(chunkValues);
+      await transaction
+        .update(documentTable)
+        .set({ status: "READY", errorMessage: null, updatedAt: new Date().toISOString() })
+        .where(and(eq(documentTable.id, documentId), eq(documentTable.workspaceId, workspaceId)));
+
+      return revision;
+    });
+
+    try {
+      await drainSearchItemCleanup(db, 10, workspaceId);
+    } catch {
+      logError("knowledge.search_item_cleanup.drain_failed", { workspaceId, documentId });
+    }
+    return result;
+  } catch (error) {
+    if (uploadAttempted) {
+      let compensated = false;
+      if (uploadedItemId) {
+        try {
+          compensated = await deleteCloudflareSearchItem(uploadedItemId);
+        } catch {
+          compensated = false;
+        }
+      }
+      if (!compensated) {
+        try {
+          if (!reservationId) {
+            await enqueueSearchItemCleanup(db, {
+              workspaceId,
+              documentId,
+              itemId: uploadedItemId ?? undefined,
+              itemKey: attemptedItemKey,
+            });
+          }
+        } catch {
+          logError("knowledge.search_item_cleanup.enqueue_failed", { workspaceId, documentId });
+        }
+      } else if (reservationId) {
+        try {
+          await releaseSearchItemCleanupReservation(db, { workspaceId, reservationId });
+        } catch {
+          logError("knowledge.search_item_cleanup.reservation_release_failed", {
+            workspaceId,
+            documentId,
+          });
+        }
+      }
+    } else if (reservationId) {
+      // No remote write began, so releasing the reservation is safe. If this release itself
+      // fails, the ordinary cleanup worker will remove nothing and clear it after the lease.
+      try {
+        await releaseSearchItemCleanupReservation(db, { workspaceId, reservationId });
+      } catch {
+        logError("knowledge.search_item_cleanup.reservation_release_failed", {
+          workspaceId,
+          documentId,
+        });
+      }
+    }
+    throw error;
+  }
 }

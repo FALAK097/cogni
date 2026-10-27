@@ -4,7 +4,11 @@ import { and, asc, eq, ilike, inArray } from "drizzle-orm";
 
 import type { Db } from "@/lib/db/client";
 import { getDb } from "@/lib/db/client";
-import { document as documentTable, documentChunk as documentChunkTable } from "@/lib/db/schema";
+import {
+  document as documentTable,
+  documentChunk as documentChunkTable,
+  documentRevision,
+} from "@/lib/db/schema";
 import {
   type CloudflareSearchChunk,
   type CloudflareSearchFilters,
@@ -71,17 +75,40 @@ export async function retrieveKnowledgeContextWith({
     }
 
     const documents = await db
-      .select({ id: documentTable.id, title: documentTable.title })
+      .select({
+        id: documentTable.id,
+        title: documentTable.title,
+        providerItemKey: documentRevision.providerItemKey,
+      })
       .from(documentTable)
+      .leftJoin(
+        documentRevision,
+        and(
+          eq(documentRevision.documentId, documentTable.id),
+          eq(documentRevision.workspaceId, documentTable.workspaceId),
+          eq(documentRevision.status, "CURRENT"),
+        ),
+      )
       .where(and(...documentConditions));
     const titlesByDocumentId = new Map(
       documents.map((document) => [document.id, document.title] as const),
+    );
+    const keysByDocumentId = new Map(
+      documents.map((document) => [document.id, document.providerItemKey ?? `${document.id}.txt`]),
     );
 
     const contexts = searchMatches.flatMap((match: CloudflareSearchChunk) => {
       const documentId = readSearchMetadataString(match.item?.metadata, "documentId");
       const title = documentId ? titlesByDocumentId.get(documentId) : null;
-      if (!documentId || !title || !match.text.trim()) return [];
+      const currentItemKey = documentId ? keysByDocumentId.get(documentId) : null;
+      if (
+        !documentId ||
+        !title ||
+        !currentItemKey ||
+        match.item?.key !== currentItemKey ||
+        !match.text.trim()
+      )
+        return [];
       return [{ documentId, title, content: match.text }];
     });
     if (contexts.length > 0) return contexts.slice(0, safeLimit);

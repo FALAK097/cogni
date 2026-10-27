@@ -53,6 +53,8 @@ const stubs = {
   "@/features/knowledge/server/mime": `export const inferKnowledgeMimeType = () => "text/plain"; export const knowledgeSourceTypeFromMime = () => "TEXT";`,
   "@/lib/storage/index": `export const isAllowedKnowledgeUpload = () => true; export const saveObject = () => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; };`,
   "@/lib/storage": `export const deleteObject = () => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; };`,
+  "@/lib/db/client": `export const runDbWriteOperation = async (_db, operation) => operation(_db);`,
+  "@/features/knowledge/server/source-revisions": `export const drainSearchItemCleanup = async () => {}; export const markDocumentRevisionsDeleted = async () => {};`,
   "@/features/integrations/server/composio-connections": `export const COMPOSIO_PROVIDER_SLUGS = {}; export const COMPOSIO_TOOLKITS = {}; export const createComposioClient = () => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; }; export const getComposioProviderBySlug = () => null; export const getOrCreateAuthConfig = () => {};`,
   "@/lib/db/schema": `export const integration = { workspaceId: "workspaceId", provider: "provider" }; export const approvalRequest = { id: "id", workspaceId: "workspaceId" }; export const workflowRun = { id: "id", workspaceId: "workspaceId", name: "name", idempotencyKey: "idempotencyKey", status: "status" }; export const document = { id: "id", workspaceId: "workspaceId" }; export const widget = { id: "id" };`,
   "@/features/widget/domain": `export const normalizeHostname = () => null; export const normalizeLauncherSize = () => "md"; export const normalizePosition = () => "right"; export const normalizeFontFamily = () => "system"; export const normalizeFontSize = () => "md"; export const normalizeLogoUrl = () => null; export const stringifyJsonArray = () => "[]";`,
@@ -71,6 +73,19 @@ async function loadRoute(entryPoint) {
     platform: "node",
     alias: { "@": resolve("src") },
     plugins: [
+      {
+        name: "server-only-test-stub",
+        setup(buildContext) {
+          buildContext.onResolve({ filter: /^server-only$/ }, () => ({
+            path: "server-only",
+            namespace: "server-only-test-stub",
+          }));
+          buildContext.onLoad({ filter: /.*/, namespace: "server-only-test-stub" }, () => ({
+            contents: "export {};",
+            loader: "js",
+          }));
+        },
+      },
       {
         name: "privileged-route-permission-test",
         setup(buildContext) {

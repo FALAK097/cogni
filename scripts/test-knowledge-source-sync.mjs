@@ -50,6 +50,8 @@ const stubs = {
   "@/lib/auth/permissions": `export const canManageWorkspace = (role) => role === "OWNER";`,
   "@/lib/db/schema": `export const document = { id: "id", workspaceId: "workspaceId", status: "status" }; export const workflowRun = { workspaceId: "workspaceId", name: "name", idempotencyKey: "idempotencyKey", status: "status" };`,
   "@/lib/jobs/ingestion": `export const enqueueDocumentProcessing = async (input) => { globalThis.__knowledgeSourceSyncTest.enqueueCalls.push(input); };`,
+  "@/lib/db/client": `export const runDbWriteOperation = async (_db, operation) => operation(_db);`,
+  "@/features/knowledge/server/source-revisions": `export const drainSearchItemCleanup = async () => {}; export const markDocumentRevisionsDeleted = async () => {};`,
   "@/lib/storage": `export const deleteObject = async () => {};`,
 };
 
@@ -61,6 +63,19 @@ const compiled = await build({
   platform: "node",
   alias: { "@": resolve("src") },
   plugins: [
+    {
+      name: "server-only-test-stub",
+      setup(buildContext) {
+        buildContext.onResolve({ filter: /^server-only$/ }, () => ({
+          path: "server-only",
+          namespace: "server-only-test-stub",
+        }));
+        buildContext.onLoad({ filter: /.*/, namespace: "server-only-test-stub" }, () => ({
+          contents: "export {};",
+          loader: "js",
+        }));
+      },
+    },
     {
       name: "knowledge-source-sync-test",
       setup(buildContext) {

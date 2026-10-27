@@ -127,6 +127,27 @@
       "when": 1791526941545,
       "tag": "0017_agent_test_expected_sources",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793081164899,
+      "tag": "0018_document_source_revisions",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793081932740,
+      "tag": "0019_cloudflare_search_item_lifecycle",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1793082309822,
+      "tag": "0020_search_item_cleanup_backoff_claims",
+      "breakpoints": true
     }
   ]
 }
