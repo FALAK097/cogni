@@ -531,6 +531,7 @@ export const agentTestImprovement = pgTable(
       .notNull(),
   },
   (table) => [
+    uniqueIndex("agent_test_improvement_workspace_id_key").on(table.workspaceId, table.id),
     foreignKey({
       columns: [table.workspaceId, table.runId],
       foreignColumns: [agentTestRun.workspaceId, agentTestRun.id],
@@ -551,6 +552,77 @@ export const agentTestImprovement = pgTable(
     check(
       "agent_test_improvement_review_state_check",
       sql`(${table.status} = 'OPEN' and ${table.reviewedAt} is null) or (${table.status} <> 'OPEN' and ${table.reviewedAt} is not null)`,
+    ),
+  ],
+);
+
+export const agentTestComparisonStatus = pgEnum("agent_test_comparison_status", [
+  "PENDING",
+  "COMPLETE",
+  "ERROR",
+]);
+
+export const agentTestComparison = pgTable(
+  "agent_test_comparison",
+  {
+    id: text().primaryKey().notNull(),
+    workspaceId: text()
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    improvementId: text().notNull(),
+    idempotencyKey: text().notNull(),
+    caseSnapshot: jsonb()
+      .$type<{
+        title: string;
+        prompt: string;
+        expectedOutcome: "grounded_answer" | "no_evidence" | "human_handoff";
+        expectedSourceIds: string[];
+      }>()
+      .notNull(),
+    baselineReferences: jsonb().$type<{
+      configBasis: "widget-draft-revision-v1";
+      configFingerprint: string;
+      modelProvider: "OPENAI" | "GOOGLE";
+      modelName: string;
+      sources: { documentId: string; revisionId: string | null; revisionNumber: number | null }[];
+    } | null>(),
+    replayReferences: jsonb().$type<{
+      configFingerprint: string;
+      modelProvider: "OPENAI" | "GOOGLE";
+      modelName: string;
+      sources: { documentId: string; revisionId: string | null; revisionNumber: number | null }[];
+    } | null>(),
+    baselineOutcome: text(),
+    replayOutcome: text(),
+    replayStatus: text(),
+    status: agentTestComparisonStatus().default("PENDING").notNull(),
+    errorCode: text(),
+    createdByMembershipId: text().references(() => workspaceMember.id, {
+      onDelete: "set null",
+      onUpdate: "cascade",
+    }),
+    createdAt: timestampString()
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+    completedAt: timestampString(),
+  },
+  (table) => [
+    uniqueIndex("agent_test_comparison_workspace_id_key").on(table.workspaceId, table.id),
+    uniqueIndex("agent_test_comparison_workspace_idempotency_key").on(
+      table.workspaceId,
+      table.idempotencyKey,
+    ),
+    foreignKey({
+      columns: [table.workspaceId, table.improvementId],
+      foreignColumns: [agentTestImprovement.workspaceId, agentTestImprovement.id],
+      name: "agent_test_comparison_workspace_improvement_fk",
+    })
+      .onDelete("cascade")
+      .onUpdate("cascade"),
+    index("agent_test_comparison_workspace_createdAt_idx").on(table.workspaceId, table.createdAt),
+    check(
+      "agent_test_comparison_status_result_check",
+      sql`(${table.status} = 'PENDING' and ${table.completedAt} is null) or (${table.status} <> 'PENDING' and ${table.completedAt} is not null)`,
     ),
   ],
 );

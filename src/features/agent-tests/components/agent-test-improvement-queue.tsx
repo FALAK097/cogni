@@ -13,8 +13,10 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  useAgentTestComparisons,
   useAgentTestImprovements,
   useCreateAgentTestImprovement,
+  useReplayAgentTestComparison,
   useReviewAgentTestImprovement,
 } from "@/hooks/query/use-widget";
 import type { AgentTestExpectedOutcome, AgentTestImprovementStatus } from "../input";
@@ -57,10 +59,38 @@ export function AgentTestImprovementQueue({
   const [selectedFailure, setSelectedFailure] = useState<FailedAgentTestContext | null>(null);
   const [rationale, setRationale] = useState("");
   const [reviewNoteById, setReviewNoteById] = useState<Record<string, string>>({});
+  const [requestKeyByImprovementId, setRequestKeyByImprovementId] = useState<
+    Record<string, string>
+  >({});
   const improvementsQuery = useAgentTestImprovements();
+  const comparisonsQuery = useAgentTestComparisons();
   const createImprovement = useCreateAgentTestImprovement();
+  const replayComparison = useReplayAgentTestComparison();
   const reviewImprovement = useReviewAgentTestImprovement();
+  const [comparisonById, setComparisonById] = useState<
+    Record<
+      string,
+      {
+        comparison: {
+          status: "PENDING" | "COMPLETE" | "ERROR";
+          replayStatus: string | null;
+          replayReferences: unknown;
+        };
+        answerText: string | null;
+        replayed: boolean;
+      }
+    >
+  >({});
   const items = (improvementsQuery.data?.items ?? []).filter((item) => item.status === status);
+  const savedComparisonById = new Map<
+    string,
+    NonNullable<typeof comparisonsQuery.data>["comparisons"][number]
+  >();
+  for (const comparison of comparisonsQuery.data?.comparisons ?? []) {
+    if (!savedComparisonById.has(comparison.improvementId)) {
+      savedComparisonById.set(comparison.improvementId, comparison);
+    }
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -89,6 +119,11 @@ export function AgentTestImprovementQueue({
             Capture a verified failed check for human review. Resolving an item closes the review
             only; it does not mean the agent behavior is fixed.
           </p>
+          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground">
+            Replays use the saved case against the current draft. Older runs without saved
+            evaluation context are labeled baseline unavailable; answer text is shown temporarily
+            and never saved.
+          </p>
         </div>
         <p className="text-xs text-muted-foreground">
           {failedCases.length} eligible failures loaded
@@ -104,7 +139,7 @@ export function AgentTestImprovementQueue({
           {failedCases.length === 0 ? (
             <p className="rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">
               {unavailableFailureCount > 0
-                ? "These failures are from older runs or edited tests without matching run-time context. Run the current suite again to create a review item."
+                ? "Baseline unavailable for these older runs or edited tests without matching saved context. Run the current suite again to create a review item."
                 : "No eligible failures in the loaded history. Run the suite to record verified context."}
             </p>
           ) : (
@@ -161,6 +196,11 @@ export function AgentTestImprovementQueue({
       {reviewImprovement.isError ? (
         <p className="mt-3 text-sm text-destructive" role="alert">
           {reviewImprovement.error.message}
+        </p>
+      ) : null}
+      {replayComparison.isError ? (
+        <p className="mt-3 text-sm text-destructive" role="alert">
+          {replayComparison.error.message}
         </p>
       ) : null}
 
@@ -264,6 +304,84 @@ export function AgentTestImprovementQueue({
                     <p className="mt-3 whitespace-pre-wrap break-words text-xs text-muted-foreground">
                       Review note: {item.reviewNote}
                     </p>
+                  ) : null}
+                  {canReview ? (
+                    <div className="mt-4 rounded-lg border border-border/70 p-3">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-sm font-medium">Compare with the current draft</p>
+                          <p className="text-xs text-muted-foreground">
+                            The saved failure is the baseline. This replay leaves the original run
+                            and review item unchanged.
+                          </p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="min-h-10 w-full sm:w-auto"
+                          disabled={replayComparison.isPending}
+                          onClick={async () => {
+                            const idempotencyKey =
+                              requestKeyByImprovementId[item.id] ?? crypto.randomUUID();
+                            setRequestKeyByImprovementId((current) => ({
+                              ...current,
+                              [item.id]: idempotencyKey,
+                            }));
+                            try {
+                              const result = await replayComparison.mutateAsync({
+                                improvementId: item.id,
+                                idempotencyKey,
+                              });
+                              setComparisonById((current) => ({ ...current, [item.id]: result }));
+                              setRequestKeyByImprovementId((current) => {
+                                const next = { ...current };
+                                delete next[item.id];
+                                return next;
+                              });
+                            } catch {
+                              // The mutation error is shown below the queue.
+                            }
+                          }}
+                        >
+                          {replayComparison.isPending ? "Replaying…" : "Replay this case"}
+                        </Button>
+                      </div>
+                      {(comparisonById[item.id]?.comparison.status ??
+                        savedComparisonById.get(item.id)?.status) === "COMPLETE" ? (
+                        <div className="mt-3 space-y-2 text-xs" aria-live="polite">
+                          <p className="font-medium">
+                            Recorded historical outcome: mismatch · Current-draft replay:{" "}
+                            {comparisonById[item.id]?.comparison.replayStatus ??
+                              savedComparisonById.get(item.id)?.replayStatus}
+                          </p>
+                          {comparisonById[item.id]?.answerText ? (
+                            <div className="rounded-md bg-muted/40 p-3">
+                              <p className="mb-1 font-medium">Transient preview answer</p>
+                              <p className="whitespace-pre-wrap break-words text-muted-foreground">
+                                {comparisonById[item.id]?.answerText}
+                              </p>
+                            </div>
+                          ) : null}
+                          <p className="text-muted-foreground">
+                            The comparison stores outcomes and source revision references, not
+                            answer text.
+                          </p>
+                        </div>
+                      ) : null}
+                      {(comparisonById[item.id]?.comparison.status ??
+                        savedComparisonById.get(item.id)?.status) === "PENDING" ? (
+                        <output className="mt-2 block text-xs text-muted-foreground">
+                          A replay with this request key is still processing. Start a new replay if
+                          it does not finish.
+                        </output>
+                      ) : null}
+                      {(comparisonById[item.id]?.comparison.status ??
+                        savedComparisonById.get(item.id)?.status) === "ERROR" ? (
+                        <output className="mt-2 block text-xs text-destructive" role="alert">
+                          This replay could not be verified. Start a new replay to try again.
+                        </output>
+                      ) : null}
+                    </div>
                   ) : null}
                   <p className="mt-3 text-xs text-muted-foreground">
                     Added{" "}

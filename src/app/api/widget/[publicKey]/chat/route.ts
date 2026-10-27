@@ -697,6 +697,8 @@ export async function POST(
                 }
               : undefined,
             isPreview ? widget.workspace.id : undefined,
+            isPreview ? body.previewRunId : undefined,
+            isPreview ? body.previewCaseId : undefined,
           ),
         },
       ),
