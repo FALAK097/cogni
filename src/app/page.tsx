@@ -1,10 +1,5 @@
 import { Navbar } from "@/components/landing/navbar";
-import { Hero } from "@/components/landing/hero";
-import { Features } from "@/components/landing/features";
-import { HowItWorks } from "@/components/landing/how-it-works";
-import { Integrations } from "@/components/landing/integrations";
-import { Faq } from "@/components/landing/faq";
-import { FinalCta } from "@/components/landing/final-cta";
+import { EditorialLanding } from "@/components/landing/editorial-landing";
 import { Footer } from "@/components/landing/footer";
 
 export const metadata = {
@@ -15,14 +10,9 @@ export const metadata = {
 
 export default function HomePage() {
   return (
-    <main className="light overflow-x-hidden bg-white text-gray-900">
+    <main className="light bg-background text-foreground">
       <Navbar />
-      <Hero />
-      <Features />
-      <HowItWorks />
-      <Integrations />
-      <Faq />
-      <FinalCta />
+      <EditorialLanding />
       <Footer />
     </main>
   );

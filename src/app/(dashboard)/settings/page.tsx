@@ -39,19 +39,15 @@ export default async function SettingsPage() {
 
   return (
     <ContentLayout>
-      <div className="container mx-auto space-y-8 pb-10">
+      <div className="mx-auto max-w-[1200px] space-y-10 pb-10">
         <header>
-          <h1 className="text-xl font-semibold tracking-tight">{APP_PAGES.settings.label}</h1>
-          <p className="mt-2 text-sm text-muted-foreground">{APP_PAGES.settings.description}</p>
+          <h1 className="text-3xl font-medium tracking-tight">{APP_PAGES.settings.label}</h1>
         </header>
         <section aria-labelledby="team-heading" className="space-y-4">
           <div>
             <h2 id="team-heading" className="text-lg font-semibold tracking-tight">
               Team
             </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Manage who can access this workspace and what they can change.
-            </p>
           </div>
           <TeamSettings
             canManage={canManage}

@@ -1,0 +1,1624 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --color-cogni-canvas: #f8f7f3;
+        --color-cogni-surface: #fdfdfd;
+        --color-cogni-ink: #14243c;
+        --color-cogni-muted: #59677b;
+        --color-cogni-border: #dce1e8;
+        --color-cogni-primary: #2457db;
+        --color-cogni-primary-hover: #1b43b0;
+        --color-cogni-tint: #edf2fc;
+        --color-cogni-dark: #10243b;
+        --color-cogni-on-dark: #dae4f0;
+        --color-cogni-success: #1d765d;
+        --color-cogni-success-tint: #e7f2ed;
+        --font-cogni-sans: Geist;
+        --font-cogni-editorial: Instrument Serif;
+        --text-cogni-12: 12px;
+        --text-cogni-14: 14px;
+        --text-cogni-18: 18px;
+        --text-cogni-24: 24px;
+        --text-cogni-48: 48px;
+        --text-cogni-64: 64px;
+        --text-cogni-96: 96px;
+        --font-weight-cogni-400: 400;
+        --font-weight-cogni-500: 500;
+        --font-weight-cogni-600: 600;
+        --spacing-cogni-xs: 4px;
+        --spacing-cogni-sm: 8px;
+        --spacing-cogni-compact: 12px;
+        --spacing-cogni-md: 16px;
+        --spacing-cogni-lg: 24px;
+        --spacing-cogni-xl: 32px;
+        --spacing-cogni-2xl: 48px;
+        --spacing-cogni-3xl: 64px;
+        --spacing-cogni-section: 96px;
+        --radius-cogni-control: 8px;
+        --radius-cogni-panel: 16px;
+        --radius-cogni-scene: 24px;
+        --radius-cogni-pill: 999px;
+        --tracking-cogni-display: -0.045em;
+        --tracking-cogni-label: 0.12em;
+        --leading-cogni-body: 28px;
+        --leading-cogni-display: 96px;
+        --container-cogni-page: 1104px;
+        --breakpoint-cogni-mobile: 768px;
+        --opacity-cogni-disabled: 0.45;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--color-cogni-canvas);
+      }
+      main {
+        width: 1440px;
+        margin: 0 auto;
+      }
+      section {
+        position: relative;
+        overflow: hidden;
+      }
+      i {
+        font-family: var(--font-cogni-editorial);
+      }
+      @media (max-width: 1440px) {
+        main {
+          margin: 0;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation: none !important;
+          transition: none !important;
+        }
+      }
+    </style>
+    <title>Cogni design system</title>
+  </head>
+  <body>
+    <main aria-label="Cogni design system">
+      <section
+        aria-label="Cogni · Editorial support design system"
+        style="width: 1440px; height: 2800px; background: var(--color-cogni-canvas)"
+      >
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 72px;
+            width: 900px;
+            font-family: var(--font-cogni-sans);
+            font-size: 12px;
+            line-height: 28px;
+            color: var(--color-cogni-muted);
+            letter-spacing: var(--tracking-cogni-label);
+            font-weight: 500;
+          "
+        >
+          COGNI / DESIGN SYSTEM / 01
+        </div>
+        <svg
+          style="position: absolute; left: 96px; top: 120px"
+          width="48"
+          height="48"
+          viewBox="0 0 32 32"
+          fill="none"
+        >
+          <path
+            d="M8 4h16a5 5 0 0 1 5 5v12a5 5 0 0 1-5 5H13l-6 4v-4a5 5 0 0 1-4-5V9a5 5 0 0 1 5-5Z"
+            fill="var(--color-cogni-primary)"
+          />
+          <circle cx="12" cy="14" r="1.6" fill="var(--color-cogni-surface)" />
+          <path
+            d="M19 11a5 5 0 0 1 4 2M19 19a5 5 0 0 0 4-2"
+            stroke="var(--color-cogni-surface)"
+            stroke-width="2"
+            stroke-linecap="round"
+          />
+        </svg>
+        <div
+          style="
+            position: absolute;
+            left: 168px;
+            top: 113px;
+            width: 1000px;
+            font-family: var(--font-cogni-sans);
+            font-size: 64px;
+            line-height: 69px;
+            color: var(--color-cogni-ink);
+            letter-spacing: var(--tracking-cogni-display);
+            font-weight: 400;
+          "
+        >
+          Calm. Clear. Reliable.
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 214px;
+            width: 1100px;
+            font-family: var(--font-cogni-sans);
+            font-size: 24px;
+            line-height: 26px;
+            color: var(--color-cogni-muted);
+          "
+        >
+          Editorial confidence for the landing page. Quiet precision for the product.
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 300px;
+            width: 1248px;
+            height: 1px;
+            background: var(--color-cogni-border);
+          "
+        ></div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 334px;
+            width: 500px;
+            font-family: var(--font-cogni-sans);
+            font-size: 12px;
+            line-height: 28px;
+            color: var(--color-cogni-muted);
+            letter-spacing: var(--tracking-cogni-label);
+            font-weight: 500;
+          "
+        >
+          01 / SEMANTIC COLOR
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 382px;
+            width: 188px;
+            height: 94px;
+            background: var(--color-cogni-canvas);
+            border-radius: 8px;
+            border: 1px solid var(--color-cogni-border);
+          "
+        ></div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 497px;
+            width: 188px;
+            font-family: var(--font-cogni-sans);
+            font-size: 18px;
+            line-height: 28px;
+            color: var(--color-cogni-ink);
+          "
+        >
+          Canvas
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 531px;
+            width: 188px;
+            font-family: var(--font-cogni-sans);
+            font-size: 14px;
+            line-height: 22px;
+            color: var(--color-cogni-muted);
+          "
+        >
+          #F8F7F3
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 308px;
+            top: 382px;
+            width: 188px;
+            height: 94px;
+            background: var(--color-cogni-surface);
+            border-radius: 8px;
+            border: 1px solid var(--color-cogni-border);
+          "
+        ></div>
+        <div
+          style="
+            position: absolute;
+            left: 308px;
+            top: 497px;
+            width: 188px;
+            font-family: var(--font-cogni-sans);
+            font-size: 18px;
+            line-height: 28px;
+            color: var(--color-cogni-ink);
+          "
+        >
+          Surface
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 308px;
+            top: 531px;
+            width: 188px;
+            font-family: var(--font-cogni-sans);
+            font-size: 14px;
+            line-height: 22px;
+            color: var(--color-cogni-muted);
+          "
+        >
+          #FDFDFD
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 520px;
+            top: 382px;
+            width: 188px;
+            height: 94px;
+            background: var(--color-cogni-ink);
+            border-radius: 8px;
+            border: 1px solid var(--color-cogni-border);
+          "
+        ></div>
+        <div
+          style="
+            position: absolute;
+            left: 520px;
+            top: 497px;
+            width: 188px;
+            font-family: var(--font-cogni-sans);
+            font-size: 18px;
+            line-height: 28px;
+            color: var(--color-cogni-ink);
+          "
+        >
+          Ink
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 520px;
+            top: 531px;
+            width: 188px;
+            font-family: var(--font-cogni-sans);
+            font-size: 14px;
+            line-height: 22px;
+            color: var(--color-cogni-muted);
+          "
+        >
+          #14243C
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 732px;
+            top: 382px;
+            width: 188px;
+            height: 94px;
+            background: var(--color-cogni-muted);
+            border-radius: 8px;
+            border: 1px solid var(--color-cogni-border);
+          "
+        ></div>
+        <div
+          style="
+            position: absolute;
+            left: 732px;
+            top: 497px;
+            width: 188px;
+            font-family: var(--font-cogni-sans);
+            font-size: 18px;
+            line-height: 28px;
+            color: var(--color-cogni-ink);
+          "
+        >
+          Secondary
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 732px;
+            top: 531px;
+            width: 188px;
+            font-family: var(--font-cogni-sans);
+            font-size: 14px;
+            line-height: 22px;
+            color: var(--color-cogni-muted);
+          "
+        >
+          #59677B
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 944px;
+            top: 382px;
+            width: 188px;
+            height: 94px;
+            background: var(--color-cogni-primary);
+            border-radius: 8px;
+            border: 1px solid var(--color-cogni-border);
+          "
+        ></div>
+        <div
+          style="
+            position: absolute;
+            left: 944px;
+            top: 497px;
+            width: 188px;
+            font-family: var(--font-cogni-sans);
+            font-size: 18px;
+            line-height: 28px;
+            color: var(--color-cogni-ink);
+          "
+        >
+          Action
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 944px;
+            top: 531px;
+            width: 188px;
+            font-family: var(--font-cogni-sans);
+            font-size: 14px;
+            line-height: 22px;
+            color: var(--color-cogni-muted);
+          "
+        >
+          #2457DB
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 1156px;
+            top: 382px;
+            width: 188px;
+            height: 94px;
+            background: var(--color-cogni-success);
+            border-radius: 8px;
+            border: 1px solid var(--color-cogni-border);
+          "
+        ></div>
+        <div
+          style="
+            position: absolute;
+            left: 1156px;
+            top: 497px;
+            width: 188px;
+            font-family: var(--font-cogni-sans);
+            font-size: 18px;
+            line-height: 28px;
+            color: var(--color-cogni-ink);
+          "
+        >
+          Success
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 1156px;
+            top: 531px;
+            width: 188px;
+            font-family: var(--font-cogni-sans);
+            font-size: 14px;
+            line-height: 22px;
+            color: var(--color-cogni-muted);
+          "
+        >
+          #1D765D
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 584px;
+            width: 1200px;
+            font-family: var(--font-cogni-sans);
+            font-size: 18px;
+            line-height: 28px;
+            color: var(--color-cogni-muted);
+          "
+        >
+          Blue means interactive. Green means a named status. Never rely on color alone.
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 652px;
+            width: 1248px;
+            height: 1px;
+            background: var(--color-cogni-border);
+          "
+        ></div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 685px;
+            width: 500px;
+            font-family: var(--font-cogni-sans);
+            font-size: 12px;
+            line-height: 28px;
+            color: var(--color-cogni-muted);
+            letter-spacing: var(--tracking-cogni-label);
+            font-weight: 500;
+          "
+        >
+          02 / TYPOGRAPHY
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 743px;
+            width: 650px;
+            font-family: var(--font-cogni-sans);
+            font-size: 64px;
+            line-height: 69px;
+            color: var(--color-cogni-ink);
+            letter-spacing: var(--tracking-cogni-display);
+            font-weight: 400;
+          "
+        >
+          Good answers.
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 817px;
+            width: 650px;
+            font-family: var(--font-cogni-sans);
+            font-size: 64px;
+            line-height: 69px;
+            color: var(--color-cogni-primary);
+            font-family: var(--font-cogni-editorial);
+            font-style: italic;
+            letter-spacing: -0.025em;
+          "
+        >
+          Great handoffs.
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 917px;
+            width: 640px;
+            font-family: var(--font-cogni-sans);
+            font-size: 24px;
+            line-height: 26px;
+            color: var(--color-cogni-ink);
+          "
+        >
+          Geist / 400 · 500 · 600
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 961px;
+            width: 640px;
+            font-family: var(--font-cogni-sans);
+            font-size: 18px;
+            line-height: 28px;
+            color: var(--color-cogni-muted);
+          "
+        >
+          Instrument Serif / 400 italic · Display emphasis only
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 856px;
+            top: 746px;
+            width: 470px;
+            font-family: var(--font-cogni-sans);
+            font-size: 24px;
+            line-height: 26px;
+            color: var(--color-cogni-ink);
+          "
+        >
+          96 / 104 Hero
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 856px;
+            top: 806px;
+            width: 470px;
+            font-family: var(--font-cogni-sans);
+            font-size: 24px;
+            line-height: 26px;
+            color: var(--color-cogni-ink);
+          "
+        >
+          64 / 69 Section
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 856px;
+            top: 866px;
+            width: 470px;
+            font-family: var(--font-cogni-sans);
+            font-size: 24px;
+            line-height: 26px;
+            color: var(--color-cogni-ink);
+          "
+        >
+          48 / 52 Data or subhead
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 856px;
+            top: 926px;
+            width: 470px;
+            font-family: var(--font-cogni-sans);
+            font-size: 24px;
+            line-height: 26px;
+            color: var(--color-cogni-ink);
+          "
+        >
+          24 / 32 Lead
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 856px;
+            top: 978px;
+            width: 470px;
+            font-family: var(--font-cogni-sans);
+            font-size: 18px;
+            line-height: 28px;
+            color: var(--color-cogni-ink);
+          "
+        >
+          18 / 28 Body
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 856px;
+            top: 1021px;
+            width: 470px;
+            font-family: var(--font-cogni-sans);
+            font-size: 14px;
+            line-height: 22px;
+            color: var(--color-cogni-muted);
+          "
+        >
+          14 / 22 UI · 12 / 18 Metadata
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 1085px;
+            width: 1248px;
+            height: 1px;
+            background: var(--color-cogni-border);
+          "
+        ></div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 1117px;
+            width: 600px;
+            font-family: var(--font-cogni-sans);
+            font-size: 12px;
+            line-height: 28px;
+            color: var(--color-cogni-muted);
+            letter-spacing: var(--tracking-cogni-label);
+            font-weight: 500;
+          "
+        >
+          03 / ACTIONS & FOCUS
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 1171px;
+            width: 160px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            border-radius: var(--radius-cogni-pill);
+            background: var(--color-cogni-primary);
+            color: var(--color-cogni-surface);
+            border: 1px solid var(--color-cogni-primary);
+            font-family: var(--font-cogni-sans);
+            font-size: 14px;
+            font-weight: 500;
+          "
+        >
+          Get started<svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+          >
+            <path d="M5 12h14M13 6l6 6-6 6" />
+          </svg>
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 300px;
+            top: 1171px;
+            width: 160px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            border-radius: var(--radius-cogni-pill);
+            background: var(--color-cogni-primary-hover);
+            color: var(--color-cogni-surface);
+            border: 1px solid var(--color-cogni-primary);
+            font-family: var(--font-cogni-sans);
+            font-size: 14px;
+            font-weight: 500;
+          "
+        >
+          Get started<svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+          >
+            <path d="M5 12h14M13 6l6 6-6 6" />
+          </svg>
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 504px;
+            top: 1171px;
+            width: 160px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            border-radius: var(--radius-cogni-pill);
+            background: var(--color-cogni-primary);
+            color: var(--color-cogni-surface);
+            outline: 3px solid var(--color-cogni-primary);
+            outline-offset: 4px;
+            border: 1px solid var(--color-cogni-primary);
+            font-family: var(--font-cogni-sans);
+            font-size: 14px;
+            font-weight: 500;
+          "
+        >
+          Get started<svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+          >
+            <path d="M5 12h14M13 6l6 6-6 6" />
+          </svg>
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 708px;
+            top: 1171px;
+            width: 194px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            border-radius: var(--radius-cogni-pill);
+            background: var(--color-cogni-surface);
+            color: var(--color-cogni-ink);
+            border: 1px solid var(--color-cogni-border);
+            font-family: var(--font-cogni-sans);
+            font-size: 14px;
+            font-weight: 500;
+          "
+        >
+          See how it works<svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+          >
+            <path d="M5 12h14M13 6l6 6-6 6" />
+          </svg>
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 960px;
+            top: 1171px;
+            width: 160px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            border-radius: var(--radius-cogni-pill);
+            background: var(--color-cogni-primary);
+            color: var(--color-cogni-surface);
+            border: 1px solid var(--color-cogni-primary);
+            opacity: var(--opacity-cogni-disabled);
+            font-family: var(--font-cogni-sans);
+            font-size: 14px;
+            font-weight: 500;
+          "
+        >
+          Get started<svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+          >
+            <path d="M5 12h14M13 6l6 6-6 6" />
+          </svg>
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 1243px;
+            width: 180px;
+            font-family: var(--font-cogni-sans);
+            font-size: 14px;
+            line-height: 22px;
+            color: var(--color-cogni-muted);
+          "
+        >
+          Default
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 300px;
+            top: 1243px;
+            width: 180px;
+            font-family: var(--font-cogni-sans);
+            font-size: 14px;
+            line-height: 22px;
+            color: var(--color-cogni-muted);
+          "
+        >
+          Hover
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 504px;
+            top: 1243px;
+            width: 180px;
+            font-family: var(--font-cogni-sans);
+            font-size: 14px;
+            line-height: 22px;
+            color: var(--color-cogni-muted);
+          "
+        >
+          Keyboard focus
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 708px;
+            top: 1243px;
+            width: 194px;
+            font-family: var(--font-cogni-sans);
+            font-size: 14px;
+            line-height: 22px;
+            color: var(--color-cogni-muted);
+          "
+        >
+          Secondary
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 960px;
+            top: 1243px;
+            width: 180px;
+            font-family: var(--font-cogni-sans);
+            font-size: 14px;
+            line-height: 22px;
+            color: var(--color-cogni-muted);
+          "
+        >
+          Disabled
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 1300px;
+            width: 1180px;
+            font-family: var(--font-cogni-sans);
+            font-size: 18px;
+            line-height: 28px;
+            color: var(--color-cogni-muted);
+          "
+        >
+          48px marketing controls · 44px touch targets · One primary action per decision
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 1375px;
+            width: 1248px;
+            height: 1px;
+            background: var(--color-cogni-border);
+          "
+        ></div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 1408px;
+            width: 700px;
+            font-family: var(--font-cogni-sans);
+            font-size: 12px;
+            line-height: 28px;
+            color: var(--color-cogni-muted);
+            letter-spacing: var(--tracking-cogni-label);
+            font-weight: 500;
+          "
+        >
+          04 / PRODUCT LANGUAGE
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 1468px;
+            width: 108px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius-cogni-pill);
+            background: var(--color-cogni-success-tint);
+            color: var(--color-cogni-success);
+            font-family: var(--font-cogni-sans);
+            font-size: 12px;
+            font-weight: 500;
+          "
+        >
+          ✓ Ready
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 228px;
+            top: 1468px;
+            width: 132px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius-cogni-pill);
+            background: var(--color-cogni-tint);
+            color: var(--color-cogni-primary);
+            font-family: var(--font-cogni-sans);
+            font-size: 12px;
+            font-weight: 500;
+          "
+        >
+          AI answering
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 384px;
+            top: 1468px;
+            width: 118px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius-cogni-pill);
+            background: var(--color-cogni-success-tint);
+            color: var(--color-cogni-success);
+            font-family: var(--font-cogni-sans);
+            font-size: 12px;
+            font-weight: 500;
+          "
+        >
+          AI paused
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 526px;
+            top: 1468px;
+            width: 154px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius-cogni-pill);
+            background: var(--color-cogni-tint);
+            color: var(--color-cogni-primary);
+            font-family: var(--font-cogni-sans);
+            font-size: 12px;
+            font-weight: 500;
+          "
+        >
+          Assigned to Maya
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 1532px;
+            width: 560px;
+            height: 108px;
+            background: var(--color-cogni-tint);
+            border-radius: 12px;
+          "
+        ></div>
+        <div
+          style="
+            position: absolute;
+            left: 116px;
+            top: 1552px;
+            width: 520px;
+            font-family: var(--font-cogni-sans);
+            font-size: 18px;
+            line-height: 28px;
+            color: var(--color-cogni-ink);
+            font-weight: 500;
+          "
+        >
+          Selected conversation
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 116px;
+            top: 1590px;
+            width: 520px;
+            font-family: var(--font-cogni-sans);
+            font-size: 14px;
+            line-height: 22px;
+            color: var(--color-cogni-primary);
+          "
+        >
+          Alex Morgan · Human · Maya
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 704px;
+            top: 1532px;
+            width: 640px;
+            height: 108px;
+            background: var(--color-cogni-surface);
+            border: 1px solid var(--color-cogni-border);
+            border-radius: 12px;
+          "
+        ></div>
+        <div
+          style="
+            position: absolute;
+            left: 724px;
+            top: 1552px;
+            width: 600px;
+            font-family: var(--font-cogni-sans);
+            font-size: 18px;
+            line-height: 28px;
+            color: var(--color-cogni-ink);
+          "
+        >
+          Source needs attention
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 724px;
+            top: 1590px;
+            width: 600px;
+            font-family: var(--font-cogni-sans);
+            font-size: 14px;
+            line-height: 22px;
+            color: var(--color-cogni-muted);
+          "
+        >
+          Import failed. Check the source URL, then try again.
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 1695px;
+            width: 1248px;
+            height: 1px;
+            background: var(--color-cogni-border);
+          "
+        ></div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 1730px;
+            width: 600px;
+            font-family: var(--font-cogni-sans);
+            font-size: 12px;
+            line-height: 28px;
+            color: var(--color-cogni-muted);
+            letter-spacing: var(--tracking-cogni-label);
+            font-weight: 500;
+          "
+        >
+          05 / SPACE & SHAPE
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 1804px;
+            width: 4px;
+            height: 40px;
+            background: var(--color-cogni-primary);
+            border-radius: 2px;
+          "
+        ></div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 1868px;
+            width: 110px;
+            font-family: var(--font-cogni-sans);
+            font-size: 14px;
+            line-height: 22px;
+            color: var(--color-cogni-muted);
+          "
+        >
+          4px
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 234px;
+            top: 1804px;
+            width: 8px;
+            height: 40px;
+            background: var(--color-cogni-primary);
+            border-radius: 2px;
+          "
+        ></div>
+        <div
+          style="
+            position: absolute;
+            left: 234px;
+            top: 1868px;
+            width: 110px;
+            font-family: var(--font-cogni-sans);
+            font-size: 14px;
+            line-height: 22px;
+            color: var(--color-cogni-muted);
+          "
+        >
+          8px
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 372px;
+            top: 1804px;
+            width: 12px;
+            height: 40px;
+            background: var(--color-cogni-primary);
+            border-radius: 2px;
+          "
+        ></div>
+        <div
+          style="
+            position: absolute;
+            left: 372px;
+            top: 1868px;
+            width: 110px;
+            font-family: var(--font-cogni-sans);
+            font-size: 14px;
+            line-height: 22px;
+            color: var(--color-cogni-muted);
+          "
+        >
+          12px
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 510px;
+            top: 1804px;
+            width: 16px;
+            height: 40px;
+            background: var(--color-cogni-primary);
+            border-radius: 2px;
+          "
+        ></div>
+        <div
+          style="
+            position: absolute;
+            left: 510px;
+            top: 1868px;
+            width: 110px;
+            font-family: var(--font-cogni-sans);
+            font-size: 14px;
+            line-height: 22px;
+            color: var(--color-cogni-muted);
+          "
+        >
+          16px
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 648px;
+            top: 1804px;
+            width: 24px;
+            height: 40px;
+            background: var(--color-cogni-primary);
+            border-radius: 2px;
+          "
+        ></div>
+        <div
+          style="
+            position: absolute;
+            left: 648px;
+            top: 1868px;
+            width: 110px;
+            font-family: var(--font-cogni-sans);
+            font-size: 14px;
+            line-height: 22px;
+            color: var(--color-cogni-muted);
+          "
+        >
+          24px
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 786px;
+            top: 1804px;
+            width: 32px;
+            height: 40px;
+            background: var(--color-cogni-primary);
+            border-radius: 2px;
+          "
+        ></div>
+        <div
+          style="
+            position: absolute;
+            left: 786px;
+            top: 1868px;
+            width: 110px;
+            font-family: var(--font-cogni-sans);
+            font-size: 14px;
+            line-height: 22px;
+            color: var(--color-cogni-muted);
+          "
+        >
+          32px
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 924px;
+            top: 1804px;
+            width: 48px;
+            height: 40px;
+            background: var(--color-cogni-primary);
+            border-radius: 2px;
+          "
+        ></div>
+        <div
+          style="
+            position: absolute;
+            left: 924px;
+            top: 1868px;
+            width: 110px;
+            font-family: var(--font-cogni-sans);
+            font-size: 14px;
+            line-height: 22px;
+            color: var(--color-cogni-muted);
+          "
+        >
+          48px
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 1062px;
+            top: 1804px;
+            width: 64px;
+            height: 40px;
+            background: var(--color-cogni-primary);
+            border-radius: 2px;
+          "
+        ></div>
+        <div
+          style="
+            position: absolute;
+            left: 1062px;
+            top: 1868px;
+            width: 110px;
+            font-family: var(--font-cogni-sans);
+            font-size: 14px;
+            line-height: 22px;
+            color: var(--color-cogni-muted);
+          "
+        >
+          64px
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 1200px;
+            top: 1804px;
+            width: 96px;
+            height: 40px;
+            background: var(--color-cogni-primary);
+            border-radius: 2px;
+          "
+        ></div>
+        <div
+          style="
+            position: absolute;
+            left: 1200px;
+            top: 1868px;
+            width: 110px;
+            font-family: var(--font-cogni-sans);
+            font-size: 14px;
+            line-height: 22px;
+            color: var(--color-cogni-muted);
+          "
+        >
+          96px
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 1940px;
+            width: 1100px;
+            font-family: var(--font-cogni-sans);
+            font-size: 18px;
+            line-height: 28px;
+            color: var(--color-cogni-muted);
+          "
+        >
+          4px base · 16–24px within panels · 48–64px between groups · 96px section rhythm
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 2010px;
+            width: 180px;
+            height: 72px;
+            background: var(--color-cogni-tint);
+            border: 1px solid var(--color-cogni-border);
+            border-radius: 8px;
+          "
+        ></div>
+        <div
+          style="
+            position: absolute;
+            left: 116px;
+            top: 2030px;
+            width: 140px;
+            font-family: var(--font-cogni-sans);
+            font-size: 14px;
+            line-height: 22px;
+            color: var(--color-cogni-ink);
+          "
+        >
+          Control / 8px
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 308px;
+            top: 2010px;
+            width: 180px;
+            height: 72px;
+            background: var(--color-cogni-tint);
+            border: 1px solid var(--color-cogni-border);
+            border-radius: 16px;
+          "
+        ></div>
+        <div
+          style="
+            position: absolute;
+            left: 328px;
+            top: 2030px;
+            width: 140px;
+            font-family: var(--font-cogni-sans);
+            font-size: 14px;
+            line-height: 22px;
+            color: var(--color-cogni-ink);
+          "
+        >
+          Panel / 16px
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 520px;
+            top: 2010px;
+            width: 180px;
+            height: 72px;
+            background: var(--color-cogni-tint);
+            border: 1px solid var(--color-cogni-border);
+            border-radius: 24px;
+          "
+        ></div>
+        <div
+          style="
+            position: absolute;
+            left: 540px;
+            top: 2030px;
+            width: 140px;
+            font-family: var(--font-cogni-sans);
+            font-size: 14px;
+            line-height: 22px;
+            color: var(--color-cogni-ink);
+          "
+        >
+          Scene / 24px
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 772px;
+            top: 2016px;
+            width: 208px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            border-radius: var(--radius-cogni-pill);
+            background: var(--color-cogni-surface);
+            color: var(--color-cogni-ink);
+            border: 1px solid var(--color-cogni-border);
+            font-family: var(--font-cogni-sans);
+            font-size: 14px;
+            font-weight: 500;
+          "
+        >
+          Pill / 999px<svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+          >
+            <path d="M5 12h14M13 6l6 6-6 6" />
+          </svg>
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 2140px;
+            width: 1248px;
+            height: 1px;
+            background: var(--color-cogni-border);
+          "
+        ></div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 2174px;
+            width: 600px;
+            font-family: var(--font-cogni-sans);
+            font-size: 12px;
+            line-height: 28px;
+            color: var(--color-cogni-muted);
+            letter-spacing: var(--tracking-cogni-label);
+            font-weight: 500;
+          "
+        >
+          06 / LAYOUT & RESPONSIVE RULES
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 2232px;
+            width: 580px;
+            font-family: var(--font-cogni-sans);
+            font-size: 24px;
+            line-height: 26px;
+            color: var(--color-cogni-ink);
+            font-weight: 500;
+          "
+        >
+          Desktop
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 2280px;
+            width: 580px;
+            font-family: var(--font-cogni-sans);
+            font-size: 18px;
+            line-height: 28px;
+            color: var(--color-cogni-muted);
+          "
+        >
+          1440px canvas · 1104px content<br />168px margins · 24px grid gutters
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 760px;
+            top: 2232px;
+            width: 580px;
+            font-family: var(--font-cogni-sans);
+            font-size: 24px;
+            line-height: 26px;
+            color: var(--color-cogni-ink);
+            font-weight: 500;
+          "
+        >
+          Mobile
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 760px;
+            top: 2280px;
+            width: 580px;
+            font-family: var(--font-cogni-sans);
+            font-size: 18px;
+            line-height: 28px;
+            color: var(--color-cogni-muted);
+          "
+        >
+          390px canvas · 24px margins<br />48px headline · One column · 44px targets
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 2390px;
+            width: 1240px;
+            font-family: var(--font-cogni-sans);
+            font-size: 18px;
+            line-height: 28px;
+            color: var(--color-cogni-muted);
+          "
+        >
+          Collapse navigation. Stack product scenes. Show inbox detail as its own screen.<br />Keep
+          assignment, AI ownership, and source evidence visible at every width.
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 2500px;
+            width: 1248px;
+            height: 1px;
+            background: var(--color-cogni-border);
+          "
+        ></div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 2534px;
+            width: 600px;
+            font-family: var(--font-cogni-sans);
+            font-size: 12px;
+            line-height: 28px;
+            color: var(--color-cogni-muted);
+            letter-spacing: var(--tracking-cogni-label);
+            font-weight: 500;
+          "
+        >
+          07 / WRITING & MOTION
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 2592px;
+            width: 580px;
+            font-family: var(--font-cogni-sans);
+            font-size: 24px;
+            line-height: 26px;
+            color: var(--color-cogni-ink);
+          "
+        >
+          Show the next useful action.
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 96px;
+            top: 2640px;
+            width: 580px;
+            font-family: var(--font-cogni-sans);
+            font-size: 18px;
+            line-height: 28px;
+            color: var(--color-cogni-muted);
+          "
+        >
+          Short verbs. Explicit status. Sample data labeled.<br />No customer, outcome, or
+          compliance claims without proof.
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 760px;
+            top: 2592px;
+            width: 580px;
+            font-family: var(--font-cogni-sans);
+            font-size: 24px;
+            line-height: 26px;
+            color: var(--color-cogni-ink);
+          "
+        >
+          Let state changes do the moving.
+        </div>
+        <div
+          style="
+            position: absolute;
+            left: 760px;
+            top: 2640px;
+            width: 580px;
+            font-family: var(--font-cogni-sans);
+            font-size: 18px;
+            line-height: 28px;
+            color: var(--color-cogni-muted);
+          "
+        >
+          160ms controls · 240ms panels · Ease out<br />Reduce motion to immediate state changes.
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

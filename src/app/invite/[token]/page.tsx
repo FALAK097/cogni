@@ -26,9 +26,9 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
 
   return (
     <main className="mx-auto flex min-h-svh w-full max-w-xl items-center p-4">
-      <section className="w-full rounded-3xl border p-6 sm:p-8">
+      <section className="w-full p-6 sm:p-8">
         <p className="text-sm text-muted-foreground">workspace invite</p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight">Join workspace</h1>
+        <h1 className="mt-2 font-display text-4xl tracking-tight">Join workspace</h1>
 
         {!invite ? (
           <p className="mt-4 text-sm text-destructive">This invite does not exist.</p>
@@ -52,7 +52,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
                 </p>
                 <Link
                   href={`/sign-in?callbackURL=${encodeURIComponent(`/invite/${token}`)}`}
-                  className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground outline-none transition-colors hover:bg-primary/90 focus-visible:ring-3 focus-visible:ring-ring/40"
+                  className="inline-flex h-10 items-center justify-center rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground outline-none transition-colors hover:bg-primary/90 focus-visible:ring-3 focus-visible:ring-ring/40"
                 >
                   Sign in with Google
                 </Link>

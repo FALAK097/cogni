@@ -502,16 +502,7 @@ function runDashboardExport(
 // --- primitives ---
 
 function DashboardCard({ className, children }: { className?: string; children: ReactNode }) {
-  return (
-    <div
-      className={cn(
-        "w-full rounded-xl border border-border/50 bg-transparent text-foreground",
-        className,
-      )}
-    >
-      {children}
-    </div>
-  );
+  return <div className={cn("w-full text-foreground", className)}>{children}</div>;
 }
 
 function CardSkeleton({ className }: { className?: string }) {
@@ -974,7 +965,7 @@ function MetricCard({
   value,
   metric,
   previousRange,
-  icon,
+  icon: _icon,
   info,
   invertTrend = false,
 }: {
@@ -988,15 +979,12 @@ function MetricCard({
 }) {
   return (
     <DashboardCard className="flex h-full flex-col p-4 sm:p-5 xl:p-6">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          {icon}
+      <div className="space-y-0.5">
+        <div className="flex items-center gap-2">
+          <p className="text-xs text-muted-foreground sm:text-sm">{label}</p>
+          {info}
         </div>
-        {info}
-      </div>
-      <div className="mt-3 space-y-0.5 sm:mt-4">
-        <p className="text-xs text-muted-foreground sm:text-sm">{label}</p>
-        <p className="text-2xl font-semibold leading-tight tracking-tight tabular-nums sm:text-[1.75rem]">
+        <p className="text-3xl font-medium leading-tight tracking-tight tabular-nums sm:text-4xl">
           {value}
         </p>
       </div>
@@ -1278,12 +1266,11 @@ export function DashboardPage({
       </output>
       <div
         aria-busy={analyticsQuery.isFetching}
-        className="mx-auto flex w-full max-w-[1400px] flex-col gap-6 pb-8"
+        className="mx-auto flex w-full max-w-[1280px] flex-col gap-6 pb-8"
       >
         <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <h1 className="text-xl font-semibold tracking-tight">{APP_PAGES.insights.label}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">{APP_PAGES.insights.description}</p>
+            <h1 className="text-3xl font-medium tracking-tight">{APP_PAGES.insights.label}</h1>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             <DateRangePicker
@@ -1394,7 +1381,7 @@ export function DashboardPage({
           analytics.kpis.totalConversations.previousValue > 0 ? (
             <section className="flex flex-col gap-4 rounded-xl border border-border/60 bg-card/60 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
               <div className="flex min-w-0 items-start gap-3">
-                <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground">
                   <HugeiconsIcon icon={Message01Icon} strokeWidth={2} className="size-[18px]" />
                 </span>
                 <div className="min-w-0">
@@ -2020,7 +2007,7 @@ export function DashboardPage({
                         />
                         <span className="text-sm">{tile.label}</span>
                       </div>
-                      <p className="mt-2 text-xl font-semibold tracking-tight tabular-nums">
+                      <p className="mt-2 text-3xl font-medium tracking-tight tabular-nums">
                         {tile.value}
                       </p>
                       <p className="mt-1.5 text-xs">
@@ -2078,14 +2065,17 @@ export function DashboardPage({
                   >
                     Saved test pass rate
                   </h2>
-                  <p className="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground">
-                    Share of completed saved checks that met their expected behavior on each run.
-                    History is limited to the latest 50 runs in this date range before filtering.
-                    Errors and checks not run are excluded. Filter to the latest suite to compare
-                    the same saved checks. Agent and knowledge changes are not versioned here. These
-                    outcomes check retrieval and handoff behavior, not answer correctness,
-                    confidence, or live conversations.
-                  </p>
+                  <details className="mt-2 max-w-2xl text-xs leading-relaxed text-muted-foreground">
+                    <summary className="cursor-pointer">How this is measured</summary>
+                    <p className="mt-2">
+                      Share of completed saved checks that met their expected behavior on each run.
+                      History is limited to the latest 50 runs in this date range before filtering.
+                      Errors and checks not run are excluded. Filter to the latest suite to compare
+                      the same saved checks. Agent and knowledge changes are not versioned here.
+                      These outcomes check retrieval and handoff behavior, not answer correctness,
+                      confidence, or live conversations.
+                    </p>
+                  </details>
                 </div>
                 {latestAgentTestRun ? (
                   <p className="shrink-0 text-xs tabular-nums text-muted-foreground">
