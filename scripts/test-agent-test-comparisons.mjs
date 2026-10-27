@@ -24,6 +24,12 @@ test("replay forwards cookies only to the configured auth origin and rejects red
   assert.match(service, /\.\.\.\(input\.cookie \? \{ cookie: input\.cookie \} : \{\}\)/);
 });
 
+test("standard streamed answers bind signed preview evidence to the replay case", () => {
+  const streamPath = chatRoute.slice(chatRoute.indexOf("interruptWidgetTextStream"));
+  assert.match(streamPath, /isPreview \? body\.previewRunId : undefined/);
+  assert.match(streamPath, /isPreview \? body\.previewCaseId : undefined/);
+});
+
 test("comparison history omits generated answer text and replays cannot trigger external actions", () => {
   assert.match(service, /replayReferences:/);
   assert.match(service, /replayOutcome:/);
