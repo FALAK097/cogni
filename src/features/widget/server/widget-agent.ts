@@ -41,7 +41,12 @@ export async function streamWidgetAgent({
     outputTokens: number | null;
     totalTokens: number | null;
     finishReason: string | null;
-    sources: { documentId: string; title: string }[];
+    sources: {
+      documentId: string;
+      title: string;
+      revisionId: string | null;
+      revisionNumber: number | null;
+    }[];
     citations: { documentId: string; title: string; excerpt: string }[];
     retrievalOutcome: "SOURCES_FOUND" | "NO_MATCH";
   }) => Promise<void>;
@@ -124,9 +129,11 @@ export async function streamWidgetAgent({
           outputTokens: usage.outputTokens ?? null,
           totalTokens: usage.totalTokens ?? null,
           finishReason: finishReason ?? null,
-          sources: sources.map((source: { documentId: string; title: string }) => ({
+          sources: sources.map((source) => ({
             documentId: source.documentId,
             title: source.title,
+            revisionId: source.revisionId,
+            revisionNumber: source.revisionNumber,
           })),
           citations: [
             ...new Map(
@@ -162,9 +169,11 @@ export async function streamWidgetAgent({
   });
   return {
     fullStream: result.fullStream,
-    sources: sources.map((source: { documentId: string; title: string }) => ({
+    sources: sources.map((source) => ({
       documentId: source.documentId,
       title: source.title,
+      revisionId: source.revisionId,
+      revisionNumber: source.revisionNumber,
     })),
     waitForCompletion: completion.waitForCompletion,
     abortSignal: abortController.signal,

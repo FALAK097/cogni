@@ -19,6 +19,16 @@ export const agentTestCaseInputSchema = z
 export type AgentTestCaseInput = z.infer<typeof agentTestCaseInputSchema>;
 export type AgentTestExpectedOutcome = AgentTestCaseInput["expectedOutcome"];
 
+const agentTestSourceRevisionSchema = z
+  .object({
+    documentId: z.string().uuid(),
+    revisionId: z.string().uuid().nullable(),
+    revisionNumber: z.number().int().positive().nullable(),
+  })
+  .refine((source) => (source.revisionId === null) === (source.revisionNumber === null), {
+    message: "Revision ID and revision number must both be present or both be null.",
+  });
+
 export function buildAgentTestCaseFromQuestion(
   question: string,
   options?: {
@@ -53,12 +63,39 @@ export const agentTestRunInputSchema = z.object({
       z.object({
         id: z.string().uuid(),
         status: z.enum(["passed", "mismatch", "error", "not_run"]),
+        modelProvider: z.enum(["OPENAI", "GOOGLE"]).optional(),
+        modelName: z.string().min(1).max(120).optional(),
+        configFingerprint: z
+          .string()
+          .regex(/^[a-f0-9]{64}$/)
+          .optional(),
+        signedEvidence: z.string().min(1).max(8_000).optional(),
+        sources: z.array(agentTestSourceRevisionSchema).max(4).optional(),
       }),
     )
     .min(1)
     .max(5_000)
     .refine((results) => new Set(results.map((result) => result.id)).size === results.length),
 });
+
+export const agentTestEvaluationContextSchema = z.object({
+  version: z.literal(1),
+  configFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+  configBasis: z.literal("widget-draft-revision-v1"),
+  modelProvider: z.enum(["OPENAI", "GOOGLE"]),
+  modelName: z.string().min(1).max(120),
+  cases: z
+    .array(
+      z.object({
+        id: z.string().uuid(),
+        status: z.enum(["passed", "mismatch", "error", "not_run"]),
+        sources: z.array(agentTestSourceRevisionSchema).max(4),
+      }),
+    )
+    .max(5_000),
+});
+
+export type AgentTestEvaluationContext = z.infer<typeof agentTestEvaluationContextSchema>;
 
 export type AgentTestRunInput = z.infer<typeof agentTestRunInputSchema>;
 
@@ -74,6 +111,7 @@ export type AgentTestRunHistoryItem = AgentTestRunSummary & {
   id: string;
   createdAt: string;
   suiteDigest: string | null;
+  evaluationContext: AgentTestEvaluationContext | null;
 };
 
 export type AgentTestRunHistory = {

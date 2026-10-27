@@ -434,6 +434,18 @@ export const agentTestRun = pgTable(
     id: text().primaryKey().notNull(),
     resultDigest: text().notNull(),
     suiteDigest: text(),
+    evaluationContext: jsonb().$type<{
+      version: 1;
+      configFingerprint: string;
+      configBasis: "widget-draft-revision-v1";
+      modelProvider: "OPENAI" | "GOOGLE";
+      modelName: string;
+      cases: {
+        id: string;
+        status: "passed" | "mismatch" | "error" | "not_run";
+        sources: { documentId: string; revisionId: string | null; revisionNumber: number | null }[];
+      }[];
+    } | null>(),
     caseCount: integer().notNull(),
     passedCount: integer().notNull(),
     mismatchCount: integer().notNull(),

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { build } from "esbuild";
+import { createHash, createHmac } from "node:crypto";
 import { resolve } from "node:path";
 
 const state = {
@@ -9,7 +10,9 @@ const state = {
   caseWhere: null,
   historyWhere: null,
   insertCount: 0,
+  revisions: [],
 };
+const testSecret = "test-better-auth-secret-with-at-least-32-characters";
 globalThis.__agentTestRunStorageState = state;
 
 const stubs = {
@@ -19,19 +22,46 @@ const stubs = {
     export const and = (...conditions) => ({ op: "and", conditions });
     export const gte = (field, value) => ({ op: "gte", field, value });
     export const lt = (field, value) => ({ op: "lt", field, value });
+    export const inArray = (field, values) => ({ op: "inArray", field, values });
     export const asc = (field) => ({ op: "asc", field });
     export const desc = (field) => ({ op: "desc", field });
   `,
   "@/lib/db/client": `export const getDb = () => globalThis.__agentTestRunStorageState.db;`,
+  "@/lib/env/server": `export const env = { BETTER_AUTH_SECRET: "${testSecret}" };`,
   "@/lib/db/schema": `
     export const agentTestCase = { workspaceId: "case.workspaceId", id: "case.id" };
     export const agentTestRun = {
-      id: "run.id", resultDigest: "run.resultDigest", suiteDigest: "run.suiteDigest", workspaceId: "run.workspaceId",
+      id: "run.id", resultDigest: "run.resultDigest", suiteDigest: "run.suiteDigest", evaluationContext: "run.evaluationContext", workspaceId: "run.workspaceId",
       createdAt: "run.createdAt", caseCount: "run.caseCount", passedCount: "run.passedCount",
       mismatchCount: "run.mismatchCount", errorCount: "run.errorCount", notRunCount: "run.notRunCount",
     };
+    export const documentRevision = { id: "revision.id", documentId: "revision.documentId", revisionNumber: "revision.revisionNumber", workspaceId: "revision.workspaceId" };
   `,
 };
+
+function signEvidence({
+  prompt = "Private test prompt",
+  modelProvider = "GOOGLE",
+  modelName = "gemini-2.0-flash",
+  configFingerprint = "a".repeat(64),
+  sources = [],
+} = {}) {
+  const canonicalSources = [...sources].sort((left, right) =>
+    left.documentId.localeCompare(right.documentId),
+  );
+  const payload = {
+    workspaceId: "workspace-a",
+    prompt,
+    outcome: "answer",
+    grounded: sources.length > 0,
+    modelProvider,
+    modelName,
+    configFingerprint,
+    sources: canonicalSources,
+  };
+  const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  return `${encoded}.${createHmac("sha256", testSecret).update(encoded).digest("base64url")}`;
+}
 
 function findCondition(condition, op, field) {
   if (!condition || typeof condition !== "object") return null;
@@ -62,6 +92,15 @@ function makeDb() {
           }
           const record = state.records.get(id);
           return record?.workspaceId === workspaceId ? record : undefined;
+        },
+      },
+      documentRevision: {
+        async findMany({ where }) {
+          const workspaceId = findCondition(where, "eq", "revision.workspaceId")?.value;
+          const ids = findCondition(where, "inArray", "revision.id")?.values ?? [];
+          return state.revisions.filter(
+            (revision) => revision.workspaceId === workspaceId && ids.includes(revision.id),
+          );
         },
       },
     },
@@ -116,6 +155,7 @@ function makeDb() {
                             id,
                             createdAt,
                             suiteDigest = null,
+                            evaluationContext = null,
                             caseCount,
                             passedCount,
                             mismatchCount,
@@ -125,6 +165,7 @@ function makeDb() {
                             id,
                             createdAt,
                             suiteDigest,
+                            evaluationContext,
                             caseCount,
                             passedCount,
                             mismatchCount,
@@ -180,13 +221,24 @@ const {
 
 function reset() {
   state.savedCases = [
-    { id: "case-1", updatedAt: "2026-10-07T12:00:00.000Z", workspaceId: "workspace-a" },
-    { id: "case-2", updatedAt: "2026-10-07T12:00:00.000Z", workspaceId: "workspace-a" },
+    {
+      id: "case-1",
+      updatedAt: "2026-10-07T12:00:00.000Z",
+      prompt: "Private test prompt",
+      workspaceId: "workspace-a",
+    },
+    {
+      id: "case-2",
+      updatedAt: "2026-10-07T12:00:00.000Z",
+      prompt: "Private test prompt",
+      workspaceId: "workspace-a",
+    },
   ];
   state.records = new Map();
   state.caseWhere = null;
   state.historyWhere = null;
   state.insertCount = 0;
+  state.revisions = [];
   state.db = makeDb();
 }
 
@@ -224,6 +276,190 @@ test("run persistence verifies cases in the active workspace and stores aggregat
   assert.equal("resultDigest" in row, true);
   assert.match(row.suiteDigest, /^[a-f0-9]{64}$/);
   assert.equal("suiteVersion" in row, false);
+  assert.equal(row.evaluationContext, null);
+  const legacyCompatibleDigest = createHash("sha256")
+    .update(
+      JSON.stringify({
+        suiteVersion: runInput.suiteVersion,
+        results: [...runInput.results].sort((a, b) => a.id.localeCompare(b.id)),
+      }),
+    )
+    .digest("hex");
+  assert.equal(row.resultDigest, legacyCompatibleDigest);
+});
+
+test("signed evidence overrides forged client metadata and stores only scoped source revisions", async () => {
+  reset();
+  const documentId = "00000000-0000-4000-8000-000000000001";
+  const revisionId = "00000000-0000-4000-8000-000000000002";
+  state.revisions.push({
+    id: revisionId,
+    documentId,
+    revisionNumber: 3,
+    workspaceId: "workspace-a",
+  });
+  const input = {
+    ...runInput,
+    results: runInput.results.map((result) => ({
+      ...result,
+      modelProvider: "OPENAI",
+      modelName: "forged-model",
+      configFingerprint: "f".repeat(64),
+      sources: [
+        {
+          documentId: "00000000-0000-4000-8000-000000000009",
+          revisionId: null,
+          revisionNumber: null,
+        },
+      ],
+      signedEvidence: signEvidence({
+        configFingerprint: "a".repeat(64),
+        sources: [{ documentId, revisionId, revisionNumber: 3 }],
+      }),
+    })),
+  };
+  await recordAgentTestRun("workspace-a", "member-a", input, state.db);
+  const context = state.records.get("run-1").evaluationContext;
+  assert.equal(context.modelProvider, "GOOGLE");
+  assert.equal(context.modelName, "gemini-2.0-flash");
+  assert.equal(context.configFingerprint, "a".repeat(64));
+  assert.deepEqual(context.cases[0].sources, [{ documentId, revisionId, revisionNumber: 3 }]);
+  assert.equal(JSON.stringify(context).includes("prompt"), false);
+  assert.equal(JSON.stringify(context).includes("title"), false);
+  assert.equal(JSON.stringify(context).includes("content"), false);
+  assert.equal(JSON.stringify(context).includes("secret"), false);
+});
+
+test("tampered signed preview evidence cannot create evaluation context", async () => {
+  reset();
+  const signedEvidence = signEvidence({ modelProvider: "OPENAI", modelName: "gpt-4o-mini" });
+  const input = {
+    ...runInput,
+    results: runInput.results.map((result) => ({
+      ...result,
+      modelProvider: "OPENAI",
+      modelName: "gpt-4o-mini",
+      configFingerprint: "a".repeat(64),
+      sources: [],
+      signedEvidence: `${signedEvidence.slice(0, -1)}x`,
+    })),
+  };
+  await recordAgentTestRun("workspace-a", "member-a", input, state.db);
+  assert.equal(state.records.get("run-1").evaluationContext, null);
+});
+
+test("signed preview evidence paired with a different saved prompt cannot create context", async () => {
+  reset();
+  state.savedCases[1].prompt = "A different saved test prompt";
+  const input = {
+    ...runInput,
+    results: runInput.results.map((result) => ({
+      ...result,
+      modelProvider: "OPENAI",
+      modelName: "gpt-4o-mini",
+      configFingerprint: "a".repeat(64),
+      sources: [],
+      signedEvidence: signEvidence({
+        prompt: "Private test prompt",
+        modelProvider: "OPENAI",
+        modelName: "gpt-4o-mini",
+        configFingerprint: "a".repeat(64),
+      }),
+    })),
+  };
+  await recordAgentTestRun("workspace-a", "member-a", input, state.db);
+  assert.equal(state.records.get("run-1").evaluationContext, null);
+});
+
+test("evaluation context is withheld when a source revision belongs to another workspace", async () => {
+  reset();
+  const documentId = "00000000-0000-4000-8000-000000000001";
+  const revisionId = "00000000-0000-4000-8000-000000000002";
+  state.revisions.push({
+    id: revisionId,
+    documentId,
+    revisionNumber: 3,
+    workspaceId: "workspace-b",
+  });
+  const input = {
+    ...runInput,
+    results: runInput.results.map((result) => ({
+      ...result,
+      modelProvider: "OPENAI",
+      modelName: "gpt-4o-mini",
+      configFingerprint: "b".repeat(64),
+      sources: [{ documentId, revisionId, revisionNumber: 3 }],
+      signedEvidence: signEvidence({
+        modelProvider: "OPENAI",
+        modelName: "gpt-4o-mini",
+        configFingerprint: "b".repeat(64),
+        sources: [{ documentId, revisionId, revisionNumber: 3 }],
+      }),
+    })),
+  };
+  await recordAgentTestRun("workspace-a", "member-a", input, state.db);
+  assert.equal(state.records.get("run-1").evaluationContext, null);
+});
+
+test("evaluation context is withheld when the draft changes during the suite", async () => {
+  reset();
+  const input = {
+    ...runInput,
+    results: runInput.results.map((result, index) => ({
+      ...result,
+      modelProvider: "OPENAI",
+      modelName: "gpt-4o-mini",
+      configFingerprint: index === 0 ? "c".repeat(64) : "d".repeat(64),
+      sources: [],
+      signedEvidence: signEvidence({
+        modelProvider: "OPENAI",
+        modelName: "gpt-4o-mini",
+        configFingerprint: index === 0 ? "c".repeat(64) : "d".repeat(64),
+      }),
+    })),
+  };
+  await recordAgentTestRun("workspace-a", "member-a", input, state.db);
+  assert.equal(state.records.get("run-1").evaluationContext, null);
+});
+
+test("evaluation context retains retrieved sources without an immutable revision", async () => {
+  reset();
+  const input = {
+    ...runInput,
+    results: runInput.results.map((result) => ({
+      ...result,
+      modelProvider: "OPENAI",
+      modelName: "gpt-4o-mini",
+      configFingerprint: "e".repeat(64),
+      sources: [
+        {
+          documentId: "00000000-0000-4000-8000-000000000001",
+          revisionId: null,
+          revisionNumber: null,
+        },
+      ],
+      signedEvidence: signEvidence({
+        modelProvider: "OPENAI",
+        modelName: "gpt-4o-mini",
+        configFingerprint: "e".repeat(64),
+        sources: [
+          {
+            documentId: "00000000-0000-4000-8000-000000000001",
+            revisionId: null,
+            revisionNumber: null,
+          },
+        ],
+      }),
+    })),
+  };
+  await recordAgentTestRun("workspace-a", "member-a", input, state.db);
+  assert.deepEqual(state.records.get("run-1").evaluationContext.cases[0].sources, [
+    {
+      documentId: "00000000-0000-4000-8000-000000000001",
+      revisionId: null,
+      revisionNumber: null,
+    },
+  ]);
 });
 
 test("run persistence rejects results for another or changed suite before writing", async () => {
@@ -267,6 +503,97 @@ test("run IDs are idempotent and conflicting retries are rejected", async () => 
     ),
     AgentTestRunConflictError,
   );
+});
+
+test("run ID is idempotent when cases and source references are reordered", async () => {
+  reset();
+  const firstSource = {
+    documentId: "00000000-0000-4000-8000-000000000001",
+    revisionId: null,
+    revisionNumber: null,
+  };
+  const secondSource = {
+    documentId: "00000000-0000-4000-8000-000000000002",
+    revisionId: null,
+    revisionNumber: null,
+  };
+  const first = {
+    ...runInput,
+    results: runInput.results.map((result) => ({
+      ...result,
+      modelProvider: "OPENAI",
+      modelName: "gpt-4o-mini",
+      configFingerprint: "a".repeat(64),
+      sources: [firstSource, secondSource],
+      signedEvidence: signEvidence({
+        modelProvider: "OPENAI",
+        modelName: "gpt-4o-mini",
+        sources: [firstSource, secondSource],
+      }),
+    })),
+  };
+  const reordered = {
+    ...first,
+    results: [...first.results].reverse().map((result) => ({
+      ...result,
+      sources: [...result.sources].reverse(),
+      signedEvidence: signEvidence({
+        modelProvider: "OPENAI",
+        modelName: "gpt-4o-mini",
+        sources: [...result.sources].reverse(),
+      }),
+    })),
+  };
+  await recordAgentTestRun("workspace-a", "member-a", first, state.db);
+  await recordAgentTestRun("workspace-a", "member-a", reordered, state.db);
+  await recordAgentTestRun(
+    "workspace-a",
+    "member-a",
+    {
+      ...reordered,
+      results: reordered.results.map(({ id, status, signedEvidence }) => ({
+        id,
+        status,
+        signedEvidence,
+      })),
+    },
+    state.db,
+  );
+  assert.equal(state.insertCount, 1);
+});
+
+test("run ID rejects a retry with changed but valid signed evaluation context", async () => {
+  reset();
+  const firstSource = {
+    documentId: "00000000-0000-4000-8000-000000000001",
+    revisionId: null,
+    revisionNumber: null,
+  };
+  const secondSource = {
+    documentId: "00000000-0000-4000-8000-000000000002",
+    revisionId: null,
+    revisionNumber: null,
+  };
+  const createInput = (source) => ({
+    ...runInput,
+    results: runInput.results.map((result) => ({
+      id: result.id,
+      status: result.status,
+      signedEvidence: signEvidence({
+        modelProvider: "OPENAI",
+        modelName: "gpt-4o-mini",
+        configFingerprint: "a".repeat(64),
+        sources: [source],
+      }),
+    })),
+  });
+
+  await recordAgentTestRun("workspace-a", "member-a", createInput(firstSource), state.db);
+  await assert.rejects(
+    recordAgentTestRun("workspace-a", "member-a", createInput(secondSource), state.db),
+    AgentTestRunConflictError,
+  );
+  assert.equal(state.insertCount, 1);
 });
 
 test("run ID collisions in another workspace do not return that workspace's record", async () => {
