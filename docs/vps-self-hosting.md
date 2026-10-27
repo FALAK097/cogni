@@ -36,7 +36,9 @@ the database. Cloudflare Workers deployment is not supported by this package.
    Set `POSTGRES_PASSWORD` in `.env.db` to a unique URL-safe secret, and set `DATABASE_URL` in `.env`
    to `postgresql://cogni:<same-secret>@db:5432/cogni`. Also set `BETTER_AUTH_SECRET` to at least 32
    random characters, `BETTER_AUTH_URL` to the public HTTPS origin, Google OAuth credentials, and one
-   model API key. Set `CRON_SECRET` to at least 16 random characters. Set `CLOUDFLARE_ACCOUNT_ID`,
+   model API key. Set `CRON_SECRET` to at least 16 random characters. Compose passes only this value
+   to the polling sidecar; `.env` remains available to the app and migration services. Set
+   `CLOUDFLARE_ACCOUNT_ID`,
    `CLOUDFLARE_AI_SEARCH_TOKEN` (or `CLOUDFLARE_API_TOKEN`), and `SEARCH_INDEX` for semantic
    retrieval. The app services load `.env`; PostgreSQL receives only the password from `.env.db`. Keep both files private.
 
