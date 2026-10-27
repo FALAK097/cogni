@@ -1,4 +1,3 @@
-pyenv: cannot rehash: /Users/falakgala/.pyenv/shims isn't writable
 # Cogni product delivery plan
 
 Updated: 27 October 2026. This plan turns the existing [product roadmap](./product-roadmap.md) and [opportunities](./product-opportunities.md) into independently reviewable product releases. It does not replace either document's engineering status or release gates.
@@ -32,6 +31,8 @@ Product implications:
 ## Existing work and sequencing constraints
 
 PR [#48](https://github.com/FALAK097/cogni/pull/48) is the active broad platform foundation (Inbox, Agent, Insights, integrations, knowledge, deployment, and support workflows). Keep it distinct from follow-up PRs and refresh its CI, preview, and owner-setup state before treating any release gates as closed. The current checkout also has uncommitted design/product work. Review and reconcile that work separately; do not silently stage it into a phase branch.
+
+Waitlyze's [foundation PR #88](https://github.com/FALAK097/waitlyze/pull/88) and [product PR #89](https://github.com/FALAK097/waitlyze/pull/89) are process references: research and a stable foundation were separated from product implementation, with an explicit merge order and evidence in each PR. Apply that planning discipline to Cogni's dependencies and product model; do not copy Waitlyze's visual design or waitlist-specific features.
 
 The repository's existing roadmap already records the core support loop and many implemented foundations. The phases below close remaining acceptance gaps and define new investment; they are not a claim that every listed gap is still open. Each implementation PR must refresh the evidence table before scope is finalized.
 
