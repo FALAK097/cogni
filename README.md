@@ -128,3 +128,11 @@ administrative tools.
 
 See [`docs/vercel-migration.md`](docs/vercel-migration.md) for the compatibility matrix, production
 cutover checklist, verification steps, and rollback plan.
+
+## Linux VPS with Docker Compose
+
+The supported VPS starter runs Cogni and PostgreSQL in Compose, with a persistent upload volume and
+a polling ingestion worker. It still requires Google OAuth, Cloudflare AI Search, and an external
+OpenAI or Gemini API key for the grounded AI support loop. See [`docs/vps-self-hosting.md`](docs/vps-self-hosting.md)
+for setup, backup, restore, upgrade, and the current limits. This recipe does not provide Cloudflare
+Workers support or a fully self-contained installation.

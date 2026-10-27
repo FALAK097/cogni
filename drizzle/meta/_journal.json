@@ -148,6 +148,13 @@
       "when": 1793082309822,
       "tag": "0020_search_item_cleanup_backoff_claims",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1793086486440,
+      "tag": "0021_ingestion_worker_leases",
+      "breakpoints": true
     }
   ]
 }

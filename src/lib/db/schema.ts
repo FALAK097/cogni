@@ -913,6 +913,8 @@ export const workflowRun = pgTable(
     errorMessage: text(),
     attempts: integer().default(0).notNull(),
     maxAttempts: integer().default(3).notNull(),
+    leaseToken: text(),
+    leaseExpiresAt: numeric(),
     startedAt: numeric()
       .default(sql`(CURRENT_TIMESTAMP)`)
       .notNull(),

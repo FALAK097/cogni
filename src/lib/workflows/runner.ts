@@ -183,11 +183,13 @@ export async function completeWorkflowRun({
   workspaceId,
   runId,
   output,
+  leaseToken,
 }: {
   db: Db;
   workspaceId: string;
   runId: string;
   output?: Record<string, unknown>;
+  leaseToken?: string;
 }) {
   const results = await db
     .update(workflowRun)
@@ -195,11 +197,21 @@ export async function completeWorkflowRun({
       status: "COMPLETED",
       output: JSON.stringify(output ?? {}),
       finishedAt: new Date().toISOString(),
+      ...(leaseToken ? { leaseToken: null, leaseExpiresAt: null } : {}),
     })
-    .where(and(eq(workflowRun.id, runId), eq(workflowRun.workspaceId, workspaceId)))
+    .where(
+      and(
+        eq(workflowRun.id, runId),
+        eq(workflowRun.workspaceId, workspaceId),
+        ...(leaseToken
+          ? [eq(workflowRun.status, "RUNNING"), eq(workflowRun.leaseToken, leaseToken)]
+          : []),
+      ),
+    )
     .returning();
 
   const run = results[0];
+  if (!run) throw new Error("Workflow lease was lost before completion.");
 
   await emitDomainEvent({
     db,
@@ -225,11 +237,13 @@ export async function failWorkflowRun({
   workspaceId,
   runId,
   errorMessage,
+  leaseToken,
 }: {
   db: Db;
   workspaceId: string;
   runId: string;
   errorMessage: string;
+  leaseToken?: string;
 }) {
   const current = await db.query.workflowRun.findFirst({
     where: (run, { eq, and }) => and(eq(run.id, runId), eq(run.workspaceId, workspaceId)),
@@ -248,11 +262,21 @@ export async function failWorkflowRun({
       status,
       errorMessage,
       finishedAt: terminal ? new Date().toISOString() : null,
+      ...(leaseToken ? { leaseToken: null, leaseExpiresAt: null } : {}),
     })
-    .where(and(eq(workflowRun.id, runId), eq(workflowRun.workspaceId, workspaceId)))
+    .where(
+      and(
+        eq(workflowRun.id, runId),
+        eq(workflowRun.workspaceId, workspaceId),
+        ...(leaseToken
+          ? [eq(workflowRun.status, "RUNNING"), eq(workflowRun.leaseToken, leaseToken)]
+          : []),
+      ),
+    )
     .returning();
 
   const run = results[0];
+  if (!run) return null;
 
   await emitDomainEvent({
     db,

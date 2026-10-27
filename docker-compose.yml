@@ -1,0 +1,77 @@
+name: cogni
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    env_file: .env.db
+    environment:
+      POSTGRES_DB: cogni
+      POSTGRES_USER: cogni
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cogni -d cogni"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  migrate:
+    build: .
+    env_file: .env
+    command: ["node", "scripts/migrate.mjs"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    build: .
+    env_file: .env
+    environment:
+      ENV: production
+      UPLOAD_STORAGE: local
+      NODE_ENV: production
+      CLOUDFLARE_INGESTION_QUEUE_URL: ""
+      INGESTION_SHARED_SECRET: ""
+      INGESTION_RECLAIM_STALE: "true"
+    ports:
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
+    volumes:
+      - uploads_data:/app/.uploads
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health/ready').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  ingestion-worker:
+    image: curlimages/curl:8.12.1
+    env_file: .env
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        while true; do
+          curl --fail --silent --show-error
+          --header "Authorization: Bearer $${CRON_SECRET}"
+          http://app:3000/api/cron/ingestion >/dev/null || true;
+          sleep 30;
+        done
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  uploads_data:

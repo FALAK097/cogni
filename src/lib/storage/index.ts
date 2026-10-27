@@ -27,7 +27,7 @@ export async function saveObject({
     throw new Error("Upload type or size is not allowed.");
   }
 
-  if (env.ENV === "production") {
+  if (getUploadStorage() === "r2") {
     if (!isR2Configured()) {
       throw new Error("R2 must be configured in production.");
     }
@@ -51,7 +51,7 @@ export async function saveObject({
 }
 
 export async function readObject(storageKey: string) {
-  if (env.ENV === "production") {
+  if (getUploadStorage() === "r2") {
     if (!isR2Configured()) {
       throw new Error("R2 must be configured in production.");
     }
@@ -62,7 +62,7 @@ export async function readObject(storageKey: string) {
 }
 
 export async function deleteObject(storageKey: string) {
-  if (env.ENV === "production") {
+  if (getUploadStorage() === "r2") {
     if (!isR2Configured()) {
       throw new Error("R2 must be configured in production.");
     }
@@ -71,6 +71,10 @@ export async function deleteObject(storageKey: string) {
   }
 
   await deleteUpload(storageKey);
+}
+
+function getUploadStorage() {
+  return env.UPLOAD_STORAGE ?? (env.ENV === "production" ? "r2" : "local");
 }
 
 export { isAllowedUpload, isAllowedKnowledgeUpload, uploadPublicPath };

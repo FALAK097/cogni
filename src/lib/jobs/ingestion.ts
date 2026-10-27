@@ -1,7 +1,7 @@
 import "server-only";
 
 import { after } from "next/server";
-import { and, eq, inArray, lt, or } from "drizzle-orm";
+import { and, eq, inArray, isNull, lt, or } from "drizzle-orm";
 import { z } from "zod";
 
 import { processDocument } from "@/features/knowledge/server/process-document";
@@ -21,6 +21,8 @@ export const ingestionJobSchema = z.object({
 export type IngestionJob = z.infer<typeof ingestionJobSchema>;
 
 const staleJobAgeMs = 10 * 60 * 1_000;
+const ingestionLeaseDurationMs = 2 * 60 * 1_000;
+const ingestionLeaseHeartbeatMs = 30 * 1_000;
 
 export async function enqueueDocumentProcessing({
   db,
@@ -109,24 +111,39 @@ async function publishCloudflareIngestionJob(workflowRunId: string, workspaceId:
 function scheduleIngestionDrain(db: Db) {
   try {
     after(async () => {
-      await drainIngestionQueue(db, 3);
+      await drainIngestionQueue(db, 3, {
+        allowStaleRunning: env.INGESTION_RECLAIM_STALE !== "false",
+      });
     });
   } catch {
     // A cron drain is the durable fallback when no Next.js request context is available.
   }
 }
 
-export async function drainIngestionQueue(db: Db, limit = 5) {
+export async function drainIngestionQueue(
+  db: Db,
+  limit = 5,
+  { allowStaleRunning = true }: { allowStaleRunning?: boolean } = {},
+) {
   const staleBefore = new Date(Date.now() - staleJobAgeMs).toISOString();
+  const leaseExpiredAt = new Date().toISOString();
   const candidates = await db.query.workflowRun.findMany({
-    where: (fields, { and, eq, inArray, lt, or }) =>
-      and(
-        eq(fields.name, "document.process"),
-        or(
-          inArray(fields.status, ["QUEUED", "FAILED"]),
-          and(eq(fields.status, "RUNNING"), lt(fields.startedAt, staleBefore)),
-        ),
-      ),
+    where: (fields, { and, eq, inArray, lt, or }) => {
+      const eligibleStatus = allowStaleRunning
+        ? or(
+            inArray(fields.status, ["QUEUED", "FAILED"]),
+            and(
+              eq(fields.status, "RUNNING"),
+              or(
+                and(isNull(fields.leaseExpiresAt), lt(fields.startedAt, staleBefore)),
+                lt(fields.leaseExpiresAt, leaseExpiredAt),
+              ),
+            ),
+          )
+        : inArray(fields.status, ["QUEUED", "FAILED"]);
+
+      return and(eq(fields.name, "document.process"), eligibleStatus);
+    },
     orderBy: (fields, { asc }) => [asc(fields.startedAt)],
     limit: Math.max(1, Math.min(limit, 20)),
   });
@@ -139,23 +156,10 @@ export async function drainIngestionQueue(db: Db, limit = 5) {
         db,
         workspaceId: candidate.workspaceId,
         workflowRunId: candidate.id,
-        allowStaleRunning: true,
+        allowStaleRunning,
       });
       if (!result.claimed) continue;
     } catch (error) {
-      const current = await db.query.workflowRun.findFirst({
-        where: (fields, { and, eq }) =>
-          and(eq(fields.id, candidate.id), eq(fields.workspaceId, candidate.workspaceId)),
-        columns: { status: true },
-      });
-      if (current?.status === "RUNNING") {
-        await failWorkflowRun({
-          db,
-          workspaceId: candidate.workspaceId,
-          runId: candidate.id,
-          errorMessage: error instanceof Error ? error.message : "Unknown ingestion failure.",
-        });
-      }
       logError("knowledge.ingestion.job_failed", {
         workflowRunId: candidate.id,
         workspaceId: candidate.workspaceId,
@@ -173,20 +177,34 @@ export async function processIngestionWorkflowRun({
   workspaceId,
   workflowRunId,
   allowStaleRunning = false,
+  leaseTiming,
 }: {
   db: Db;
   workspaceId: string;
   workflowRunId: string;
   allowStaleRunning?: boolean;
+  leaseTiming?: {
+    durationMs?: number;
+    heartbeatMs?: number;
+    enabled?: boolean;
+    now?: () => Date;
+  };
 }) {
-  const staleBefore = new Date(Date.now() - staleJobAgeMs).toISOString();
+  const nowDate = () => leaseTiming?.now?.() ?? new Date();
+  const leaseDurationMs = leaseTiming?.durationMs ?? ingestionLeaseDurationMs;
+  const heartbeatMs = leaseTiming?.heartbeatMs ?? ingestionLeaseHeartbeatMs;
+  const now = nowDate().toISOString();
+  const staleBefore = new Date(nowDate().getTime() - staleJobAgeMs).toISOString();
+  const leaseToken = crypto.randomUUID();
   const [claimed] = await db
     .update(workflowRun)
     .set({
       status: "RUNNING",
       errorMessage: null,
       finishedAt: null,
-      startedAt: new Date().toISOString(),
+      startedAt: now,
+      leaseToken,
+      leaseExpiresAt: new Date(nowDate().getTime() + leaseDurationMs).toISOString(),
     })
     .where(
       and(
@@ -196,7 +214,13 @@ export async function processIngestionWorkflowRun({
         allowStaleRunning
           ? or(
               inArray(workflowRun.status, ["QUEUED", "FAILED"]),
-              and(eq(workflowRun.status, "RUNNING"), lt(workflowRun.startedAt, staleBefore)),
+              and(
+                eq(workflowRun.status, "RUNNING"),
+                or(
+                  and(isNull(workflowRun.leaseExpiresAt), lt(workflowRun.startedAt, staleBefore)),
+                  lt(workflowRun.leaseExpiresAt, now),
+                ),
+              ),
             )
           : inArray(workflowRun.status, ["QUEUED", "FAILED"]),
       ),
@@ -212,16 +236,88 @@ export async function processIngestionWorkflowRun({
     return { claimed: false, status: existing?.status ?? "NOT_FOUND" };
   }
 
-  await processIngestionJob(db, JSON.parse(claimed.input) as unknown);
+  let leaseOwned = true;
+  const heartbeat =
+    leaseTiming?.enabled === false
+      ? undefined
+      : setInterval(() => {
+          const renewedAt = nowDate();
+          void db
+            .update(workflowRun)
+            .set({
+              leaseExpiresAt: new Date(renewedAt.getTime() + leaseDurationMs).toISOString(),
+            })
+            .where(
+              and(
+                eq(workflowRun.id, workflowRunId),
+                eq(workflowRun.workspaceId, workspaceId),
+                eq(workflowRun.status, "RUNNING"),
+                eq(workflowRun.leaseToken, leaseToken),
+              ),
+            )
+            .returning({ id: workflowRun.id })
+            .then((rows) => {
+              if (rows.length === 0) leaseOwned = false;
+            })
+            .catch(() => {
+              leaseOwned = false;
+            });
+        }, heartbeatMs);
+  heartbeat?.unref?.();
+
+  try {
+    await processIngestionJob(db, JSON.parse(claimed.input) as unknown, leaseToken, async () => {
+      if (!leaseOwned) throw new Error("Ingestion lease was lost; refusing further processing.");
+      try {
+        const current = await db.query.workflowRun.findFirst({
+          where: (fields, { and, eq, gt }) =>
+            and(
+              eq(fields.id, workflowRunId),
+              eq(fields.workspaceId, workspaceId),
+              eq(fields.status, "RUNNING"),
+              eq(fields.leaseToken, leaseToken),
+              gt(fields.leaseExpiresAt, nowDate().toISOString()),
+            ),
+          columns: { id: true },
+        });
+        if (current) return;
+      } catch (error) {
+        leaseOwned = false;
+        throw error;
+      }
+      leaseOwned = false;
+      throw new Error("Ingestion lease was lost; refusing further processing.");
+    });
+    if (!leaseOwned) throw new Error("Ingestion lease was lost before completion.");
+  } catch (error) {
+    await failWorkflowRun({
+      db,
+      workspaceId,
+      runId: workflowRunId,
+      errorMessage: error instanceof Error ? error.message : "Unknown ingestion failure.",
+      leaseToken,
+    });
+    throw error;
+  } finally {
+    if (heartbeat) clearInterval(heartbeat);
+  }
   return { claimed: true, status: "COMPLETED" as const };
 }
 
-export async function processIngestionJob(db: Db, input: unknown) {
+export async function processIngestionJob(
+  db: Db,
+  input: unknown,
+  leaseToken: string,
+  assertLease: () => Promise<void> = async () => {},
+) {
   const job = ingestionJobSchema.parse(input);
+  await assertLease();
   await processDocument({
     db,
     workspaceId: job.workspaceId,
     documentId: job.documentId,
     idempotencyKey: job.idempotencyKey,
+    leaseToken,
+    assertLease,
   });
 }
