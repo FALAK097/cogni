@@ -5,12 +5,17 @@ import { z } from "zod";
 import { APP_ROUTES } from "@/features/navigation/app-routes";
 
 import { randomUUID } from "node:crypto";
-import { eq, and } from "drizzle-orm";
-import { document as documentTable } from "@/lib/db/schema";
+import { eq, and, inArray, like } from "drizzle-orm";
+import { document as documentTable, workflowRun } from "@/lib/db/schema";
+import { runDbWriteOperation } from "@/lib/db/client";
 import { enqueueDocumentProcessing } from "@/lib/jobs/ingestion";
 import { requireAuth, requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { canManageWorkspace } from "@/lib/auth/permissions";
 import { deleteObject, isAllowedKnowledgeUpload, saveObject } from "@/lib/storage/index";
+import {
+  drainSearchItemCleanup,
+  markDocumentRevisionsDeleted,
+} from "@/features/knowledge/server/source-revisions";
 import {
   inferKnowledgeMimeType,
   knowledgeSourceTypeFromMime,
@@ -269,8 +274,27 @@ export async function deleteDocumentAction(formData: FormData) {
   if (document.storageKey) {
     await deleteObject(document.storageKey);
   }
-  await db
-    .delete(documentTable)
-    .where(and(eq(documentTable.id, documentId), eq(documentTable.workspaceId, workspace.id)));
+  await runDbWriteOperation(db, async (transaction) => {
+    await markDocumentRevisionsDeleted(transaction, workspace.id, documentId);
+    await transaction
+      .update(workflowRun)
+      .set({
+        status: "CANCELLED",
+        errorMessage: "Knowledge source was deleted.",
+        finishedAt: new Date().toISOString(),
+      })
+      .where(
+        and(
+          eq(workflowRun.workspaceId, workspace.id),
+          eq(workflowRun.name, "document.process"),
+          like(workflowRun.idempotencyKey, `%${documentId}%`),
+          inArray(workflowRun.status, ["QUEUED", "FAILED"]),
+        ),
+      );
+    await transaction
+      .delete(documentTable)
+      .where(and(eq(documentTable.id, documentId), eq(documentTable.workspaceId, workspace.id)));
+  });
+  await drainSearchItemCleanup(db, 20, workspace.id);
   revalidatePath(APP_ROUTES.agent);
 }

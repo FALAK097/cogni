@@ -705,6 +705,85 @@ export const document = pgTable(
   ],
 );
 
+/**
+ * Content identities for successfully indexed knowledge sources. This table intentionally keeps
+ * documentId as an opaque value instead of a foreign key: deleting a source removes its content,
+ * but retains a minimal tombstone so later evaluations can report that a cited revision was
+ * deleted. No source text, URL, filename, or provider response is stored here.
+ */
+export const documentRevision = pgTable(
+  "document_revision",
+  {
+    id: text().primaryKey().notNull(),
+    documentId: text().notNull(),
+    revisionNumber: integer().notNull(),
+    contentSha256: text().notNull(),
+    sourceType: text().notNull(),
+    providerItemId: text(),
+    providerItemKey: text(),
+    status: text().default("CURRENT").notNull(),
+    createdAt: numeric()
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+    retiredAt: numeric(),
+    workspaceId: text()
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
+  },
+  (table) => [
+    uniqueIndex("document_revision_workspace_document_number_key").on(
+      table.workspaceId,
+      table.documentId,
+      table.revisionNumber,
+    ),
+    uniqueIndex("document_revision_current_key")
+      .on(table.workspaceId, table.documentId)
+      .where(sql`${table.status} = 'CURRENT'`),
+    index("document_revision_workspace_document_createdAt_idx").on(
+      table.workspaceId,
+      table.documentId,
+      table.createdAt,
+    ),
+    check("document_revision_number_positive_check", sql`${table.revisionNumber} > 0`),
+    check("document_revision_hash_sha256_check", sql`${table.contentSha256} ~ '^[0-9a-f]{64}$'`),
+    check(
+      "document_revision_status_check",
+      sql`${table.status} in ('CURRENT', 'SUPERSEDED', 'DELETED')`,
+    ),
+  ],
+);
+
+/** Retryable provider erasure records; these contain item identity only, never indexed content. */
+export const searchItemCleanup = pgTable(
+  "search_item_cleanup",
+  {
+    id: text().primaryKey().notNull(),
+    itemId: text(),
+    itemKey: text().notNull(),
+    documentId: text().notNull(),
+    attempts: integer().default(0).notNull(),
+    nextAttemptAt: numeric()
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+    claimedUntil: numeric(),
+    createdAt: numeric()
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+    updatedAt: numeric().notNull(),
+    workspaceId: text()
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
+  },
+  (table) => [
+    index("search_item_cleanup_due_idx").on(table.nextAttemptAt, table.claimedUntil),
+    index("search_item_cleanup_workspace_due_idx").on(
+      table.workspaceId,
+      table.nextAttemptAt,
+      table.claimedUntil,
+    ),
+  ],
+);
+
 export const documentChunk = pgTable(
   "document_chunk",
   {

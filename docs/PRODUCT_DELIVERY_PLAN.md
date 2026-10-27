@@ -67,6 +67,8 @@ Phases are sequenced by dependency. Each phase can contain several narrow PRs; a
 
 **Dependency:** agent publication versions, saved tests, and Phase 0 core-loop acceptance. Phase 2 slice 1 establishes the source-revision contract before test-run metadata or impact comparisons depend on it.
 
+**Merge blocker:** Cloudflare may accept a provider item upload before the source revision transaction commits. A process crash in that window can leave an item under a revision-specific key that was never persisted, so neither the cleanup outbox nor immediate compensation can discover it. Keep the source lifecycle change draft-only until Cloudflare provides verified idempotent overwrite/discovery semantics for the chosen item key, or a durable intent/reconciliation design closes this crash window. Do not claim atomic provider erasure.
+
 ### Phase 3 — Dependable team operations
 
 Select work with design partners. Candidate PRs are (1) business hours and time-zone-correct SLA measurement; (2) capacity-aware routing and collision handling; (3) operational reporting with clear denominators and export. Existing tickets, assignment, saved views, snooze, labels, and notes should be extended before adding parallel concepts.

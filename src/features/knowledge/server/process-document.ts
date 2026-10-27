@@ -53,15 +53,6 @@ export async function processDocument({
 
     await indexDocumentContent(db, document.id, text, workspaceId);
 
-    await db
-      .update(documentTable)
-      .set({
-        status: "READY",
-        errorMessage: null,
-        updatedAt: new Date().toISOString(),
-      })
-      .where(and(eq(documentTable.id, document.id), eq(documentTable.workspaceId, workspaceId)));
-
     await completeWorkflowRun({
       db,
       workspaceId,
