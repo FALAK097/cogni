@@ -40,6 +40,7 @@
     "test:ticket-lifecycle-route": "node --test scripts/test-ticket-lifecycle-routes.mjs",
     "test:conversation-delete-route": "node --test scripts/test-conversation-delete-route.mjs",
     "test:conversation-draft": "node --test scripts/test-conversation-draft.mjs",
+    "test:conversation-mobile-presentation": "node --test scripts/test-conversation-mobile-presentation.mjs",
     "test:conversation-scroll": "node --test scripts/test-conversation-scroll.mjs",
     "test:conversation-timeline": "node --test scripts/test-conversation-timeline.mjs",
     "test:integration-action-recovery": "node --test scripts/test-integration-action-recovery.mjs",

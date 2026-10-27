@@ -132,6 +132,12 @@ import {
   normalizeTimezone,
   type SnoozePreset,
 } from "@/features/conversations/snooze-schedule";
+import {
+  canCreateTestFromMessage,
+  getReplyContextLabel,
+  getTranscriptMessageAlignment,
+  getTranscriptMessageRowClassName,
+} from "@/features/conversations/mobile-inbox-presentation";
 
 import {
   scrollPaneClassName,
@@ -713,6 +719,10 @@ export function ConversationDetail({
 
   const isAssignedToMe = session.assigneeId === session.currentMembershipId;
   const replyTargetLabel = `Replying to ${displayName} via ${getConversationChannelLabel(session.conversationChannel)}`;
+  const replyContextLabel = getReplyContextLabel(
+    displayName,
+    getConversationChannelLabel(session.conversationChannel),
+  );
 
   if (part === "details") {
     return (
@@ -1230,33 +1240,30 @@ export function ConversationDetail({
             )}
           >
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <fieldset className="inline-flex min-w-0 items-center gap-0.5 rounded-lg border border-border/50 bg-muted/30 p-0.5">
-                <legend className="sr-only">Message type</legend>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={composerMode === "reply" ? "secondary" : "ghost"}
-                  className="h-11 gap-1.5 px-3 text-xs sm:h-9 sm:px-2.5"
-                  aria-pressed={composerMode === "reply"}
-                  disabled={sendMessageMutation.isPending}
-                  onClick={() => setComposerMode("reply")}
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-11 gap-2 rounded-lg px-3 text-sm sm:h-9"
+                      disabled={sendMessageMutation.isPending}
+                    />
+                  }
                 >
-                  <MessageSquare className="size-3.5" aria-hidden="true" />
-                  Reply
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={composerMode === "note" ? "secondary" : "ghost"}
-                  className="h-11 gap-1.5 px-3 text-xs sm:h-9 sm:px-2.5"
-                  aria-pressed={composerMode === "note"}
-                  disabled={sendMessageMutation.isPending}
-                  onClick={() => setComposerMode("note")}
-                >
-                  <FileText className="size-3.5" aria-hidden="true" />
-                  Note
-                </Button>
-              </fieldset>
+                  {composerMode === "reply" ? "Reply" : "Internal note"}
+                  <ChevronDown className="size-3.5" aria-hidden="true" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem className="min-h-11" onClick={() => setComposerMode("reply")}>
+                    Reply to customer
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="min-h-11" onClick={() => setComposerMode("note")}>
+                    Internal note
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               {composerMode === "note" ? (
                 <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-800 dark:text-amber-300">
                   <FileText className="size-3" aria-hidden="true" />
@@ -1268,9 +1275,7 @@ export function ConversationDetail({
                   title={replyTargetLabel}
                 >
                   <MessageSquare className="size-3 shrink-0" aria-hidden="true" />
-                  <span className="truncate">
-                    To {displayName} · {getConversationChannelLabel(session.conversationChannel)}
-                  </span>
+                  <span className="truncate">{replyContextLabel}</span>
                 </span>
               )}
             </div>
@@ -1584,8 +1589,8 @@ function MessageBubble({
   message: WidgetMessage;
   session: ConversationDetailData;
   displayName: string;
-  canManage?: boolean;
-  onCreateTest?: (prompt: string) => void;
+  canManage: boolean;
+  onCreateTest: (prompt: string) => void;
 }) {
   const isUser = message.role === "user";
   const isTeam = message.authorType === "TEAM";
@@ -1594,12 +1599,13 @@ function MessageBubble({
     message.metadata?.type === "documents" ? (message.metadata.documents ?? []) : [];
   const hasDocuments = documents.length > 0;
   const parsedMessage = splitMessageSources(message.content);
+  const alignment = getTranscriptMessageAlignment(message.role, isInternal);
   const authorName =
     message.authorName?.trim() || (isUser ? displayName : isTeam ? "Team" : "AI agent");
   const timestamp = new Date(message.timestamp);
 
   return (
-    <div className="flex gap-3">
+    <div className={getTranscriptMessageRowClassName(alignment)} data-message-alignment={alignment}>
       {isUser ? (
         <Avatar className="mt-0.5 h-8 w-8 shrink-0">
           <AvatarImage src={generateAvatarUrl(session.visitorId)} alt={displayName} />
@@ -1628,15 +1634,15 @@ function MessageBubble({
               Internal note
             </span>
           ) : null}
-          {isUser && canManage && onCreateTest ? (
+          {canCreateTestFromMessage(message.role, canManage) ? (
             <button
               type="button"
               onClick={() => onCreateTest(message.content)}
-              className="ml-auto inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              className="ml-auto inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               aria-label="Create agent test from this question"
               title="Create agent test from this question"
             >
-              <Sparkles className="size-3 text-primary" aria-hidden="true" />
+              <Sparkles className="size-3.5 text-primary" aria-hidden="true" />
               <span>Create test</span>
             </button>
           ) : null}
