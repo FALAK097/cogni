@@ -30,6 +30,11 @@ test("standard streamed answers bind signed preview evidence to the replay case"
   assert.match(streamPath, /isPreview \? body\.previewCaseId : undefined/);
 });
 
+test("persisted replay failures return their terminal state and allow a fresh retry key", () => {
+  assert.match(service, /status: "ERROR"[\s\S]*?\.returning\(\)[\s\S]*?failedComparison/);
+  assert.match(queue, /delete next\[item\.id\]/);
+});
+
 test("comparison history omits generated answer text and replays cannot trigger external actions", () => {
   assert.match(service, /replayReferences:/);
   assert.match(service, /replayOutcome:/);

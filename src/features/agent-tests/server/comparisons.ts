@@ -292,7 +292,7 @@ export async function replayAgentTestComparison(
     if (!comparison) throw new Error("Comparison reservation could not be completed.");
     return { comparison, answerText, replayed: false };
   } catch {
-    await db
+    const [failedComparison] = await db
       .update(agentTestComparison)
       .set({ status: "ERROR", errorCode: "replay_failed", completedAt: new Date().toISOString() })
       .where(
@@ -301,7 +301,11 @@ export async function replayAgentTestComparison(
           eq(agentTestComparison.workspaceId, input.workspaceId),
           eq(agentTestComparison.status, "PENDING"),
         ),
-      );
+      )
+      .returning();
+    if (failedComparison) {
+      return { comparison: failedComparison, answerText: null, replayed: false };
+    }
     throw new Error(
       "The single-case replay could not be verified. You can start a new comparison.",
     );
