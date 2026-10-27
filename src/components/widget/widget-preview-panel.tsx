@@ -26,6 +26,7 @@ export function isPreviewEvidence(value: unknown): value is WidgetPreviewEvidenc
   }
 
   if (
+    (evidence.runId === undefined) !== (evidence.caseId === undefined) ||
     (evidence.modelProvider !== undefined &&
       evidence.modelProvider !== "OPENAI" &&
       evidence.modelProvider !== "GOOGLE") ||
@@ -35,7 +36,12 @@ export function isPreviewEvidence(value: unknown): value is WidgetPreviewEvidenc
       (typeof evidence.configFingerprint !== "string" ||
         !/^[a-f0-9]{64}$/.test(evidence.configFingerprint))) ||
     (evidence.signedEvidence !== undefined &&
-      (typeof evidence.signedEvidence !== "string" || evidence.signedEvidence.length > 8_000))
+      (typeof evidence.signedEvidence !== "string" || evidence.signedEvidence.length > 8_000)) ||
+    (evidence.runId !== undefined &&
+      (typeof evidence.runId !== "string" || !/^[0-9a-f-]{36}$/i.test(evidence.runId))) ||
+    (evidence.caseId !== undefined &&
+      (typeof evidence.caseId !== "string" || !/^[0-9a-f-]{36}$/i.test(evidence.caseId))) ||
+    (evidence.runId !== undefined && typeof evidence.signedEvidence !== "string")
   ) {
     return false;
   }

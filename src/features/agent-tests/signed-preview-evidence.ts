@@ -2,6 +2,8 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 
 const signedPreviewEvidencePayloadSchema = z.object({
+  runId: z.string().min(1).max(128),
+  caseId: z.string().min(1).max(128),
   workspaceId: z.string().min(1).max(128),
   prompt: z.string().max(4_000),
   outcome: z.enum(["answer", "handoff"]),

@@ -10,6 +10,7 @@ import { AGENT_TEST_EVALUATION_CONTEXT_BASIS } from "../evaluation-context";
 import { verifyAgentTestPreviewEvidence } from "../signed-preview-evidence";
 import {
   getAgentTestSuiteVersion,
+  matchesAgentTestOutcome,
   summarizeAgentTestRun,
   type AgentTestEvaluationContext,
   type AgentTestRunInput,
@@ -38,7 +39,14 @@ export async function recordAgentTestRun(
   const requestedIds = input.results.map((result) => result.id).sort();
   const savedCases = await db.query.agentTestCase.findMany({
     where: eq(agentTestCase.workspaceId, workspaceId),
-    columns: { id: true, updatedAt: true, prompt: true },
+    columns: {
+      id: true,
+      updatedAt: true,
+      title: true,
+      prompt: true,
+      expectedOutcome: true,
+      expectedSourceIds: true,
+    },
   });
   const savedIds = savedCases.map((testCase) => testCase.id).sort();
   if (
@@ -49,7 +57,6 @@ export async function recordAgentTestRun(
     throw new AgentTestSuiteChangedError();
   }
 
-  const counts = summarizeAgentTestRun(input.results);
   const suiteDigest = createHash("sha256").update(input.suiteVersion).digest("hex");
   const signedEvidence = input.results.map((result) =>
     result.signedEvidence
@@ -57,6 +64,29 @@ export async function recordAgentTestRun(
       : null,
   );
   const savedCaseById = new Map(savedCases.map((testCase) => [testCase.id, testCase]));
+  const canonicalStatuses: ("passed" | "mismatch" | "error")[] = input.results.map(
+    (result, index) => {
+      const savedCase = savedCaseById.get(result.id);
+      const evidence = signedEvidence[index];
+      if (
+        !savedCase ||
+        !evidence ||
+        evidence.runId !== input.runId ||
+        evidence.caseId !== result.id ||
+        evidence.workspaceId !== workspaceId ||
+        evidence.prompt !== savedCase.prompt
+      ) {
+        return "error";
+      }
+      return matchesAgentTestOutcome(
+        savedCase.expectedOutcome,
+        evidence,
+        savedCase.expectedSourceIds ?? [],
+      )
+        ? "passed"
+        : "mismatch";
+    },
+  );
   const contextMetadata = signedEvidence[0];
   const contextIsConsistent =
     contextMetadata !== null &&
@@ -65,6 +95,7 @@ export async function recordAgentTestRun(
       return (
         evidence !== null &&
         result !== undefined &&
+        canonicalStatuses[index] !== "error" &&
         evidence.workspaceId === workspaceId &&
         evidence.prompt === savedCaseById.get(result.id)?.prompt &&
         evidence.modelProvider === contextMetadata.modelProvider &&
@@ -105,22 +136,30 @@ export async function recordAgentTestRun(
         modelProvider: contextMetadata.modelProvider,
         modelName: contextMetadata.modelName,
         cases: input.results
-          .map((result, index) => ({
-            id: result.id,
-            status: result.status,
-            sources: (signedEvidence[index]?.sources ?? []).map((source) => ({
-              documentId: source.documentId,
-              revisionId: source.revisionId,
-              revisionNumber: source.revisionNumber,
-            })),
-          }))
+          .map((result, index) => {
+            const savedCase = savedCaseById.get(result.id);
+            if (!savedCase) throw new AgentTestSuiteChangedError();
+            const status = canonicalStatuses[index];
+            if (!status || status === "error") throw new AgentTestSuiteChangedError();
+            return {
+              id: result.id,
+              status,
+              caseUpdatedAt: new Date(savedCase.updatedAt).toISOString(),
+              sources: (signedEvidence[index]?.sources ?? []).map((source) => ({
+                documentId: source.documentId,
+                revisionId: source.revisionId,
+                revisionNumber: source.revisionNumber,
+              })),
+            };
+          })
           .sort((left, right) => left.id.localeCompare(right.id)),
       };
     }
   }
   const canonicalResults = input.results
-    .map(({ id, status }) => ({ id, status }))
+    .map(({ id }, index) => ({ id, status: canonicalStatuses[index] ?? "error" }))
     .sort((left, right) => left.id.localeCompare(right.id));
+  const counts = summarizeAgentTestRun(canonicalResults);
   const digestPayload = {
     suiteVersion: input.suiteVersion,
     results: canonicalResults,

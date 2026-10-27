@@ -1,5 +1,5 @@
 export function createPreviewMessageSender({ state, show, sendMessage }) {
-  return async function sendPreviewMessage(message) {
+  return async function sendPreviewMessage(message, runId, caseId) {
     if (!state.preview || !state.isInitialized || !state.input || typeof message !== "string") {
       return false;
     }
@@ -11,7 +11,7 @@ export function createPreviewMessageSender({ state, show, sendMessage }) {
     try {
       show();
       state.input.value = text;
-      await sendMessage();
+      await sendMessage(runId && caseId ? { runId, caseId } : null);
       return true;
     } finally {
       state.previewMessagePending = false;

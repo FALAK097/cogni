@@ -35,6 +35,8 @@ import {
 import { runAgentTestCase } from "@/features/agent-tests/run-case";
 
 export type WidgetPreviewEvidence = {
+  runId?: string;
+  caseId?: string;
   outcome: "answer" | "handoff" | "error";
   grounded: boolean;
   modelProvider?: "OPENAI" | "GOOGLE";
@@ -191,7 +193,10 @@ export function WidgetTestPanel({
   evidence: WidgetPreviewEvidence | null;
   sendingPrompt: string | null;
   canManage: boolean;
-  onTryPrompt: (prompt: string) => Promise<WidgetPreviewEvidence | null>;
+  onTryPrompt: (
+    prompt: string,
+    binding?: { runId: string; caseId: string },
+  ) => Promise<WidgetPreviewEvidence | null>;
   onResetPreview: () => Promise<boolean>;
 }) {
   const [tryError, setTryError] = useState<string | null>(null);
@@ -302,9 +307,10 @@ export function WidgetTestPanel({
     setRetryPrompt(null);
     setActiveCaseId(null);
     setBatchResults({});
+    const runId = crypto.randomUUID();
     const results = await runAgentTestSuite(savedCases, {
       resetPreview: onResetPreview,
-      runPrompt: (testCase) => onTryPrompt(testCase.prompt),
+      runPrompt: (testCase) => onTryPrompt(testCase.prompt, { runId, caseId: testCase.id }),
       onCaseStart: (testCase, index) =>
         setBatchProgress({ index: index + 1, total: savedCases.length, title: testCase.title }),
       onResult: (result) => setBatchResults((current) => ({ ...current, [result.id]: result })),
@@ -314,7 +320,7 @@ export function WidgetTestPanel({
     if (canManage && results.length > 0) {
       try {
         await recordRun.mutateAsync({
-          runId: crypto.randomUUID(),
+          runId,
           suiteVersion: getAgentTestSuiteVersion(savedCases),
           results: results.map(({ id, status, evidence }) => ({
             id,

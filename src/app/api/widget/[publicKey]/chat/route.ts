@@ -62,59 +62,70 @@ const PREVIEW_HOSTNAME = "dashboard-preview";
 
 const nullableText = (max: number) => z.string().trim().max(max).nullable().default(null);
 
-const chatRequestSchema = z.object({
-  sessionId: z.string().uuid(),
-  interactionId: z.string().uuid(),
-  visitorId: z.string().uuid().nullable().default(null),
-  message: z.string().trim().min(1).max(4_000),
-  history: z
-    .array(
-      z.object({
-        role: z.enum(["user", "assistant"]),
-        content: z.string().trim().min(1).max(4_000),
+const chatRequestSchema = z
+  .object({
+    sessionId: z.string().uuid(),
+    interactionId: z.string().uuid(),
+    visitorId: z.string().uuid().nullable().default(null),
+    message: z.string().trim().min(1).max(4_000),
+    history: z
+      .array(
+        z.object({
+          role: z.enum(["user", "assistant"]),
+          content: z.string().trim().min(1).max(4_000),
+        }),
+      )
+      .min(1)
+      .max(50),
+    leadInfo: z
+      .object({
+        name: nullableText(100),
+        email: z.email().nullable().default(null),
+        phone: nullableText(30),
+      })
+      .nullable()
+      .default(null),
+    preview: z.boolean().default(false),
+    previewRunId: z.string().uuid().optional(),
+    previewCaseId: z.string().uuid().optional(),
+    metadata: z
+      .object({
+        hostname: nullableText(253),
+        pageUrl: nullableText(2_000),
+        referrer: nullableText(2_000),
+        browser: nullableText(100),
+        deviceType: nullableText(50),
+        os: nullableText(100),
+        country: nullableText(100),
+        city: nullableText(100),
+        timezone: nullableText(100),
+        language: nullableText(50),
+        screenSize: nullableText(50),
+      })
+      .default({
+        hostname: null,
+        pageUrl: null,
+        referrer: null,
+        browser: null,
+        deviceType: null,
+        os: null,
+        country: null,
+        city: null,
+        timezone: null,
+        language: null,
+        screenSize: null,
       }),
-    )
-    .min(1)
-    .max(50),
-  leadInfo: z
-    .object({
-      name: nullableText(100),
-      email: z.email().nullable().default(null),
-      phone: nullableText(30),
-    })
-    .nullable()
-    .default(null),
-  preview: z.boolean().default(false),
-  metadata: z
-    .object({
-      hostname: nullableText(253),
-      pageUrl: nullableText(2_000),
-      referrer: nullableText(2_000),
-      browser: nullableText(100),
-      deviceType: nullableText(50),
-      os: nullableText(100),
-      country: nullableText(100),
-      city: nullableText(100),
-      timezone: nullableText(100),
-      language: nullableText(50),
-      screenSize: nullableText(50),
-    })
-    .default({
-      hostname: null,
-      pageUrl: null,
-      referrer: null,
-      browser: null,
-      deviceType: null,
-      os: null,
-      country: null,
-      city: null,
-      timezone: null,
-      language: null,
-      screenSize: null,
-    }),
-});
+  })
+  .refine(
+    (body) =>
+      (body.previewRunId === undefined && body.previewCaseId === undefined) ||
+      (body.preview && body.previewRunId !== undefined && body.previewCaseId !== undefined),
+    "Preview run and case IDs must be provided together for dashboard previews.",
+  );
 
 type WidgetPreviewEvidence = {
+  runId?: string;
+  caseId?: string;
   outcome: "answer" | "handoff";
   grounded: boolean;
   modelProvider: WidgetModelProvider;
@@ -134,6 +145,8 @@ function streamHeaders(
   session?: { id: string; token: string },
   previewEvidence?: WidgetPreviewEvidence,
   previewWorkspaceId?: string,
+  previewRunId?: string,
+  previewCaseId?: string,
 ) {
   const headers = new Headers({
     "Content-Type": "text/event-stream",
@@ -145,30 +158,36 @@ function streamHeaders(
     headers.set("X-Widget-Session-Token", session.token);
   }
   if (previewEvidence && previewWorkspaceId) {
-    const signedEvidence = signAgentTestPreviewEvidence(
-      {
-        workspaceId: previewWorkspaceId,
-        prompt: previewEvidence.prompt,
-        outcome: previewEvidence.outcome,
-        grounded: previewEvidence.grounded,
-        modelProvider: previewEvidence.modelProvider,
-        modelName: previewEvidence.modelName,
-        configFingerprint: previewEvidence.configFingerprint,
-        sources: previewEvidence.sources.slice(0, 4).map((source) => ({
-          documentId: source.documentId,
-          revisionId: source.revisionId,
-          revisionNumber: source.revisionNumber,
-        })),
-      },
-      env.BETTER_AUTH_SECRET,
-    );
+    const binding =
+      previewRunId && previewCaseId ? { runId: previewRunId, caseId: previewCaseId } : undefined;
+    const signedEvidence = binding
+      ? signAgentTestPreviewEvidence(
+          {
+            ...binding,
+            workspaceId: previewWorkspaceId,
+            prompt: previewEvidence.prompt,
+            outcome: previewEvidence.outcome,
+            grounded: previewEvidence.grounded,
+            modelProvider: previewEvidence.modelProvider,
+            modelName: previewEvidence.modelName,
+            configFingerprint: previewEvidence.configFingerprint,
+            sources: previewEvidence.sources.slice(0, 4).map((source) => ({
+              documentId: source.documentId,
+              revisionId: source.revisionId,
+              revisionNumber: source.revisionNumber,
+            })),
+          },
+          env.BETTER_AUTH_SECRET,
+        )
+      : undefined;
     headers.set(
       "X-Widget-Preview-Evidence",
       encodeURIComponent(
         JSON.stringify({
           ...previewEvidence,
+          ...binding,
           prompt: previewEvidence.prompt.length <= 1_000 ? previewEvidence.prompt : undefined,
-          signedEvidence,
+          ...(signedEvidence ? { signedEvidence } : {}),
           sources: previewEvidence.sources.slice(0, 4).map((source) => ({
             documentId: source.documentId,
             revisionId: source.revisionId,
@@ -480,6 +499,8 @@ export async function POST(
           visitorSession ?? undefined,
           isPreview ? previewEvidence : undefined,
           isPreview ? widget.workspace.id : undefined,
+          isPreview ? body.previewRunId : undefined,
+          isPreview ? body.previewCaseId : undefined,
         ),
       }),
       origin,

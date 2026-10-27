@@ -28,9 +28,17 @@ export function parseWidgetPreviewEvidence(headerValue) {
       value.modelName.length > MAX_MODEL_NAME_LENGTH ||
       typeof value.configFingerprint !== "string" ||
       !/^[a-f0-9]{64}$/.test(value.configFingerprint) ||
-      typeof value.signedEvidence !== "string" ||
-      value.signedEvidence.length === 0 ||
-      value.signedEvidence.length > 8_000
+      (value.runId === undefined) !== (value.caseId === undefined) ||
+      (value.runId !== undefined &&
+        (typeof value.runId !== "string" || !/^[0-9a-f-]{36}$/i.test(value.runId))) ||
+      (value.caseId !== undefined &&
+        (typeof value.caseId !== "string" || !/^[0-9a-f-]{36}$/i.test(value.caseId))) ||
+      (value.runId !== undefined && typeof value.signedEvidence !== "string") ||
+      (value.signedEvidence !== undefined &&
+        (typeof value.signedEvidence !== "string" ||
+          value.signedEvidence.length === 0 ||
+          value.signedEvidence.length > 8_000)) ||
+      (value.runId !== undefined && typeof value.signedEvidence !== "string")
     ) {
       return null;
     }
@@ -70,8 +78,9 @@ export function parseWidgetPreviewEvidence(headerValue) {
       modelProvider: value.modelProvider,
       modelName: value.modelName,
       configFingerprint: value.configFingerprint,
-      signedEvidence: value.signedEvidence,
+      ...(typeof value.signedEvidence === "string" ? { signedEvidence: value.signedEvidence } : {}),
       sources,
+      ...(value.runId === undefined ? {} : { runId: value.runId, caseId: value.caseId }),
       ...(prompt === undefined ? {} : { prompt }),
     };
   } catch {
