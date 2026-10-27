@@ -131,6 +131,12 @@ import {
   normalizeTimezone,
   type SnoozePreset,
 } from "@/features/conversations/snooze-schedule";
+import {
+  canCreateTestFromMessage,
+  getReplyContextLabel,
+  getTranscriptMessageAlignment,
+  getTranscriptMessageRowClassName,
+} from "@/features/conversations/mobile-inbox-presentation";
 
 import {
   scrollPaneClassName,
@@ -714,6 +720,11 @@ export function ConversationDetail({
   if (!session) return null;
 
   const isAssignedToMe = session.assigneeId === session.currentMembershipId;
+  const replyTargetLabel = `Replying to ${displayName} via ${getConversationChannelLabel(session.conversationChannel)}`;
+  const replyContextLabel = getReplyContextLabel(
+    displayName,
+    getConversationChannelLabel(session.conversationChannel),
+  );
 
   if (part === "details") {
     return (
@@ -1150,6 +1161,8 @@ export function ConversationDetail({
                       message={message}
                       session={session}
                       displayName={displayName}
+                      canManage={canManage}
+                      onCreateTest={(prompt) => setTestDraftPrompt(prompt)}
                     />
                   ))}
                 </div>
@@ -1232,7 +1245,7 @@ export function ConversationDetail({
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="h-10 gap-2 px-1 text-sm"
+                      className="h-11 gap-2 rounded-lg px-2 text-sm sm:h-9"
                       disabled={sendMessageMutation.isPending}
                       aria-label="Message type"
                     />
@@ -1242,10 +1255,10 @@ export function ConversationDetail({
                   <ChevronDown className="size-3.5" aria-hidden="true" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
-                  <DropdownMenuItem onClick={() => setComposerMode("reply")}>
+                  <DropdownMenuItem className="min-h-11 sm:min-h-9" onClick={() => setComposerMode("reply")}>
                     Reply to customer
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setComposerMode("note")}>
+                  <DropdownMenuItem className="min-h-11 sm:min-h-9" onClick={() => setComposerMode("note")}>
                     Internal note
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -1257,7 +1270,8 @@ export function ConversationDetail({
                   className="min-w-0 truncate text-xs text-muted-foreground"
                   title={replyTarget}
                 >
-                  {replyTarget}
+                  <MessageSquare className="size-3 shrink-0" aria-hidden="true" />
+                  <span className="truncate">{replyContextLabel}</span>
                 </span>
               )}
             </div>
@@ -1562,6 +1576,8 @@ function MessageBubble({
   message: WidgetMessage;
   session: ConversationDetailData;
   displayName: string;
+  canManage: boolean;
+  onCreateTest: (prompt: string) => void;
 }) {
   const isUser = message.role === "user";
   const isTeam = message.authorType === "TEAM";
@@ -1570,12 +1586,13 @@ function MessageBubble({
     message.metadata?.type === "documents" ? (message.metadata.documents ?? []) : [];
   const hasDocuments = documents.length > 0;
   const parsedMessage = splitMessageSources(message.content);
+  const alignment = getTranscriptMessageAlignment(message.role, isInternal);
   const authorName =
     message.authorName?.trim() || (isUser ? displayName : isTeam ? "Team" : "AI agent");
   const timestamp = new Date(message.timestamp);
 
   return (
-    <div className={cn("flex gap-3", !isUser && !isInternal && "flex-row-reverse")}>
+    <div className={getTranscriptMessageRowClassName(alignment)} data-message-alignment={alignment}>
       {isUser ? (
         <Avatar className="mt-0.5 h-8 w-8 shrink-0">
           <AvatarImage src={generateAvatarUrl(session.visitorId)} alt={displayName} />
@@ -1604,6 +1621,18 @@ function MessageBubble({
               <FileText className="size-3" aria-hidden="true" />
               Internal note
             </span>
+          ) : null}
+          {canCreateTestFromMessage(message.role, canManage) ? (
+            <button
+              type="button"
+              onClick={() => onCreateTest(message.content)}
+              className="ml-auto inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              aria-label="Create agent test from this question"
+              title="Create agent test from this question"
+            >
+              <Sparkles className="size-3.5 text-primary" aria-hidden="true" />
+              <span>Create test</span>
+            </button>
           ) : null}
           <time
             dateTime={message.timestamp}
