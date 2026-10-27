@@ -996,6 +996,85 @@ export function useReviewAgentTestImprovement() {
   });
 }
 
+const agentTestComparisonResponseSchema = z.object({
+  id: z.string().uuid(),
+  improvementId: z.string().uuid(),
+  caseSnapshot: z.object({
+    title: z.string(),
+    prompt: z.string(),
+    expectedOutcome: z.enum(["grounded_answer", "no_evidence", "human_handoff"]),
+    expectedSourceIds: z.array(z.string().uuid()),
+  }),
+  baselineReferences: z.unknown().nullable(),
+  replayReferences: z.unknown().nullable(),
+  baselineOutcome: z.string().nullable(),
+  replayOutcome: z.string().nullable(),
+  replayStatus: z.string().nullable(),
+  status: z.enum(["PENDING", "COMPLETE", "ERROR"]),
+  createdAt: z.string().datetime({ offset: true }),
+  completedAt: z.string().datetime({ offset: true }).nullable(),
+});
+
+export function useAgentTestComparisons() {
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useQuery({
+    queryKey: queryKeys.widget.agentTestComparisons(workspaceId),
+    enabled: Boolean(workspaceId),
+    queryFn: async () => {
+      const response = await fetch("/api/dashboard/agent-test-comparisons");
+      const body: unknown = await response.json().catch(() => null);
+      const parsed = z
+        .object({ comparisons: z.array(agentTestComparisonResponseSchema) })
+        .safeParse(body);
+      if (!response.ok || !parsed.success) {
+        const error = z.object({ error: z.string() }).safeParse(body);
+        throw new Error(error.success ? error.data.error : "Could not load replay comparisons.");
+      }
+      return parsed.data;
+    },
+  });
+}
+
+export function useReplayAgentTestComparison() {
+  const queryClient = useQueryClient();
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useMutation({
+    mutationFn: async (input: { improvementId: string; idempotencyKey: string }) => {
+      const response = await fetch("/api/dashboard/agent-test-comparisons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      const body: unknown = await response.json().catch(() => null);
+      const parsed = z
+        .object({
+          comparison: z.object({
+            id: z.string().uuid(),
+            status: z.enum(["PENDING", "COMPLETE", "ERROR"]),
+            baselineOutcome: z.string().nullable(),
+            replayOutcome: z.string().nullable(),
+            replayStatus: z.string().nullable(),
+            baselineReferences: z.unknown().nullable(),
+            replayReferences: z.unknown().nullable(),
+          }),
+          answerText: z.string().nullable(),
+          replayed: z.boolean(),
+        })
+        .safeParse(body);
+      if (!response.ok || !parsed.success) {
+        const error = z.object({ error: z.string() }).safeParse(body);
+        throw new Error(error.success ? error.data.error : "Could not replay this saved check.");
+      }
+      return parsed.data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.widget.agentTestComparisons(workspaceId),
+      });
+    },
+  });
+}
+
 export function useSaveAgentTestCase() {
   const queryClient = useQueryClient();
   const workspaceId = useActiveWorkspaceId() ?? "";
