@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { and, asc, desc, eq, inArray, isNull, lte, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
 
 import { document as documentTable, documentRevision, searchItemCleanup } from "@/lib/db/schema";
 import { runDbWriteOperation, type Db } from "@/lib/db/client";
@@ -76,7 +76,8 @@ export async function recordDocumentRevisionInTransaction(
     workspaceId,
     documentId,
     content,
-  }: { workspaceId: string; documentId: string; content: string },
+    revisionId: requestedRevisionId,
+  }: { workspaceId: string; documentId: string; content: string; revisionId?: string },
 ): Promise<SourceRevisionWriteResult> {
   const [source] = await transaction
     .select({ id: documentTable.id, sourceType: documentTable.sourceType })
@@ -144,7 +145,7 @@ export async function recordDocumentRevisionInTransaction(
   }
 
   const revisionNumber = (latest?.revisionNumber ?? 0) + 1;
-  const revisionId = randomUUID();
+  const revisionId = requestedRevisionId ?? randomUUID();
   await transaction.insert(documentRevision).values({
     id: revisionId,
     workspaceId,
@@ -335,6 +336,72 @@ export async function enqueueSearchItemCleanup(
   );
 }
 
+/**
+ * Persist a cleanup intent before uploading a new provider item. If the process dies after the
+ * remote upload but before the revision transaction commits, the normal cleanup drain will find
+ * this row after its reservation lease expires and remove the unreferenced provider item by key.
+ */
+export async function reserveSearchItemCleanup(
+  db: Db,
+  input: { workspaceId: string; documentId: string; itemKey: string },
+) {
+  const id = randomUUID();
+  const now = new Date();
+  await runDbWriteOperation(db, async (transaction) => {
+    await transaction.insert(searchItemCleanup).values({
+      id,
+      workspaceId: input.workspaceId,
+      documentId: input.documentId,
+      itemId: null,
+      itemKey: input.itemKey,
+      attempts: 0,
+      nextAttemptAt: now.toISOString(),
+      claimedUntil: new Date(now.getTime() + searchItemCleanupClaimLeaseMs).toISOString(),
+      updatedAt: now.toISOString(),
+    });
+  });
+  return id;
+}
+
+/** Renew a pre-upload reservation while holding the source row lock in the indexing transaction. */
+export async function renewSearchItemCleanupReservationInTransaction(
+  transaction: Db,
+  input: { workspaceId: string; documentId: string; reservationId: string },
+) {
+  const now = new Date();
+  const renewed = await transaction
+    .update(searchItemCleanup)
+    .set({
+      claimedUntil: new Date(now.getTime() + searchItemCleanupClaimLeaseMs).toISOString(),
+      updatedAt: now.toISOString(),
+    })
+    .where(
+      and(
+        eq(searchItemCleanup.id, input.reservationId),
+        eq(searchItemCleanup.workspaceId, input.workspaceId),
+        eq(searchItemCleanup.documentId, input.documentId),
+      ),
+    )
+    .returning({ id: searchItemCleanup.id });
+  return renewed.length === 1;
+}
+
+export async function releaseSearchItemCleanupReservation(
+  db: Db,
+  input: { workspaceId: string; reservationId: string },
+) {
+  await runDbWriteOperation(db, (transaction) =>
+    transaction
+      .delete(searchItemCleanup)
+      .where(
+        and(
+          eq(searchItemCleanup.id, input.reservationId),
+          eq(searchItemCleanup.workspaceId, input.workspaceId),
+        ),
+      ),
+  );
+}
+
 type SearchItemCleanupDelete = (itemId: string) => Promise<boolean>;
 type SearchItemCleanupDeleteByKey = (itemKey: string) => Promise<boolean>;
 
@@ -412,18 +479,55 @@ export async function drainSearchItemCleanupWith(
     cleanupCandidates += pending.length;
     for (const cleanup of pending) {
       try {
-        const removed = cleanup.itemId
-          ? await deleteItem(cleanup.itemId)
-          : await deleteItemsByKey(cleanup.itemKey);
-        if (!removed) throw new Error("Provider cleanup did not complete.");
-        await db
-          .delete(searchItemCleanup)
-          .where(
-            and(
-              eq(searchItemCleanup.id, cleanup.id),
-              eq(searchItemCleanup.workspaceId, cleanup.workspaceId),
-            ),
-          );
+        await runDbWriteOperation(db, async (transaction) => {
+          // Serialize cleanup with indexing and source deletion. A retry may reuse a key that an
+          // older cleanup row is about to remove; the current revision wins over that stale intent.
+          await transaction
+            .select({ id: documentTable.id })
+            .from(documentTable)
+            .where(
+              and(
+                eq(documentTable.id, cleanup.documentId),
+                eq(documentTable.workspaceId, cleanup.workspaceId),
+              ),
+            )
+            .for("update");
+
+          const activeIdentity = await transaction
+            .select({ id: documentRevision.id })
+            .from(documentRevision)
+            .where(
+              and(
+                eq(documentRevision.workspaceId, cleanup.workspaceId),
+                eq(documentRevision.documentId, cleanup.documentId),
+                eq(documentRevision.status, "CURRENT"),
+                or(
+                  and(
+                    eq(documentRevision.providerItemKey, cleanup.itemKey),
+                    isNotNull(documentRevision.providerItemId),
+                  ),
+                  cleanup.itemId ? eq(documentRevision.providerItemId, cleanup.itemId) : undefined,
+                ),
+              ),
+            )
+            .limit(1);
+
+          if (activeIdentity.length === 0) {
+            const removed = cleanup.itemId
+              ? await deleteItem(cleanup.itemId)
+              : await deleteItemsByKey(cleanup.itemKey);
+            if (!removed) throw new Error("Provider cleanup did not complete.");
+          }
+
+          await transaction
+            .delete(searchItemCleanup)
+            .where(
+              and(
+                eq(searchItemCleanup.id, cleanup.id),
+                eq(searchItemCleanup.workspaceId, cleanup.workspaceId),
+              ),
+            );
+        });
         deleted += 1;
       } catch {
         const updatedAt = new Date().toISOString();

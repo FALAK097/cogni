@@ -22,7 +22,17 @@ if (!databaseUrl || !["localhost", "127.0.0.1", "::1"].includes(new URL(database
 const outputFile = join(tmpdir(), `cogni-source-revisions-${process.pid}.mjs`);
 await build({
   stdin: {
-    contents: `export { getDb } from "@/lib/db/client";
+    contents: `import postgres from "postgres";
+      import { drizzle } from "drizzle-orm/postgres-js";
+      import * as schema from "@/lib/db/schema";
+      import * as relations from "@/lib/db/relations";
+      export function createTestDb(databaseUrl) {
+        const client = postgres(databaseUrl, { max: 1, prepare: false });
+        return {
+          db: drizzle(client, { schema: { ...schema, ...relations } }),
+          close: () => client.end(),
+        };
+      }
       export * from "@/features/knowledge/server/source-revisions";`,
     resolveDir: process.cwd(),
     sourcefile: "source-revisions-db-entry.ts",
@@ -52,26 +62,62 @@ await build({
 });
 
 const {
-  getDb,
+  createTestDb,
   recordDocumentRevision,
   resolveDocumentRevision,
   markDocumentRevisionsDeleted,
   hashSourceContent,
   enqueueSearchItemCleanup,
+  reserveSearchItemCleanup,
+  renewSearchItemCleanupReservationInTransaction,
   drainSearchItemCleanupWith,
 } = await import(pathToFileURL(outputFile).href);
+
+async function waitForEvent(promise, eventName, timeoutMs = 5000) {
+  let timeout;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timeout = setTimeout(
+          () => reject(new Error(`Timed out waiting for ${eventName}.`)),
+          timeoutMs,
+        );
+      }),
+    ]);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function waitForCleanupClaim(raw, cleanupId, timeoutMs = 5000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const [row] = await raw`
+      SELECT "claimedUntil"
+      FROM search_item_cleanup
+      WHERE id = ${cleanupId}`;
+    if (row && new Date(row.claimedUntil).getTime() > Date.now()) return;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error("Cleanup worker did not claim the expired upload reservation.");
+}
 
 const timestamp = new Date().toISOString();
 
 test("source revisions are stable, tenant-scoped, and leave identity-only deletion records", async () => {
   const raw = postgres(databaseUrl, { max: 1, prepare: false });
-  const db = getDb();
+  const primaryClient = createTestDb(databaseUrl);
+  const db = primaryClient.db;
+  const competingClient = createTestDb(databaseUrl);
   const workspaceId = randomUUID();
   const foreignWorkspaceId = randomUUID();
   const sourceId = randomUUID();
   const legacySourceId = randomUUID();
   const unsupportedSourceId = randomUUID();
   const foreignSourceId = randomUUID();
+  const activeSourceId = randomUUID();
+  const raceSourceId = randomUUID();
 
   try {
     await raw`INSERT INTO workspace (id, name, slug, "updatedAt") VALUES
@@ -81,6 +127,8 @@ test("source revisions are stable, tenant-scoped, and leave identity-only deleti
       (${sourceId}, 'Policy', 'TXT', 'READY', ${timestamp}, ${workspaceId}),
       (${legacySourceId}, 'Legacy policy', 'TXT', 'READY', ${timestamp}, ${workspaceId}),
       (${unsupportedSourceId}, 'Sitemap', 'SITEMAP', 'READY', ${timestamp}, ${workspaceId}),
+      (${activeSourceId}, 'Active policy', 'TXT', 'READY', ${timestamp}, ${workspaceId}),
+      (${raceSourceId}, 'Upload race policy', 'TXT', 'READY', ${timestamp}, ${workspaceId}),
       (${foreignSourceId}, 'Foreign policy', 'TXT', 'READY', ${timestamp}, ${foreignWorkspaceId})`;
 
     const originalContent = "Support is available Monday through Friday.";
@@ -189,6 +237,9 @@ test("source revisions are stable, tenant-scoped, and leave identity-only deleti
     assert.ok(cleanupItems.every((item) => item.itemKey === `${sourceId}.txt`));
     assert.ok(cleanupItems.every((item) => item.workspaceId === workspaceId));
     assert.equal("content" in cleanupItems[0], false);
+
+    // Move unrelated tombstone rows onto retry backoff so the orphan assertions below observe
+    // only their own reservation instead of depending on every eligible workspace cleanup row.
     const failedCleanup = await drainSearchItemCleanupWith(db, {
       workspaceId,
       deleteItem: async () => true,
@@ -210,6 +261,189 @@ test("source revisions are stable, tenant-scoped, and leave identity-only deleti
       deleteItemsByKey: async () => true,
     });
     assert.equal(immediateRetry.cleanupCandidates, 0);
+
+    const orphanKey = `${sourceId}.orphan-after-crash.txt`;
+    await reserveSearchItemCleanup(db, {
+      workspaceId,
+      documentId: sourceId,
+      itemKey: orphanKey,
+    });
+    const providerItems = new Set([orphanKey]);
+    const duringUpload = await drainSearchItemCleanupWith(db, {
+      workspaceId,
+      deleteItem: async () => true,
+      deleteItemsByKey: async (itemKey) => {
+        providerItems.delete(itemKey);
+        return true;
+      },
+    });
+    assert.equal(duringUpload.cleanupCandidates, 0);
+    assert.equal(providerItems.has(orphanKey), true);
+    await raw`
+      UPDATE search_item_cleanup
+      SET "claimedUntil" = ${new Date(Date.now() - 1).toISOString()}
+      WHERE "workspaceId" = ${workspaceId} AND "documentId" = ${sourceId}
+        AND "itemKey" = ${orphanKey}`;
+    const afterCrash = await drainSearchItemCleanupWith(db, {
+      workspaceId,
+      deleteItem: async () => true,
+      deleteItemsByKey: async (itemKey) => {
+        providerItems.delete(itemKey);
+        return true;
+      },
+    });
+    assert.equal(afterCrash.cleanupDeleted, 1);
+    assert.equal(providerItems.has(orphanKey), false);
+
+    const raceKey = `${raceSourceId}.upload-race.txt`;
+    const raceReservationId = await reserveSearchItemCleanup(db, {
+      workspaceId,
+      documentId: raceSourceId,
+      itemKey: raceKey,
+    });
+    await raw`
+      UPDATE search_item_cleanup
+      SET "claimedUntil" = ${new Date(Date.now() - 1).toISOString()}
+      WHERE id = ${raceReservationId}`;
+
+    let releaseUploadStart;
+    let releaseSimulatedCrash;
+    let signalSourceLocked;
+    let signalUploadAccepted;
+    const sourceLocked = new Promise((resolve) => {
+      signalSourceLocked = resolve;
+    });
+    const uploadAccepted = new Promise((resolve) => {
+      signalUploadAccepted = resolve;
+    });
+    const waitToStartUpload = new Promise((resolve) => {
+      releaseUploadStart = resolve;
+    });
+    const waitToSimulateCrash = new Promise((resolve) => {
+      releaseSimulatedCrash = resolve;
+    });
+    const providerItemsAfterCrash = new Set();
+    const crashedUploadTransaction = db.transaction(async (transaction) => {
+      const sourceRows = await transaction.execute(
+        sql`SELECT id FROM document WHERE id = ${raceSourceId} AND "workspaceId" = ${workspaceId} FOR UPDATE`,
+      );
+      assert.equal(sourceRows.length, 1);
+      signalSourceLocked();
+      await waitToStartUpload;
+      assert.equal(
+        await renewSearchItemCleanupReservationInTransaction(transaction, {
+          workspaceId,
+          documentId: raceSourceId,
+          reservationId: raceReservationId,
+        }),
+        true,
+      );
+      providerItemsAfterCrash.add(raceKey);
+      signalUploadAccepted();
+      await waitToSimulateCrash;
+      throw new Error("Simulated process crash after provider upload.");
+    });
+    let cleanupDeleteStarted = false;
+    let cleanupWaitingForUpload;
+
+    try {
+      await waitForEvent(sourceLocked, "source lock");
+      cleanupWaitingForUpload = drainSearchItemCleanupWith(competingClient.db, {
+        workspaceId,
+        deleteItem: async () => true,
+        deleteItemsByKey: async (itemKey) => {
+          cleanupDeleteStarted = true;
+          providerItemsAfterCrash.delete(itemKey);
+          return true;
+        },
+      });
+      await waitForCleanupClaim(raw, raceReservationId);
+      assert.equal(cleanupDeleteStarted, false);
+      const [reservationWhileClaimed] = await raw`
+        SELECT id FROM search_item_cleanup WHERE id = ${raceReservationId}`;
+      assert.ok(reservationWhileClaimed);
+
+      releaseUploadStart();
+      await waitForEvent(uploadAccepted, "simulated provider upload");
+      assert.equal(providerItemsAfterCrash.has(raceKey), true);
+      assert.equal(cleanupDeleteStarted, false);
+
+      releaseSimulatedCrash();
+      await assert.rejects(
+        crashedUploadTransaction,
+        /Simulated process crash after provider upload/,
+      );
+      const recoveredOrphan = await waitForEvent(cleanupWaitingForUpload, "orphan cleanup");
+      assert.equal(recoveredOrphan.cleanupDeleted, 1);
+      assert.equal(cleanupDeleteStarted, true);
+      assert.equal(providerItemsAfterCrash.has(raceKey), false);
+    } finally {
+      releaseUploadStart();
+      releaseSimulatedCrash();
+      await Promise.allSettled([crashedUploadTransaction, cleanupWaitingForUpload].filter(Boolean));
+    }
+
+    const activeRevision = await recordDocumentRevision(db, {
+      workspaceId,
+      documentId: activeSourceId,
+      content: "This is still the current indexed policy.",
+    });
+    assert.equal(activeRevision.status, "created");
+    const activeKey = `${activeSourceId}.${activeRevision.revisionId}.txt`;
+    await raw`
+      UPDATE document_revision
+      SET "providerItemId" = 'active-provider-item', "providerItemKey" = ${activeKey}
+      WHERE id = ${activeRevision.revisionId} AND "workspaceId" = ${workspaceId}`;
+    await reserveSearchItemCleanup(db, {
+      workspaceId,
+      documentId: activeSourceId,
+      itemKey: activeKey,
+    });
+    await raw`
+      UPDATE search_item_cleanup
+      SET "claimedUntil" = ${new Date(Date.now() - 1).toISOString()}
+      WHERE "workspaceId" = ${workspaceId} AND "documentId" = ${activeSourceId}
+        AND "itemKey" = ${activeKey}`;
+    let activeProviderDeleteCalled = false;
+    const protectedCurrentItem = await drainSearchItemCleanupWith(db, {
+      workspaceId,
+      deleteItem: async () => {
+        activeProviderDeleteCalled = true;
+        return true;
+      },
+      deleteItemsByKey: async () => {
+        activeProviderDeleteCalled = true;
+        return true;
+      },
+    });
+    assert.equal(protectedCurrentItem.cleanupDeleted, 1);
+    assert.equal(activeProviderDeleteCalled, false);
+
+    await raw`
+      UPDATE document_revision
+      SET "providerItemId" = NULL
+      WHERE id = ${activeRevision.revisionId} AND "workspaceId" = ${workspaceId}`;
+    await reserveSearchItemCleanup(db, {
+      workspaceId,
+      documentId: activeSourceId,
+      itemKey: activeKey,
+    });
+    await raw`
+      UPDATE search_item_cleanup
+      SET "claimedUntil" = ${new Date(Date.now() - 1).toISOString()}
+      WHERE "workspaceId" = ${workspaceId} AND "documentId" = ${activeSourceId}
+        AND "itemKey" = ${activeKey}`;
+    let orphanedCurrentItemDeleted = false;
+    const orphanedCurrentItem = await drainSearchItemCleanupWith(db, {
+      workspaceId,
+      deleteItem: async () => true,
+      deleteItemsByKey: async (itemKey) => {
+        orphanedCurrentItemDeleted = itemKey === activeKey;
+        return true;
+      },
+    });
+    assert.equal(orphanedCurrentItem.cleanupDeleted, 1);
+    assert.equal(orphanedCurrentItemDeleted, true);
 
     await enqueueSearchItemCleanup(db, {
       workspaceId,
@@ -233,13 +467,28 @@ test("source revisions are stable, tenant-scoped, and leave identity-only deleti
         return true;
       },
     });
-    await claimed;
-    const competingDrain = await drainSearchItemCleanupWith(db, {
-      workspaceId,
-      deleteItem: async () => true,
-      deleteItemsByKey: async () => true,
-    });
-    releaseClaim();
+    let claimTimeout;
+    let competingDrain;
+    try {
+      await Promise.race([
+        claimed,
+        new Promise((_, reject) => {
+          claimTimeout = setTimeout(
+            () => reject(new Error("Cleanup claim was not acquired.")),
+            5000,
+          );
+        }),
+      ]);
+      competingDrain = await drainSearchItemCleanupWith(competingClient.db, {
+        workspaceId,
+        deleteItem: async () => true,
+        deleteItemsByKey: async () => true,
+      });
+    } finally {
+      clearTimeout(claimTimeout);
+      releaseClaim();
+      await firstDrain.catch(() => undefined);
+    }
     const firstDrainResult = await firstDrain;
     assert.equal(competingDrain.cleanupCandidates, 0);
     assert.equal(firstDrainResult.cleanupDeleted, 1);
@@ -251,8 +500,14 @@ test("source revisions are stable, tenant-scoped, and leave identity-only deleti
       sourceType: "TXT",
     });
   } finally {
-    await raw`DELETE FROM workspace WHERE id IN (${workspaceId}, ${foreignWorkspaceId})`;
-    await raw.end();
-    await unlink(outputFile).catch(() => undefined);
+    try {
+      await raw`DELETE FROM workspace WHERE id IN (${workspaceId}, ${foreignWorkspaceId})`;
+    } finally {
+      try {
+        await Promise.all([primaryClient.close(), competingClient.close(), raw.end()]);
+      } finally {
+        await unlink(outputFile).catch(() => undefined);
+      }
+    }
   }
 });

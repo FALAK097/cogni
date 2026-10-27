@@ -5,6 +5,7 @@ import {
   document as documentTable,
   documentChunk as documentChunkTable,
   documentRevision,
+  searchItemCleanup,
 } from "@/lib/db/schema";
 import { runDbWriteOperation } from "@/lib/db/client";
 import { readObject } from "@/lib/storage/index";
@@ -20,7 +21,11 @@ import {
   drainSearchItemCleanup,
   enqueueSearchItemCleanup,
   enqueueSearchItemCleanupInTransaction,
+  hashSourceContent,
   recordDocumentRevisionInTransaction,
+  releaseSearchItemCleanupReservation,
+  renewSearchItemCleanupReservationInTransaction,
+  reserveSearchItemCleanup,
   type SourceRevisionWriteResult,
 } from "@/features/knowledge/server/source-revisions";
 import { logError } from "@/lib/logging/logger";
@@ -88,6 +93,60 @@ export async function indexDocumentContent(
   let uploadAttempted = false;
   let uploadedItemId: string | null = null;
   let attemptedItemKey = `${documentId}.txt`;
+  let reservationId: string | null = null;
+  let requestedRevisionId: string | undefined;
+
+  if (isCloudflareSearchConfigured()) {
+    const contentSha256 = hashSourceContent(text);
+    const intent = await runDbWriteOperation(db, async (transaction) => {
+      const [source] = await transaction
+        .select({ id: documentTable.id })
+        .from(documentTable)
+        .where(and(eq(documentTable.id, documentId), eq(documentTable.workspaceId, workspaceId)))
+        .for("update");
+      if (!source) throw new Error("Knowledge source was not found in this workspace.");
+
+      const [current] = await transaction
+        .select({
+          id: documentRevision.id,
+          contentSha256: documentRevision.contentSha256,
+          providerItemId: documentRevision.providerItemId,
+          providerItemKey: documentRevision.providerItemKey,
+        })
+        .from(documentRevision)
+        .where(
+          and(
+            eq(documentRevision.workspaceId, workspaceId),
+            eq(documentRevision.documentId, documentId),
+            eq(documentRevision.status, "CURRENT"),
+          ),
+        )
+        .limit(1);
+
+      if (current?.contentSha256 === contentSha256 && current.providerItemId) return null;
+
+      // Always reserve a fresh id. recordDocumentRevisionInTransaction ignores it for unchanged
+      // content, while a competing extraction can make this content a new revision before upload.
+      const revisionId = randomUUID();
+      const itemKey =
+        current?.contentSha256 === contentSha256
+          ? (current.providerItemKey ?? `${documentId}.${revisionId}.txt`)
+          : `${documentId}.${revisionId}.txt`;
+      return { revisionId, itemKey };
+    });
+
+    if (intent) {
+      // The cleanup intent is committed separately from the transaction that uploads and records
+      // the provider item. Its lease prevents cleanup from racing a normal upload attempt.
+      reservationId = await reserveSearchItemCleanup(db, {
+        workspaceId,
+        documentId,
+        itemKey: intent.itemKey,
+      });
+      requestedRevisionId = intent.revisionId;
+      attemptedItemKey = intent.itemKey;
+    }
+  }
 
   try {
     const result = await runDbWriteOperation(db, async (transaction) => {
@@ -118,6 +177,7 @@ export async function indexDocumentContent(
         workspaceId,
         documentId,
         content: text,
+        revisionId: requestedRevisionId,
       });
       if (revision.status === "unsupported-source") {
         throw new Error(`Knowledge source type ${revision.sourceType} cannot be versioned.`);
@@ -138,11 +198,23 @@ export async function indexDocumentContent(
         )
         .limit(1);
 
-      const itemKey = storedRevision?.providerItemKey ?? `${documentId}.${revision.revisionId}.txt`;
+      const itemKey = reservationId
+        ? attemptedItemKey
+        : (storedRevision?.providerItemKey ?? `${documentId}.${revision.revisionId}.txt`);
       attemptedItemKey = itemKey;
       let providerItemId = storedRevision?.providerItemId ?? null;
 
       if (isCloudflareSearchConfigured() && !providerItemId) {
+        if (
+          reservationId &&
+          !(await renewSearchItemCleanupReservationInTransaction(transaction, {
+            workspaceId,
+            documentId,
+            reservationId,
+          }))
+        ) {
+          throw new Error("Search item upload reservation expired before upload.");
+        }
         uploadAttempted = true;
         providerItemId = await uploadCloudflareSearchDocument({
           documentId,
@@ -192,6 +264,17 @@ export async function indexDocumentContent(
         });
       }
 
+      if (reservationId) {
+        await transaction
+          .delete(searchItemCleanup)
+          .where(
+            and(
+              eq(searchItemCleanup.id, reservationId),
+              eq(searchItemCleanup.workspaceId, workspaceId),
+            ),
+          );
+      }
+
       await transaction
         .delete(documentChunkTable)
         .where(eq(documentChunkTable.documentId, documentId));
@@ -229,15 +312,37 @@ export async function indexDocumentContent(
       }
       if (!compensated) {
         try {
-          await enqueueSearchItemCleanup(db, {
-            workspaceId,
-            documentId,
-            itemId: uploadedItemId ?? undefined,
-            itemKey: attemptedItemKey,
-          });
+          if (!reservationId) {
+            await enqueueSearchItemCleanup(db, {
+              workspaceId,
+              documentId,
+              itemId: uploadedItemId ?? undefined,
+              itemKey: attemptedItemKey,
+            });
+          }
         } catch {
           logError("knowledge.search_item_cleanup.enqueue_failed", { workspaceId, documentId });
         }
+      } else if (reservationId) {
+        try {
+          await releaseSearchItemCleanupReservation(db, { workspaceId, reservationId });
+        } catch {
+          logError("knowledge.search_item_cleanup.reservation_release_failed", {
+            workspaceId,
+            documentId,
+          });
+        }
+      }
+    } else if (reservationId) {
+      // No remote write began, so releasing the reservation is safe. If this release itself
+      // fails, the ordinary cleanup worker will remove nothing and clear it after the lease.
+      try {
+        await releaseSearchItemCleanupReservation(db, { workspaceId, reservationId });
+      } catch {
+        logError("knowledge.search_item_cleanup.reservation_release_failed", {
+          workspaceId,
+          documentId,
+        });
       }
     }
     throw error;
