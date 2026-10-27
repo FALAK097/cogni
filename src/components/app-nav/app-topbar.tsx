@@ -24,11 +24,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useIsMobileSidebar, useSidebar } from "@/hooks/use-sidebar";
+import { useIsMobileSidebar, useSidebar, useSidebarClientReady } from "@/hooks/use-sidebar";
 import { cn } from "@/lib/utils";
 import { APP_PAGES } from "@/features/navigation/app-routes";
 
 type AppTopbarProps = {
+  initialSidebarOpen?: boolean;
   userData?: {
     avatar?: string;
     name?: string;
@@ -177,13 +178,14 @@ function Breadcrumbs() {
   );
 }
 
-export function AppTopbar({ userData, className }: AppTopbarProps) {
+export function AppTopbar({ userData, className, initialSidebarOpen = false }: AppTopbarProps) {
   const pathname = usePathname();
   const toggleOpen = useSidebar((state) => state.toggleOpen);
   const sidebarDisabled = useSidebar((state) => state.settings.disabled);
   const isMobile = useIsMobileSidebar();
   const mobileDrawerOpen = useSidebar((state) => state.mobileDrawerOpen);
   const isOpen = useSidebar((state) => state.isOpen);
+  const clientReady = useSidebarClientReady();
   const isHover = useSidebar((state) => state.isHover);
   const isHoverOpen = useSidebar((state) => state.settings.isHoverOpen);
   const showBreadcrumbs = !Object.values(APP_PAGES).some((page) => page.href === pathname);
@@ -222,7 +224,7 @@ export function AppTopbar({ userData, className }: AppTopbarProps) {
   return (
     <header
       className={cn(
-        "sticky top-0 z-10 flex h-14 items-center justify-between gap-4 border-b border-sidebar-border bg-sidebar px-4 sm:px-8 print:hidden",
+        "sticky top-0 z-10 flex h-14 items-center justify-between gap-4 border-b border-sidebar-border bg-card px-4 sm:px-6 print:hidden",
         className,
       )}
     >
@@ -237,11 +239,13 @@ export function AppTopbar({ userData, className }: AppTopbarProps) {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="size-9 shrink-0"
+                      className="size-9 shrink-0 hover:bg-transparent"
                       onClick={() => toggleOpen()}
                       aria-label={`Toggle sidebar (${shortcutLabel})`}
                       aria-expanded={
-                        isMobile ? mobileDrawerOpen : isOpen || (isHoverOpen && isHover)
+                        isMobile
+                          ? mobileDrawerOpen
+                          : (clientReady ? isOpen : initialSidebarOpen) || (isHoverOpen && isHover)
                       }
                       {...(!isMobile
                         ? { "aria-controls": "workspace-desktop-navigation" }
@@ -261,7 +265,13 @@ export function AppTopbar({ userData, className }: AppTopbarProps) {
             {showBreadcrumbs && <div className="h-6 w-px shrink-0 bg-border" />}
           </>
         )}
-        {showBreadcrumbs && <Breadcrumbs />}
+        {showBreadcrumbs ? (
+          <Breadcrumbs />
+        ) : (
+          <span className="truncate text-base font-medium tracking-tight">
+            {Object.values(APP_PAGES).find((page) => page.href === pathname)?.label}
+          </span>
+        )}
       </div>
       <div className="flex shrink-0 items-center gap-1 sm:gap-2">
         <ModeToggle />

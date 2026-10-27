@@ -9,7 +9,12 @@ import { WorkspaceSwitcher } from "@/components/app-nav/workspace-switcher";
 import { ThemeLogo } from "@/components/theme-logo";
 import { Settings } from "@/components/icons";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { closeMobileSidebar, useIsMobileSidebar, useSidebar } from "@/hooks/use-sidebar";
+import {
+  closeMobileSidebar,
+  useIsMobileSidebar,
+  useSidebar,
+  useSidebarClientReady,
+} from "@/hooks/use-sidebar";
 import { SITE_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { APP_PAGES, APP_ROUTES } from "@/features/navigation/app-routes";
@@ -19,7 +24,7 @@ function SidebarContent({ expanded }: { expanded: boolean }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col items-stretch">
-      <div className="flex-none px-4 pt-4 pb-2">
+      <div className="flex-none px-2 pt-4 pb-3">
         <Link
           href={APP_ROUTES.inbox}
           aria-label={`${SITE_NAME} home`}
@@ -67,7 +72,7 @@ export function Sidebar({ initialOpen = true }: { initialOpen?: boolean }) {
   const mobileDrawerOpen = useSidebar((state) => state.mobileDrawerOpen);
   const setMobileDrawerOpen = useSidebar((state) => state.setMobileDrawerOpen);
   const isHover = useSidebar((state) => state.isHover);
-  const hasHydrated = useSidebar((state) => state.hasHydrated);
+  const hasHydrated = useSidebarClientReady();
   const setIsHover = useSidebar((state) => state.setIsHover);
   const settings = useSidebar((state) => state.settings);
   const desktopOpen = (hasHydrated ? isOpen : initialOpen) || (settings.isHoverOpen && isHover);
@@ -83,7 +88,7 @@ export function Sidebar({ initialOpen = true }: { initialOpen?: boolean }) {
       <aside
         id="workspace-desktop-navigation"
         className={cn(
-          "fixed top-0 left-0 z-40 hidden h-svh border-r border-sidebar-border bg-sidebar lg:block print:hidden motion-safe:transition-[width] motion-safe:duration-150",
+          "fixed top-0 left-0 z-40 hidden h-svh border-r border-sidebar-border bg-card lg:block print:hidden motion-safe:transition-[width] motion-safe:duration-150",
           desktopOpen ? "w-56" : "w-14",
         )}
       >

@@ -14,13 +14,13 @@ const FOOTER_LINKS = [
 
 export function Footer() {
   return (
-    <footer className="border-t border-gray-100 bg-white">
-      <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-12">
+    <footer className="border-t border-border bg-background">
+      <div className="mx-auto max-w-[1120px] px-6 sm:px-10">
         {/* Main row */}
         <div className="flex flex-col items-start justify-between gap-8 py-12 sm:flex-row sm:items-center">
           {/* Brand */}
           <Link href="/" className="flex shrink-0 items-center gap-2.5">
-            <ThemeLogo showWordmark wordmarkClassName="text-gray-900" />
+            <ThemeLogo showWordmark wordmarkClassName="text-foreground" />
           </Link>
 
           {/* Nav links */}
@@ -29,7 +29,7 @@ export function Footer() {
               <a
                 key={label}
                 href={href}
-                className="text-sm text-gray-500 transition-colors duration-150 hover:text-gray-900"
+                className="text-sm text-muted-foreground transition-colors duration-150 hover:text-foreground"
               >
                 {label}
               </a>
@@ -38,8 +38,8 @@ export function Footer() {
         </div>
 
         {/* Bottom divider + copyright */}
-        <div className="border-t border-gray-100 py-6">
-          <p className="text-sm text-gray-400">
+        <div className="border-t border-border py-6">
+          <p className="text-sm text-muted-foreground">
             &copy; {COPYRIGHT_YEAR} cogni Inc. All rights reserved.
           </p>
         </div>

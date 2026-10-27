@@ -89,9 +89,9 @@ export type AppearanceConfig = {
   fontSize: string;
 };
 
-const FIELD_CLASS = cn("h-10 rounded-lg border border-border bg-card px-3 text-sm shadow-xs");
+const FIELD_CLASS = cn("h-10 rounded-lg border border-border bg-card px-3 text-sm shadow-none");
 const TEXTAREA_FIELD_CLASS = cn(
-  "resize-y rounded-lg border border-border bg-card px-3 py-2.5 text-sm shadow-xs",
+  "resize-y rounded-lg border border-border bg-card px-3 py-2.5 text-sm shadow-none",
 );
 const INPUT_NO_RING_CLASS = cn(
   "h-8 flex-1 border-0 bg-transparent px-1 text-sm text-foreground shadow-none focus-visible:ring-0",
@@ -107,10 +107,11 @@ function SettingsPanelHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="mb-8 flex items-start justify-between gap-4 border-b border-border pb-6">
+    <div className="mb-6 flex items-start justify-between gap-4">
       <div>
-        <h2 className="text-base font-semibold text-foreground">{title}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+        <h2 className="text-lg font-medium text-foreground" title={description}>
+          {title}
+        </h2>
       </div>
       {action}
     </div>
@@ -485,7 +486,7 @@ export function WidgetAppearancePanel({
           </div>
         </section>
 
-        <section className="flex items-center justify-between gap-4 rounded-lg border border-border bg-muted px-4 py-3.5">
+        <section className="flex items-center justify-between gap-4 py-3.5">
           <div>
             <p className="text-sm font-medium text-foreground">Remove branding</p>
             <p className="mt-0.5 text-sm text-muted-foreground">
@@ -528,7 +529,7 @@ export function WidgetAgentPanel({
   return (
     <>
       <SettingsPanelHeader
-        title="Agent"
+        title="Identity & instructions"
         description="Configure your AI assistant's identity and behavior instructions."
       />
       <div className="space-y-6">
@@ -602,24 +603,20 @@ export function WidgetAgentPanel({
           <Label htmlFor="instructions" className="text-sm font-medium text-foreground">
             Instructions
           </Label>
-          <p className="text-sm text-muted-foreground">
-            System prompt that guides how your assistant responds.
-          </p>
+
           <Textarea
             id="instructions"
             value={instructions}
             onChange={(event) => onUpdate("instructions", event.target.value)}
-            rows={8}
-            className={cn(TEXTAREA_FIELD_CLASS, "min-h-[160px] leading-6")}
+            rows={5}
+            className={cn(TEXTAREA_FIELD_CLASS, "min-h-[128px] leading-6")}
           />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="escalation-keywords" className="text-sm font-medium text-foreground">
-            Escalation keywords
+            Human handoff keywords
           </Label>
-          <p className="text-sm text-muted-foreground">
-            Comma-separated keywords that trigger human handoff.
-          </p>
+
           <Input
             id="escalation-keywords"
             value={escalationKeywords}
@@ -705,7 +702,7 @@ export function WidgetBehaviourPanel({
             />
           </div>
         </div>
-        <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-4 py-4">
+        <div className="flex items-center justify-between gap-4 py-4">
           <div>
             <p className="text-sm font-medium text-foreground">Hide suggestions on interact</p>
             <p className="mt-0.5 text-sm text-muted-foreground">
@@ -719,7 +716,7 @@ export function WidgetBehaviourPanel({
             className="data-checked:bg-[var(--widget-accent)]"
           />
         </div>
-        <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-4 py-4">
+        <div className="flex items-center justify-between gap-4 py-4">
           <div>
             <p className="text-sm font-medium text-foreground">Enable lead capture</p>
             <p className="mt-0.5 text-sm text-muted-foreground">
@@ -776,7 +773,7 @@ export function WidgetBehaviourPanel({
             </div>
           </div>
         ) : null}
-        <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-4 py-4">
+        <div className="flex items-center justify-between gap-4 py-4">
           <div>
             <p className="text-sm font-medium text-foreground">Enable brochure feature</p>
             <p className="mt-0.5 text-sm text-muted-foreground">
@@ -960,24 +957,32 @@ export function WidgetInstallationPanel({
       />
       <div className="space-y-8">
         {launchChecklist ? (
-          <AgentLaunchChecklistCard
-            checklist={launchChecklist}
-            onNavigateTab={onNavigateTab}
-            onPublish={() => onReadinessAction("publish")}
-            onResume={() => onReadinessAction("resume")}
-            onFocusDomain={() => domainInputRef.current?.focus()}
-            canManage={canManage}
-          />
+          <details>
+            <summary className="cursor-pointer list-none text-sm font-medium [&::-webkit-details-marker]:hidden">
+              Launch checklist · {launchChecklist.completedCount}/{launchChecklist.totalCount}{" "}
+              complete
+            </summary>
+            <div className="pt-4">
+              <AgentLaunchChecklistCard
+                checklist={launchChecklist}
+                onNavigateTab={onNavigateTab}
+                onPublish={() => onReadinessAction("publish")}
+                onResume={() => onReadinessAction("resume")}
+                onFocusDomain={() => domainInputRef.current?.focus()}
+                canManage={canManage}
+              />
+            </div>
+          </details>
         ) : (
           <section
             aria-labelledby="agent-launch-readiness"
             aria-live="polite"
-            className="flex flex-col gap-3 rounded-lg border border-border/70 bg-muted/30 p-3 sm:flex-row sm:items-center sm:justify-between"
+            className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between"
           >
             <div className="flex min-w-0 items-start gap-3">
               <span
                 className={cn(
-                  "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg border bg-card",
+                  "mt-0.5 flex size-8 shrink-0 items-center justify-center",
                   readiness.complete
                     ? "border-primary/20 text-primary"
                     : "border-border text-muted-foreground",
@@ -1022,7 +1027,7 @@ export function WidgetInstallationPanel({
             ) : null}
           </section>
         )}
-        <section className="flex items-start justify-between gap-4 rounded-lg border border-border bg-card p-4">
+        <section className="flex items-start justify-between gap-4 py-4">
           <div className="min-w-0">
             <Label
               htmlFor="widget-visitor-access"
@@ -1030,14 +1035,10 @@ export function WidgetInstallationPanel({
             >
               Accept visitor conversations
             </Label>
-            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              {isEnabled
-                ? "Your widget can serve visitors on authorized domains."
-                : "The widget is paused. Visitors cannot start or continue conversations."}
-            </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              This safety control applies to live traffic when saved. Agent content and appearance
-              change when you publish.
+              {isEnabled
+                ? "Changes apply to live traffic immediately."
+                : "Paused for visitors. Changes apply immediately."}
             </p>
           </div>
           <Switch
@@ -1051,10 +1052,6 @@ export function WidgetInstallationPanel({
         <section className="space-y-4">
           <div>
             <h3 className="text-sm font-semibold text-foreground">Authorized domains</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Add each website domain where the widget is embedded (e.g.{" "}
-              <code className="rounded bg-muted px-1 py-0.5 text-xs">acme.com</code>).
-            </p>
             <p className="mt-1 text-xs text-muted-foreground">
               Saved domain changes take effect for live traffic immediately.
             </p>
@@ -1094,10 +1091,7 @@ export function WidgetInstallationPanel({
           </div>
           <div className="space-y-2">
             {allowedDomains.map((domain) => (
-              <div
-                key={domain}
-                className="flex items-center justify-between rounded-lg border border-border bg-muted px-3 py-2.5"
-              >
+              <div key={domain} className="flex items-center justify-between py-2.5">
                 <span className="text-sm font-medium text-foreground">{domain}</span>
                 <Button
                   type="button"
@@ -1113,7 +1107,7 @@ export function WidgetInstallationPanel({
               </div>
             ))}
             {allowedDomains.length === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border py-8">
+              <div className="py-2">
                 <p className="text-sm text-muted-foreground">No domains authorized yet</p>
               </div>
             ) : null}
@@ -1128,7 +1122,7 @@ export function WidgetInstallationPanel({
             </p>
           </div>
           <div className="relative">
-            <pre className="max-h-48 overflow-x-auto rounded-lg border border-border bg-muted p-4 font-mono text-xs leading-5 text-foreground">
+            <pre className="max-h-48 overflow-x-auto rounded-lg bg-muted p-4 font-mono text-xs leading-5 text-foreground">
               {embedScript}
             </pre>
             <Button
@@ -1173,7 +1167,7 @@ export function WidgetVersionHistory({
 
   return (
     <>
-      <details className="rounded-xl border border-border bg-card">
+      <details className="border-0 bg-transparent">
         <summary className="cursor-pointer rounded-xl px-4 py-3 text-sm font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
           Version history
         </summary>

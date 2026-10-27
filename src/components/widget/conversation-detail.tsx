@@ -34,7 +34,6 @@ import {
   Pause,
   Play,
   Plus,
-  MessageSquare,
   Send,
   RotateCcw,
   Sparkles,
@@ -119,13 +118,13 @@ import type {
 import { generateAvatarUrl } from "@/lib/avatar-generator";
 import { cn } from "@/lib/utils";
 import { resolveTranscriptScroll } from "@/features/conversations/transcript-scroll";
+import { getConversationChannelLabel } from "@/features/conversations/channel-label";
 import { mergeTranscriptMessages } from "@/features/conversations/transcript-timeline";
 import {
   clearSubmittedDraft,
   type ConversationComposerDraft,
   type ConversationComposerDraftChange,
 } from "@/features/conversations/draft-state";
-import { getConversationChannelLabel } from "@/features/conversations/channel-label";
 import { getSafeDocumentHref } from "@/features/knowledge/document-link";
 import {
   getSnoozeUntil,
@@ -416,6 +415,9 @@ export function ConversationDetail({
   }, [transcriptMessages]);
 
   const displayName = session ? getDisplayName(session) : "";
+  const replyTarget = session
+    ? `To ${session.contactEmail || session.contactPhone || displayName} · ${getConversationChannelLabel(session.conversationChannel)}`
+    : "";
   const firstVisitorQuestion = session?.messages.find((m) => m.role === "user")?.content;
   const membersQuery = useWorkspaceMembers();
   const assignedMemberName =
@@ -592,9 +594,9 @@ export function ConversationDetail({
         <output
           aria-busy="true"
           aria-label="Loading contact details"
-          className={cn("flex h-full flex-col gap-2.5", scrollPaneClassName)}
+          className={cn("flex h-full flex-col gap-0", scrollPaneClassName)}
         >
-          <div aria-hidden="true" className="flex h-full flex-col gap-2.5">
+          <div aria-hidden="true" className="flex h-full flex-col gap-0">
             <Skeleton className="h-28 w-full shrink-0 rounded-xl" />
             <Skeleton className="h-36 w-full shrink-0 rounded-xl" />
             <Skeleton className="h-36 w-full shrink-0 rounded-xl" />
@@ -610,7 +612,7 @@ export function ConversationDetail({
         className="flex h-full min-w-0 flex-1 flex-col"
       >
         <div className="flex h-full min-w-0 flex-1 flex-col">
-          <header className="flex shrink-0 items-center justify-between gap-2 px-3 py-2 sm:px-4">
+          <header className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-4 py-4 sm:px-6">
             <div className="flex min-w-0 items-center gap-2.5">
               <Button
                 type="button"
@@ -712,11 +714,10 @@ export function ConversationDetail({
   if (!session) return null;
 
   const isAssignedToMe = session.assigneeId === session.currentMembershipId;
-  const replyTargetLabel = `Replying to ${displayName} via ${getConversationChannelLabel(session.conversationChannel)}`;
 
   if (part === "details") {
     return (
-      <div className={cn("flex h-full flex-col gap-2.5", scrollPaneClassName)}>
+      <div className={cn("flex h-full flex-col gap-0", scrollPaneClassName)}>
         <SessionDetailsContent
           session={session}
           displayName={displayName}
@@ -832,7 +833,7 @@ export function ConversationDetail({
       ) : null}
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <div className="flex shrink-0 items-center justify-between gap-2 px-3 py-2 sm:px-4">
+        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-4 py-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-2.5">
             <Button
               variant="ghost"
@@ -854,9 +855,8 @@ export function ConversationDetail({
 
             <div className="min-w-0">
               <h3 className="truncate text-sm font-semibold text-foreground">{displayName}</h3>
-              <p className="text-xs text-muted-foreground">
-                Last activity{" "}
-                {formatDistanceToNow(new Date(session.lastActivityAt), { addSuffix: true })}
+              <p className="truncate text-xs text-muted-foreground">
+                {getConversationChannelLabel(session.conversationChannel)}
               </p>
             </div>
           </div>
@@ -866,7 +866,7 @@ export function ConversationDetail({
               <Button
                 variant="outline"
                 size="sm"
-                className="hidden h-9 rounded-md border-border/60 px-2.5 text-xs shadow-none sm:inline-flex"
+                className="hidden h-9 rounded-full border-0 px-3 text-sm shadow-none sm:inline-flex"
                 onClick={handleAssign}
                 disabled={takeOverMutation.isPending}
               >
@@ -879,7 +879,7 @@ export function ConversationDetail({
               type="button"
               variant={session.conversationStatus === "CLOSED" ? "outline" : "secondary"}
               size="sm"
-              className="hidden h-9 gap-1.5 rounded-md px-2.5 text-xs shadow-none lg:inline-flex"
+              className="hidden h-9 gap-1.5 rounded-full px-3 text-sm shadow-none lg:inline-flex"
               onClick={handleToggleStatus}
               disabled={statusMutation.isPending}
               aria-label={
@@ -904,7 +904,7 @@ export function ConversationDetail({
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-11 w-11 justify-center rounded-md border-border/60 px-0 text-xs shadow-none sm:h-9 sm:w-auto sm:px-2.5 sm:text-xs xl:hidden"
+                    className="h-11 w-11 justify-center rounded-md border-border/60 px-0 text-xs shadow-none sm:h-9 sm:w-auto sm:px-2.5 sm:text-xs min-[1440px]:hidden"
                     aria-label={`Conversation details for ${displayName}`}
                     title="Conversation details"
                   >
@@ -1113,14 +1113,11 @@ export function ConversationDetail({
               ) : handoffStatus.state === "assigned" ? (
                 <output
                   aria-label="Assigned to teammate"
-                  className="block rounded-xl border border-blue-200/80 bg-blue-50/60 p-3 text-xs text-blue-900 shadow-sm dark:border-blue-900/60 dark:bg-blue-950/20 dark:text-blue-200"
+                  className="block rounded-xl bg-success-muted p-3 text-xs text-success"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <UserCheck
-                        className="size-4 shrink-0 text-blue-600 dark:text-blue-400"
-                        aria-hidden="true"
-                      />
+                      <UserCheck className="size-4 shrink-0 text-success" aria-hidden="true" />
                       <span className="font-medium">
                         Assigned to {assignedMemberName ?? session.assigneeName} · Teammate response
                         expected
@@ -1153,8 +1150,6 @@ export function ConversationDetail({
                       message={message}
                       session={session}
                       displayName={displayName}
-                      canManage={canManage}
-                      onCreateTest={(prompt) => setTestDraftPrompt(prompt)}
                     />
                   ))}
                 </div>
@@ -1229,48 +1224,40 @@ export function ConversationDetail({
                 "border-amber-300/70 bg-amber-50/40 dark:border-amber-800/70 dark:bg-amber-950/10",
             )}
           >
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <fieldset className="inline-flex min-w-0 items-center gap-0.5 rounded-lg border border-border/50 bg-muted/30 p-0.5">
-                <legend className="sr-only">Message type</legend>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={composerMode === "reply" ? "secondary" : "ghost"}
-                  className="h-11 gap-1.5 px-3 text-xs sm:h-9 sm:px-2.5"
-                  aria-pressed={composerMode === "reply"}
-                  disabled={sendMessageMutation.isPending}
-                  onClick={() => setComposerMode("reply")}
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-10 gap-2 px-1 text-sm"
+                      disabled={sendMessageMutation.isPending}
+                      aria-label="Message type"
+                    />
+                  }
                 >
-                  <MessageSquare className="size-3.5" aria-hidden="true" />
-                  Reply
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={composerMode === "note" ? "secondary" : "ghost"}
-                  className="h-11 gap-1.5 px-3 text-xs sm:h-9 sm:px-2.5"
-                  aria-pressed={composerMode === "note"}
-                  disabled={sendMessageMutation.isPending}
-                  onClick={() => setComposerMode("note")}
-                >
-                  <FileText className="size-3.5" aria-hidden="true" />
-                  Note
-                </Button>
-              </fieldset>
+                  {composerMode === "reply" ? "Reply" : "Internal note"}
+                  <ChevronDown className="size-3.5" aria-hidden="true" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem onClick={() => setComposerMode("reply")}>
+                    Reply to customer
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setComposerMode("note")}>
+                    Internal note
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               {composerMode === "note" ? (
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-800 dark:text-amber-300">
-                  <FileText className="size-3" aria-hidden="true" />
-                  Team only
-                </span>
+                <span className="text-xs text-amber-800 dark:text-amber-300">Team only</span>
               ) : (
                 <span
-                  className="inline-flex basis-full min-w-0 items-center gap-1.5 text-xs text-muted-foreground sm:basis-auto sm:max-w-[60%]"
-                  title={replyTargetLabel}
+                  className="min-w-0 truncate text-xs text-muted-foreground"
+                  title={replyTarget}
                 >
-                  <MessageSquare className="size-3 shrink-0" aria-hidden="true" />
-                  <span className="truncate">
-                    To {displayName} · {getConversationChannelLabel(session.conversationChannel)}
-                  </span>
+                  {replyTarget}
                 </span>
               )}
             </div>
@@ -1282,7 +1269,7 @@ export function ConversationDetail({
               placeholder={
                 composerMode === "reply" ? "Type your reply..." : "Write a note for your team..."
               }
-              className="min-h-[64px] resize-none rounded-lg border-border/50 bg-muted/20 px-3 py-2 text-base leading-relaxed shadow-none sm:text-sm dark:bg-muted/10"
+              className="min-h-[88px] resize-none rounded-xl border-0 bg-transparent px-2 py-2 text-base leading-relaxed shadow-none focus-visible:ring-0 sm:text-sm"
               onKeyDown={(event) => {
                 if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
                   event.preventDefault();
@@ -1316,7 +1303,6 @@ export function ConversationDetail({
                       >
                         <span className="inline-flex items-center gap-1.5">
                           <FileText className="size-4" aria-hidden="true" />
-                          <span className="hidden sm:inline">Saved replies</span>
                         </span>
                       </PopoverTrigger>
                       <PopoverContent align="start" className="w-[min(22rem,calc(100vw-2rem))] p-0">
@@ -1512,9 +1498,9 @@ export function ConversationDetail({
                       onClick={() => copilotMutation.mutate()}
                     >
                       <Bot className="size-4" aria-hidden="true" />
-                      <span className="hidden sm:inline">
-                        {copilotMutation.isPending ? "Thinking…" : "Copilot"}
-                      </span>
+                      {copilotMutation.isPending ? (
+                        <span className="text-xs">Thinking…</span>
+                      ) : null}
                     </Button>
                   </>
                 ) : null}
@@ -1524,15 +1510,9 @@ export function ConversationDetail({
                 <span id="composer-shortcut-hint" className="sr-only">
                   Press Command or Control and Enter to send.
                 </span>
-                <span
-                  aria-hidden="true"
-                  className="mr-3 hidden text-xs text-muted-foreground sm:inline"
-                >
-                  ⌘/Ctrl + Enter
-                </span>
                 <Button
                   size="sm"
-                  className="h-11 min-w-[76px] gap-1.5 rounded-md px-3.5 text-sm sm:h-9"
+                  className="h-11 min-w-[76px] gap-1.5 rounded-full px-4 text-sm sm:h-9"
                   onClick={() => handleSend()}
                   disabled={!composerText.trim() || sendMessageMutation.isPending}
                   aria-keyshortcuts="Meta+Enter Control+Enter"
@@ -1578,14 +1558,10 @@ function MessageBubble({
   message,
   session,
   displayName,
-  canManage,
-  onCreateTest,
 }: {
   message: WidgetMessage;
   session: ConversationDetailData;
   displayName: string;
-  canManage?: boolean;
-  onCreateTest?: (prompt: string) => void;
 }) {
   const isUser = message.role === "user";
   const isTeam = message.authorType === "TEAM";
@@ -1599,7 +1575,7 @@ function MessageBubble({
   const timestamp = new Date(message.timestamp);
 
   return (
-    <div className="flex gap-3">
+    <div className={cn("flex gap-3", !isUser && !isInternal && "flex-row-reverse")}>
       {isUser ? (
         <Avatar className="mt-0.5 h-8 w-8 shrink-0">
           <AvatarImage src={generateAvatarUrl(session.visitorId)} alt={displayName} />
@@ -1609,12 +1585,13 @@ function MessageBubble({
         </Avatar>
       ) : isTeam ? (
         <Avatar className="mt-0.5 h-8 w-8 shrink-0">
+          <AvatarImage src={generateAvatarUrl(`team:${authorName}`)} alt="" />
           <AvatarFallback className="bg-muted text-[10px] font-medium text-muted-foreground">
             {getInitials(authorName)}
           </AvatarFallback>
         </Avatar>
       ) : (
-        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center text-muted-foreground">
           <Bot className="h-4 w-4" />
         </div>
       )}
@@ -1628,39 +1605,24 @@ function MessageBubble({
               Internal note
             </span>
           ) : null}
-          {isUser && canManage && onCreateTest ? (
-            <button
-              type="button"
-              onClick={() => onCreateTest(message.content)}
-              className="ml-auto inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-              aria-label="Create agent test from this question"
-              title="Create agent test from this question"
-            >
-              <Sparkles className="size-3 text-primary" aria-hidden="true" />
-              <span>Create test</span>
-            </button>
-          ) : null}
           <time
             dateTime={message.timestamp}
             title={format(timestamp, "PPpp")}
-            className={cn(
-              "shrink-0 text-muted-foreground tabular-nums",
-              !isUser || !canManage ? "ml-auto" : "",
-            )}
+            className={cn("shrink-0 text-muted-foreground tabular-nums", "ml-auto")}
           >
             {format(timestamp, "p")}
           </time>
         </div>
         <div
           className={cn(
-            "rounded-xl px-4 py-3 text-sm leading-relaxed",
+            "rounded-2xl px-4 py-3 text-sm leading-relaxed",
             isInternal
               ? "border border-border bg-muted/60 text-foreground"
               : isUser
-                ? "border border-border/50 bg-card text-foreground"
+                ? "bg-muted text-foreground"
                 : isTeam
-                  ? "border border-primary/15 bg-primary/8 text-foreground"
-                  : "border border-primary/10 bg-primary/5 text-foreground",
+                  ? "bg-cream text-foreground"
+                  : "bg-muted text-foreground",
           )}
         >
           <Streamdown className="break-words font-sans text-sm leading-relaxed">
@@ -2167,9 +2129,7 @@ function SessionDetailsContent({
                   </button>
                 ) : null}
               </div>
-            ) : (
-              <p className="mt-1 text-xs text-muted-foreground">No tags yet</p>
-            )}
+            ) : null}
             {tagError && !tagPopoverOpen ? (
               <p role="alert" className="mt-2 text-xs text-destructive">
                 {tagError}
@@ -2179,10 +2139,14 @@ function SessionDetailsContent({
         </CardContent>
       </Card>
 
-      <Card className={cn(detailCardClassName, "shrink-0")}>
-        <CardHeader className={detailCardHeaderClassName()}>
-          <CardTitle className="text-xs font-semibold">User details</CardTitle>
-        </CardHeader>
+      <details className="group/details shrink-0 border-b border-border">
+        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-5 text-sm font-medium [&::-webkit-details-marker]:hidden">
+          Technical details
+          <ChevronDown
+            className="size-3.5 text-muted-foreground group-open/details:rotate-180"
+            aria-hidden="true"
+          />
+        </summary>
         <CardContent className={cn("space-y-0 pb-3", detailCardContentClassName())}>
           <DetailRow label="User ID">
             <span className="inline-flex items-center gap-1">
@@ -2220,12 +2184,16 @@ function SessionDetailsContent({
           {session.browser ? <DetailRow label="Browser">{session.browser}</DetailRow> : null}
           {session.os ? <DetailRow label="Device">{session.os}</DetailRow> : null}
         </CardContent>
-      </Card>
+      </details>
 
-      <Card className={cn(detailCardClassName, "shrink-0")}>
-        <CardHeader className={detailCardHeaderClassName()}>
-          <CardTitle className="text-xs font-semibold">Conversation details</CardTitle>
-        </CardHeader>
+      <details className="group/details shrink-0 border-b border-border">
+        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-5 text-sm font-medium [&::-webkit-details-marker]:hidden">
+          Assignment & workflow
+          <ChevronDown
+            className="size-3.5 text-muted-foreground group-open/details:rotate-180"
+            aria-hidden="true"
+          />
+        </summary>
         <CardContent className={cn("space-y-0 pb-3", detailCardContentClassName())}>
           <div className="mb-2 border-b border-border/60 pb-3">
             <div className="flex items-center justify-between gap-2">
@@ -2311,9 +2279,7 @@ function SessionDetailsContent({
                   </Badge>
                 ))}
               </div>
-            ) : (
-              <p className="mt-1 text-xs text-muted-foreground">No labels yet</p>
-            )}
+            ) : null}
             {labelError && !labelPopoverOpen ? (
               <p role="alert" className="mt-2 text-xs text-destructive">
                 {labelError}
@@ -2628,7 +2594,7 @@ function SessionDetailsContent({
             )}
           </DetailRow>
         </CardContent>
-      </Card>
+      </details>
 
       {(session.attachments?.length ?? 0) > 0 ? (
         <Card className={cn(detailCardClassName, "shrink-0")}>
@@ -2672,10 +2638,14 @@ function SessionDetailsContent({
       ) : null}
 
       {(session.previousConversations?.length ?? 0) > 0 ? (
-        <Card className={cn(detailCardClassName, "shrink-0")}>
-          <CardHeader className={detailCardHeaderClassName()}>
-            <CardTitle className="text-xs font-semibold">Previous conversations</CardTitle>
-          </CardHeader>
+        <details className="group/details shrink-0 border-b border-border">
+          <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-5 text-sm font-medium [&::-webkit-details-marker]:hidden">
+            Previous conversations
+            <ChevronDown
+              className="size-3.5 text-muted-foreground group-open/details:rotate-180"
+              aria-hidden="true"
+            />
+          </summary>
           <CardContent className={cn("space-y-1 pb-3", detailCardContentClassName())}>
             {session.previousConversations?.map((conversation) => {
               const statusLabel =
@@ -2719,14 +2689,18 @@ function SessionDetailsContent({
               );
             })}
           </CardContent>
-        </Card>
+        </details>
       ) : null}
 
       {(session.workflows?.length ?? 0) > 0 ? (
-        <Card className={cn(detailCardClassName, "shrink-0")}>
-          <CardHeader className={detailCardHeaderClassName()}>
-            <CardTitle className="text-xs font-semibold">Workflows</CardTitle>
-          </CardHeader>
+        <details className="group/details shrink-0 border-b border-border">
+          <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-5 text-sm font-medium [&::-webkit-details-marker]:hidden">
+            Workflows
+            <ChevronDown
+              className="size-3.5 text-muted-foreground group-open/details:rotate-180"
+              aria-hidden="true"
+            />
+          </summary>
           <CardContent className={cn("space-y-3 pb-3", detailCardContentClassName())}>
             {session.workflows?.map((workflow) => {
               const startAt = workflowInputString(workflow.input, "startAt");
@@ -2779,13 +2753,17 @@ function SessionDetailsContent({
               );
             })}
           </CardContent>
-        </Card>
+        </details>
       ) : null}
 
-      <Card className={cn(detailCardClassName, "shrink-0")}>
-        <CardHeader className={detailCardHeaderClassName()}>
-          <CardTitle className="text-xs font-semibold">Notes</CardTitle>
-        </CardHeader>
+      <details className="group/details shrink-0 border-b border-border">
+        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-5 text-sm font-medium [&::-webkit-details-marker]:hidden">
+          Notes
+          <ChevronDown
+            className="size-3.5 text-muted-foreground group-open/details:rotate-180"
+            aria-hidden="true"
+          />
+        </summary>
         <CardContent className={cn("pb-3", detailCardContentClassName())}>
           {allNotes.length === 0 ? (
             <p className="text-xs text-muted-foreground">
@@ -2809,7 +2787,7 @@ function SessionDetailsContent({
             </div>
           )}
         </CardContent>
-      </Card>
+      </details>
     </>
   );
 }

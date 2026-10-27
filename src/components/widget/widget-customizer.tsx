@@ -8,7 +8,7 @@ import { useToast } from "@/components/ui/use-toast";
 import type { DashboardWidgetConfig } from "@/hooks/query";
 import { useWidgetConfig, useSaveWidgetConfig, usePublishWidgetConfig } from "@/hooks/query";
 import { isValidDomain, sanitizeDomain } from "@/lib/domain-validation";
-import { getWidgetAccentVars, WIDGET_BRAND_COLOR } from "@/lib/widget-accent";
+import { getWidgetAccentVars } from "@/lib/widget-accent";
 import { normalizeFontFamily, normalizeFontSize, normalizeLogoUrl } from "@/features/widget/domain";
 import { WIDGET_PREVIEW_RESPONSE_TIMEOUT_MS } from "@/features/widget/agent-timeouts";
 import { BookingSettingsCard } from "@/features/integrations/components/booking-settings-card";
@@ -55,7 +55,7 @@ const NAV_ITEMS: {
   { id: "deploy", label: "Deploy", icon: Code },
 ];
 
-const WIDGET_CARD_CLASS = "rounded-xl border border-border";
+const WIDGET_CARD_CLASS = "bg-transparent";
 
 const WIDGET_SETTINGS_CARD_CLASS = `${WIDGET_CARD_CLASS} overflow-hidden`;
 async function waitForPreviewWidget(prompt: string): Promise<WidgetPreviewEvidence | null> {
@@ -164,8 +164,8 @@ export function WidgetCustomizerSkeleton() {
     <output
       aria-busy="true"
       aria-label="Loading Agent setup"
-      className="flex h-full min-h-0 w-full flex-col gap-2 overflow-hidden p-2 sm:gap-3 sm:p-3"
-      style={getWidgetAccentVars(WIDGET_BRAND_COLOR)}
+      className="flex h-full min-h-0 w-full flex-col gap-4 overflow-hidden bg-background p-4 sm:p-6"
+      style={getWidgetAccentVars("#282624")}
     >
       <div aria-hidden="true" className="flex shrink-0 flex-wrap items-center gap-2 px-1 py-1">
         <Skeleton className="h-6 w-16 rounded" />
@@ -738,8 +738,8 @@ export function WidgetCustomizer({
 
   return (
     <div
-      className="flex h-full min-h-0 w-full flex-col gap-2 overflow-hidden p-2 sm:gap-3 sm:p-3"
-      style={getWidgetAccentVars(WIDGET_BRAND_COLOR)}
+      className="flex h-full min-h-0 w-full flex-col gap-4 overflow-hidden bg-background p-4 sm:p-6"
+      style={getWidgetAccentVars("#282624")}
     >
       {widgetConfigQuery.isError ? (
         <div
@@ -761,7 +761,7 @@ export function WidgetCustomizer({
       ) : null}
 
       <div className="flex shrink-0 flex-wrap items-center gap-2">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">
+        <h1 className="text-2xl font-medium tracking-tight text-foreground">
           {APP_PAGES.agent.label}
         </h1>
         <button
@@ -804,7 +804,7 @@ export function WidgetCustomizer({
           <Button
             id="agent-publish"
             type="button"
-            className="min-h-10 rounded-lg"
+            className="min-h-10 rounded-full"
             disabled={!canPublishChanges}
             onClick={() => publishChanges()}
           >
@@ -853,9 +853,8 @@ export function WidgetCustomizer({
               aria-label="Agent workspace tabs"
               className="mx-4 h-12 w-auto shrink-0 justify-start gap-1 rounded-none border-b border-border bg-transparent px-0 sm:mx-6"
             >
-              {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
-                <TabsTrigger key={id} value={id} className="h-11 gap-2 px-3 sm:h-10">
-                  <Icon className="size-4" strokeWidth={2} />
+              {NAV_ITEMS.map(({ id, label }) => (
+                <TabsTrigger key={id} value={id} className="h-11 flex-none gap-2 px-4 sm:h-10">
                   {label}
                 </TabsTrigger>
               ))}
@@ -872,21 +871,6 @@ export function WidgetCustomizer({
                     modelName={config.modelName}
                     onUpdate={(key, value) => updateConfig(key, value)}
                   />
-                  <WidgetBehaviourPanel
-                    inputPlaceholder={config.inputPlaceholder}
-                    autoShowPreviewDelay={config.autoShowPreviewDelay}
-                    hideSuggestionsOnInteract={config.hideSuggestionsOnInteract}
-                    enableLeadCapture={config.enableLeadCapture}
-                    leadCaptureMinutesThreshold={config.leadCaptureMinutesThreshold}
-                    leadCaptureMessageThreshold={config.leadCaptureMessageThreshold}
-                    leadCaptureKeywords={config.leadCaptureKeywords}
-                    enableBrochure={config.enableBrochure}
-                    brochureSuggestionText={config.brochureSuggestionText}
-                    privacyPolicyUrl={config.privacyPolicyUrl}
-                    onUpdate={handleBehaviourUpdate}
-                    onKeywordsChange={(value) => handleArrayChange("leadCaptureKeywords", value)}
-                  />
-                  <BookingSettingsCard />
                 </fieldset>
                 <section
                   id="knowledge"
@@ -897,12 +881,47 @@ export function WidgetCustomizer({
                     <h2 id="knowledge-heading" className="text-base font-semibold tracking-tight">
                       Knowledge sources
                     </h2>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Give your agent trusted information to use when answering customers.
-                    </p>
                   </div>
                   <WidgetKnowledgeManager canManage={canManage} />
                 </section>
+                <fieldset disabled={!canManage} className="min-w-0 space-y-4 border-0 p-0">
+                  <legend className="sr-only">Additional agent settings</legend>{" "}
+                  <details className="group/behavior">
+                    <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between text-sm font-medium [&::-webkit-details-marker]:hidden">
+                      Widget behavior{" "}
+                      <span aria-hidden="true" className="text-muted-foreground">
+                        +
+                      </span>
+                    </summary>
+                    <div className="pt-5">
+                      {" "}
+                      <WidgetBehaviourPanel
+                        inputPlaceholder={config.inputPlaceholder}
+                        autoShowPreviewDelay={config.autoShowPreviewDelay}
+                        hideSuggestionsOnInteract={config.hideSuggestionsOnInteract}
+                        enableLeadCapture={config.enableLeadCapture}
+                        leadCaptureMinutesThreshold={config.leadCaptureMinutesThreshold}
+                        leadCaptureMessageThreshold={config.leadCaptureMessageThreshold}
+                        leadCaptureKeywords={config.leadCaptureKeywords}
+                        enableBrochure={config.enableBrochure}
+                        brochureSuggestionText={config.brochureSuggestionText}
+                        privacyPolicyUrl={config.privacyPolicyUrl}
+                        onUpdate={handleBehaviourUpdate}
+                        onKeywordsChange={(value) =>
+                          handleArrayChange("leadCaptureKeywords", value)
+                        }
+                      />
+                    </div>
+                  </details>
+                  <details>
+                    <summary className="min-h-11 cursor-pointer list-none py-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
+                      Appointment booking
+                    </summary>
+                    <div className="pt-4">
+                      <BookingSettingsCard />
+                    </div>
+                  </details>
+                </fieldset>
               </TabsContent>
 
               <TabsContent value="test" keepMounted={false}>
@@ -918,25 +937,6 @@ export function WidgetCustomizer({
               </TabsContent>
 
               <TabsContent value="deploy" keepMounted={false} className="space-y-8">
-                <fieldset disabled={!canManage} className="min-w-0 space-y-8 border-0 p-0">
-                  <legend className="sr-only">Widget appearance settings</legend>
-                  <WidgetAppearancePanel
-                    config={appearanceConfig}
-                    onUpdate={handleAppearanceUpdate}
-                    onBatchUpdate={handleAppearanceBatchUpdate}
-                    onReset={handleResetAppearance}
-                  />
-                  <WidgetConversationStarterPanel
-                    welcomeMessage={config.welcomeMessage}
-                    previewMessages={config.previewMessages}
-                    onUpdateWelcome={(value) => updateConfig("welcomeMessage", value)}
-                    onPreviewMessagesChange={(value) => handleArrayChange("previewMessages", value)}
-                  />
-                  <WidgetSuggestedQuestionsPanel
-                    suggestions={config.suggestions}
-                    onChange={(value) => handleArrayChange("suggestions", value)}
-                  />
-                </fieldset>
                 <WidgetInstallationPanel
                   readiness={launchReadiness}
                   launchChecklist={launchChecklist}
@@ -963,6 +963,38 @@ export function WidgetCustomizer({
                   onEnabledChange={(value) => updateConfig("isEnabled", value)}
                   canManage={canManage}
                 />
+                <details className="group/appearance">
+                  <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between text-lg font-medium [&::-webkit-details-marker]:hidden">
+                    Customize your widget{" "}
+                    <span aria-hidden="true" className="text-sm text-muted-foreground">
+                      +
+                    </span>
+                  </summary>
+                  <div className="pt-6">
+                    {" "}
+                    <fieldset disabled={!canManage} className="min-w-0 space-y-8 border-0 p-0">
+                      <legend className="sr-only">Widget appearance settings</legend>
+                      <WidgetAppearancePanel
+                        config={appearanceConfig}
+                        onUpdate={handleAppearanceUpdate}
+                        onBatchUpdate={handleAppearanceBatchUpdate}
+                        onReset={handleResetAppearance}
+                      />
+                      <WidgetConversationStarterPanel
+                        welcomeMessage={config.welcomeMessage}
+                        previewMessages={config.previewMessages}
+                        onUpdateWelcome={(value) => updateConfig("welcomeMessage", value)}
+                        onPreviewMessagesChange={(value) =>
+                          handleArrayChange("previewMessages", value)
+                        }
+                      />
+                      <WidgetSuggestedQuestionsPanel
+                        suggestions={config.suggestions}
+                        onChange={(value) => handleArrayChange("suggestions", value)}
+                      />
+                    </fieldset>
+                  </div>
+                </details>
                 <WidgetVersionHistory
                   versions={publication?.versions ?? []}
                   currentVersion={publication?.current?.version ?? null}

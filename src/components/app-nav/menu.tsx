@@ -77,16 +77,16 @@ export function Menu({ isOpen }: MenuProps) {
                     aria-label={label}
                     aria-current={isCurrentActive ? "page" : false}
                     className={cn(
-                      buttonVariants({ variant: isCurrentActive ? "secondary" : "ghost" }),
-                      "w-full h-11 lg:h-10 mb-1 relative overflow-hidden group cursor-pointer flex items-center transition-colors duration-150",
+                      buttonVariants({ variant: "ghost" }),
+                      "w-full h-11 lg:h-11 mb-2 rounded-xl hover:bg-transparent relative overflow-hidden group cursor-pointer flex items-center transition-colors duration-150",
                       isOpen === false ? "justify-center px-0" : "justify-start px-4",
-                      isCurrentActive && "bg-sidebar-accent text-sidebar-accent-foreground",
+                      isCurrentActive ? "text-foreground" : "text-muted-foreground",
                     )}
                     onClick={() => closeMobileSidebar()}
                   >
                     <span
                       className={cn(
-                        isOpen === false ? "" : "mr-4",
+                        isOpen === false ? "" : "mr-3",
                         "flex-shrink-0 flex items-center justify-center",
                       )}
                     >

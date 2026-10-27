@@ -22,7 +22,7 @@ export function LegalDocument({ title, description, effectiveDate, sections }: L
           <p className="mb-3 text-sm font-semibold uppercase tracking-[0.15em] text-primary">
             Legal
           </p>
-          <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+          <h1 className="font-display text-5xl tracking-tight text-foreground sm:text-6xl">
             {title}
           </h1>
           <p className="mt-4 text-base leading-relaxed text-muted-foreground">{description}</p>

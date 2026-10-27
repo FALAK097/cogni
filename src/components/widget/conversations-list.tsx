@@ -7,16 +7,13 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "reac
 import type { FormEvent, KeyboardEvent as ReactKeyboardEvent } from "react";
 import {
   AlertCircle,
-  Bot,
   CheckCircle2,
   Clock,
   Filter,
   Loader2,
   MessageSquare,
-  Pause,
   Plus,
   Search,
-  User,
   X,
 } from "@/components/icons";
 
@@ -347,7 +344,7 @@ export function ConversationsList({
             <Input
               aria-label="Search conversations"
               placeholder="Search conversations…"
-              className="h-11 rounded-lg border-border/50 bg-input/50 pl-9 pr-12 text-base shadow-none sm:h-9 sm:pr-10 sm:text-sm"
+              className="h-11 rounded-lg border-border/50 bg-muted border-transparent pl-9 pr-12 text-base shadow-none sm:h-9 sm:pr-10 sm:text-sm"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
@@ -371,7 +368,7 @@ export function ConversationsList({
               render={
                 <Button
                   type="button"
-                  variant={activeFilterCount ? "secondary" : "outline"}
+                  variant="ghost"
                   size="icon"
                   aria-label={
                     activeFilterCount
@@ -509,11 +506,7 @@ export function ConversationsList({
                     <p role="alert" className="text-xs text-destructive">
                       Use up to 32 letters, numbers, spaces, periods, underscores or hyphens.
                     </p>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">
-                      Matches a label on the conversation.
-                    </p>
-                  )}
+                  ) : null}
                 </div>
                 {savingView ? (
                   <form
@@ -772,10 +765,8 @@ export function ConversationsList({
                     onKeyDown={handleConversationListKeyDown}
                     onClick={() => onSelectConversation(conversation.id)}
                     className={cn(
-                      "relative flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
-                      selected
-                        ? "bg-primary/5 before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full before:bg-primary"
-                        : "hover:bg-muted/40",
+                      "relative flex w-full items-start gap-3 rounded-2xl px-3 py-3.5 text-left transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
+                      selected ? "bg-secondary" : "hover:bg-muted/40",
                     )}
                   >
                     <Avatar className="h-10 w-10">
@@ -786,33 +777,33 @@ export function ConversationsList({
                     </Avatar>
 
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <span
-                          className={cn(
-                            "truncate text-sm text-foreground",
-                            (selected || unreadCount > 0) && "font-semibold",
-                          )}
-                        >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate text-sm font-medium text-foreground">
                           {displayName}
                         </span>
-                        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                        <time
+                          className="shrink-0 text-xs text-muted-foreground"
+                          dateTime={conversation.lastMessageAt}
+                        >
                           {formatListTime(conversation.lastMessageAt)}
-                        </span>
+                        </time>
                       </div>
                       <div className="mt-0.5 flex items-end justify-between gap-2">
                         <p className="line-clamp-1 text-sm text-muted-foreground">
                           {conversation.preview}
                         </p>
                         {unreadCount > 0 ? (
-                          <span className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-semibold tabular-nums text-primary-foreground">
+                          <span className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-success px-1.5 text-[11px] font-semibold tabular-nums text-primary-foreground">
                             {unreadCount}
                           </span>
                         ) : null}
                       </div>
                       <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                        <span className="inline-flex rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
-                          {getConversationChannelLabel(conversation.channel)}
-                        </span>
+                        {conversation.channel !== "WIDGET" ? (
+                          <span className="text-xs text-muted-foreground">
+                            {getConversationChannelLabel(conversation.channel)}
+                          </span>
+                        ) : null}
                         {conversation.ticket ? (
                           <span
                             className="inline-flex items-center gap-1 rounded border border-border/70 bg-background px-1.5 py-0.5 text-xs text-muted-foreground"
@@ -861,27 +852,14 @@ export function ConversationsList({
                             Escalated
                           </span>
                         ) : null}
-                        <span
-                          className={cn(
-                            "inline-flex items-center gap-1 text-xs font-medium",
-                            conversation.aiPaused
-                              ? "text-amber-700 dark:text-amber-400"
-                              : "text-muted-foreground",
-                          )}
-                        >
-                          {conversation.aiPaused ? (
-                            <Pause className="size-3.5 shrink-0" aria-hidden="true" />
-                          ) : (
-                            <Bot className="size-3.5 shrink-0" aria-hidden="true" />
-                          )}
-                          {conversation.aiPaused ? "AI paused" : "AI enabled"}
-                        </span>
-                        <span className="inline-flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-                          <User className="size-3.5 shrink-0" aria-hidden="true" />
-                          <span className="truncate">
-                            {conversation.assigneeName ?? "Unassigned"}
+                        {conversation.aiPaused && conversation.status !== "ESCALATED" ? (
+                          <span className="text-xs text-muted-foreground">AI paused</span>
+                        ) : null}
+                        {conversation.assigneeName ? (
+                          <span className="truncate text-xs text-muted-foreground">
+                            {conversation.assigneeName}
                           </span>
-                        </span>
+                        ) : null}
                       </div>
                     </div>
                   </button>
