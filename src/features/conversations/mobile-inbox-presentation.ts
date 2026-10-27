@@ -9,9 +9,7 @@ export function getTranscriptMessageAlignment(
 }
 
 export function getTranscriptMessageRowClassName(alignment: TranscriptMessageAlignment) {
-  return alignment === "outgoing"
-    ? "flex w-full flex-row-reverse justify-start gap-3"
-    : "flex w-full gap-3";
+  return alignment === "outgoing" ? "flex w-full flex-row justify-end gap-3" : "flex w-full gap-3";
 }
 
 export function canCreateTestFromMessage(role: "user" | "assistant", canManage: boolean) {

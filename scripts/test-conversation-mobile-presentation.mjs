@@ -20,7 +20,7 @@ test("visitor messages and outgoing replies have distinct transcript alignment",
   assert.equal(presentation.getTranscriptMessageAlignment("assistant", false), "outgoing");
 });
 
-test("outgoing transcript rows render full-width with their content anchored at the right edge", () => {
+test("outgoing transcript rows keep the avatar before the message and align both to the right", () => {
   const markup = renderToStaticMarkup(
     createElement(
       "div",
@@ -28,12 +28,13 @@ test("outgoing transcript rows render full-width with their content anchored at 
         className: presentation.getTranscriptMessageRowClassName("outgoing"),
         "data-message-alignment": "outgoing",
       },
-      createElement("p", null, "AI reply"),
+      createElement("span", { "data-part": "avatar" }, "AI"),
+      createElement("p", { "data-part": "message" }, "AI reply"),
     ),
   );
 
-  assert.match(markup, /class="flex w-full flex-row-reverse justify-start gap-3"/);
-  assert.match(markup, /data-message-alignment="outgoing"/);
+  assert.ok(markup.includes('class="flex w-full flex-row justify-end gap-3"'));
+  assert.ok(markup.indexOf('data-part="avatar"') < markup.indexOf('data-part="message"'));
 });
 
 test("only workspace managers can create a test from a visitor message", () => {
