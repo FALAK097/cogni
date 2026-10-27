@@ -15,7 +15,13 @@ import {
   searchCloudflareIndex,
 } from "@/lib/search/cloudflare-search";
 
-type KnowledgeContext = { documentId: string; title: string; content: string };
+type KnowledgeContext = {
+  documentId: string;
+  title: string;
+  content: string;
+  revisionId: string | null;
+  revisionNumber: number | null;
+};
 type SearchKnowledge = typeof searchCloudflareIndex;
 
 function readSearchMetadataString(metadata: Record<string, unknown> | undefined, key: string) {
@@ -79,6 +85,8 @@ export async function retrieveKnowledgeContextWith({
         id: documentTable.id,
         title: documentTable.title,
         providerItemKey: documentRevision.providerItemKey,
+        revisionId: documentRevision.id,
+        revisionNumber: documentRevision.revisionNumber,
       })
       .from(documentTable)
       .leftJoin(
@@ -96,6 +104,15 @@ export async function retrieveKnowledgeContextWith({
     const keysByDocumentId = new Map(
       documents.map((document) => [document.id, document.providerItemKey ?? `${document.id}.txt`]),
     );
+    const revisionsByDocumentId = new Map(
+      documents.map((document) => [
+        document.id,
+        {
+          revisionId: document.revisionId ?? null,
+          revisionNumber: document.revisionNumber ?? null,
+        },
+      ]),
+    );
 
     const contexts = searchMatches.flatMap((match: CloudflareSearchChunk) => {
       const documentId = readSearchMetadataString(match.item?.metadata, "documentId");
@@ -109,7 +126,16 @@ export async function retrieveKnowledgeContextWith({
         !match.text.trim()
       )
         return [];
-      return [{ documentId, title, content: match.text }];
+      const revision = revisionsByDocumentId.get(documentId);
+      return [
+        {
+          documentId,
+          title,
+          content: match.text,
+          revisionId: revision?.revisionId ?? null,
+          revisionNumber: revision?.revisionNumber ?? null,
+        },
+      ];
     });
     if (contexts.length > 0) return contexts.slice(0, safeLimit);
   }
@@ -139,6 +165,8 @@ export async function retrieveKnowledgeContextWith({
     documentId: match.documentId,
     title: match.title,
     content: match.content,
+    revisionId: null,
+    revisionNumber: null,
   }));
 }
 

@@ -96,6 +96,37 @@ test("saved test run summaries keep errors and checks not run out of the pass-ra
   });
 
   assert.equal(parsed.success, true);
+  assert.equal("modelProvider" in parsed.data.results[0], false, "legacy payloads stay compatible");
+  const contextResult = agentTestRunInputSchema.safeParse({
+    runId: "00000000-0000-4000-8000-000000000005",
+    suiteVersion: "[]",
+    results: [
+      {
+        ...results[0],
+        modelProvider: "GOOGLE",
+        modelName: "gemini-2.0-flash",
+        configFingerprint: "a".repeat(64),
+        sources: [
+          {
+            documentId: "00000000-0000-4000-8000-000000000006",
+            revisionId: "00000000-0000-4000-8000-000000000007",
+            revisionNumber: 2,
+          },
+        ],
+        prompt: "must not be retained",
+      },
+    ],
+  });
+  assert.equal(contextResult.success, true);
+  if (contextResult.success) assert.equal("prompt" in contextResult.data.results[0], false);
+  assert.equal(
+    agentTestRunInputSchema.safeParse({
+      runId: "00000000-0000-4000-8000-000000000005",
+      suiteVersion: "[]",
+      results: [{ ...results[0], configFingerprint: "not-a-digest" }],
+    }).success,
+    false,
+  );
   assert.deepEqual(summarizeAgentTestRun(results), {
     caseCount: 4,
     passedCount: 1,
@@ -143,7 +174,12 @@ test("saved test suites reset the preview before every prompt and keep running a
       },
       runPrompt: async (testCase) => {
         order.push(`run:${testCase.id}`);
-        if (testCase.id === "grounded") return { outcome: "answer", grounded: true };
+        if (testCase.id === "grounded")
+          return {
+            outcome: "answer",
+            grounded: true,
+            signedEvidence: "opaque-signed-preview-evidence",
+          };
         if (testCase.id === "no-evidence") return { outcome: "answer", grounded: true };
         return { outcome: "handoff", grounded: false };
       },
@@ -166,6 +202,7 @@ test("saved test suites reset the preview before every prompt and keep running a
       ["handoff", "passed"],
     ],
   );
+  assert.equal(results[0].evidence.signedEvidence, "opaque-signed-preview-evidence");
 });
 
 test("a failed preview reset marks later checks not run without sending their prompts", async () => {

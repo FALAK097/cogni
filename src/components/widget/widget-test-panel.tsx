@@ -37,7 +37,16 @@ import { runAgentTestCase } from "@/features/agent-tests/run-case";
 export type WidgetPreviewEvidence = {
   outcome: "answer" | "handoff" | "error";
   grounded: boolean;
-  sources: { documentId?: string; title: string }[];
+  modelProvider?: "OPENAI" | "GOOGLE";
+  modelName?: string;
+  configFingerprint?: string;
+  signedEvidence?: string;
+  sources: {
+    documentId?: string;
+    title: string;
+    revisionId?: string | null;
+    revisionNumber?: number | null;
+  }[];
   prompt?: string;
 };
 
@@ -307,7 +316,31 @@ export function WidgetTestPanel({
         await recordRun.mutateAsync({
           runId: crypto.randomUUID(),
           suiteVersion: getAgentTestSuiteVersion(savedCases),
-          results: results.map(({ id, status }) => ({ id, status })),
+          results: results.map(({ id, status, evidence }) => ({
+            id,
+            status,
+            ...(evidence?.modelProvider ? { modelProvider: evidence.modelProvider } : {}),
+            ...(evidence?.modelName ? { modelName: evidence.modelName } : {}),
+            ...(evidence?.configFingerprint
+              ? { configFingerprint: evidence.configFingerprint }
+              : {}),
+            ...(evidence?.signedEvidence ? { signedEvidence: evidence.signedEvidence } : {}),
+            ...(evidence
+              ? {
+                  sources: (evidence.sources ?? []).flatMap((source) =>
+                    source.documentId
+                      ? [
+                          {
+                            documentId: source.documentId,
+                            revisionId: source.revisionId ?? null,
+                            revisionNumber: source.revisionNumber ?? null,
+                          },
+                        ]
+                      : [],
+                  ),
+                }
+              : {}),
+          })),
         });
       } catch {
         historyError =

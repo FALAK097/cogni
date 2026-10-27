@@ -11,7 +11,15 @@ export type AgentTestSuiteCase = {
 export type AgentTestSuiteEvidence = {
   outcome: "answer" | "handoff" | "error";
   grounded: boolean;
-  sources?: { documentId?: string }[];
+  modelProvider?: "OPENAI" | "GOOGLE";
+  modelName?: string;
+  configFingerprint?: string;
+  signedEvidence?: string;
+  sources?: {
+    documentId?: string;
+    revisionId?: string | null;
+    revisionNumber?: number | null;
+  }[];
 };
 
 export type AgentTestSuiteResult = {

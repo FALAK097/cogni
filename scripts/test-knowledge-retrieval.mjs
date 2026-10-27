@@ -63,6 +63,7 @@ const db = createTestDb(appClient);
 const workspaceId = randomUUID();
 const foreignWorkspaceId = randomUUID();
 const readyDocumentId = randomUUID();
+const currentRevisionId = randomUUID();
 const unrelatedDocumentId = randomUUID();
 const processingDocumentId = randomUUID();
 const foreignDocumentId = randomUUID();
@@ -71,6 +72,7 @@ const now = new Date();
 before(async () => {
   await raw`INSERT INTO "workspace" ("id", "name", "slug", "updatedAt") VALUES (${workspaceId}, 'Retrieval test', ${`test-${workspaceId}`}, ${now}), (${foreignWorkspaceId}, 'Foreign retrieval test', ${`test-${foreignWorkspaceId}`}, ${now})`;
   await raw`INSERT INTO "document" ("id", "title", "sourceType", "status", "updatedAt", "workspaceId") VALUES (${readyDocumentId}, 'Refund policy', 'TEXT', 'READY', ${now}, ${workspaceId}), (${unrelatedDocumentId}, 'Recent unrelated note', 'TEXT', 'READY', ${now}, ${workspaceId}), (${processingDocumentId}, 'Processing draft', 'TEXT', 'PROCESSING', ${now}, ${workspaceId}), (${foreignDocumentId}, 'Foreign refund policy', 'TEXT', 'READY', ${now}, ${foreignWorkspaceId})`;
+  await raw`INSERT INTO "document_revision" ("id", "documentId", "revisionNumber", "contentSha256", "sourceType", "status", "workspaceId") VALUES (${currentRevisionId}, ${readyDocumentId}, 1, ${"a".repeat(64)}, 'TEXT', 'CURRENT', ${workspaceId})`;
   await raw`INSERT INTO "document_chunk" ("id", "content", "position", "documentId") VALUES (${randomUUID()}, 'Our refund policy allows refunds within 14 days.', 0, ${readyDocumentId}), (${randomUUID()}, 'This unrelated recent note does not answer the question.', 0, ${unrelatedDocumentId}), (${randomUUID()}, 'Refund policy draft text should not be used.', 0, ${processingDocumentId}), (${randomUUID()}, 'Foreign refund policy says 90 days.', 0, ${foreignDocumentId})`;
 });
 
@@ -105,8 +107,11 @@ test("exact-phrase fallback respects ready status, workspace and selected-source
       documentId: readyDocumentId,
       title: "Refund policy",
       content: "Our refund policy allows refunds within 14 days.",
+      revisionId: null,
+      revisionNumber: null,
     },
   ]);
+  assert.notEqual(contexts[0].revisionId, currentRevisionId);
 });
 
 test("search metadata cannot expose another workspace's source content", async () => {

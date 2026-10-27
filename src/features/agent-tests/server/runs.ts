@@ -1,11 +1,19 @@
 import "server-only";
 
 import { createHash } from "node:crypto";
-import { and, desc, eq, gte, lt } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lt } from "drizzle-orm";
 
 import { getDb, type Db } from "@/lib/db/client";
-import { agentTestCase, agentTestRun } from "@/lib/db/schema";
-import { getAgentTestSuiteVersion, summarizeAgentTestRun, type AgentTestRunInput } from "../input";
+import { env } from "@/lib/env/server";
+import { agentTestCase, agentTestRun, documentRevision } from "@/lib/db/schema";
+import { AGENT_TEST_EVALUATION_CONTEXT_BASIS } from "../evaluation-context";
+import { verifyAgentTestPreviewEvidence } from "../signed-preview-evidence";
+import {
+  getAgentTestSuiteVersion,
+  summarizeAgentTestRun,
+  type AgentTestEvaluationContext,
+  type AgentTestRunInput,
+} from "../input";
 
 export class AgentTestSuiteChangedError extends Error {
   constructor() {
@@ -30,7 +38,7 @@ export async function recordAgentTestRun(
   const requestedIds = input.results.map((result) => result.id).sort();
   const savedCases = await db.query.agentTestCase.findMany({
     where: eq(agentTestCase.workspaceId, workspaceId),
-    columns: { id: true, updatedAt: true },
+    columns: { id: true, updatedAt: true, prompt: true },
   });
   const savedIds = savedCases.map((testCase) => testCase.id).sort();
   if (
@@ -43,14 +51,82 @@ export async function recordAgentTestRun(
 
   const counts = summarizeAgentTestRun(input.results);
   const suiteDigest = createHash("sha256").update(input.suiteVersion).digest("hex");
-  const resultDigest = createHash("sha256")
-    .update(
-      JSON.stringify({
-        suiteVersion: input.suiteVersion,
-        results: [...input.results].sort((a, b) => a.id.localeCompare(b.id)),
-      }),
-    )
-    .digest("hex");
+  const signedEvidence = input.results.map((result) =>
+    result.signedEvidence
+      ? verifyAgentTestPreviewEvidence(result.signedEvidence, env.BETTER_AUTH_SECRET)
+      : null,
+  );
+  const savedCaseById = new Map(savedCases.map((testCase) => [testCase.id, testCase]));
+  const contextMetadata = signedEvidence[0];
+  const contextIsConsistent =
+    contextMetadata !== null &&
+    signedEvidence.every((evidence, index) => {
+      const result = input.results[index];
+      return (
+        evidence !== null &&
+        result !== undefined &&
+        evidence.workspaceId === workspaceId &&
+        evidence.prompt === savedCaseById.get(result.id)?.prompt &&
+        evidence.modelProvider === contextMetadata.modelProvider &&
+        evidence.modelName === contextMetadata.modelName &&
+        evidence.configFingerprint === contextMetadata.configFingerprint
+      );
+    });
+  let evaluationContext: AgentTestEvaluationContext | null = null;
+  if (contextIsConsistent && contextMetadata) {
+    const requestedRevisions = signedEvidence.flatMap((evidence) =>
+      (evidence?.sources ?? []).flatMap((source) =>
+        source.revisionId ? [{ ...source, revisionId: source.revisionId }] : [],
+      ),
+    );
+    const revisionIds = [...new Set(requestedRevisions.map((source) => source.revisionId))];
+    const storedRevisions = revisionIds.length
+      ? await db.query.documentRevision.findMany({
+          where: and(
+            eq(documentRevision.workspaceId, workspaceId),
+            inArray(documentRevision.id, revisionIds),
+          ),
+          columns: { id: true, documentId: true, revisionNumber: true },
+        })
+      : [];
+    const revisionById = new Map(storedRevisions.map((revision) => [revision.id, revision]));
+    const sourcesAreValid = requestedRevisions.every((source) => {
+      const revision = revisionById.get(source.revisionId);
+      return (
+        revision?.documentId === source.documentId &&
+        revision.revisionNumber === source.revisionNumber
+      );
+    });
+    if (sourcesAreValid) {
+      evaluationContext = {
+        version: 1,
+        configFingerprint: contextMetadata.configFingerprint,
+        configBasis: AGENT_TEST_EVALUATION_CONTEXT_BASIS,
+        modelProvider: contextMetadata.modelProvider,
+        modelName: contextMetadata.modelName,
+        cases: input.results
+          .map((result, index) => ({
+            id: result.id,
+            status: result.status,
+            sources: (signedEvidence[index]?.sources ?? []).map((source) => ({
+              documentId: source.documentId,
+              revisionId: source.revisionId,
+              revisionNumber: source.revisionNumber,
+            })),
+          }))
+          .sort((left, right) => left.id.localeCompare(right.id)),
+      };
+    }
+  }
+  const canonicalResults = input.results
+    .map(({ id, status }) => ({ id, status }))
+    .sort((left, right) => left.id.localeCompare(right.id));
+  const digestPayload = {
+    suiteVersion: input.suiteVersion,
+    results: canonicalResults,
+    ...(evaluationContext ? { evaluationContext } : {}),
+  };
+  const resultDigest = createHash("sha256").update(JSON.stringify(digestPayload)).digest("hex");
   const [created] = await db
     .insert(agentTestRun)
     .values({
@@ -59,6 +135,7 @@ export async function recordAgentTestRun(
       createdByMembershipId: membershipId,
       resultDigest,
       suiteDigest,
+      evaluationContext,
       ...counts,
     })
     .onConflictDoNothing()
@@ -100,6 +177,7 @@ export async function listAgentTestRuns(
       id: agentTestRun.id,
       createdAt: agentTestRun.createdAt,
       suiteDigest: agentTestRun.suiteDigest,
+      evaluationContext: agentTestRun.evaluationContext,
       caseCount: agentTestRun.caseCount,
       passedCount: agentTestRun.passedCount,
       mismatchCount: agentTestRun.mismatchCount,

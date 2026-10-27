@@ -3,6 +3,7 @@ export const PREVIEW_EVIDENCE_EVENT = "cogni:widget-preview-evidence";
 const MAX_HEADER_LENGTH = 8_000;
 const MAX_SOURCE_COUNT = 4;
 const MAX_TITLE_LENGTH = 160;
+const MAX_MODEL_NAME_LENGTH = 120;
 
 export function parseWidgetPreviewEvidence(headerValue) {
   if (
@@ -20,7 +21,16 @@ export function parseWidgetPreviewEvidence(headerValue) {
       value === null ||
       (value.outcome !== "answer" && value.outcome !== "handoff") ||
       typeof value.grounded !== "boolean" ||
-      !Array.isArray(value.sources)
+      !Array.isArray(value.sources) ||
+      (value.modelProvider !== "OPENAI" && value.modelProvider !== "GOOGLE") ||
+      typeof value.modelName !== "string" ||
+      value.modelName.length === 0 ||
+      value.modelName.length > MAX_MODEL_NAME_LENGTH ||
+      typeof value.configFingerprint !== "string" ||
+      !/^[a-f0-9]{64}$/.test(value.configFingerprint) ||
+      typeof value.signedEvidence !== "string" ||
+      value.signedEvidence.length === 0 ||
+      value.signedEvidence.length > 8_000
     ) {
       return null;
     }
@@ -41,6 +51,12 @@ export function parseWidgetPreviewEvidence(headerValue) {
         source.documentId.length <= 128
           ? { documentId: source.documentId }
           : {}),
+        ...(typeof source.revisionId === "string" && source.revisionId.length <= 128
+          ? { revisionId: source.revisionId }
+          : { revisionId: null }),
+        ...(Number.isInteger(source.revisionNumber) && source.revisionNumber > 0
+          ? { revisionNumber: source.revisionNumber }
+          : { revisionNumber: null }),
       }));
 
     if (value.grounded !== sources.length > 0) return null;
@@ -51,6 +67,10 @@ export function parseWidgetPreviewEvidence(headerValue) {
     return {
       outcome: value.outcome,
       grounded: value.grounded,
+      modelProvider: value.modelProvider,
+      modelName: value.modelName,
+      configFingerprint: value.configFingerprint,
+      signedEvidence: value.signedEvidence,
       sources,
       ...(prompt === undefined ? {} : { prompt }),
     };

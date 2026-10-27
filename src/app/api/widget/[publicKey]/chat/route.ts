@@ -14,6 +14,8 @@ import {
 } from "@/features/conversations/server/conversation-service";
 import { handoffReply, matchesEscalationKeywords } from "@/features/conversations/server/handoff";
 import type { WidgetModelProvider, WidgetWidgetConfig } from "@/features/widget/domain";
+import { resolveAgentTestModelIdentity } from "@/features/agent-tests/evaluation-context";
+import { signAgentTestPreviewEvidence } from "@/features/agent-tests/signed-preview-evidence";
 import {
   assertPublicWidgetAccess,
   bearerToken,
@@ -115,13 +117,23 @@ const chatRequestSchema = z.object({
 type WidgetPreviewEvidence = {
   outcome: "answer" | "handoff";
   grounded: boolean;
-  sources: { documentId: string; title: string }[];
+  modelProvider: WidgetModelProvider;
+  modelName: string;
+  configFingerprint: string;
+  sources: {
+    documentId: string;
+    title: string;
+    revisionId: string | null;
+    revisionNumber: number | null;
+  }[];
   prompt: string;
+  signedEvidence?: string;
 };
 
 function streamHeaders(
   session?: { id: string; token: string },
   previewEvidence?: WidgetPreviewEvidence,
+  previewWorkspaceId?: string,
 ) {
   const headers = new Headers({
     "Content-Type": "text/event-stream",
@@ -132,15 +144,36 @@ function streamHeaders(
     headers.set("X-Widget-Session-Id", session.id);
     headers.set("X-Widget-Session-Token", session.token);
   }
-  if (previewEvidence) {
+  if (previewEvidence && previewWorkspaceId) {
+    const signedEvidence = signAgentTestPreviewEvidence(
+      {
+        workspaceId: previewWorkspaceId,
+        prompt: previewEvidence.prompt,
+        outcome: previewEvidence.outcome,
+        grounded: previewEvidence.grounded,
+        modelProvider: previewEvidence.modelProvider,
+        modelName: previewEvidence.modelName,
+        configFingerprint: previewEvidence.configFingerprint,
+        sources: previewEvidence.sources.slice(0, 4).map((source) => ({
+          documentId: source.documentId,
+          revisionId: source.revisionId,
+          revisionNumber: source.revisionNumber,
+        })),
+      },
+      env.BETTER_AUTH_SECRET,
+    );
     headers.set(
       "X-Widget-Preview-Evidence",
       encodeURIComponent(
         JSON.stringify({
           ...previewEvidence,
-          sources: previewEvidence.sources.slice(0, 4).map(({ documentId, title }) => ({
-            documentId,
-            title: title.slice(0, 160),
+          prompt: previewEvidence.prompt.length <= 1_000 ? previewEvidence.prompt : undefined,
+          signedEvidence,
+          sources: previewEvidence.sources.slice(0, 4).map((source) => ({
+            documentId: source.documentId,
+            revisionId: source.revisionId,
+            revisionNumber: source.revisionNumber,
+            title: source.title.slice(0, 160),
           })),
         }),
       ),
@@ -225,6 +258,20 @@ export async function POST(
     if ("error" in publicAccess) return publicAccess.error;
     access = publicAccess;
   }
+
+  const {
+    modelProvider: effectiveModelProvider,
+    modelName: effectiveModelName,
+    configFingerprint,
+  } = resolveAgentTestModelIdentity(
+    {
+      id: access.widget.id,
+      updatedAt: access.widget.updatedAt,
+      modelProvider: access.settings.modelProvider,
+      modelName: access.settings.modelName,
+    },
+    { provider: env.WIDGET_MODEL_PROVIDER, modelName: env.WIDGET_MODEL_NAME },
+  );
 
   const hostname = isPreview
     ? PREVIEW_HOSTNAME
@@ -432,6 +479,7 @@ export async function POST(
         headers: streamHeaders(
           visitorSession ?? undefined,
           isPreview ? previewEvidence : undefined,
+          isPreview ? widget.workspace.id : undefined,
         ),
       }),
       origin,
@@ -443,7 +491,15 @@ export async function POST(
     return respondWithText(
       handoffReply,
       isPreview && shouldEscalate
-        ? { outcome: "handoff", grounded: false, sources: [], prompt: body.message }
+        ? {
+            outcome: "handoff",
+            grounded: false,
+            sources: [],
+            prompt: body.message,
+            modelProvider: effectiveModelProvider,
+            modelName: effectiveModelName,
+            configFingerprint,
+          }
         : undefined,
     );
   }
@@ -479,9 +535,8 @@ export async function POST(
       locale: body.metadata.language,
     });
 
-    const resolvedModelProvider =
-      env.WIDGET_MODEL_PROVIDER ?? (settings.modelProvider as WidgetModelProvider);
-    const resolvedModelName = env.WIDGET_MODEL_NAME ?? settings.modelName;
+    const resolvedModelProvider = effectiveModelProvider;
+    const resolvedModelName = effectiveModelName;
 
     run = isPreview
       ? null
@@ -615,8 +670,12 @@ export async function POST(
                   grounded: result.sources.length > 0,
                   sources: result.sources,
                   prompt: body.message,
+                  modelProvider: effectiveModelProvider,
+                  modelName: effectiveModelName,
+                  configFingerprint,
                 }
               : undefined,
+            isPreview ? widget.workspace.id : undefined,
           ),
         },
       ),

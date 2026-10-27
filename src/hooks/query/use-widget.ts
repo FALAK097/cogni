@@ -19,6 +19,7 @@ import type {
   AgentTestRunHistory,
   AgentTestRunInput,
 } from "@/features/agent-tests/input";
+import { agentTestEvaluationContextSchema } from "@/features/agent-tests/input";
 import { parseInboxConversationEventsResponse } from "@/features/conversations/inbox-events";
 
 export type DashboardWidgetConfig = Omit<WidgetWidgetConfig, "borderRadius"> & {
@@ -830,6 +831,7 @@ export function useAgentTestRunHistory(startDate: string, endDate: string) {
                 .string()
                 .regex(/^[a-f0-9]{64}$/)
                 .nullable(),
+              evaluationContext: agentTestEvaluationContextSchema.nullable(),
               caseCount: z.number().int().nonnegative(),
               passedCount: z.number().int().nonnegative(),
               mismatchCount: z.number().int().nonnegative(),

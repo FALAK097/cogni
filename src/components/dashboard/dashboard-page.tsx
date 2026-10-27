@@ -1191,6 +1191,8 @@ export function DashboardPage({
             mismatches: run.mismatchCount,
             errors: run.errorCount,
             notRun: run.notRunCount,
+            contextAvailable: run.evaluationContext ? 1 : 0,
+            contextMissing: run.evaluationContext ? 0 : 1,
           },
         };
       }),
@@ -2230,6 +2232,8 @@ export function DashboardPage({
                     { key: "mismatches", label: "Mismatches" },
                     { key: "errors", label: "Errors" },
                     { key: "notRun", label: "Not run" },
+                    { key: "contextAvailable", label: "Context available" },
+                    { key: "contextMissing", label: "Context missing" },
                   ]}
                   yAxisDomain={[0, 100]}
                   allowDecimals={false}
