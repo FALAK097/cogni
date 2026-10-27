@@ -485,7 +485,7 @@ function KnowledgeSourcesPanel({
   retryingSourceId: string | null;
 }) {
   return (
-    <div className="overflow-hidden rounded-[20px] border border-border/60 bg-transparent shadow-none [--card-spacing:0rem]">
+    <div className="overflow-hidden bg-transparent shadow-none [--card-spacing:0rem]">
       {isInitialLoading ? (
         <KnowledgeBaseSkeleton />
       ) : isError ? (
@@ -574,12 +574,9 @@ function KnowledgeSourcesMobileList({
         const isReady = source.status === "ready" || source.status === "indexed";
 
         return (
-          <div
-            key={source.id}
-            className="rounded-2xl border border-border/60 bg-card p-4 shadow-sm"
-          >
+          <div key={source.id} className="border-b border-border py-4">
             <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 text-muted-foreground">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center text-muted-foreground">
                 <Icon className="h-4 w-4" />
               </div>
               <div className="min-w-0 flex-1">
@@ -849,7 +846,7 @@ function SourceIdentity({ source }: { source: KnowledgeBaseSource }) {
 
   return (
     <div className="flex min-w-0 items-center gap-3.5">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 text-muted-foreground">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center text-muted-foreground">
         <Icon className="h-4 w-4" />
       </div>
       <div className="min-w-0 space-y-0.5">
@@ -1059,7 +1056,7 @@ function AddSourceMenu({ onSelect }: { onSelect: (dialog: Exclude<AddDialog, nul
           closeOnClick={false}
           onClick={() => onSelect(item.dialog)}
         >
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-muted/30 text-muted-foreground">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center text-muted-foreground">
             <item.icon className="h-4 w-4" />
           </span>
           <span className="space-y-0.5">

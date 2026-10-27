@@ -816,7 +816,9 @@ export function useAgentTestRunHistory(startDate: string, endDate: string) {
     queryKey: queryKeys.widget.agentTestRuns.list(workspaceId, startDate, endDate),
     enabled: Boolean(workspaceId),
     queryFn: async () => {
-      const params = new URLSearchParams({ startDate, endDate });
+      const params = new URLSearchParams();
+      if (startDate) params.set("startDate", startDate);
+      if (endDate) params.set("endDate", endDate);
       const response = await fetch(`/api/dashboard/agent-test-runs?${params.toString()}`);
       const body: unknown = await response.json().catch(() => null);
       const parsed = z

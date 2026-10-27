@@ -40,9 +40,6 @@ export function IntegrationCategorySection({
           <h2 className="text-[17px] font-semibold tracking-tight text-foreground">
             {category.label}
           </h2>
-          <p className="text-[13px] text-muted-foreground mt-0.5 line-clamp-1">
-            {category.description}
-          </p>
         </div>
 
         {hasMore && (
@@ -63,7 +60,7 @@ export function IntegrationCategorySection({
       </div>
 
       {/* Cards grid */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="flex flex-col">
         {visible.map((integration) => (
           <IntegrationCard
             key={integration.slug}

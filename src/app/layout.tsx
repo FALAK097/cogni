@@ -1,10 +1,33 @@
 import type { Metadata } from "next";
 import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
+import localFont from "next/font/local";
 
 import { AppProvider } from "@/providers/app-provider";
 
 import "./globals.css";
+
+const interfaceFont = localFont({
+  src: [
+    { path: "../../public/fonts/inter-400.woff", weight: "400", style: "normal" },
+    { path: "../../public/fonts/inter-500.woff", weight: "500", style: "normal" },
+    { path: "../../public/fonts/inter-600.woff", weight: "600", style: "normal" },
+    { path: "../../public/fonts/inter-700.woff", weight: "700", style: "normal" },
+  ],
+  variable: "--font-interface",
+  display: "swap",
+  preload: false,
+});
+
+const editorialFont = localFont({
+  src: [
+    { path: "../../public/fonts/instrument-serif-normal.woff", weight: "400", style: "normal" },
+    { path: "../../public/fonts/instrument-serif-italic.woff", weight: "400", style: "italic" },
+  ],
+  variable: "--font-editorial",
+  display: "swap",
+  preload: false,
+});
 
 const THEME_INIT_SCRIPT = `(function(){try{var e=document.documentElement,t=localStorage.getItem("theme");if(!t){var d=localStorage.getItem("dashboard-theme");if(d==="dark"||d==="light"){t=d;localStorage.setItem("theme",d);localStorage.removeItem("dashboard-theme");}}if(t==="dark"||(!t&&window.matchMedia("(prefers-color-scheme: dark)").matches)){e.classList.add("dark");e.style.colorScheme="dark";}else{e.classList.remove("dark");e.style.colorScheme="light";}}catch(t){}})();`;
 
@@ -30,7 +53,7 @@ export default function RootLayout({
     <html
       lang="en"
       data-scroll-behavior="smooth"
-      className={`${GeistSans.variable} ${GeistMono.variable} h-full`}
+      className={`${interfaceFont.variable} ${editorialFont.variable} ${GeistSans.variable} ${GeistMono.variable} h-full`}
       suppressHydrationWarning
     >
       <head>

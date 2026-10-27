@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  CheckCircle2,
-  AlertCircle,
-  Loader2,
-  Dot,
-  ChevronRight,
-  Sparkles,
-} from "@/components/icons";
+import { CheckCircle2, AlertCircle, Loader2, Dot, ChevronRight } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { type AgentLaunchChecklist, type ReadinessStep } from "@/features/widget/agent-readiness";
@@ -49,16 +42,10 @@ export function AgentLaunchChecklistCard({
     if (checklist.complete) return null;
 
     return (
-      <section
-        aria-labelledby="insights-launch-readiness-title"
-        className="rounded-xl border border-primary/20 bg-primary/5 p-4 transition-colors"
-      >
+      <section aria-labelledby="insights-launch-readiness-title" className="py-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <span className="flex size-6 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <Sparkles className="size-3.5" aria-hidden="true" />
-              </span>
               <h2
                 id="insights-launch-readiness-title"
                 className="text-sm font-semibold text-foreground"
@@ -67,12 +54,6 @@ export function AgentLaunchChecklistCard({
                 complete
               </h2>
             </div>
-            {currentStep ? (
-              <p className="text-xs text-muted-foreground">
-                <strong className="font-medium text-foreground">{currentStep.title}:</strong>{" "}
-                {currentStep.description}
-              </p>
-            ) : null}
           </div>
 
           {currentStep && currentStep.actionLabel ? (
@@ -98,15 +79,6 @@ export function AgentLaunchChecklistCard({
           className="sr-only"
           aria-label={`Launch readiness progress: ${checklist.percent}%`}
         />
-        <div
-          className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-primary/15"
-          aria-hidden="true"
-        >
-          <div
-            className="h-full bg-primary transition-all duration-300"
-            style={{ width: `${checklist.percent}%` }}
-          />
-        </div>
       </section>
     );
   }
@@ -157,17 +129,14 @@ export function AgentLaunchChecklistCard({
           />
           <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-muted" aria-hidden="true">
             <div
-              className={cn(
-                "h-full transition-all duration-300",
-                checklist.complete ? "bg-emerald-500" : "bg-primary",
-              )}
+              className={cn("h-full ", checklist.complete ? "bg-emerald-500" : "bg-primary")}
               style={{ width: `${checklist.percent}%` }}
             />
           </div>
         </div>
       </div>
 
-      <div className="divide-y divide-border/50 rounded-lg border border-border/60 bg-muted/20">
+      <div className="space-y-3">
         {checklist.steps.map((step, idx) => {
           const isComplete = step.status === "complete";
           const isInProgress = step.status === "in_progress";
@@ -185,10 +154,10 @@ export function AgentLaunchChecklistCard({
                 <span
                   className={cn(
                     "mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full text-xs",
-                    isComplete && "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-                    isInProgress && "bg-primary/15 text-primary",
-                    isActionRequired && "bg-amber-500/15 text-amber-600 dark:text-amber-400",
-                    step.status === "pending" && "bg-muted text-muted-foreground",
+                    isComplete && "text-success",
+                    isInProgress && "text-foreground",
+                    isActionRequired && "text-amber-600 dark:text-amber-400",
+                    step.status === "pending" && "text-muted-foreground",
                   )}
                   aria-hidden="true"
                 >

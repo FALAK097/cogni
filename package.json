@@ -87,7 +87,8 @@
     "prepare": "husky",
     "test:analytics-knowledge-gap-review-route": "node --test scripts/test-analytics-knowledge-gap-review-route.mjs",
     "test:navigation-routes": "node --test scripts/test-navigation-routes.mjs",
-    "test:dashboard-session-patch": "node --test scripts/test-dashboard-session-patch.mjs"
+    "test:dashboard-session-patch": "node --test scripts/test-dashboard-session-patch.mjs",
+    "test:avatars": "node --test scripts/test-avatar-generator.mjs"
   },
   "dependencies": {
     "@ai-sdk/google": "4.0.87",
@@ -111,6 +112,7 @@
     "@tanstack/react-table": "^9.2.4",
     "ai": "7.0.127",
     "better-auth": "^1.7.7",
+    "blobatar": "2.7.0",
     "chat": "^4.41.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

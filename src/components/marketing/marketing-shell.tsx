@@ -29,7 +29,7 @@ function MarketingNav() {
           <Link
             key={label}
             href={href}
-            className="rounded-lg px-3 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900"
+            className="rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             {label}
           </Link>
@@ -39,22 +39,22 @@ function MarketingNav() {
       <div className="flex items-center gap-2">
         <Link
           href="/sign-in"
-          className="hidden rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-primary/20 transition-[transform,background-color,box-shadow] duration-150 ease-out hover:-translate-y-0.5 active:scale-[0.96] sm:inline-block"
+          className="hidden rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white  transition-[transform,background-color,box-shadow] duration-150 ease-out  sm:inline-block"
         >
           Get started
         </Link>
 
         <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
           <SheetTrigger
-            className="inline-flex size-11 items-center justify-center rounded-xl border border-gray-200 text-gray-700 transition-colors hover:bg-gray-100 md:hidden"
+            className="inline-flex size-11 items-center justify-center rounded-xl border border-input text-foreground transition-colors hover:bg-muted md:hidden"
             aria-label="Open navigation menu"
           >
             <Menu className="size-5" />
           </SheetTrigger>
           <SheetContent side="right" className="w-[min(100vw-2rem,320px)] px-0" title="Navigation">
-            <SheetHeader className="border-b border-gray-100 px-5 pb-4">
+            <SheetHeader className="border-b border-border px-5 pb-4">
               <SheetTitle className="flex items-center gap-2.5 text-left">
-                <ThemeLogo showWordmark wordmarkClassName="text-gray-900" />
+                <ThemeLogo showWordmark wordmarkClassName="text-foreground" />
               </SheetTitle>
             </SheetHeader>
             <nav className="flex flex-col gap-1 px-3 py-4">
@@ -63,17 +63,17 @@ function MarketingNav() {
                   key={label}
                   href={href}
                   onClick={() => setMobileOpen(false)}
-                  className="rounded-xl px-4 py-3 text-base font-medium text-gray-700 transition-colors hover:bg-gray-100"
+                  className="rounded-xl px-4 py-3 text-base font-medium text-foreground transition-colors hover:bg-muted"
                 >
                   {label}
                 </Link>
               ))}
             </nav>
-            <div className="border-t border-gray-100 px-5 py-4">
+            <div className="border-t border-border px-5 py-4">
               <Link
                 href="/sign-in"
                 onClick={() => setMobileOpen(false)}
-                className="flex h-11 w-full items-center justify-center rounded-xl bg-primary text-sm font-semibold text-white shadow-sm shadow-primary/20"
+                className="flex h-11 w-full items-center justify-center rounded-full bg-primary text-sm font-semibold text-white "
               >
                 Get started
               </Link>
@@ -87,12 +87,12 @@ function MarketingNav() {
 
 export function MarketingShell({ children }: MarketingShellProps) {
   return (
-    <div className="light min-h-svh bg-white text-gray-900">
+    <div className="light min-h-svh bg-background text-foreground">
       {/* Navbar */}
-      <header className="sticky top-0 z-40 border-b border-gray-100 bg-white/90 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-5 sm:px-8 lg:px-12">
+      <header className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur-md">
+        <div className="mx-auto flex h-16 max-w-[1120px] items-center justify-between gap-3 px-5 sm:px-8 lg:px-12">
           <Link href="/" className="flex shrink-0 items-center gap-2.5">
-            <ThemeLogo showWordmark wordmarkClassName="text-gray-900" />
+            <ThemeLogo showWordmark wordmarkClassName="text-foreground" />
           </Link>
           <MarketingNav />
         </div>
@@ -101,26 +101,26 @@ export function MarketingShell({ children }: MarketingShellProps) {
       <main>{children}</main>
 
       {/* Footer - light, consistent with landing page */}
-      <footer className="border-t border-gray-100 bg-white">
-        <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-12">
+      <footer className="border-t border-border bg-background">
+        <div className="mx-auto max-w-[1120px] px-5 sm:px-8 lg:px-12">
           <div className="flex flex-col items-start justify-between gap-8 py-12 sm:flex-row sm:items-center">
             <Link href="/" className="flex items-center gap-2.5">
-              <ThemeLogo showWordmark wordmarkClassName="text-gray-900" />
+              <ThemeLogo showWordmark wordmarkClassName="text-foreground" />
             </Link>
             <nav className="flex flex-wrap gap-x-7 gap-y-2">
               {NAV_LINKS.map(({ label, href }) => (
                 <Link
                   key={label}
                   href={href}
-                  className="text-sm text-gray-500 transition-colors hover:text-gray-900"
+                  className="text-sm text-muted-foreground transition-colors hover:text-foreground"
                 >
                   {label}
                 </Link>
               ))}
             </nav>
           </div>
-          <div className="border-t border-gray-100 py-6">
-            <p className="text-sm text-gray-400">
+          <div className="border-t border-border py-6">
+            <p className="text-sm text-muted-foreground">
               &copy; {COPYRIGHT_YEAR} cogni Inc. All rights reserved.
             </p>
           </div>
