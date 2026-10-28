@@ -37,4 +37,4 @@ COPY --from=build /app/postcss.config.mjs ./postcss.config.mjs
 RUN mkdir -p /app/.uploads && chown -R cogni:cogni /app/.next /app/.uploads
 USER cogni
 EXPOSE 3000
-CMD ["pnpm", "start"]
+CMD ["node", "node_modules/next/dist/bin/next", "start"]

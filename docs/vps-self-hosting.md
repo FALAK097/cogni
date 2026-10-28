@@ -29,18 +29,18 @@ the database. Cloudflare Workers deployment is not supported by this package.
 2. Create the deployment environment file and set secrets:
 
    ```sh
-   cp .env.example .env
+   cp .env.compose.example .env
    cp .env.db.example .env.db
    ```
 
-   Set `POSTGRES_PASSWORD` in `.env.db` to a unique URL-safe secret, and set `DATABASE_URL` in `.env`
-   to `postgresql://cogni:<same-secret>@db:5432/cogni`. Also set `BETTER_AUTH_SECRET` to at least 32
-   random characters, `BETTER_AUTH_URL` to the public HTTPS origin, Google OAuth credentials, and one
-   model API key. Set `CRON_SECRET` to at least 16 random characters. Compose passes only this value
-   to the polling sidecar; `.env` remains available to the app and migration services. Set
-   `CLOUDFLARE_ACCOUNT_ID`,
-   `CLOUDFLARE_AI_SEARCH_TOKEN` (or `CLOUDFLARE_API_TOKEN`), and `SEARCH_INDEX` for semantic
-   retrieval. The app services load `.env`; PostgreSQL receives only the password from `.env.db`. Keep both files private.
+   Generate a URL-safe PostgreSQL password with `openssl rand -hex 32`, then put the same value in
+   `POSTGRES_PASSWORD` in `.env.db` and in `DATABASE_URL` in `.env`. The example already uses the
+   Compose database hostname `db`; replace its password placeholder. Replace the other placeholders
+   with a `BETTER_AUTH_SECRET` from `openssl rand -base64 48`, your public HTTPS `BETTER_AUTH_URL`,
+   Google OAuth credentials, a `CRON_SECRET` from `openssl rand -hex 16`, Cloudflare AI Search
+   credentials/index, and one model API key. Compose passes only `CRON_SECRET` to the polling sidecar;
+   `.env` remains available to the app and migration services. PostgreSQL receives only its password
+   from `.env.db`. Keep both files private.
 
 3. Build and start the services:
 
