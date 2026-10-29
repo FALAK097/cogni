@@ -116,6 +116,12 @@ export async function updateAgentTestCase(
 ) {
   return db.transaction(async (transaction) => {
     const tx = transaction as unknown as Db;
+    const [existing] = await tx
+      .select({ id: agentTestCase.id })
+      .from(agentTestCase)
+      .where(and(eq(agentTestCase.id, caseId), eq(agentTestCase.workspaceId, workspaceId)))
+      .limit(1);
+    if (!existing) return null;
     await lockWorkspaceWidget(tx, workspaceId);
     await validateExpectedSources(workspaceId, input.expectedSourceIds ?? [], tx);
     try {
@@ -147,6 +153,12 @@ export async function updateAgentTestCase(
 export async function deleteAgentTestCase(workspaceId: string, caseId: string, db: Db = getDb()) {
   return db.transaction(async (transaction) => {
     const tx = transaction as unknown as Db;
+    const [existing] = await tx
+      .select({ id: agentTestCase.id })
+      .from(agentTestCase)
+      .where(and(eq(agentTestCase.id, caseId), eq(agentTestCase.workspaceId, workspaceId)))
+      .limit(1);
+    if (!existing) return false;
     await lockWorkspaceWidget(tx, workspaceId);
     const deleted = await tx
       .delete(agentTestCase)
