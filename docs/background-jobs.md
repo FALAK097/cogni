@@ -70,10 +70,10 @@ token usage only; no transcript, answer text, attachments, internal notes, or ev
 is persisted.
 
 The Vercel cron currently runs once daily at 03:00 UTC and the QA drain processes at most four
-scoring runs per invocation. A bounded post-response drain opportunistically processes close-triggered
-work; cron recovers durable work if that hook is unavailable or the queue is backlogged. Thus
-inactivity eligibility starts at 24 hours, but the bounded scan and daily cadence may delay enqueueing
-by up to roughly one additional daily interval (and longer if the durable queue is backlogged).
+scoring runs per sweep. Thus inactivity eligibility starts at 24 hours, but the bounded scan and
+daily cadence may delay enqueueing by up to roughly one additional daily interval (and longer if the
+durable queue is backlogged). Closed conversations are eligible and enqueued immediately, but their
+scores may wait until the next scheduled sweep.
 These are uncalibrated review cues, not confidence estimates or quality trends. Evaluator token
 usage is recorded separately from customer-agent usage.
 

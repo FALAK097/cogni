@@ -10,7 +10,6 @@ import type { widget as widgetTable } from "@/lib/db/schema";
 import { and, eq, ne, sql } from "drizzle-orm";
 import {
   enqueueClosedConversationQa,
-  scheduleConversationQaDrain,
   startConversationQaVersionAfterReopen,
 } from "@/features/conversation-qa/server/queue";
 
@@ -553,8 +552,7 @@ export async function setConversationStatus({
   conversationId: string;
   status: "CLOSED" | "OPEN";
 }) {
-  let shouldScheduleQaDrain = false;
-  const updatedConversation = await runDbWriteOperation(db, async (transaction) => {
+  return runDbWriteOperation(db, async (transaction) => {
     const [current] = await transaction
       .select({
         status: conversation.status,
@@ -587,21 +585,18 @@ export async function setConversationStatus({
     if (updated) {
       await recordConversationEvent(transaction, workspaceId, conversationId, "state");
       if (targetStatus === "CLOSED" && current.status !== "CLOSED") {
-        const evaluation = await enqueueClosedConversationQa({
+        await enqueueClosedConversationQa({
           db: transaction,
           workspaceId,
           conversationId,
           messages: current.messages,
         });
-        shouldScheduleQaDrain = evaluation !== null;
       } else if (targetStatus === "OPEN" && current.status === "CLOSED") {
         await startConversationQaVersionAfterReopen(transaction, workspaceId, conversationId);
       }
     }
     return updated ?? null;
   });
-  if (shouldScheduleQaDrain) scheduleConversationQaDrain(db);
-  return updatedConversation;
 }
 
 export async function updateConversationState({
@@ -623,8 +618,7 @@ export async function updateConversationState({
     updatedAt?: string;
   };
 }) {
-  let shouldScheduleQaDrain = false;
-  const updatedConversation = await runDbWriteOperation(db, async (transaction) => {
+  return runDbWriteOperation(db, async (transaction) => {
     const conditions = [
       eq(conversation.id, conversationId),
       eq(conversation.workspaceId, workspaceId),
@@ -649,13 +643,12 @@ export async function updateConversationState({
     if (updated) {
       await recordConversationEvent(transaction, workspaceId, conversationId, "state");
       if (changes.status === "CLOSED" && current.status !== "CLOSED") {
-        const evaluation = await enqueueClosedConversationQa({
+        await enqueueClosedConversationQa({
           db: transaction,
           workspaceId,
           conversationId,
           messages: current.messages,
         });
-        shouldScheduleQaDrain = evaluation !== null;
       } else if (
         current.status === "CLOSED" &&
         changes.status !== undefined &&
@@ -666,8 +659,6 @@ export async function updateConversationState({
     }
     return updated ?? null;
   });
-  if (shouldScheduleQaDrain) scheduleConversationQaDrain(db);
-  return updatedConversation;
 }
 
 export async function startVisitorConversation({

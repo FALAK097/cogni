@@ -1,6 +1,5 @@
 import "server-only";
 
-import { after } from "next/server";
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 
 import type { Db } from "@/lib/db/client";
@@ -22,7 +21,6 @@ import {
   nextConversationQaVersion,
   parsePublicQaMessages,
 } from "@/features/conversation-qa/scoring";
-import { logError } from "@/lib/logging/logger";
 
 export {
   CONVERSATION_QA_MAX_ATTEMPTS,
@@ -572,19 +570,4 @@ export async function drainConversationQaQueue(db: Db, limit = 4, now = new Date
   }
 
   return { inactivityQueued, processed };
-}
-
-/** Process close-triggered jobs after the response; cron remains the durable retry/reconciliation path. */
-export function scheduleConversationQaDrain(db: Db) {
-  try {
-    after(async () => {
-      try {
-        await drainConversationQaQueue(db, 4);
-      } catch {
-        logError("conversation.qa.after_drain_failed", {});
-      }
-    });
-  } catch {
-    // The workflow row is durable and will be picked up by the scheduled cron sweep.
-  }
 }
