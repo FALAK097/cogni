@@ -174,6 +174,7 @@ async function createCurrentPublishCheck() {
   const check = await startAgentTestPublishCheck(workspaceId, membershipId, db);
   if (check.baselineRequired) await recordPublishCheckResult(check.id, "baseline", db);
   await recordPublishCheckResult(check.id, "draft", db);
+  return check.id;
 }
 
 test("legacy backfill helpers keep published snapshots within runtime schema limits", async () => {
@@ -290,8 +291,8 @@ test("new agents are unpublished; publish, edit, and rollback stay workspace sco
       "updatedAt" = ${new Date().toISOString()}
     WHERE "id" = ${agent.id}
   `;
-  await createCurrentPublishCheck();
-  const first = await publishWidgetDraft(db, workspaceId, userId);
+  const firstCheckId = await createCurrentPublishCheck();
+  const first = await publishWidgetDraft(db, workspaceId, userId, undefined, firstCheckId);
   assert.equal(first.ok, true);
   if (!first.ok) return;
   assert.equal(first.widget.publishedVersion, 1);
@@ -321,8 +322,8 @@ test("new agents are unpublished; publish, edit, and rollback stay workspace sco
   assert.equal(effectiveConfig.isEnabled, false);
   assert.deepEqual(effectiveConfig.authorizedDomains, ["revoked.example.test"]);
 
-  await createCurrentPublishCheck();
-  const second = await publishWidgetDraft(db, workspaceId, userId);
+  const secondCheckId = await createCurrentPublishCheck();
+  const second = await publishWidgetDraft(db, workspaceId, userId, undefined, secondCheckId);
   assert.equal(second.ok, true);
   if (!second.ok) return;
   assert.equal(second.widget.publishedVersion, 2);
