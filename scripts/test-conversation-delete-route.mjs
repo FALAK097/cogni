@@ -7,9 +7,11 @@ const state = {
   role: "OWNER",
   workspaceId: "workspace-current",
   conversationId: "conversation-target",
+  conversationWorkspaceId: "workspace-current",
   visitorSessionId: "visitor-session-shared",
   queryCalls: 0,
   deletes: [],
+  deletedRows: [],
   events: [],
 };
 globalThis.__conversationDeleteRouteTest = state;
@@ -30,7 +32,22 @@ const stubs = {
           where: (condition) => ({
             returning: async () => {
               state.deletes.push({ table: table.name, condition });
-              return [{ id: state.conversationId }];
+              const conditions = condition.op === "and" ? condition.conditions : [condition];
+              const inWorkspace = conditions.some(
+                (entry) =>
+                  entry.column === "conversation.workspaceId" &&
+                  entry.value === state.conversationWorkspaceId,
+              );
+              const matchesConversation = conditions.some(
+                (entry) =>
+                  entry.column === "conversation.id" && entry.value === state.conversationId,
+              );
+              const rows =
+                inWorkspace && matchesConversation
+                  ? [{ id: state.conversationId }]
+                  : [];
+              state.deletedRows.push(...rows);
+              return rows;
             },
           }),
         }),
@@ -86,7 +103,9 @@ function resetState(role = "OWNER") {
   state.role = role;
   state.queryCalls = 0;
   state.deletes = [];
+  state.deletedRows = [];
   state.events = [];
+  state.conversationWorkspaceId = "workspace-current";
 }
 
 const context = { params: Promise.resolve({ conversation_id: state.conversationId }) };
@@ -125,4 +144,23 @@ test("deleting a conversation removes only that workspace conversation and prese
     },
   ]);
   assert.deepEqual(state.events, [[state.workspaceId, state.conversationId, "state"]]);
+});
+
+test("a foreign-workspace conversation is not deleted and emits no event", async () => {
+  resetState("OWNER");
+  state.conversationWorkspaceId = "workspace-foreign";
+
+  const response = await route.DELETE(new Request("https://cogni.test"), context);
+
+  assert.equal(response.status, 404);
+  assert.equal(state.deletes.length, 1, "the attempted delete remains workspace scoped");
+  assert.deepEqual(state.deletedRows, []);
+  assert.deepEqual(state.events, []);
+  assert.deepEqual(state.deletes[0].condition, {
+    op: "and",
+    conditions: [
+      { op: "eq", column: "conversation.id", value: state.conversationId },
+      { op: "eq", column: "conversation.workspaceId", value: state.workspaceId },
+    ],
+  });
 });
