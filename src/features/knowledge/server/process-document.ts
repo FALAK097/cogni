@@ -3,10 +3,10 @@ import type { Db } from "@/lib/db/client";
 import { extractDocumentText, indexDocumentContent } from "@/features/knowledge/server/extract";
 import {
   claimKnowledgeSourceProcessingAttempt,
+  emitKnowledgeSourceReadyIfCurrent,
   failKnowledgeSourceProcessingAttempt,
 } from "@/features/knowledge/server/source-revisions";
 import { logError } from "@/lib/logging/logger";
-import { emitDomainEvent } from "@/lib/events/domain-events";
 import { completeWorkflowRun, failWorkflowRun, startWorkflowRun } from "@/lib/workflows/runner";
 
 export async function processDocument({
@@ -116,10 +116,9 @@ export async function processDocument({
     runId: run.id,
     output: { documentId, chunkCount },
   });
-  await emitDomainEvent({
-    db,
+  await emitKnowledgeSourceReadyIfCurrent(db, {
     workspaceId,
-    type: "document.ready",
-    entityId: documentId,
+    documentId,
+    readyToken: result.readyToken,
   });
 }

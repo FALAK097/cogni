@@ -4,6 +4,7 @@ import { and, asc, desc, eq, inArray, isNotNull, isNull, lte, or } from "drizzle
 import {
   document as documentTable,
   documentRevision,
+  domainEvent,
   searchItemCleanup,
   widget,
 } from "@/lib/db/schema";
@@ -13,7 +14,7 @@ import {
   deleteCloudflareSearchItemsByKey,
   isCloudflareSearchConfigured,
 } from "@/lib/search/cloudflare-search";
-import { logError } from "@/lib/logging/logger";
+import { logError, logInfo } from "@/lib/logging/logger";
 import {
   getSearchItemCleanupClaimLimit,
   getSearchItemCleanupRequestLimit,
@@ -21,7 +22,7 @@ import {
   searchItemCleanupClaimLeaseMs,
 } from "@/features/knowledge/server/search-item-cleanup-policy";
 
-const supportedSourceTypes = new Set(["URL", "TXT", "TEXT", "PDF", "DOCX"]);
+const supportedSourceTypes = new Set(["URL", "SITEMAP", "TXT", "TEXT", "PDF", "DOCX"]);
 
 export function isSupportedKnowledgeSourceType(sourceType: string) {
   return supportedSourceTypes.has(sourceType);
@@ -222,6 +223,55 @@ export async function failKnowledgeSourceProcessingAttempt(
       );
     return true;
   });
+}
+
+/** Emit READY only if the same indexing attempt still owns the source after workflow completion. */
+export async function emitKnowledgeSourceReadyIfCurrent(
+  db: Db,
+  input: { workspaceId: string; documentId: string; readyToken: number },
+) {
+  const emitted = await runDbWriteOperation(db, async (transaction) => {
+    await lockWorkspaceSourceBasisInTransaction(transaction, input.workspaceId);
+    const [source] = await transaction
+      .select({
+        id: documentTable.id,
+        status: documentTable.status,
+        updatedAt: documentTable.updatedAt,
+      })
+      .from(documentTable)
+      .where(
+        and(
+          eq(documentTable.id, input.documentId),
+          eq(documentTable.workspaceId, input.workspaceId),
+        ),
+      )
+      .for("update");
+    if (
+      !source ||
+      source.status !== "READY" ||
+      new Date(source.updatedAt).getTime() !== input.readyToken
+    ) {
+      return false;
+    }
+
+    await transaction.insert(domainEvent).values({
+      id: randomUUID(),
+      workspaceId: input.workspaceId,
+      type: "document.ready",
+      entityId: input.documentId,
+      payload: JSON.stringify({}),
+    });
+    return true;
+  });
+
+  if (emitted) {
+    logInfo("domain.event.emitted", {
+      workspaceId: input.workspaceId,
+      type: "document.ready",
+      entityId: input.documentId,
+    });
+  }
+  return emitted;
 }
 
 /**

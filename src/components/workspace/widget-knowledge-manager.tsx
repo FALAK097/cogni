@@ -880,10 +880,11 @@ function SourceActions({
   isProcessing: boolean;
 }) {
   const sourceType = source.sourceType.toLowerCase();
-  const canSync = source.status === "ready" && sourceType === "website";
+  const canSync = source.status === "ready" && ["website", "sitemap"].includes(sourceType);
   const canReindex = source.status === "ready" && ["file", "text", "txt"].includes(sourceType);
   const canRetry =
-    source.status === "failed" && ["website", "file", "text", "txt"].includes(sourceType);
+    source.status === "failed" &&
+    ["website", "sitemap", "file", "text", "txt"].includes(sourceType);
 
   return (
     <div className="flex items-center justify-end gap-1.5">
@@ -1461,8 +1462,8 @@ function SitemapDialog({ open, onOpenChange, onSuccess, onError }: AddDialogProp
         <DialogHeader>
           <DialogTitle>Import from Sitemap</DialogTitle>
           <DialogDescription>
-            Provide a sitemap URL (for example, sitemap.xml). Each listed URL will be fetched and
-            combined into one source.
+            Provide a sitemap URL (for example, sitemap.xml). Up to 25 same-site pages are fetched
+            and combined into one source.
           </DialogDescription>
         </DialogHeader>
         <form className="space-y-4" action={handleSubmit}>

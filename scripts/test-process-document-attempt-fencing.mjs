@@ -9,12 +9,7 @@ const state = {
   failOwnsAttempt: true,
   extractionError: null,
   indexError: null,
-  indexResult: {
-    status: "created",
-    revisionId: "revision-1",
-    revisionNumber: 1,
-    contentSha256: "hash",
-  },
+  indexResult: { status: "indexed", readyToken: 202 },
   indexArgs: null,
   completions: [],
   failures: [],
@@ -51,20 +46,26 @@ const stubs = {
       s.failureInput = input;
       return s.failOwnsAttempt;
     }
-  `,
-  "@/lib/logging/logger": `export const logError = () => {};`,
-  "@/lib/events/domain-events": `
-    export async function emitDomainEvent(input) {
-      globalThis.__processDocumentAttemptFenceTest.readyEvents.push(input);
+    export async function emitKnowledgeSourceReadyIfCurrent(_db, input) {
+      const s = globalThis.__processDocumentAttemptFenceTest;
+      s.calls.push("ready-event");
+      s.readyEventInput = input;
+      s.readyEvents.push(input);
+      return true;
     }
   `,
+  "@/lib/logging/logger": `export const logError = () => {};`,
   "@/lib/workflows/runner": `
     export async function startWorkflowRun() { return { id: "run-1" }; }
     export async function completeWorkflowRun(input) {
-      globalThis.__processDocumentAttemptFenceTest.completions.push(input);
+      const s = globalThis.__processDocumentAttemptFenceTest;
+      s.calls.push("complete");
+      s.completions.push(input);
     }
     export async function failWorkflowRun(input) {
-      globalThis.__processDocumentAttemptFenceTest.failures.push(input);
+      const s = globalThis.__processDocumentAttemptFenceTest;
+      s.calls.push("fail-workflow");
+      s.failures.push(input);
     }
   `,
 };
@@ -107,12 +108,7 @@ function reset(overrides = {}) {
     failOwnsAttempt: true,
     extractionError: null,
     indexError: null,
-    indexResult: {
-      status: "created",
-      revisionId: "revision-1",
-      revisionNumber: 1,
-      contentSha256: "hash",
-    },
+    indexResult: { status: "indexed", readyToken: 202 },
     indexArgs: null,
     failureInput: null,
     completions: [],
@@ -150,13 +146,15 @@ test("the PROCESSING token is claimed before extraction and passed to indexing",
   assert.ok(state.calls.indexOf("claim") < state.calls.indexOf("extract"));
   assert.equal(state.indexArgs[4], state.claimToken);
   assert.equal(state.readyEvents.length, 1);
+  assert.equal(state.readyEventInput.readyToken, 202);
+  assert.ok(state.calls.indexOf("complete") < state.calls.indexOf("ready-event"));
 });
 
 test("a stale extraction failure completes as stale without failing the newer attempt", async () => {
   reset({ extractionError: new Error("old extraction failed"), failOwnsAttempt: false });
 
   await assert.doesNotReject(processDocument(makeInput()));
-  assert.deepEqual(state.calls, ["claim", "extract", "fail-source"]);
+  assert.deepEqual(state.calls, ["claim", "extract", "fail-source", "complete"]);
   assert.equal(state.failureInput.processingToken, state.claimToken);
   assert.equal(state.failures.length, 0);
   assert.deepEqual(state.completions[0].output, { documentId: "document-1", status: "stale" });

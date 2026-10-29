@@ -281,8 +281,21 @@ test("server receipt binds suite, published version, draft fingerprint, verified
   assert.match(processDocument, /if \(!failed\)[\s\S]*?status: "stale"/);
   const staleResultGuard = processDocument.indexOf('if (!result || result.status === "stale")');
   const staleReturn = processDocument.indexOf("return;", staleResultGuard);
-  const readyEvent = processDocument.indexOf('type: "document.ready"');
+  const readyEvent = processDocument.indexOf("emitKnowledgeSourceReadyIfCurrent(db");
   assert.ok(staleResultGuard >= 0 && staleReturn > staleResultGuard && readyEvent > staleReturn);
+  assert.ok(processDocument.indexOf("completeWorkflowRun({", staleReturn) < readyEvent);
+  const readyEventWriter = sourceRevisions.slice(
+    sourceRevisions.indexOf("export async function emitKnowledgeSourceReadyIfCurrent"),
+    sourceRevisions.indexOf("/**\n * Call inside the same transaction"),
+  );
+  assert.ok(
+    readyEventWriter.indexOf("lockWorkspaceSourceBasisInTransaction") <
+      readyEventWriter.indexOf(".from(documentTable)") &&
+      readyEventWriter.indexOf(".from(documentTable)") <
+        readyEventWriter.indexOf("transaction.insert(domainEvent)"),
+  );
+  assert.match(readyEventWriter, /source\.status !== "READY"/);
+  assert.match(readyEventWriter, /source\.updatedAt\)\.getTime\(\) !== input\.readyToken/);
   assert.match(processingStatusWriter, /\.for\("update"\)/);
   const retryClaim = retryRoute.slice(
     retryRoute.indexOf("const claimed = await runDbWriteOperation"),

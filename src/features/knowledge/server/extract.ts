@@ -11,6 +11,7 @@ import { runDbWriteOperation } from "@/lib/db/client";
 import { readObject } from "@/lib/storage/index";
 import { chunkText, stripHtml } from "@/features/knowledge/server/chunk";
 import { extractPdfText } from "@/features/knowledge/server/extract-pdf";
+import { crawlSitemapText } from "@/features/knowledge/server/crawl";
 import {
   deleteCloudflareSearchItem,
   isCloudflareSearchConfigured,
@@ -31,7 +32,6 @@ import {
   releaseSearchItemCleanupReservation,
   renewSearchItemCleanupReservationInTransaction,
   reserveSearchItemCleanup,
-  type SourceRevisionWriteResult,
 } from "@/features/knowledge/server/source-revisions";
 import { logError } from "@/lib/logging/logger";
 
@@ -46,6 +46,10 @@ export async function extractDocumentText({
   storageKey?: string | null;
   mimeType?: string | null;
 }) {
+  if (sourceType === "SITEMAP" && sourceUrl) {
+    return crawlSitemapText(sourceUrl, stripHtml);
+  }
+
   if (sourceType === "URL" && sourceUrl) {
     const html = await fetchPublicText(
       sourceUrl,
@@ -89,7 +93,7 @@ export async function indexDocumentContent(
   text: string,
   workspaceId: string,
   processingToken: number,
-): Promise<SourceRevisionWriteResult | { status: "stale" }> {
+): Promise<{ status: "indexed"; readyToken: number } | { status: "stale" }> {
   const chunks = chunkText(text);
   if (chunks.length === 0) {
     throw new Error("No extractable text found.");
@@ -383,16 +387,17 @@ export async function indexDocumentContent(
         position,
       }));
       await transaction.insert(documentChunkTable).values(chunkValues);
+      const readyToken = Math.max(Date.now(), processingToken + 1);
       await transaction
         .update(documentTable)
         .set({
           status: "READY",
           errorMessage: null,
-          updatedAt: new Date(Math.max(Date.now(), processingToken + 1)).toISOString(),
+          updatedAt: new Date(readyToken).toISOString(),
         })
         .where(and(eq(documentTable.id, documentId), eq(documentTable.workspaceId, workspaceId)));
 
-      return revision;
+      return { status: "indexed" as const, readyToken };
     });
 
     try {
