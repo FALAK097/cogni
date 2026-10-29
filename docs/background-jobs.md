@@ -57,6 +57,26 @@ Vercel and local server variables:
 - `BETTER_AUTH_URL`: the public HTTPS application origin used for the private callback
 - `CRON_SECRET`: protects the daily database reconciliation sweep
 
+## Conversation QA scoring
+
+Conversation QA uses `conversation_qa_evaluation` plus the existing `workflow_run` outbox. Closing a
+conversation enqueues an idempotent evaluation in the same database transaction; the scheduled
+sweep processes queued, failed, or stale work. The daily sweep scopes data scans to at most 1,000
+workspace IDs and checks up to 100 open, assigned, and escalated conversations for 24 hours without
+a public message. Scoring input is bounded to the latest 100 public messages and 40,000 characters.
+Public message bodies, retrieval outcomes, and cited-source excerpts are passed to the evaluator
+transiently. Workflow inputs/outputs, QA rows, and error codes contain IDs, categories, scores, and
+token usage only; no transcript, answer text, attachments, internal notes, or evaluator explanation
+is persisted.
+
+The Vercel cron currently runs once daily at 03:00 UTC and the QA drain processes at most four
+scoring runs per sweep. Thus inactivity eligibility starts at 24 hours, but the bounded scan and
+daily cadence may delay enqueueing by up to roughly one additional daily interval (and longer if the
+durable queue is backlogged). Closed conversations are eligible and enqueued immediately, but their
+scores may wait until the next scheduled sweep.
+These are uncalibrated review cues, not confidence estimates or quality trends. Evaluator token
+usage is recorded separately from customer-agent usage.
+
 `INGESTION_SHARED_SECRET` must be at least 32 characters and must never be exposed to the browser.
 The internal callback compares it in constant time. Local HTTP development deliberately uses the
 post-response database drain because a Cloudflare Worker cannot call a localhost URL.

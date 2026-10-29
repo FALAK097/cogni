@@ -5,6 +5,7 @@ import { env } from "@/lib/env/server";
 import { drainIngestionQueue } from "@/lib/jobs/ingestion";
 import { drainSearchItemCleanup } from "@/features/knowledge/server/source-revisions";
 import { pruneExpiredRateLimitBuckets } from "@/lib/rate-limit/shared";
+import { drainConversationQaQueue } from "@/features/conversation-qa/server/queue";
 
 export const maxDuration = 300;
 
@@ -20,5 +21,12 @@ export async function GET(request: Request) {
   const rateLimitBucketsPruned = await pruneExpiredRateLimitBuckets();
   const result = await drainIngestionQueue(db, 10);
   const searchCleanup = await drainSearchItemCleanup(db, 50);
-  return NextResponse.json({ ok: true, rateLimitBucketsPruned, ...result, ...searchCleanup });
+  const conversationQa = await drainConversationQaQueue(db, 4);
+  return NextResponse.json({
+    ok: true,
+    rateLimitBucketsPruned,
+    ...result,
+    ...searchCleanup,
+    conversationQa,
+  });
 }

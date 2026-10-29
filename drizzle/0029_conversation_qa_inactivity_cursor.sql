@@ -1,0 +1,2 @@
+ALTER TABLE "conversation_qa_state" ADD COLUMN "lastObservedMessageAt" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "conversation_qa_state" ADD COLUMN "nextEligibleAt" timestamp with time zone;

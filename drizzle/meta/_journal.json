@@ -183,6 +183,34 @@
       "when": 1793168283055,
       "tag": "0025_agent_test_publish_receipt_bindings",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1793278664633,
+      "tag": "0026_conversation_qa_scoring",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1793278792822,
+      "tag": "0027_conversation_qa_scoring_constraints",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1793278894945,
+      "tag": "0028_conversation_qa_scoring_error_code",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1793279136278,
+      "tag": "0029_conversation_qa_inactivity_cursor",
+      "breakpoints": true
     }
   ]
 }
