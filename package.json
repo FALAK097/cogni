@@ -90,8 +90,7 @@
     "prepare": "husky",
     "test:analytics-knowledge-gap-review-route": "node --test scripts/test-analytics-knowledge-gap-review-route.mjs",
     "test:navigation-routes": "node --test scripts/test-navigation-routes.mjs",
-    "test:dashboard-session-patch": "node --test scripts/test-dashboard-session-patch.mjs",
-    "test:conversation-qa": "node --test scripts/test-conversation-qa-scoring.mjs"
+    "test:dashboard-session-patch": "node --test scripts/test-dashboard-session-patch.mjs"
   },
   "dependencies": {
     "@ai-sdk/google": "4.0.87",

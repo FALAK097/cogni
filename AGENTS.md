@@ -49,3 +49,4 @@ src/
 4. **Google-only Auth**: Google OAuth is the only authentication method.
 5. **Code Style**: Format using Oxfmt (`pnpm fmt`) and lint using Oxlint (`pnpm lint`). Check types via `pnpm typecheck`.
 6. **Commit Messages**: All git commits must adhere to the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) format (checked via commitlint).
+7. **Unit Tests**: Do not write or add unit tests. Preserve existing tests and use existing integration/CI validation.

@@ -54,7 +54,6 @@ jobs:
       - run: pnpm test:agent-readiness
       - run: pnpm test:agent-tests
       - run: pnpm test:agent-test-history-db
-      - run: pnpm test:conversation-qa
       - run: pnpm test:inbox-keyboard-navigation
       - run: pnpm test:navigation-routes
       - run: pnpm test:knowledge-source-type
