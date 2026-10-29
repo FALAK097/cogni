@@ -248,6 +248,133 @@ export const conversation = pgTable(
   ],
 );
 
+export const conversationQaState = pgTable(
+  "conversation_qa_state",
+  {
+    workspaceId: text()
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    conversationId: text().notNull(),
+    version: integer().default(1).notNull(),
+    lastObservedMessageAt: timestampString(),
+    nextEligibleAt: timestampString(),
+    updatedAt: timestampString()
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.workspaceId, table.conversationId] }),
+    foreignKey({
+      columns: [table.workspaceId, table.conversationId],
+      foreignColumns: [conversation.workspaceId, conversation.id],
+      name: "conversation_qa_state_workspace_conversation_fk",
+    })
+      .onDelete("cascade")
+      .onUpdate("cascade"),
+    check("conversation_qa_state_version_check", sql`${table.version} > 0`),
+  ],
+);
+
+/** Stores only bounded evaluator labels and usage; never transcript or evaluator prose. */
+export const conversationQaEvaluation = pgTable(
+  "conversation_qa_evaluation",
+  {
+    id: text().primaryKey().notNull(),
+    workspaceId: text()
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    conversationId: text().notNull(),
+    version: integer().notNull(),
+    status: text().default("QUEUED").notNull(),
+    trigger: text().notNull(),
+    publicMessageAt: timestampString().notNull(),
+    helpfulness: integer(),
+    grounding: integer(),
+    sentiment: text(),
+    topics: jsonb().$type<string[]>().default([]).notNull(),
+    escalationOutcome: text(),
+    reasonCodes: jsonb().$type<string[]>().default([]).notNull(),
+    lowScore: boolean(),
+    modelProvider: text(),
+    modelName: text(),
+    inputTokens: integer(),
+    outputTokens: integer(),
+    errorCode: text(),
+    createdAt: timestampString()
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+    completedAt: timestampString(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.workspaceId, table.conversationId],
+      foreignColumns: [conversation.workspaceId, conversation.id],
+      name: "conversation_qa_evaluation_workspace_conversation_fk",
+    })
+      .onDelete("cascade")
+      .onUpdate("cascade"),
+    uniqueIndex("conversation_qa_evaluation_workspace_conversation_version_key").on(
+      table.workspaceId,
+      table.conversationId,
+      table.version,
+    ),
+    index("conversation_qa_evaluation_workspace_createdAt_idx").on(
+      table.workspaceId,
+      table.createdAt,
+    ),
+    index("conversation_qa_evaluation_workspace_status_createdAt_idx").on(
+      table.workspaceId,
+      table.status,
+      table.createdAt,
+    ),
+    check("conversation_qa_evaluation_version_check", sql`${table.version} > 0`),
+    check(
+      "conversation_qa_evaluation_status_check",
+      sql`${table.status} in ('QUEUED', 'RUNNING', 'COMPLETED', 'FAILED', 'SKIPPED', 'STALE')`,
+    ),
+    check(
+      "conversation_qa_evaluation_trigger_check",
+      sql`${table.trigger} in ('CLOSED', 'INACTIVE')`,
+    ),
+    check(
+      "conversation_qa_evaluation_scores_check",
+      sql`(${table.helpfulness} is null or ${table.helpfulness} between 1 and 5) and (${table.grounding} is null or ${table.grounding} between 1 and 5)`,
+    ),
+    check(
+      "conversation_qa_evaluation_result_check",
+      sql`(${table.status} <> 'COMPLETED' or (${table.helpfulness} is not null and ${table.grounding} is not null and ${table.sentiment} is not null and ${table.escalationOutcome} is not null and ${table.lowScore} is not null and ${table.lowScore} = (${table.grounding} < 3 or ${table.escalationOutcome} = 'MISSED' or ${table.helpfulness} + ${table.grounding} < 6)))`,
+    ),
+    check(
+      "conversation_qa_evaluation_sentiment_check",
+      sql`${table.sentiment} is null or ${table.sentiment} in ('positive', 'neutral', 'negative', 'mixed')`,
+    ),
+    check(
+      "conversation_qa_evaluation_escalation_check",
+      sql`${table.escalationOutcome} is null or ${table.escalationOutcome} in ('NONE', 'RESOLVED', 'PENDING', 'MISSED', 'NOT_APPLICABLE')`,
+    ),
+    check(
+      "conversation_qa_evaluation_topics_check",
+      sql`jsonb_typeof(${table.topics}) = 'array' and jsonb_array_length(${table.topics}) <= 3 and ${table.topics} <@ '["account_access", "billing", "integrations", "pricing", "product_usage", "technical_issue", "cancellation", "other"]'::jsonb`,
+    ),
+    check(
+      "conversation_qa_evaluation_reason_codes_check",
+      sql`jsonb_typeof(${table.reasonCodes}) = 'array' and jsonb_array_length(${table.reasonCodes}) <= 4 and ${table.reasonCodes} <@ '["ANSWER_UNCLEAR", "FACT_UNSUPPORTED", "QUESTION_UNANSWERED", "ESCALATION_MISSED", "TONE_MISMATCH", "GOOD_RESOLUTION", "INSUFFICIENT_CONTEXT"]'::jsonb`,
+    ),
+    check(
+      "conversation_qa_evaluation_model_check",
+      sql`(${table.modelProvider} is null or ${table.modelProvider} in ('OPENAI', 'GOOGLE')) and (${table.modelName} is null or length(${table.modelName}) between 1 and 256)`,
+    ),
+    check(
+      "conversation_qa_evaluation_usage_check",
+      sql`(${table.inputTokens} is null or ${table.inputTokens} >= 0) and (${table.outputTokens} is null or ${table.outputTokens} >= 0)`,
+    ),
+    check(
+      "conversation_qa_evaluation_error_code_check",
+      sql`${table.errorCode} is null or ${table.errorCode} = 'EVALUATION_FAILED'`,
+    ),
+  ],
+);
+
 export const ticketStatus = pgEnum("ticket_status", ["OPEN", "PENDING", "RESOLVED"]);
 export const ticketPriority = pgEnum("ticket_priority", ["LOW", "NORMAL", "HIGH", "URGENT"]);
 

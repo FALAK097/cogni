@@ -86,6 +86,7 @@ import {
 import { agentHref, APP_PAGES, APP_ROUTES } from "@/features/navigation/app-routes";
 import { CreateAgentTestCaseDialog } from "@/features/agent-tests/components/create-agent-test-case-dialog";
 import { AgentTestImprovementQueue } from "@/features/agent-tests/components/agent-test-improvement-queue";
+import { ConversationQaInsights } from "@/features/conversation-qa/components/conversation-qa-insights";
 import type { AgentTestExpectedOutcome } from "@/features/agent-tests/input";
 import { useAddManualTextSource, useKnowledgeBaseSources } from "@/hooks/query/use-knowledge-base";
 import { useAgentTestCases, useWidgetConfig } from "@/hooks/query/use-widget";
@@ -1362,6 +1363,8 @@ export function DashboardPage({
             )}
           </div>
         </header>
+
+        <ConversationQaInsights />
 
         {dateRangeNotice ? (
           <output
