@@ -62,6 +62,14 @@ await build({
           contents: "export {};",
           loader: "js",
         }));
+        buildContext.onResolve({ filter: /^next\/server$/ }, () => ({
+          path: "next-server",
+          namespace: "next-server-test-stub",
+        }));
+        buildContext.onLoad({ filter: /.*/, namespace: "next-server-test-stub" }, () => ({
+          contents: "export function after() {}",
+          loader: "js",
+        }));
       },
     },
   ],
