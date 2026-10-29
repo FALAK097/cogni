@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import { build } from "esbuild";
 import { resolve } from "node:path";
@@ -33,6 +34,14 @@ const stubs = {
           },
         },
       },
+      select: () => ({
+        from: () => ({
+          where: () => ({
+            for: async () =>
+              s.source ? [{ id: s.source.id, status: s.source.status }] : [],
+          }),
+        }),
+      }),
       update: () => ({
         set: (values) => {
           s.updateValues = values;
@@ -51,7 +60,7 @@ const stubs = {
   "@/lib/db/schema": `export const document = { id: "id", workspaceId: "workspaceId", status: "status" }; export const workflowRun = { workspaceId: "workspaceId", name: "name", idempotencyKey: "idempotencyKey", status: "status" };`,
   "@/lib/jobs/ingestion": `export const enqueueDocumentProcessing = async (input) => { globalThis.__knowledgeSourceSyncTest.enqueueCalls.push(input); };`,
   "@/lib/db/client": `export const runDbWriteOperation = async (_db, operation) => operation(_db);`,
-  "@/features/knowledge/server/source-revisions": `export const drainSearchItemCleanup = async () => {}; export const markDocumentRevisionsDeleted = async () => {};`,
+  "@/features/knowledge/server/source-revisions": `export const drainSearchItemCleanup = async () => {}; export const markDocumentRevisionsDeleted = async () => {}; export const isSupportedKnowledgeSourceType = (sourceType) => ["URL", "SITEMAP", "TXT", "TEXT", "PDF", "DOCX"].includes(sourceType); export async function lockWorkspaceSourceBasisInTransaction() {}`,
   "@/lib/storage": `export const deleteObject = async () => {};`,
 };
 
@@ -94,6 +103,10 @@ const compiled = await build({
 });
 const { PATCH } = await import(
   `data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString("base64")}`
+);
+const knowledgeManager = await readFile(
+  "src/components/workspace/widget-knowledge-manager.tsx",
+  "utf8",
 );
 
 function reset(overrides = {}) {
@@ -144,6 +157,21 @@ test("owners can sync a ready website through the durable ingestion queue", asyn
   assert.match(state.enqueueCalls[0].idempotencyKey, /^document:sync:source-1:/);
 });
 
+test("owners can reindex a ready file in place without changing its source ID", async () => {
+  reset({
+    source: { id: "source-file", sourceType: "PDF", status: "READY" },
+    claimed: [{ id: "source-file" }],
+  });
+  const response = await PATCH(makeRequest({ action: "sync" }), {
+    params: Promise.resolve({ source_id: "source-file" }),
+  });
+
+  assert.equal(response.status, 202);
+  assert.equal(state.enqueueCalls.length, 1);
+  assert.equal(state.enqueueCalls[0].documentId, "source-file");
+  assert.match(state.enqueueCalls[0].idempotencyKey, /^document:sync:source-file:/);
+});
+
 test("members cannot sync sources or cause lookup/queue side effects", async () => {
   reset({ role: "MEMBER" });
   const response = await PATCH(makeRequest({ action: "sync" }), context);
@@ -153,8 +181,8 @@ test("members cannot sync sources or cause lookup/queue side effects", async () 
   assert.equal(state.enqueueCalls.length, 0);
 });
 
-test("sync rejects uploaded files, unknown fields, and non-ready sources", async () => {
-  reset({ source: { id: "source-1", sourceType: "PDF", status: "READY" } });
+test("sync rejects unsupported types, unknown fields, and non-ready sources", async () => {
+  reset({ source: { id: "source-1", sourceType: "UNKNOWN", status: "READY" } });
   let response = await PATCH(makeRequest({ action: "sync" }), context);
   assert.equal(response.status, 400);
   assert.equal(state.enqueueCalls.length, 0);
@@ -171,6 +199,37 @@ test("sync rejects uploaded files, unknown fields, and non-ready sources", async
   response = await PATCH(makeRequest({ action: "sync" }), context);
   assert.equal(response.status, 409);
   assert.equal(state.enqueueCalls.length, 0);
+});
+
+test("sitemap sources can be synced and retried through the bounded crawl processor", async () => {
+  reset({
+    source: { id: "source-sitemap", sourceType: "SITEMAP", status: "READY" },
+    claimed: [{ id: "source-sitemap" }],
+  });
+  let response = await PATCH(makeRequest({ action: "sync" }), {
+    params: Promise.resolve({ source_id: "source-sitemap" }),
+  });
+  assert.equal(response.status, 202);
+  assert.equal(state.enqueueCalls[0].documentId, "source-sitemap");
+
+  reset({
+    source: { id: "source-sitemap", sourceType: "SITEMAP", status: "FAILED" },
+    claimed: [{ id: "source-sitemap" }],
+  });
+  response = await PATCH(makeRequest({ action: "retry" }), {
+    params: Promise.resolve({ source_id: "source-sitemap" }),
+  });
+  assert.equal(response.status, 202);
+  assert.match(state.enqueueCalls[0].idempotencyKey, /^document:retry:source-sitemap:/);
+
+  assert.match(
+    knowledgeManager,
+    /const canSync = source\.status === "ready" && \["website", "sitemap"\]\.includes\(sourceType\)/,
+  );
+  assert.match(
+    knowledgeManager,
+    /const canRetry =\s*source\.status === "failed" &&\s*\["website", "sitemap", "file", "text", "txt"\]\.includes\(sourceType\)/,
+  );
 });
 
 test("retry remains limited to failed sources", async () => {

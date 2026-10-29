@@ -1,14 +1,20 @@
 import { createHash, randomUUID } from "node:crypto";
 import { and, asc, desc, eq, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
 
-import { document as documentTable, documentRevision, searchItemCleanup } from "@/lib/db/schema";
+import {
+  document as documentTable,
+  documentRevision,
+  domainEvent,
+  searchItemCleanup,
+  widget,
+} from "@/lib/db/schema";
 import { runDbWriteOperation, type Db } from "@/lib/db/client";
 import {
   deleteCloudflareSearchItem,
   deleteCloudflareSearchItemsByKey,
   isCloudflareSearchConfigured,
 } from "@/lib/search/cloudflare-search";
-import { logError } from "@/lib/logging/logger";
+import { logError, logInfo } from "@/lib/logging/logger";
 import {
   getSearchItemCleanupClaimLimit,
   getSearchItemCleanupRequestLimit,
@@ -16,7 +22,11 @@ import {
   searchItemCleanupClaimLeaseMs,
 } from "@/features/knowledge/server/search-item-cleanup-policy";
 
-const supportedSourceTypes = new Set(["URL", "TXT", "TEXT", "PDF", "DOCX"]);
+const supportedSourceTypes = new Set(["URL", "SITEMAP", "TXT", "TEXT", "PDF", "DOCX"]);
+
+export function isSupportedKnowledgeSourceType(sourceType: string) {
+  return supportedSourceTypes.has(sourceType);
+}
 
 export type SourceRevisionWriteResult =
   | {
@@ -66,6 +76,204 @@ export function hashSourceContent(content: string) {
   return createHash("sha256").update(content, "utf8").digest("hex");
 }
 
+/** Serialize changes to the workspace's source basis before taking any document row locks. */
+export async function lockWorkspaceSourceBasisInTransaction(transaction: Db, workspaceId: string) {
+  const [saved] = await transaction
+    .select({ id: widget.id })
+    .from(widget)
+    .where(eq(widget.workspaceId, workspaceId))
+    .limit(1)
+    .for("update");
+  if (!saved) throw new Error("Agent configuration was not found.");
+}
+
+export async function updateKnowledgeSourceStatus(
+  db: Db,
+  input: {
+    workspaceId: string;
+    documentId: string;
+    status: "PROCESSING" | "FAILED";
+    errorMessage: string | null;
+  },
+) {
+  return runDbWriteOperation(db, async (transaction) => {
+    await lockWorkspaceSourceBasisInTransaction(transaction, input.workspaceId);
+    const [source] = await transaction
+      .select({ id: documentTable.id, updatedAt: documentTable.updatedAt })
+      .from(documentTable)
+      .where(
+        and(
+          eq(documentTable.id, input.documentId),
+          eq(documentTable.workspaceId, input.workspaceId),
+        ),
+      )
+      .for("update");
+    if (!source) return false;
+
+    const updatedAt = new Date(nextKnowledgeSourceToken(source.updatedAt)).toISOString();
+
+    await transaction
+      .update(documentTable)
+      .set({
+        status: input.status,
+        errorMessage: input.errorMessage,
+        updatedAt,
+      })
+      .where(
+        and(
+          eq(documentTable.id, input.documentId),
+          eq(documentTable.workspaceId, input.workspaceId),
+        ),
+      );
+    return true;
+  });
+}
+
+/** Use the source timestamp as a monotonically increasing processing-attempt token. */
+function nextKnowledgeSourceToken(updatedAt: string) {
+  const previousUpdatedAt = new Date(updatedAt).getTime();
+  const now = Date.now();
+  return Math.max(now, Number.isFinite(previousUpdatedAt) ? previousUpdatedAt + 1 : now);
+}
+
+export async function claimKnowledgeSourceProcessingAttempt(
+  db: Db,
+  input: { workspaceId: string; documentId: string },
+) {
+  return runDbWriteOperation(db, async (transaction) => {
+    await lockWorkspaceSourceBasisInTransaction(transaction, input.workspaceId);
+    const [source] = await transaction
+      .select({ id: documentTable.id, updatedAt: documentTable.updatedAt })
+      .from(documentTable)
+      .where(
+        and(
+          eq(documentTable.id, input.documentId),
+          eq(documentTable.workspaceId, input.workspaceId),
+        ),
+      )
+      .for("update");
+    if (!source) return null;
+
+    const processingToken = nextKnowledgeSourceToken(source.updatedAt);
+    const updated = await transaction
+      .update(documentTable)
+      .set({
+        status: "PROCESSING",
+        errorMessage: null,
+        updatedAt: new Date(processingToken).toISOString(),
+      })
+      .where(
+        and(
+          eq(documentTable.id, input.documentId),
+          eq(documentTable.workspaceId, input.workspaceId),
+        ),
+      )
+      .returning({ id: documentTable.id });
+    return updated.length === 1 ? processingToken : null;
+  });
+}
+
+/** Only the attempt that still owns PROCESSING may transition a source to FAILED. */
+export async function failKnowledgeSourceProcessingAttempt(
+  db: Db,
+  input: {
+    workspaceId: string;
+    documentId: string;
+    processingToken: number;
+    errorMessage: string;
+  },
+) {
+  return runDbWriteOperation(db, async (transaction) => {
+    await lockWorkspaceSourceBasisInTransaction(transaction, input.workspaceId);
+    const [source] = await transaction
+      .select({
+        id: documentTable.id,
+        status: documentTable.status,
+        updatedAt: documentTable.updatedAt,
+      })
+      .from(documentTable)
+      .where(
+        and(
+          eq(documentTable.id, input.documentId),
+          eq(documentTable.workspaceId, input.workspaceId),
+        ),
+      )
+      .for("update");
+    if (
+      !source ||
+      source.status !== "PROCESSING" ||
+      new Date(source.updatedAt).getTime() !== input.processingToken
+    ) {
+      return false;
+    }
+
+    await transaction
+      .update(documentTable)
+      .set({
+        status: "FAILED",
+        errorMessage: input.errorMessage,
+        updatedAt: new Date(nextKnowledgeSourceToken(source.updatedAt)).toISOString(),
+      })
+      .where(
+        and(
+          eq(documentTable.id, input.documentId),
+          eq(documentTable.workspaceId, input.workspaceId),
+          eq(documentTable.status, "PROCESSING"),
+        ),
+      );
+    return true;
+  });
+}
+
+/** Emit READY only if the same indexing attempt still owns the source after workflow completion. */
+export async function emitKnowledgeSourceReadyIfCurrent(
+  db: Db,
+  input: { workspaceId: string; documentId: string; readyToken: number },
+) {
+  const emitted = await runDbWriteOperation(db, async (transaction) => {
+    await lockWorkspaceSourceBasisInTransaction(transaction, input.workspaceId);
+    const [source] = await transaction
+      .select({
+        id: documentTable.id,
+        status: documentTable.status,
+        updatedAt: documentTable.updatedAt,
+      })
+      .from(documentTable)
+      .where(
+        and(
+          eq(documentTable.id, input.documentId),
+          eq(documentTable.workspaceId, input.workspaceId),
+        ),
+      )
+      .for("update");
+    if (
+      !source ||
+      source.status !== "READY" ||
+      new Date(source.updatedAt).getTime() !== input.readyToken
+    ) {
+      return false;
+    }
+
+    await transaction.insert(domainEvent).values({
+      id: randomUUID(),
+      workspaceId: input.workspaceId,
+      type: "document.ready",
+      entityId: input.documentId,
+      payload: JSON.stringify({}),
+    });
+    return true;
+  });
+
+  if (emitted) {
+    logInfo("domain.event.emitted", {
+      workspaceId: input.workspaceId,
+      type: "document.ready",
+      entityId: input.documentId,
+    });
+  }
+  return emitted;
+}
+
 /**
  * Call inside the same transaction that makes the newly extracted content READY. The source row
  * lock serializes revision numbers and the partial unique index enforces a single CURRENT row.
@@ -79,6 +287,7 @@ export async function recordDocumentRevisionInTransaction(
     revisionId: requestedRevisionId,
   }: { workspaceId: string; documentId: string; content: string; revisionId?: string },
 ): Promise<SourceRevisionWriteResult> {
+  await lockWorkspaceSourceBasisInTransaction(transaction, workspaceId);
   const [source] = await transaction
     .select({ id: documentTable.id, sourceType: documentTable.sourceType })
     .from(documentTable)
@@ -86,7 +295,7 @@ export async function recordDocumentRevisionInTransaction(
     .for("update");
 
   if (!source) throw new SourceRevisionDocumentNotFoundError();
-  if (!supportedSourceTypes.has(source.sourceType)) {
+  if (!isSupportedKnowledgeSourceType(source.sourceType)) {
     return { status: "unsupported-source", sourceType: source.sourceType };
   }
 
@@ -215,7 +424,7 @@ export async function resolveDocumentRevision(
     }
     return { status: "not-found" };
   }
-  if (!supportedSourceTypes.has(source.sourceType)) {
+  if (!isSupportedKnowledgeSourceType(source.sourceType)) {
     return { status: "unsupported-source", sourceType: source.sourceType };
   }
   if (source.status !== "READY") {
@@ -258,6 +467,7 @@ export async function markDocumentRevisionsDeleted(
   workspaceId: string,
   documentId: string,
 ) {
+  await lockWorkspaceSourceBasisInTransaction(transaction, workspaceId);
   await transaction
     .select({ id: documentTable.id })
     .from(documentTable)

@@ -72,11 +72,13 @@ test("Postgres history isolates tenants, deduplicates concurrent saves, validate
   const foreignId = randomUUID();
   const userId = randomUUID();
   const memberId = randomUUID();
+  const widgetId = randomUUID();
   const caseId = randomUUID();
   const runId = randomUUID();
   const now = new Date().toISOString();
   try {
     await raw`INSERT INTO workspace (id, name, slug, "updatedAt") VALUES (${workspaceId}, 'History test', ${workspaceId}, ${now}), (${foreignId}, 'Foreign history', ${foreignId}, ${now})`;
+    await raw`INSERT INTO widget (id, "publicKey", "workspaceId", "updatedAt") VALUES (${widgetId}, ${randomUUID().replace(/-/g, "")}, ${workspaceId}, ${now})`;
     await raw`INSERT INTO "user" (id, name, email, "updatedAt") VALUES (${userId}, 'History owner', ${`${userId}@example.test`}, ${now})`;
     await raw`INSERT INTO workspace_member (id, role, "updatedAt", "userId", "workspaceId") VALUES (${memberId}, 'OWNER', ${now}, ${userId}, ${workspaceId})`;
     await raw`INSERT INTO agent_test_case (id, title, prompt, "expectedOutcome", "updatedAt", "workspaceId") VALUES (${caseId}, 'Check', 'Private prompt', 'grounded_answer', ${now}, ${workspaceId})`;

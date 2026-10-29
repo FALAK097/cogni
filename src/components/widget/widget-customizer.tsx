@@ -253,6 +253,7 @@ export function WidgetCustomizer({
   const mobileTestResultRef = useRef<HTMLElement | null>(null);
   const [copied, setCopied] = useState(false);
   const [publicationError, setPublicationError] = useState<string | null>(null);
+  const [publishCheckId, setPublishCheckId] = useState<string | null>(null);
   const [domainInput, setDomainInput] = useState("");
   const [configOverrides, setConfigOverrides] = useState<Partial<WidgetCustomizerConfig>>({});
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -305,6 +306,7 @@ export function WidgetCustomizer({
           : "Draft saved · not published";
   const canPublishChanges =
     canManage &&
+    Boolean(publishCheckId) &&
     Boolean(publication?.hasUnpublishedChanges) &&
     !isSavingDraft &&
     !publishWidgetConfigMutation.isPending;
@@ -357,6 +359,7 @@ export function WidgetCustomizer({
     <Key extends keyof WidgetCustomizerConfig>(key: Key, value: WidgetCustomizerConfig[Key]) => {
       if (!canManage) return;
       const next = { ...configOverridesRef.current, [key]: value };
+      setPublishCheckId(null);
       configOverridesRef.current = next;
       setConfigOverrides(next);
     },
@@ -367,6 +370,7 @@ export function WidgetCustomizer({
     (updates: Partial<WidgetCustomizerConfig>) => {
       if (!canManage) return;
       const next = { ...configOverridesRef.current, ...updates };
+      setPublishCheckId(null);
       configOverridesRef.current = next;
       setConfigOverrides(next);
     },
@@ -666,7 +670,9 @@ export function WidgetCustomizer({
       await publishWidgetConfigMutation.mutateAsync({
         workspaceId: activeWorkspaceId,
         ...(restoreVersion ? { restoreVersion } : {}),
+        ...(!restoreVersion && publishCheckId ? { publishCheckId } : {}),
       });
+      if (!restoreVersion) setPublishCheckId(null);
     } catch (error: unknown) {
       setPublicationError(
         error instanceof Error ? error.message : "Couldn't publish these agent changes.",
@@ -926,6 +932,7 @@ export function WidgetCustomizer({
                   canManage={canManage}
                   onTryPrompt={tryPreviewPrompt}
                   onResetPreview={resetPreview}
+                  onPublishCheckComplete={setPublishCheckId}
                 />
               </TabsContent>
 

@@ -4,6 +4,10 @@ import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { document as documentTable, workflowRun } from "@/lib/db/schema";
 import { runDbWriteOperation } from "@/lib/db/client";
 import { enqueueDocumentProcessing } from "@/lib/jobs/ingestion";
+import {
+  isSupportedKnowledgeSourceType,
+  lockWorkspaceSourceBasisInTransaction,
+} from "@/features/knowledge/server/source-revisions";
 import { deleteObject } from "@/lib/storage";
 import {
   drainSearchItemCleanup,
@@ -43,29 +47,36 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Source not found." }, { status: 404 });
   }
 
-  if (
-    parsed.data.action === "sync" &&
-    source.sourceType !== "URL" &&
-    source.sourceType !== "SITEMAP"
-  ) {
+  if (!isSupportedKnowledgeSourceType(source.sourceType)) {
     return NextResponse.json(
-      { error: "Only website and sitemap sources can be synced." },
+      { error: "This knowledge source type cannot be processed." },
       { status: 400 },
     );
   }
 
   const expectedStatus = parsed.data.action === "sync" ? "READY" : "FAILED";
-  const [claimed] = await db
-    .update(documentTable)
-    .set({ status: "PROCESSING", errorMessage: null, updatedAt: new Date().toISOString() })
-    .where(
-      and(
-        eq(documentTable.id, sourceId),
-        eq(documentTable.workspaceId, workspace.id),
-        eq(documentTable.status, expectedStatus),
-      ),
-    )
-    .returning({ id: documentTable.id });
+  const claimed = await runDbWriteOperation(db, async (transaction) => {
+    await lockWorkspaceSourceBasisInTransaction(transaction, workspace.id);
+    const [lockedSource] = await transaction
+      .select({ id: documentTable.id, status: documentTable.status })
+      .from(documentTable)
+      .where(and(eq(documentTable.id, sourceId), eq(documentTable.workspaceId, workspace.id)))
+      .for("update");
+    if (lockedSource?.status !== expectedStatus) return false;
+
+    const updated = await transaction
+      .update(documentTable)
+      .set({ status: "PROCESSING", errorMessage: null, updatedAt: new Date().toISOString() })
+      .where(
+        and(
+          eq(documentTable.id, sourceId),
+          eq(documentTable.workspaceId, workspace.id),
+          eq(documentTable.status, expectedStatus),
+        ),
+      )
+      .returning({ id: documentTable.id });
+    return updated.length === 1;
+  });
 
   if (!claimed) {
     return NextResponse.json(

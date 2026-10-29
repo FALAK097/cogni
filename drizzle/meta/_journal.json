@@ -169,6 +169,20 @@
       "when": 1793100034493,
       "tag": "0023_agent_test_case_comparisons",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793167652762,
+      "tag": "0024_agent_test_publish_check",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1793168283055,
+      "tag": "0025_agent_test_publish_receipt_bindings",
+      "breakpoints": true
     }
   ]
 }

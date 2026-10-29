@@ -11,7 +11,7 @@ const compiled = await build({
   platform: "node",
   alias: { "@": resolve("src") },
 });
-const { resolveAgentTestModelIdentity } = await import(
+const { resolveAgentTestModelIdentity, resolveAgentTestPublishCandidateIdentity } = await import(
   `data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString("base64")}`
 );
 
@@ -41,5 +41,21 @@ test("draft edits and effective model changes produce a different opaque fingerp
   const overridden = resolveAgentTestModelIdentity(widget, { modelName: "gpt-4.1-mini" });
   assert.notEqual(original.configFingerprint, edited.configFingerprint);
   assert.notEqual(original.configFingerprint, overridden.configFingerprint);
+  assert.equal("instructions" in original, false);
+});
+
+test("publish candidate fingerprint binds the full config even when timestamps match", () => {
+  const config = {
+    instructions: "Answer clearly.",
+    modelProvider: "OPENAI",
+    modelName: "gpt-4o-mini",
+  };
+  const original = resolveAgentTestPublishCandidateIdentity({ widgetId: widget.id, config }, {});
+  const edited = resolveAgentTestPublishCandidateIdentity(
+    { widgetId: widget.id, config: { ...config, instructions: "Use concise answers." } },
+    {},
+  );
+
+  assert.notEqual(original.configFingerprint, edited.configFingerprint);
   assert.equal("instructions" in original, false);
 });

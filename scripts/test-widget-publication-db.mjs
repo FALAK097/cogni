@@ -9,6 +9,7 @@ import { build } from "esbuild";
 import postgres from "postgres";
 
 process.env.SKIP_ENV_VALIDATION ??= "true";
+process.env.BETTER_AUTH_SECRET ??= "widget-publication-test-secret-with-32-bytes";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl || !["localhost", "127.0.0.1", "::1"].includes(new URL(databaseUrl).hostname)) {
@@ -36,6 +37,12 @@ await build({
       } from "@/features/widget/server/widget-service";
       export { parseWidgetPublicationSnapshot } from "@/features/widget/publication";
       export { publishWidgetDraft } from "@/features/widget/server/widget-publication-service";
+      export {
+        getAgentTestPublishPreview,
+        recordAgentTestPublishCheckResults,
+        startAgentTestPublishCheck,
+      } from "@/features/agent-tests/server/publish-checks";
+      export { signAgentTestPreviewEvidence } from "@/features/agent-tests/signed-preview-evidence";
     `,
     resolveDir: process.cwd(),
     sourcefile: "widget-publication-test-entry.ts",
@@ -70,13 +77,20 @@ const {
   getWidgetPublicationStatus,
   parseWidgetPublicationSnapshot,
   publishWidgetDraft,
+  getAgentTestPublishPreview,
+  recordAgentTestPublishCheckResults,
+  startAgentTestPublishCheck,
+  signAgentTestPreviewEvidence,
   settingsFromPublishedConfig,
 } = await import(`${pathToFileURL(outputFile).href}?run=${randomUUID()}`);
 const raw = postgres(databaseUrl, { max: 1, prepare: false });
 const workspaceId = randomUUID();
 const foreignWorkspaceId = randomUUID();
 const userId = randomUUID();
+const membershipId = randomUUID();
+const testCaseId = randomUUID();
 const now = new Date().toISOString();
+const testPrompt = "What can this support team help with?";
 
 const migration = await readFile(
   join(process.cwd(), "drizzle", "0010_agent_publication_versions.sql"),
@@ -100,6 +114,19 @@ before(async () => {
     INSERT INTO "user" ("id", "name", "email", "updatedAt")
     VALUES (${userId}, 'Publication owner', ${`${userId}@example.test`}, ${now})
   `;
+  await raw`
+    INSERT INTO "workspace_member" ("id", "role", "updatedAt", "userId", "workspaceId")
+    VALUES (${membershipId}, 'OWNER', ${now}, ${userId}, ${workspaceId})
+  `;
+  await raw`
+    INSERT INTO "agent_test_case" (
+      "id", "title", "prompt", "expectedOutcome", "expectedSourceIds", "updatedAt",
+      "workspaceId", "createdByMembershipId"
+    ) VALUES (
+      ${testCaseId}, 'No-evidence publish check', ${testPrompt}, 'no_evidence', '[]'::jsonb,
+      ${now}, ${workspaceId}, ${membershipId}
+    )
+  `;
 });
 
 after(async () => {
@@ -108,6 +135,47 @@ after(async () => {
   await getDb().$client.end({ timeout: 5 });
   await raw.end({ timeout: 5 });
 });
+
+async function recordPublishCheckResult(checkId, variant, db = getDb()) {
+  const preview = await getAgentTestPublishPreview(
+    { workspaceId, membershipId, checkId, caseId: testCaseId },
+    db,
+  );
+  assert.ok(preview);
+  const signedEvidence = signAgentTestPreviewEvidence(
+    {
+      runId: checkId,
+      caseId: testCaseId,
+      workspaceId,
+      prompt: testPrompt,
+      outcome: "answer",
+      grounded: false,
+      modelProvider: preview.identity.modelProvider,
+      modelName: preview.identity.modelName,
+      configFingerprint: preview.identity.configFingerprint,
+      sources: [],
+    },
+    process.env.BETTER_AUTH_SECRET,
+  );
+  await recordAgentTestPublishCheckResults(
+    {
+      workspaceId,
+      membershipId,
+      checkId,
+      variant,
+      results: [{ id: testCaseId, status: "passed", signedEvidence }],
+    },
+    db,
+  );
+}
+
+async function createCurrentPublishCheck() {
+  const db = getDb();
+  const check = await startAgentTestPublishCheck(workspaceId, membershipId, db);
+  if (check.baselineRequired) await recordPublishCheckResult(check.id, "baseline", db);
+  await recordPublishCheckResult(check.id, "draft", db);
+  return check.id;
+}
 
 test("legacy backfill helpers keep published snapshots within runtime schema limits", async () => {
   await raw.unsafe(migrationFunction("widget_json_array_or_empty"));
@@ -223,7 +291,8 @@ test("new agents are unpublished; publish, edit, and rollback stay workspace sco
       "updatedAt" = ${new Date().toISOString()}
     WHERE "id" = ${agent.id}
   `;
-  const first = await publishWidgetDraft(db, workspaceId, userId);
+  const firstCheckId = await createCurrentPublishCheck();
+  const first = await publishWidgetDraft(db, workspaceId, userId, undefined, firstCheckId);
   assert.equal(first.ok, true);
   if (!first.ok) return;
   assert.equal(first.widget.publishedVersion, 1);
@@ -253,7 +322,8 @@ test("new agents are unpublished; publish, edit, and rollback stay workspace sco
   assert.equal(effectiveConfig.isEnabled, false);
   assert.deepEqual(effectiveConfig.authorizedDomains, ["revoked.example.test"]);
 
-  const second = await publishWidgetDraft(db, workspaceId, userId);
+  const secondCheckId = await createCurrentPublishCheck();
+  const second = await publishWidgetDraft(db, workspaceId, userId, undefined, secondCheckId);
   assert.equal(second.ok, true);
   if (!second.ok) return;
   assert.equal(second.widget.publishedVersion, 2);

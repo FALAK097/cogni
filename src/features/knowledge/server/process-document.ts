@@ -1,10 +1,12 @@
 import type { Db } from "@/lib/db/client";
-import { and, eq } from "drizzle-orm";
-import { document as documentTable } from "@/lib/db/schema";
 
 import { extractDocumentText, indexDocumentContent } from "@/features/knowledge/server/extract";
+import {
+  claimKnowledgeSourceProcessingAttempt,
+  emitKnowledgeSourceReadyIfCurrent,
+  failKnowledgeSourceProcessingAttempt,
+} from "@/features/knowledge/server/source-revisions";
 import { logError } from "@/lib/logging/logger";
-import { emitDomainEvent } from "@/lib/events/domain-events";
 import { completeWorkflowRun, failWorkflowRun, startWorkflowRun } from "@/lib/workflows/runner";
 
 export async function processDocument({
@@ -35,15 +37,25 @@ export async function processDocument({
     input: { documentId },
   });
 
+  let processingToken: number | null = null;
+  let chunkCount = 0;
+  let result: Awaited<ReturnType<typeof indexDocumentContent>> | null = null;
+
   try {
-    await db
-      .update(documentTable)
-      .set({
-        status: "PROCESSING",
-        errorMessage: null,
-        updatedAt: new Date().toISOString(),
-      })
-      .where(and(eq(documentTable.id, document.id), eq(documentTable.workspaceId, workspaceId)));
+    processingToken = await claimKnowledgeSourceProcessingAttempt(db, {
+      workspaceId,
+      documentId: document.id,
+    });
+    if (processingToken === null) {
+      await completeWorkflowRun({
+        db,
+        workspaceId,
+        runId: run.id,
+        output: { documentId, status: "stale" },
+      });
+      return;
+    }
+
     const text = await extractDocumentText({
       sourceType: document.sourceType,
       sourceUrl: document.sourceUrl,
@@ -51,30 +63,28 @@ export async function processDocument({
       mimeType: document.mimeType,
     });
 
-    await indexDocumentContent(db, document.id, text, workspaceId);
-
-    await completeWorkflowRun({
-      db,
-      workspaceId,
-      runId: run.id,
-      output: { documentId, chunkCount: text.length },
-    });
-    await emitDomainEvent({
-      db,
-      workspaceId,
-      type: "document.ready",
-      entityId: documentId,
-    });
+    chunkCount = text.length;
+    result = await indexDocumentContent(db, document.id, text, workspaceId, processingToken);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Processing failed.";
-    await db
-      .update(documentTable)
-      .set({
-        status: "FAILED",
+    if (processingToken !== null) {
+      const failed = await failKnowledgeSourceProcessingAttempt(db, {
+        workspaceId,
+        documentId: document.id,
+        processingToken,
         errorMessage: message,
-        updatedAt: new Date().toISOString(),
-      })
-      .where(and(eq(documentTable.id, document.id), eq(documentTable.workspaceId, workspaceId)));
+      });
+      if (!failed) {
+        await completeWorkflowRun({
+          db,
+          workspaceId,
+          runId: run.id,
+          output: { documentId, status: "stale" },
+        });
+        return;
+      }
+    }
+
     await failWorkflowRun({
       db,
       workspaceId,
@@ -89,4 +99,26 @@ export async function processDocument({
     });
     throw error;
   }
+
+  if (!result || result.status === "stale") {
+    await completeWorkflowRun({
+      workspaceId,
+      db,
+      runId: run.id,
+      output: { documentId, status: "stale" },
+    });
+    return;
+  }
+
+  await completeWorkflowRun({
+    db,
+    workspaceId,
+    runId: run.id,
+    output: { documentId, chunkCount },
+  });
+  await emitKnowledgeSourceReadyIfCurrent(db, {
+    workspaceId,
+    documentId,
+    readyToken: result.readyToken,
+  });
 }

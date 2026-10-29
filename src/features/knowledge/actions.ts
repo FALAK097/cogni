@@ -14,6 +14,7 @@ import { canManageWorkspace } from "@/lib/auth/permissions";
 import { deleteObject, isAllowedKnowledgeUpload, saveObject } from "@/lib/storage/index";
 import {
   drainSearchItemCleanup,
+  lockWorkspaceSourceBasisInTransaction,
   markDocumentRevisionsDeleted,
 } from "@/features/knowledge/server/source-revisions";
 import {
@@ -60,18 +61,21 @@ export async function addUrlSourceAction(
     return { error: parsed.error.issues[0]?.message ?? "Check the URL details." };
   }
 
-  const [document] = await db
-    .insert(documentTable)
-    .values({
-      id: randomUUID(),
-      workspaceId: workspace.id,
-      title: parsed.data.title,
-      sourceType: "URL",
-      sourceUrl: parsed.data.sourceUrl,
-      status: "PROCESSING",
-      updatedAt: new Date().toISOString(),
-    })
-    .returning();
+  const [document] = await runDbWriteOperation(db, async (transaction) => {
+    await lockWorkspaceSourceBasisInTransaction(transaction, workspace.id);
+    return transaction
+      .insert(documentTable)
+      .values({
+        id: randomUUID(),
+        workspaceId: workspace.id,
+        title: parsed.data.title,
+        sourceType: "URL",
+        sourceUrl: parsed.data.sourceUrl,
+        status: "PROCESSING",
+        updatedAt: new Date().toISOString(),
+      })
+      .returning();
+  });
 
   try {
     await enqueueDocumentProcessing({
@@ -123,19 +127,22 @@ export async function uploadDocumentAction(formData: FormData) {
     bytes,
   });
 
-  const [document] = await db
-    .insert(documentTable)
-    .values({
-      id: randomUUID(),
-      workspaceId: workspace.id,
-      title,
-      sourceType,
-      storageKey: saved.storageKey,
-      mimeType,
-      status: "PROCESSING",
-      updatedAt: new Date().toISOString(),
-    })
-    .returning();
+  const [document] = await runDbWriteOperation(db, async (transaction) => {
+    await lockWorkspaceSourceBasisInTransaction(transaction, workspace.id);
+    return transaction
+      .insert(documentTable)
+      .values({
+        id: randomUUID(),
+        workspaceId: workspace.id,
+        title,
+        sourceType,
+        storageKey: saved.storageKey,
+        mimeType,
+        status: "PROCESSING",
+        updatedAt: new Date().toISOString(),
+      })
+      .returning();
+  });
 
   try {
     await enqueueDocumentProcessing({
@@ -178,19 +185,22 @@ export async function addManualTextSourceAction(
     bytes: contentBytes,
   });
 
-  const [document] = await db
-    .insert(documentTable)
-    .values({
-      id: randomUUID(),
-      workspaceId: workspace.id,
-      title: parsed.data.title,
-      sourceType: "TXT",
-      storageKey: saved.storageKey,
-      mimeType: "text/plain",
-      status: "PROCESSING",
-      updatedAt: new Date().toISOString(),
-    })
-    .returning();
+  const [document] = await runDbWriteOperation(db, async (transaction) => {
+    await lockWorkspaceSourceBasisInTransaction(transaction, workspace.id);
+    return transaction
+      .insert(documentTable)
+      .values({
+        id: randomUUID(),
+        workspaceId: workspace.id,
+        title: parsed.data.title,
+        sourceType: "TXT",
+        storageKey: saved.storageKey,
+        mimeType: "text/plain",
+        status: "PROCESSING",
+        updatedAt: new Date().toISOString(),
+      })
+      .returning();
+  });
 
   try {
     await enqueueDocumentProcessing({
@@ -226,18 +236,21 @@ export async function importSitemapSourceAction(
     return { error: parsed.error.issues[0]?.message ?? "Check the sitemap details." };
   }
 
-  const [document] = await db
-    .insert(documentTable)
-    .values({
-      id: randomUUID(),
-      workspaceId: workspace.id,
-      title: parsed.data.title,
-      sourceType: "SITEMAP",
-      sourceUrl: parsed.data.sourceUrl,
-      status: "PROCESSING",
-      updatedAt: new Date().toISOString(),
-    })
-    .returning();
+  const [document] = await runDbWriteOperation(db, async (transaction) => {
+    await lockWorkspaceSourceBasisInTransaction(transaction, workspace.id);
+    return transaction
+      .insert(documentTable)
+      .values({
+        id: randomUUID(),
+        workspaceId: workspace.id,
+        title: parsed.data.title,
+        sourceType: "SITEMAP",
+        sourceUrl: parsed.data.sourceUrl,
+        status: "PROCESSING",
+        updatedAt: new Date().toISOString(),
+      })
+      .returning();
+  });
 
   try {
     await enqueueDocumentProcessing({

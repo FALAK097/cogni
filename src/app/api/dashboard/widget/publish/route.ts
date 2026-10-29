@@ -11,7 +11,10 @@ import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { canManageWorkspace } from "@/lib/auth/permissions";
 
 const publishRequestSchema = z
-  .object({ restoreVersion: z.number().int().positive().optional() })
+  .object({
+    restoreVersion: z.number().int().positive().optional(),
+    publishCheckId: z.string().uuid().optional(),
+  })
   .strict();
 
 async function dashboardConfig(
@@ -50,6 +53,7 @@ export async function POST(request: Request) {
     workspace.id,
     session.user.id,
     input.data.restoreVersion,
+    input.data.publishCheckId,
   );
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });

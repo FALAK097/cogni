@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { enqueueDocumentProcessing } from "@/lib/jobs/ingestion";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { document as documentTable } from "@/lib/db/schema";
+import { runDbWriteOperation } from "@/lib/db/client";
+import { lockWorkspaceSourceBasisInTransaction } from "@/features/knowledge/server/source-revisions";
 import { z } from "zod";
 import { canManageWorkspace } from "@/lib/auth/permissions";
 
@@ -30,18 +32,21 @@ export async function POST(request: Request) {
   const created = [];
 
   for (const sourceUrl of urls) {
-    const [document] = await db
-      .insert(documentTable)
-      .values({
-        id: randomUUID(),
-        workspaceId: workspace.id,
-        title: sourceUrl,
-        sourceType: "URL",
-        sourceUrl,
-        status: "PROCESSING",
-        updatedAt: new Date().toISOString(),
-      })
-      .returning();
+    const [document] = await runDbWriteOperation(db, async (transaction) => {
+      await lockWorkspaceSourceBasisInTransaction(transaction, workspace.id);
+      return transaction
+        .insert(documentTable)
+        .values({
+          id: randomUUID(),
+          workspaceId: workspace.id,
+          title: sourceUrl,
+          sourceType: "URL",
+          sourceUrl,
+          status: "PROCESSING",
+          updatedAt: new Date().toISOString(),
+        })
+        .returning();
+    });
 
     await enqueueDocumentProcessing({
       db,

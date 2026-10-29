@@ -9,6 +9,8 @@ import {
 import { isAllowedKnowledgeUpload, saveObject } from "@/lib/storage/index";
 import { document as documentTable } from "@/lib/db/schema";
 import { canManageWorkspace } from "@/lib/auth/permissions";
+import { runDbWriteOperation } from "@/lib/db/client";
+import { lockWorkspaceSourceBasisInTransaction } from "@/features/knowledge/server/source-revisions";
 
 export async function POST(request: Request) {
   const { db, workspace, membership } = await requireDashboardContext();
@@ -50,19 +52,22 @@ export async function POST(request: Request) {
     bytes,
   });
 
-  const [document] = await db
-    .insert(documentTable)
-    .values({
-      id: randomUUID(),
-      workspaceId: workspace.id,
-      title,
-      sourceType,
-      storageKey: saved.storageKey,
-      mimeType,
-      status: "PROCESSING",
-      updatedAt: new Date().toISOString(),
-    })
-    .returning();
+  const [document] = await runDbWriteOperation(db, async (transaction) => {
+    await lockWorkspaceSourceBasisInTransaction(transaction, workspace.id);
+    return transaction
+      .insert(documentTable)
+      .values({
+        id: randomUUID(),
+        workspaceId: workspace.id,
+        title,
+        sourceType,
+        storageKey: saved.storageKey,
+        mimeType,
+        status: "PROCESSING",
+        updatedAt: new Date().toISOString(),
+      })
+      .returning();
+  });
 
   const job = await enqueueDocumentProcessing({
     db,

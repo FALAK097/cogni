@@ -5,8 +5,9 @@ import { and, eq, inArray, lt, or } from "drizzle-orm";
 import { z } from "zod";
 
 import { processDocument } from "@/features/knowledge/server/process-document";
+import { updateKnowledgeSourceStatus } from "@/features/knowledge/server/source-revisions";
 import type { Db } from "@/lib/db/client";
-import { document as documentTable, workflowRun } from "@/lib/db/schema";
+import { workflowRun } from "@/lib/db/schema";
 import { logError } from "@/lib/logging/logger";
 import { env } from "@/lib/env/server";
 import { failWorkflowRun } from "@/lib/workflows/runner";
@@ -57,14 +58,12 @@ export async function enqueueDocumentProcessing({
       .onConflictDoNothing()
       .returning({ id: workflowRun.id });
   } catch (error) {
-    await db
-      .update(documentTable)
-      .set({
-        status: "FAILED",
-        errorMessage: "Could not queue document processing.",
-        updatedAt: new Date().toISOString(),
-      })
-      .where(and(eq(documentTable.id, documentId), eq(documentTable.workspaceId, workspaceId)));
+    await updateKnowledgeSourceStatus(db, {
+      workspaceId,
+      documentId,
+      status: "FAILED",
+      errorMessage: "Could not queue document processing.",
+    });
     throw error;
   }
 
