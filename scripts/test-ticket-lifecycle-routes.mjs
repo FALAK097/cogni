@@ -69,6 +69,7 @@ function reset({ parent = null, member = null, existing = null } = {}) {
     existing,
     inserts: [],
     updates: [],
+    appliedUpdates: [],
     context: async () => ({
       db: state.db,
       workspace: state.workspace,
@@ -108,9 +109,10 @@ function reset({ parent = null, member = null, existing = null } = {}) {
           where: (expression) => ({
             returning: async () => {
               state.updateExpression = expression;
-              return state.existing && matches(state.existing, expression)
-                ? [{ ...state.existing, ...values }]
-                : [];
+              if (!state.existing || !matches(state.existing, expression)) return [];
+              state.existing = { ...state.existing, ...values };
+              state.appliedUpdates.push(values);
+              return [state.existing];
             },
           }),
         };
@@ -207,6 +209,8 @@ test("ticket patch scopes the update to the active workspace", async () => {
     ],
   );
   assert.equal(state.updates.length, 1);
+  assert.deepEqual(state.appliedUpdates, []);
+  assert.equal(state.existing.status, "OPEN");
 });
 
 test("ticket patch rejects assignees from another workspace before updating", async () => {

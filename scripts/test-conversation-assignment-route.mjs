@@ -9,14 +9,14 @@ globalThis.__conversationAssignmentRouteTest = state;
 const stubs = {
   "next/server": `export const NextResponse = { json: (value, init = {}) => new Response(JSON.stringify(value), { ...init, headers: { "content-type": "application/json", ...init.headers } }) };`,
   "@/lib/auth/dashboard-context": `export const requireDashboardContext = () => globalThis.__conversationAssignmentRouteTest.context();`,
-  "@/features/conversations/server/queries": `export const appendTeamConversationMessage = async () => false; export const getConversation = async () => null; export const markConversationAsRead = async () => false;`,
-  "@/features/conversations/server/conversation-service": `export const setConversationStatus = async () => null; export const recordConversationEvent = async () => {}; export const updateConversationState = async ({ db, workspaceId, conversationId, changes }) => { globalThis.__conversationAssignmentRouteTest.stateUpdates.push({ workspaceId, conversationId }); const [row] = await db.update({}).set(changes).where({}).returning(); return row ?? null; };`,
+  "@/features/conversations/server/queries": `export const appendTeamConversationMessage = async (...args) => { globalThis.__conversationAssignmentRouteTest.appends.push(args); return true; }; export const getConversation = async () => null; export const markConversationAsRead = async (...args) => { globalThis.__conversationAssignmentRouteTest.reads.push(args); return true; };`,
+  "@/features/conversations/server/conversation-service": `export const setConversationStatus = async (...args) => { globalThis.__conversationAssignmentRouteTest.statusUpdates.push(args); return true; }; export const recordConversationEvent = async (...args) => { globalThis.__conversationAssignmentRouteTest.events.push(args); }; export const updateConversationState = async ({ db, workspaceId, conversationId, changes }) => { globalThis.__conversationAssignmentRouteTest.stateUpdates.push({ workspaceId, conversationId }); const [row] = await db.update({}).set(changes).where({}).returning(); return row ?? null; };`,
   "@/lib/db/client": `export const runDbWriteOperation = async (db, operation) => operation(db);`,
   "@/lib/auth/permissions": `export const canManageWorkspace = () => true;`,
   "@/features/contacts/server/contact-tags": `export const parseContactTags = () => [];`,
   "@/features/conversations/server/labels": `export const parseConversationLabels = () => [];`,
   "@/lib/storage/index": `export const uploadPublicPath = () => "";`,
-  "@/features/integrations/server/chat-sdk": `export const isChatSdkChannel = () => false; export const postChannelReply = async () => {};`,
+  "@/features/integrations/server/chat-sdk": `export const isChatSdkChannel = () => true; export const postChannelReply = async (...args) => { globalThis.__conversationAssignmentRouteTest.providerSends.push(args); };`,
   "@/lib/db/schema": `export const conversation = { id: "conversation.id", workspaceId: "conversation.workspaceId", status: "conversation.status" };`,
   "drizzle-orm": `export const eq = (field, value) => ({ field, value }); export const and = (...conditions) => conditions; export const inArray = () => ({}); export const ne = (field, value) => ({ field, value, not: true });`,
 };
@@ -74,8 +74,14 @@ function reset({ conversation = {}, members = [] } = {}) {
     },
     members,
     memberLookupExpressions: [],
+    conversationLookups: [],
     updates: [],
     stateUpdates: [],
+    statusUpdates: [],
+    events: [],
+    reads: [],
+    appends: [],
+    providerSends: [],
   });
 
   state.db = {
@@ -86,6 +92,7 @@ function reset({ conversation = {}, members = [] } = {}) {
             { id: "conversation.id", workspaceId: "conversation.workspaceId" },
             { eq: stubsEq, and: stubsAnd },
           );
+          state.conversationLookups.push(expression);
           return matches(state.conversation, expression) ? state.conversation : null;
         },
       },
@@ -98,6 +105,9 @@ function reset({ conversation = {}, members = [] } = {}) {
           state.memberLookupExpressions.push(expression);
           return state.members.find((member) => matches(member, expression) === true) ?? null;
         },
+      },
+      integration: {
+        findFirst: async () => ({ id: "integration-active" }),
       },
     },
     update: () => ({
@@ -173,6 +183,51 @@ test("a foreign-workspace assignee is rejected before any state change", async (
   assert.equal(state.memberLookupExpressions.length, 1);
   assert.equal(state.updates.length, 0);
   assert.equal(state.stateUpdates.length, 0);
+});
+
+test("foreign conversations deny every dashboard PATCH action before writes or side effects", async () => {
+  const actions = [
+    { action: "assign_to_member", assignedMemberId: "member-foreign" },
+    { action: "assign" },
+    { action: "takeover" },
+    { action: "snooze", snoozedUntil: new Date(Date.now() + 60_000).toISOString() },
+    { action: "unsnooze" },
+    { action: "set_ai_paused", paused: true },
+    { action: "close" },
+    { action: "reopen" },
+    { action: "read", readThroughMessageId: "message-1" },
+    { action: "reply", message: "Please help" },
+    { action: "note", message: "Internal note" },
+  ];
+
+  for (const action of actions) {
+    reset({
+      conversation: {
+        workspaceId: "workspace-foreign",
+        channel: "SLACK",
+        externalThreadId: "thread-foreign",
+      },
+      members: [{ id: "member-foreign", workspaceId: "workspace-foreign" }],
+    });
+
+    const response = await patch(action);
+
+    assert.equal(response.status, 404, `${action.action} should deny the foreign conversation`);
+    assert.deepEqual(state.conversationLookups, [
+      [
+        { field: "conversation.id", value: "conversation-1" },
+        { field: "conversation.workspaceId", value: "workspace-active" },
+      ],
+    ]);
+    assert.deepEqual(state.updates, []);
+    assert.deepEqual(state.stateUpdates, []);
+    assert.deepEqual(state.memberLookupExpressions, []);
+    assert.deepEqual(state.statusUpdates, []);
+    assert.deepEqual(state.events, []);
+    assert.deepEqual(state.reads, []);
+    assert.deepEqual(state.appends, []);
+    assert.deepEqual(state.providerSends, []);
+  }
 });
 
 test("unassigning an open conversation clears ownership and returns it to Open", async () => {
