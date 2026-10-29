@@ -4,8 +4,18 @@ import { randomUUID } from "node:crypto";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
 import { getDb, type Db } from "@/lib/db/client";
-import { agentTestCase, document } from "@/lib/db/schema";
+import { agentTestCase, document, widget } from "@/lib/db/schema";
 import type { AgentTestCaseInput } from "../input";
+
+async function lockWorkspaceWidget(db: Db, workspaceId: string) {
+  const [saved] = await db
+    .select({ id: widget.id })
+    .from(widget)
+    .where(eq(widget.workspaceId, workspaceId))
+    .limit(1)
+    .for("update");
+  if (!saved) throw new Error("Agent configuration was not found.");
+}
 
 export class AgentTestCaseTitleConflictError extends Error {
   constructor() {
@@ -64,34 +74,38 @@ export async function createAgentTestCase(
   input: AgentTestCaseInput,
   db: Db = getDb(),
 ) {
-  await validateExpectedSources(workspaceId, input.expectedSourceIds ?? [], db);
-  try {
-    const [testCase] = await db
-      .insert(agentTestCase)
-      .values({
-        id: randomUUID(),
-        title: input.title,
-        prompt: input.prompt,
-        expectedOutcome: input.expectedOutcome,
-        expectedSourceIds: input.expectedSourceIds ?? [],
-        workspaceId,
-        createdByMembershipId: membershipId,
-        updatedAt: sql`CURRENT_TIMESTAMP`,
-      })
-      .returning({
-        id: agentTestCase.id,
-        title: agentTestCase.title,
-        prompt: agentTestCase.prompt,
-        expectedOutcome: agentTestCase.expectedOutcome,
-        expectedSourceIds: agentTestCase.expectedSourceIds,
-        createdAt: agentTestCase.createdAt,
-        updatedAt: agentTestCase.updatedAt,
-      });
-    return testCase;
-  } catch (error) {
-    if (hasErrorCode(error, "23505")) throw new AgentTestCaseTitleConflictError();
-    throw error;
-  }
+  return db.transaction(async (transaction) => {
+    const tx = transaction as unknown as Db;
+    await lockWorkspaceWidget(tx, workspaceId);
+    await validateExpectedSources(workspaceId, input.expectedSourceIds ?? [], tx);
+    try {
+      const [testCase] = await tx
+        .insert(agentTestCase)
+        .values({
+          id: randomUUID(),
+          title: input.title,
+          prompt: input.prompt,
+          expectedOutcome: input.expectedOutcome,
+          expectedSourceIds: input.expectedSourceIds ?? [],
+          workspaceId,
+          createdByMembershipId: membershipId,
+          updatedAt: sql`CURRENT_TIMESTAMP`,
+        })
+        .returning({
+          id: agentTestCase.id,
+          title: agentTestCase.title,
+          prompt: agentTestCase.prompt,
+          expectedOutcome: agentTestCase.expectedOutcome,
+          expectedSourceIds: agentTestCase.expectedSourceIds,
+          createdAt: agentTestCase.createdAt,
+          updatedAt: agentTestCase.updatedAt,
+        });
+      return testCase;
+    } catch (error) {
+      if (hasErrorCode(error, "23505")) throw new AgentTestCaseTitleConflictError();
+      throw error;
+    }
+  });
 }
 
 export async function updateAgentTestCase(
@@ -100,36 +114,44 @@ export async function updateAgentTestCase(
   input: AgentTestCaseInput,
   db: Db = getDb(),
 ) {
-  await validateExpectedSources(workspaceId, input.expectedSourceIds ?? [], db);
-  try {
-    const [testCase] = await db
-      .update(agentTestCase)
-      .set({
-        ...input,
-        expectedSourceIds: input.expectedSourceIds ?? [],
-        updatedAt: sql`GREATEST(${agentTestCase.updatedAt} + INTERVAL '1 microsecond', CURRENT_TIMESTAMP)`,
-      })
-      .where(and(eq(agentTestCase.id, caseId), eq(agentTestCase.workspaceId, workspaceId)))
-      .returning({
-        id: agentTestCase.id,
-        title: agentTestCase.title,
-        prompt: agentTestCase.prompt,
-        expectedOutcome: agentTestCase.expectedOutcome,
-        expectedSourceIds: agentTestCase.expectedSourceIds,
-        createdAt: agentTestCase.createdAt,
-        updatedAt: agentTestCase.updatedAt,
-      });
-    return testCase ?? null;
-  } catch (error) {
-    if (hasErrorCode(error, "23505")) throw new AgentTestCaseTitleConflictError();
-    throw error;
-  }
+  return db.transaction(async (transaction) => {
+    const tx = transaction as unknown as Db;
+    await lockWorkspaceWidget(tx, workspaceId);
+    await validateExpectedSources(workspaceId, input.expectedSourceIds ?? [], tx);
+    try {
+      const [testCase] = await tx
+        .update(agentTestCase)
+        .set({
+          ...input,
+          expectedSourceIds: input.expectedSourceIds ?? [],
+          updatedAt: sql`GREATEST(${agentTestCase.updatedAt} + INTERVAL '1 microsecond', CURRENT_TIMESTAMP)`,
+        })
+        .where(and(eq(agentTestCase.id, caseId), eq(agentTestCase.workspaceId, workspaceId)))
+        .returning({
+          id: agentTestCase.id,
+          title: agentTestCase.title,
+          prompt: agentTestCase.prompt,
+          expectedOutcome: agentTestCase.expectedOutcome,
+          expectedSourceIds: agentTestCase.expectedSourceIds,
+          createdAt: agentTestCase.createdAt,
+          updatedAt: agentTestCase.updatedAt,
+        });
+      return testCase ?? null;
+    } catch (error) {
+      if (hasErrorCode(error, "23505")) throw new AgentTestCaseTitleConflictError();
+      throw error;
+    }
+  });
 }
 
 export async function deleteAgentTestCase(workspaceId: string, caseId: string, db: Db = getDb()) {
-  const deleted = await db
-    .delete(agentTestCase)
-    .where(and(eq(agentTestCase.id, caseId), eq(agentTestCase.workspaceId, workspaceId)))
-    .returning({ id: agentTestCase.id });
-  return deleted.length > 0;
+  return db.transaction(async (transaction) => {
+    const tx = transaction as unknown as Db;
+    await lockWorkspaceWidget(tx, workspaceId);
+    const deleted = await tx
+      .delete(agentTestCase)
+      .where(and(eq(agentTestCase.id, caseId), eq(agentTestCase.workspaceId, workspaceId)))
+      .returning({ id: agentTestCase.id });
+    return deleted.length > 0;
+  });
 }

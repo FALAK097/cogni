@@ -627,6 +627,93 @@ export const agentTestComparison = pgTable(
   ],
 );
 
+export const agentTestPublishCheckStatus = pgEnum("agent_test_publish_check_status", [
+  "PENDING_BASELINE",
+  "PENDING_DRAFT",
+  "COMPLETE",
+  "ERROR",
+]);
+
+/** A text-free, owner-created receipt binding full-suite outcomes to exact publish inputs. */
+export const agentTestPublishCheck = pgTable(
+  "agent_test_publish_check",
+  {
+    id: text().primaryKey().notNull(),
+    workspaceId: text()
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    widgetId: text()
+      .notNull()
+      .references(() => widget.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    createdByMembershipId: text().references(() => workspaceMember.id, {
+      onDelete: "set null",
+      onUpdate: "cascade",
+    }),
+    suiteDigest: text().notNull(),
+    sourceBasisDigest: text().notNull(),
+    basePublishedVersion: integer().notNull(),
+    candidateFingerprint: text().notNull(),
+    baselineRequestDigest: text(),
+    candidateRequestDigest: text(),
+    baselineReferences: jsonb().$type<{
+      configFingerprint: string;
+      modelProvider: "OPENAI" | "GOOGLE";
+      modelName: string;
+      results: {
+        caseId: string;
+        status: "passed" | "mismatch";
+        sources: { documentId: string; revisionId: string; revisionNumber: number }[];
+      }[];
+    } | null>(),
+    candidateReferences: jsonb().$type<{
+      configFingerprint: string;
+      modelProvider: "OPENAI" | "GOOGLE";
+      modelName: string;
+      results: {
+        caseId: string;
+        status: "passed" | "mismatch";
+        sources: { documentId: string; revisionId: string; revisionNumber: number }[];
+      }[];
+    } | null>(),
+    status: agentTestPublishCheckStatus().notNull(),
+    createdAt: timestampString()
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+    completedAt: timestampString(),
+  },
+  (table) => [
+    uniqueIndex("agent_test_publish_check_workspace_id_key").on(table.workspaceId, table.id),
+    index("agent_test_publish_check_workspace_createdAt_idx").on(
+      table.workspaceId,
+      table.createdAt,
+    ),
+    check(
+      "agent_test_publish_check_suite_digest_check",
+      sql`${table.suiteDigest} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "agent_test_publish_check_candidate_fingerprint_check",
+      sql`${table.candidateFingerprint} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "agent_test_publish_check_source_basis_digest_check",
+      sql`${table.sourceBasisDigest} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "agent_test_publish_check_request_digest_check",
+      sql`(${table.baselineRequestDigest} is null or ${table.baselineRequestDigest} ~ '^[0-9a-f]{64}$') and (${table.candidateRequestDigest} is null or ${table.candidateRequestDigest} ~ '^[0-9a-f]{64}$')`,
+    ),
+    check(
+      "agent_test_publish_check_version_nonnegative_check",
+      sql`${table.basePublishedVersion} >= 0`,
+    ),
+    check(
+      "agent_test_publish_check_result_state_check",
+      sql`(${table.status} = 'PENDING_BASELINE' and ${table.baselineReferences} is null and ${table.candidateReferences} is null and ${table.completedAt} is null) or (${table.status} = 'PENDING_DRAFT' and ${table.candidateReferences} is null and ${table.completedAt} is null) or (${table.status} = 'COMPLETE' and ${table.candidateReferences} is not null and ${table.completedAt} is not null) or (${table.status} = 'ERROR' and ${table.completedAt} is not null)`,
+    ),
+  ],
+);
+
 export const knowledgeGapReviewStatus = pgEnum("knowledge_gap_review_status", [
   "OPEN",
   "RESOLVED",

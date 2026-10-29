@@ -879,8 +879,11 @@ function SourceActions({
   onProcessSource: (source: KnowledgeBaseSource, action: "retry" | "sync") => void;
   isProcessing: boolean;
 }) {
-  const canSync = source.status === "ready" && ["website", "sitemap"].includes(source.sourceType);
-  const canRetry = source.status === "failed";
+  const sourceType = source.sourceType.toLowerCase();
+  const canSync = source.status === "ready" && sourceType === "website";
+  const canReindex = source.status === "ready" && ["file", "text", "txt"].includes(sourceType);
+  const canRetry =
+    source.status === "failed" && ["website", "file", "text", "txt"].includes(sourceType);
 
   return (
     <div className="flex items-center justify-end gap-1.5">
@@ -915,7 +918,7 @@ function SourceActions({
           }
         />
         <DropdownMenuContent align="end" sideOffset={8} className="w-44">
-          {canSync ? (
+          {canSync || canReindex ? (
             <DropdownMenuItem
               className="cursor-pointer gap-2"
               disabled={isProcessing}
@@ -926,7 +929,13 @@ function SourceActions({
               ) : (
                 <RefreshCw className="h-4 w-4" />
               )}
-              {isProcessing ? "Starting…" : "Sync now"}
+              {isProcessing
+                ? canReindex
+                  ? "Reindexing…"
+                  : "Starting…"
+                : canReindex
+                  ? "Reindex"
+                  : "Sync now"}
             </DropdownMenuItem>
           ) : null}
           {canRetry ? (

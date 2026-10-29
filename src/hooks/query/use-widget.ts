@@ -294,14 +294,19 @@ export function usePublishWidgetConfig() {
     mutationFn: async ({
       workspaceId,
       restoreVersion,
+      publishCheckId,
     }: {
       workspaceId: string;
       restoreVersion?: number;
+      publishCheckId?: string;
     }) => {
       const response = await fetch("/api/dashboard/widget/publish", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(restoreVersion ? { restoreVersion } : {}),
+        body: JSON.stringify({
+          ...(restoreVersion ? { restoreVersion } : {}),
+          ...(publishCheckId && !restoreVersion ? { publishCheckId } : {}),
+        }),
       });
       const result: unknown = await response.json().catch(() => null);
       if (!response.ok) {
@@ -875,6 +880,67 @@ export function useRecordAgentTestRun() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.widget.agentTestRuns.all });
+    },
+  });
+}
+
+export function useStartAgentTestPublishCheck() {
+  return useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/dashboard/agent-test-publish-checks", { method: "POST" });
+      const body: unknown = await response.json().catch(() => null);
+      const parsed = z
+        .object({
+          check: z.object({
+            id: z.string().uuid(),
+            suiteDigest: z.string().regex(/^[a-f0-9]{64}$/),
+            basePublishedVersion: z.number().int().nonnegative(),
+            baselineRequired: z.boolean(),
+          }),
+        })
+        .safeParse(body);
+      if (!response.ok || !parsed.success) {
+        const error = z.object({ error: z.string() }).safeParse(body);
+        throw new Error(
+          error.success ? error.data.error : "Couldn't start the publish comparison.",
+        );
+      }
+      return parsed.data.check;
+    },
+  });
+}
+
+export function useRecordAgentTestPublishCheckResults() {
+  return useMutation({
+    mutationFn: async (input: {
+      checkId: string;
+      variant: "baseline" | "draft";
+      results: {
+        id: string;
+        status: "passed" | "mismatch" | "error" | "not_run";
+        signedEvidence?: string;
+      }[];
+    }) => {
+      const response = await fetch("/api/dashboard/agent-test-publish-checks", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      const body: unknown = await response.json().catch(() => null);
+      const parsed = z
+        .object({
+          result: z.object({
+            status: z.enum(["PENDING_DRAFT", "COMPLETE"]),
+            passedCount: z.number().int().nonnegative(),
+            mismatchCount: z.number().int().nonnegative(),
+          }),
+        })
+        .safeParse(body);
+      if (!response.ok || !parsed.success) {
+        const error = z.object({ error: z.string() }).safeParse(body);
+        throw new Error(error.success ? error.data.error : "Couldn't verify the full saved suite.");
+      }
+      return parsed.data.result;
     },
   });
 }

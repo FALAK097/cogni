@@ -15,6 +15,7 @@ import {
 import { handoffReply, matchesEscalationKeywords } from "@/features/conversations/server/handoff";
 import type { WidgetModelProvider, WidgetWidgetConfig } from "@/features/widget/domain";
 import { resolveAgentTestModelIdentity } from "@/features/agent-tests/evaluation-context";
+import { getAgentTestPublishPreview } from "@/features/agent-tests/server/publish-checks";
 import { signAgentTestPreviewEvidence } from "@/features/agent-tests/signed-preview-evidence";
 import {
   assertPublicWidgetAccess,
@@ -46,6 +47,9 @@ import {
 } from "@/lib/ai/telemetry";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { getDb } from "@/lib/db/client";
+import { agentTestPublishCheck } from "@/lib/db/schema";
+import { and, eq } from "drizzle-orm";
+import { canManageWorkspace } from "@/lib/auth/permissions";
 import { emitDomainEvent } from "@/lib/events/domain-events";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { notifyWorkspaceMembers } from "@/lib/notifications/create-notification";
@@ -232,13 +236,48 @@ export async function POST(
         allowedDomains: string[];
       }
     | { error: Response };
+  let previewIdentity: ReturnType<typeof resolveAgentTestModelIdentity> | null = null;
 
   if (isPreview) {
     try {
-      const { workspace, session } = await requireDashboardContext();
+      const { workspace, session, membership } = await requireDashboardContext();
       const widget = await getPublicWidget(db, publicKey);
       if (!widget || widget.workspaceId !== workspace.id) {
         return Response.json({ error: "Preview access denied." }, { status: 403 });
+      }
+
+      let settings = toWidgetWidgetConfig(widget);
+      let publishPreview = null;
+      if (body.previewRunId) {
+        const checkExists = await db.query.agentTestPublishCheck.findFirst({
+          where: and(
+            eq(agentTestPublishCheck.id, body.previewRunId),
+            eq(agentTestPublishCheck.workspaceId, workspace.id),
+          ),
+          columns: { id: true },
+        });
+        if (checkExists) {
+          if (!canManageWorkspace(membership.role)) {
+            return Response.json({ error: "Preview access denied." }, { status: 403 });
+          }
+          publishPreview = await getAgentTestPublishPreview(
+            {
+              workspaceId: workspace.id,
+              membershipId: membership.id,
+              checkId: body.previewRunId,
+              caseId: body.previewCaseId!,
+            },
+            db,
+          );
+          if (!publishPreview) {
+            return Response.json(
+              { error: "This suite comparison is out of date. Start it again." },
+              { status: 409 },
+            );
+          }
+          previewIdentity = publishPreview.identity;
+          if (publishPreview.settings) settings = publishPreview.settings;
+        }
       }
 
       const rateLimit = await checkRateLimits([
@@ -265,7 +304,7 @@ export async function POST(
 
       access = {
         widget,
-        settings: toWidgetWidgetConfig(widget),
+        settings,
         origin: getRequestOrigin(request),
         allowedDomains: JSON.parse(widget.authorizedDomains || "[]") as string[],
       };
@@ -282,7 +321,8 @@ export async function POST(
     modelProvider: effectiveModelProvider,
     modelName: effectiveModelName,
     configFingerprint,
-  } = resolveAgentTestModelIdentity(
+  } = previewIdentity ??
+  resolveAgentTestModelIdentity(
     {
       id: access.widget.id,
       updatedAt: access.widget.updatedAt,

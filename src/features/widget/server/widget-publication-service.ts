@@ -13,6 +13,11 @@ import {
 import type { Db } from "@/lib/db/client";
 import { widget, widgetPublication } from "@/lib/db/schema";
 import {
+  AgentTestPublishCheckError,
+  assertAgentTestPublishCheckCurrent,
+  resolveAgentTestPublishDraftIdentity,
+} from "@/features/agent-tests/server/publish-checks";
+import {
   getWidgetPublicationStatus,
   toWidgetBookingConfig,
   toWidgetSettings,
@@ -36,6 +41,7 @@ export async function publishWidgetDraft(
   workspaceId: string,
   userId: string,
   restoreVersion?: number,
+  publishCheckId?: string,
 ): Promise<PublishWidgetDraftResult> {
   const transactionResult: PublishTransactionResult = await db.transaction(async (tx) => {
     const [saved] = await tx
@@ -45,6 +51,26 @@ export async function publishWidgetDraft(
       .limit(1)
       .for("update");
     if (!saved) return { error: "Agent configuration was not found.", status: 404 } as const;
+
+    if (restoreVersion === undefined) {
+      try {
+        await assertAgentTestPublishCheckCurrent(
+          {
+            workspaceId,
+            widgetId: saved.id,
+            checkId: publishCheckId,
+            publishedVersion: saved.publishedVersion,
+            candidateFingerprint: resolveAgentTestPublishDraftIdentity(saved).configFingerprint,
+          },
+          tx as unknown as Db,
+        );
+      } catch (error) {
+        if (error instanceof AgentTestPublishCheckError) {
+          return { error: error.message, status: 409 } as const;
+        }
+        throw error;
+      }
+    }
 
     let snapshot: WidgetPublicationSnapshot;
     if (restoreVersion !== undefined) {
