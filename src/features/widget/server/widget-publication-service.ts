@@ -52,26 +52,6 @@ export async function publishWidgetDraft(
       .for("update");
     if (!saved) return { error: "Agent configuration was not found.", status: 404 } as const;
 
-    if (restoreVersion === undefined) {
-      try {
-        await assertAgentTestPublishCheckCurrent(
-          {
-            workspaceId,
-            widgetId: saved.id,
-            checkId: publishCheckId,
-            publishedVersion: saved.publishedVersion,
-            candidateFingerprint: resolveAgentTestPublishDraftIdentity(saved).configFingerprint,
-          },
-          tx as unknown as Db,
-        );
-      } catch (error) {
-        if (error instanceof AgentTestPublishCheckError) {
-          return { error: error.message, status: 409 } as const;
-        }
-        throw error;
-      }
-    }
-
     let snapshot: WidgetPublicationSnapshot;
     if (restoreVersion !== undefined) {
       if (restoreVersion >= saved.publishedVersion) {
@@ -111,6 +91,26 @@ export async function publishWidgetDraft(
           error: "Choose a supported model for the selected provider before publishing.",
           status: 422,
         } as const;
+      }
+    }
+
+    if (restoreVersion === undefined) {
+      try {
+        await assertAgentTestPublishCheckCurrent(
+          {
+            workspaceId,
+            widgetId: saved.id,
+            checkId: publishCheckId,
+            publishedVersion: saved.publishedVersion,
+            candidateFingerprint: resolveAgentTestPublishDraftIdentity(saved).configFingerprint,
+          },
+          tx as unknown as Db,
+        );
+      } catch (error) {
+        if (error instanceof AgentTestPublishCheckError) {
+          return { error: error.message, status: 409 } as const;
+        }
+        throw error;
       }
     }
 
