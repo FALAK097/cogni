@@ -138,11 +138,12 @@ export default function HelpPage() {
                 </ul>
               </div>
               <div className="rounded-xl border border-border bg-card p-4">
-                <h3 className="text-sm font-semibold text-foreground">Draft vs. Published</h3>
+                <h3 className="text-sm font-semibold text-foreground">Immediate Grounding</h3>
                 <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                  Newly added or edited sources are immediately available in the{" "}
-                  <strong>Agent Test Console</strong> (`/agent#test`) for verification. Live visitor
-                  widgets query only the <strong>published snapshot</strong>.
+                  As soon as a source reaches <strong>Ready / Indexed</strong>, its knowledge chunks
+                  are immediately queried by both the <strong>Agent Test Console</strong> and live
+                  visitor widgets. Widget publication and rollback manage behavior settings
+                  (prompts, greetings, appearance), not knowledge content.
                 </p>
               </div>
             </div>
@@ -181,13 +182,15 @@ export default function HelpPage() {
                 Content Security Policy (CSP) Directives
               </h3>
               <p className="text-xs leading-relaxed text-muted-foreground">
-                If your site enforces a CSP header, add your Cogni domain to the following
-                directives:
+                If your site enforces a CSP header, include script, connect, inline styles, and font
+                hosts:
               </p>
               <pre className="overflow-x-auto rounded-lg bg-muted p-3 font-mono text-xs text-foreground">
                 {`script-src 'self' https://<your-cogni-domain>;
 connect-src 'self' https://<your-cogni-domain> wss://<your-cogni-domain>;
 frame-src 'self' https://<your-cogni-domain>;
+style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+font-src 'self' https://fonts.gstatic.com;
 img-src 'self' https://<your-cogni-domain> data: blob:;`}
               </pre>
             </div>
@@ -200,19 +203,20 @@ img-src 'self' https://<your-cogni-domain> data: blob:;`}
             </h2>
             <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">
               Cogni maintains separate draft and published configurations so you can refine prompt
-              instructions, suggested questions, appearance, and knowledge without risking live
-              visitor conversations.
+              instructions, suggested questions, and appearance without risking live visitor
+              conversations.
             </p>
             <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
               <li>
                 <strong>Publishing:</strong> Click <strong>Publish Changes</strong> in{" "}
                 <code>/agent#deploy</code>. This creates an immutable version record (e.g., v1, v2)
-                and promotes the draft to production.
+                and promotes the draft behavior settings to production.
               </li>
               <li>
                 <strong>Rollback:</strong> In <strong>Publication History</strong>, view previous
                 releases and click <strong>Roll Back to This Version</strong> to restore a verified
-                earlier state instantly.
+                earlier configuration. (Note: rollback restores widget behavior settings, not
+                knowledge documents, which are live upon indexing).
               </li>
             </ul>
           </section>
@@ -255,10 +259,15 @@ img-src 'self' https://<your-cogni-domain> data: blob:;`}
               </div>
             </div>
             <div className="rounded-xl border border-amber-300/60 bg-amber-50/40 p-4 text-xs text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/20 dark:text-amber-200">
-              <strong className="font-semibold">Uncertain Delivery:</strong> If network or provider
-              connectivity is interrupted, Cogni marks outgoing messages with a{" "}
-              <strong>Delivery uncertain</strong> notice and provides a manual retry button, never
-              dropping messages silently.
+              <strong className="font-semibold">
+                Uncertain Delivery &amp; Duplicate Prevention:
+              </strong>{" "}
+              If an outbound reply cannot be confirmed by the channel provider, Cogni displays an
+              amber warning and preserves your draft in the composer. Clicking Send again opens the{" "}
+              <strong>Check channel delivery before retrying</strong> dialog. Check the external
+              channel first; if the message did not arrive, confirm{" "}
+              <strong>Send again anyway</strong>. If it did arrive, keep or clear the draft to
+              prevent duplicates.
             </div>
           </section>
 
@@ -319,10 +328,10 @@ img-src 'self' https://<your-cogni-domain> data: blob:;`}
                     <td className="px-4 py-3 font-medium text-foreground">
                       Delivery uncertain badge
                     </td>
-                    <td className="px-4 py-3">Temporary channel network issue</td>
+                    <td className="px-4 py-3">Temporary channel provider outage or timeout</td>
                     <td className="px-4 py-3">
-                      Check channel health in <strong>Settings → Connections</strong>; click{" "}
-                      <strong>Retry send</strong>.
+                      Check customer channel first; if message did not arrive, confirm{" "}
+                      <strong>Send again anyway</strong> in the dialog.
                     </td>
                   </tr>
                 </tbody>

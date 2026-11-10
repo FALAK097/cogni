@@ -8,7 +8,6 @@ import { useToast } from "@/components/ui/use-toast";
 import type { DashboardWidgetConfig } from "@/hooks/query";
 import { useWidgetConfig, useSaveWidgetConfig, usePublishWidgetConfig } from "@/hooks/query";
 import { isValidDomain, sanitizeDomain } from "@/lib/domain-validation";
-import { getWidgetAccentVars } from "@/lib/widget-accent";
 import { normalizeFontFamily, normalizeFontSize, normalizeLogoUrl } from "@/features/widget/domain";
 import { WIDGET_PREVIEW_RESPONSE_TIMEOUT_MS } from "@/features/widget/agent-timeouts";
 import { BookingSettingsCard } from "@/features/integrations/components/booking-settings-card";
@@ -165,7 +164,6 @@ export function WidgetCustomizerSkeleton() {
       aria-busy="true"
       aria-label="Loading Agent setup"
       className="flex h-full min-h-0 w-full flex-col gap-4 overflow-hidden bg-background p-4 sm:p-6"
-      style={getWidgetAccentVars("#282624")}
     >
       <div aria-hidden="true" className="flex shrink-0 flex-wrap items-center gap-2 px-1 py-1">
         <Skeleton className="h-6 w-16 rounded" />
@@ -737,10 +735,7 @@ export function WidgetCustomizer({
   };
 
   return (
-    <div
-      className="flex h-full min-h-0 w-full flex-col gap-4 overflow-hidden bg-background p-4 sm:p-6"
-      style={getWidgetAccentVars("#282624")}
-    >
+    <div className="flex h-full min-h-0 w-full flex-col gap-4 overflow-hidden bg-background p-4 sm:p-6">
       {widgetConfigQuery.isError ? (
         <div
           role="alert"
