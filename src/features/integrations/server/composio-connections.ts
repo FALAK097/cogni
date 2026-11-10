@@ -51,6 +51,9 @@ export async function getOrCreateAuthConfig(composio: Composio, toolkit: string)
   if (authConfig) return authConfig.id;
 
   if (usesCustomGoogleAuth) {
+    if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
+      throw new Error("Google Chat connection requires GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.");
+    }
     const created = await composio.authConfigs.create(toolkit, {
       type: "use_custom_auth",
       authScheme: "OAUTH2",

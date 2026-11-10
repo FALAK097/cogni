@@ -102,7 +102,7 @@
     "@chat-adapter/gchat": "^4.41.1",
     "@chat-adapter/slack": "^4.41.1",
     "@chat-adapter/state-pg": "^4.41.1",
-    "@chat-adapter/teams": "4.41.1",
+    "@chat-adapter/teams": "^4.44.0",
     "@chat-adapter/whatsapp": "^4.41.1",
     "@composio/core": "^0.22.0",
     "@composio/vercel": "^0.12.1",

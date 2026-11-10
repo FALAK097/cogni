@@ -36,8 +36,8 @@ importers:
         specifier: ^4.41.1
         version: 4.44.0(ai@7.0.127(zod@4.6.7))(zod@4.6.7)
       '@chat-adapter/teams':
-        specifier: 4.41.1
-        version: 4.41.1(ai@7.0.127(zod@4.6.7))(zod@4.6.7)
+        specifier: ^4.44.0
+        version: 4.44.0(ai@7.0.127(zod@4.6.7))(zod@4.6.7)
       '@chat-adapter/whatsapp':
         specifier: ^4.41.1
         version: 4.44.0(ai@7.0.127(zod@4.6.7))(zod@4.6.7)
@@ -798,10 +798,6 @@ packages:
     resolution: {integrity: sha512-iJlk4aI8VBtIs02Mc1fsFqv7tkOqj5cPxPGdWm0+M5Kziz5SrDuLHwEiC6MdDh4kSNZpIWbiOskIuNo6uBJhdA==}
     engines: {node: '>=20'}
 
-  '@chat-adapter/shared@4.41.1':
-    resolution: {integrity: sha512-ia1Ctd4mclpiNd+sYUc/fo9RXIFoBr/Z0JFFk3hue1XiFXPTJClG/BHpS+243UmSkeE5JORjY4MmW+szdhhFWw==}
-    engines: {node: '>=20'}
-
   '@chat-adapter/shared@4.44.0':
     resolution: {integrity: sha512-g6MmtkFLVE3Fn19Ly8e+3bZTAw5Kzh/2oP3qKRaVW0IPwVLDa2GRq/Q5fpGS+Xmzn2oqzpaHJrRuQRdWjLboqg==}
     engines: {node: '>=20'}
@@ -814,8 +810,8 @@ packages:
     resolution: {integrity: sha512-/QPFKNjTsNj7sL7cEiJT7dD+sYYoh8BBwUtZRwn3nWK4iqRA834K9kWS71ceOZiaQmay19CDTUULQivMrpxkkg==}
     engines: {node: '>=20'}
 
-  '@chat-adapter/teams@4.41.1':
-    resolution: {integrity: sha512-aoxuXBJPqHSHH6t5d2IXYl8RcdViM2OOG48YTnDNqIfSwQMVToFr0Pc+hxBGaO8Fcwvtyollc2rUdQsGI6WkGA==}
+  '@chat-adapter/teams@4.44.0':
+    resolution: {integrity: sha512-zGCZprZlta/rolgqSLAqBkHn35bLp+gmZ5kksuiqrpk6tEcY1ngaPsbM8zO4TxfplHrZ8+kVW47p9M+2Is9fcw==}
     engines: {node: '>=20'}
 
   '@chat-adapter/whatsapp@4.44.0':
@@ -3096,21 +3092,6 @@ packages:
   character-reference-invalid@2.0.1:
     resolution: {integrity: sha512-iBZ4F4wRbyORVsu0jPV7gXkOsGYjGHPmAyv+HiHG8gi5PtC9KI2j1+v8/tlibRvjoWX027ypmG/n0HtO5t7unw==}
 
-  chat@4.41.1:
-    resolution: {integrity: sha512-+/LDcLoYLihf/9Kp5ymj2ylvm6q5vySQTMn0ZoeU0UWDfNVmCNc6OiADW8hwnejOLfevUs8lEpgotG9rmIxZvg==}
-    engines: {node: '>=20'}
-    peerDependencies:
-      ai: ^6.0.182 || ^7.0.0
-      workflow: ^5.0.0-beta.35
-      zod: ^3.0.0 || ^4.0.0
-    peerDependenciesMeta:
-      ai:
-        optional: true
-      workflow:
-        optional: true
-      zod:
-        optional: true
-
   chat@4.44.0:
     resolution: {integrity: sha512-DGVc9yV1ifOJFpe8Pz6BAoOBVT7/iI/7kkMuB+ZUrpyQ1iw1ElibxyvYBx7tEo1qPl6w510+Acvt1XSVPSgKjA==}
     engines: {node: '>=20'}
@@ -4997,10 +4978,6 @@ packages:
   pusher-js@8.6.0:
     resolution: {integrity: sha512-wShJPfCS/kYkCBVzVW67wa9cnQIgHTszEK2XHNrFkOgGruuGw081aERAxfRjfdFU+WcIt8x6dvbwkTW4iZuQ8Q==}
 
-  qs@6.15.2:
-    resolution: {integrity: sha512-Rzq0KEyX/w/tEybncDgdkZrJgVUsUMk3xjh3t5bv3S1HTAtg+uOYt72+ZfwiQwKdysThkTBdL/rTi6HDmX9Ddw==}
-    engines: {node: '>=0.6'}
-
   qs@6.17.1:
     resolution: {integrity: sha512-jd3COkaKVgGUW+ZHyEHCG9bH7RoaaiWuMgzsIBjUMVjLAaWGWpoUAVwljVvBHxRu/2qEHnadLGZrkutYUBPQJA==}
     engines: {node: '>=0.6'}
@@ -6797,15 +6774,6 @@ snapshots:
       - workflow
       - zod
 
-  '@chat-adapter/shared@4.41.1(ai@7.0.127(zod@4.6.7))(zod@4.6.7)':
-    dependencies:
-      chat: 4.41.1(ai@7.0.127(zod@4.6.7))(zod@4.6.7)
-    transitivePeerDependencies:
-      - ai
-      - supports-color
-      - workflow
-      - zod
-
   '@chat-adapter/shared@4.44.0(ai@7.0.127(zod@4.6.7))(zod@4.6.7)':
     dependencies:
       chat: 4.44.0(ai@7.0.127(zod@4.6.7))(zod@4.6.7)
@@ -6841,14 +6809,15 @@ snapshots:
       - workflow
       - zod
 
-  '@chat-adapter/teams@4.41.1(ai@7.0.127(zod@4.6.7))(zod@4.6.7)':
+  '@chat-adapter/teams@4.44.0(ai@7.0.127(zod@4.6.7))(zod@4.6.7)':
     dependencies:
-      '@chat-adapter/shared': 4.41.1(ai@7.0.127(zod@4.6.7))(zod@4.6.7)
+      '@chat-adapter/shared': 4.44.0(ai@7.0.127(zod@4.6.7))(zod@4.6.7)
       '@microsoft/teams.api': 2.2.0
       '@microsoft/teams.apps': 2.2.0
       '@microsoft/teams.cards': 2.2.0
+      '@microsoft/teams.graph': 2.2.0
       '@microsoft/teams.graph-endpoints': 2.2.0
-      chat: 4.41.1(ai@7.0.127(zod@4.6.7))(zod@4.6.7)
+      chat: 4.44.0(ai@7.0.127(zod@4.6.7))(zod@4.6.7)
     transitivePeerDependencies:
       - ai
       - bufferutil
@@ -8360,7 +8329,7 @@ snapshots:
   '@types/jsonwebtoken@9.0.10':
     dependencies:
       '@types/ms': 2.1.0
-      '@types/node': 20.19.43
+      '@types/node': 24.19.2
 
   '@types/mdast@4.0.4':
     dependencies:
@@ -8637,7 +8606,7 @@ snapshots:
       http-errors: 2.0.1
       iconv-lite: 0.7.2
       on-finished: 2.4.1
-      qs: 6.15.2
+      qs: 6.17.1
       raw-body: 3.0.2
       type-is: 2.1.0
     transitivePeerDependencies:
@@ -8710,21 +8679,6 @@ snapshots:
   character-entities@2.0.2: {}
 
   character-reference-invalid@2.0.1: {}
-
-  chat@4.41.1(ai@7.0.127(zod@4.6.7))(zod@4.6.7):
-    dependencies:
-      '@workflow/serde': 4.1.0-beta.2
-      mdast-util-to-string: 4.0.0
-      remark-gfm: 4.0.1
-      remark-parse: 11.0.0
-      remark-stringify: 11.0.0
-      remend: 1.3.0
-      unified: 11.0.5
-    optionalDependencies:
-      ai: 7.0.127(zod@4.6.7)
-      zod: 4.6.7
-    transitivePeerDependencies:
-      - supports-color
 
   chat@4.44.0(ai@7.0.127(zod@4.6.7))(zod@4.6.7):
     dependencies:
@@ -9213,7 +9167,7 @@ snapshots:
       once: 1.4.0
       parseurl: 1.3.3
       proxy-addr: 2.0.7
-      qs: 6.15.2
+      qs: 6.17.1
       range-parser: 1.2.1
       router: 2.2.0
       send: 1.2.1
@@ -9475,7 +9429,7 @@ snapshots:
       gaxios: 7.1.3
       google-auth-library: 10.5.0
       google-logging-utils: 1.1.3
-      qs: 6.15.2
+      qs: 6.17.1
       url-template: 2.0.8
     transitivePeerDependencies:
       - supports-color
@@ -10759,10 +10713,6 @@ snapshots:
   pusher-js@8.6.0:
     dependencies:
       tweetnacl: 1.0.3
-
-  qs@6.15.2:
-    dependencies:
-      side-channel: 1.1.1
 
   qs@6.17.1:
     dependencies:

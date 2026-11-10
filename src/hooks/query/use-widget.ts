@@ -671,9 +671,10 @@ export function useCreateInboxSavedView() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(view),
       });
-      const result: { view?: InboxSavedView; error?: string } = await response
-        .json()
-        .catch(() => ({}));
+      const result = (await response.json().catch(() => ({}))) as {
+        view?: InboxSavedView;
+        error?: string;
+      };
       if (!response.ok || !result.view) {
         throw new Error(result.error ?? "Failed to save inbox view.");
       }
@@ -696,7 +697,7 @@ export function useDeleteInboxSavedView() {
         method: "DELETE",
       });
       if (!response.ok) {
-        const result: { error?: string } = await response.json().catch(() => ({}));
+        const result = (await response.json().catch(() => ({}))) as { error?: string };
         throw new Error(result.error ?? "Failed to delete inbox view.");
       }
     },
@@ -715,9 +716,10 @@ export function useInboxMacros() {
     enabled: Boolean(workspaceId),
     queryFn: async () => {
       const response = await fetch("/api/dashboard/inbox-macros");
-      const result: { macros?: InboxMacro[]; error?: string } = await response
-        .json()
-        .catch(() => ({}));
+      const result = (await response.json().catch(() => ({}))) as {
+        macros?: InboxMacro[];
+        error?: string;
+      };
       if (!response.ok || !result.macros) {
         throw new Error(result.error ?? "Failed to load saved replies.");
       }
@@ -736,9 +738,10 @@ export function useCreateInboxMacro() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
       });
-      const result: { macro?: InboxMacro; error?: string } = await response
-        .json()
-        .catch(() => ({}));
+      const result = (await response.json().catch(() => ({}))) as {
+        macro?: InboxMacro;
+        error?: string;
+      };
       if (!response.ok || !result.macro) {
         throw new Error(result.error ?? "Failed to save reply.");
       }
@@ -769,9 +772,10 @@ export function useUpdateInboxMacro() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
       });
-      const result: { macro?: InboxMacro; error?: string } = await response
-        .json()
-        .catch(() => ({}));
+      const result = (await response.json().catch(() => ({}))) as {
+        macro?: InboxMacro;
+        error?: string;
+      };
       if (!response.ok || !result.macro) {
         throw new Error(result.error ?? "Failed to update saved reply.");
       }
@@ -794,7 +798,7 @@ export function useDeleteInboxMacro() {
         method: "DELETE",
       });
       if (!response.ok) {
-        const result: { error?: string } = await response.json().catch(() => ({}));
+        const result = (await response.json().catch(() => ({}))) as { error?: string };
         throw new Error(result.error ?? "Failed to delete saved reply.");
       }
     },
@@ -813,9 +817,10 @@ export function useAgentTestCases() {
     enabled: Boolean(workspaceId),
     queryFn: async () => {
       const response = await fetch("/api/dashboard/agent-test-cases");
-      const result: { cases?: AgentTestCase[]; error?: string } = await response
-        .json()
-        .catch(() => ({}));
+      const result = (await response.json().catch(() => ({}))) as {
+        cases?: AgentTestCase[];
+        error?: string;
+      };
       if (!response.ok || !result.cases)
         throw new Error(result.error ?? "Failed to load agent tests.");
       return { cases: result.cases };
@@ -874,9 +879,10 @@ export function useRecordAgentTestRun() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
       });
-      const result: { run?: { id?: string }; error?: string } = await response
-        .json()
-        .catch(() => ({}));
+      const result = (await response.json().catch(() => ({}))) as {
+        run?: { id?: string };
+        error?: string;
+      };
       if (!response.ok || !result.run?.id) {
         throw new Error(result.error ?? "Could not save this test run to Insights.");
       }
@@ -1165,9 +1171,10 @@ export function useSaveAgentTestCase() {
           }),
         },
       );
-      const result: { case?: AgentTestCase; error?: string } = await response
-        .json()
-        .catch(() => ({}));
+      const result = (await response.json().catch(() => ({}))) as {
+        case?: AgentTestCase;
+        error?: string;
+      };
       if (!response.ok || !result.case)
         throw new Error(result.error ?? "Failed to save agent test.");
       return result.case;
@@ -1187,7 +1194,7 @@ export function useDeleteAgentTestCase() {
         `/api/dashboard/agent-test-cases/${encodeURIComponent(caseId)}`,
         { method: "DELETE" },
       );
-      const result: { error?: string } = await response.json().catch(() => ({}));
+      const result = (await response.json().catch(() => ({}))) as { error?: string };
       if (!response.ok) throw new Error(result.error ?? "Failed to delete agent test.");
     },
     onSuccess: () => {
@@ -1213,7 +1220,10 @@ export function useUpdateContactTag() {
           body: JSON.stringify({ action: input.action, tag: input.tag }),
         },
       );
-      const result: { tags?: string[]; error?: string } = await response.json().catch(() => ({}));
+      const result = (await response.json().catch(() => ({}))) as {
+        tags?: string[];
+        error?: string;
+      };
       if (!response.ok || !result.tags) {
         throw new Error(result.error ?? "Could not update contact tags.");
       }
@@ -1245,7 +1255,10 @@ export function useUpdateConversationLabel() {
           body: JSON.stringify({ action: input.action, label: input.label }),
         },
       );
-      const result: { labels?: string[]; error?: string } = await response.json().catch(() => ({}));
+      const result = (await response.json().catch(() => ({}))) as {
+        labels?: string[];
+        error?: string;
+      };
       if (!response.ok || !result.labels) {
         throw new Error(result.error ?? "Could not update conversation labels.");
       }
