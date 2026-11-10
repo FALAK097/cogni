@@ -525,10 +525,16 @@ export async function assertAgentTestPublishCheckCurrent(
   },
   db: Db,
 ) {
-  if (!input.checkId)
+  if (!input.checkId) {
+    const savedCase = await db.query.agentTestCase.findFirst({
+      where: eq(agentTestCase.workspaceId, input.workspaceId),
+      columns: { id: true },
+    });
+    if (!savedCase) return;
     throw new AgentTestPublishCheckError(
       "Run the full saved suite against the published agent and draft before publishing.",
     );
+  }
   const check = await db.query.agentTestPublishCheck.findFirst({
     where: and(
       eq(agentTestPublishCheck.id, input.checkId),
