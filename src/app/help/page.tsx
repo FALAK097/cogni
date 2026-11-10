@@ -88,11 +88,17 @@ export default function HelpPage() {
                   The first user to register becomes the workspace <strong>OWNER</strong>.
                 </li>
                 <li>
-                  To invite teammates, visit <strong>Settings → Team</strong> and enter their Google
-                  email address.
+                  To invite teammates, visit <strong>Settings → Team</strong>, enter their Google
+                  email address, and generate a workspace invite.
                 </li>
                 <li>
-                  Invited members sign in with that exact Google account to access the workspace.
+                  Copy and share the unique <code>/invite/&lt;token&gt;</code> link with the
+                  invitee.
+                </li>
+                <li>
+                  The teammate must open that link, sign in with the matching Google account, and
+                  click <strong>Accept invite</strong>. (Signing in directly at /sign-in without
+                  using the invite link will create a separate workspace instead of joining).
                 </li>
               </ol>
             </div>

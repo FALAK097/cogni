@@ -12,8 +12,13 @@ Cogni enforces a **Google-only authentication contract** for operator access.
 
 1. **Sign In**: Navigate to `/sign-in` and select **Continue with Google**.
 2. **Workspace Creation**: The initial user to sign in initializes the workspace and is assigned the `OWNER` role.
-3. **Inviting Teammates**: Workspace owners invite team members from **Settings → Team** by providing their Google-associated email address.
-4. **Member Acceptance**: Invited teammates accept by signing in with that exact Google email address.
+3. **Inviting Teammates**: Workspace owners invite team members from **Settings → Team** by entering their Google email address and selecting their role (`MEMBER` or `OWNER`).
+4. **Sharing the Invite Link**: Cogni generates a unique invite link (`https://<your-cogni-domain>/invite/<token>`). The workspace owner must copy and share this link directly with the invitee.
+5. **Accepting the Invitation**:
+   - The teammate opens the unique `/invite/<token>` link in their browser.
+   - They click **Sign in with Google** using the matching invited email address.
+   - Once authenticated with the matching account, they click **Accept invite** to join the workspace.
+   - _Important_: Signing in directly at `/sign-in` without opening the invite link will NOT accept the invitation; it places the user in a separate isolated workspace. Teammates must open the invite link and accept to join.
 
 ### Troubleshooting Google Sign-In
 
