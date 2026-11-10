@@ -13,6 +13,7 @@ import type {
   WidgetBorderRadiusStyle,
   WidgetPublicationStatus,
 } from "@/features/widget/domain";
+import type { EvidenceBoundReadiness } from "@/features/widget/agent-readiness";
 import { toast } from "@/components/ui/use-toast";
 import type {
   AgentTestCaseInput,
@@ -32,6 +33,7 @@ export type DashboardWidgetConfig = Omit<WidgetWidgetConfig, "borderRadius"> & {
   allowedDomains: string[];
   borderRadius: WidgetBorderRadiusStyle;
   publication: WidgetPublicationStatus;
+  readiness?: EvidenceBoundReadiness;
 };
 
 export type AgentTestCase = AgentTestCaseInput & {

@@ -53,7 +53,7 @@ function digestSuite(suiteVersion: string) {
   return createHash("sha256").update(suiteVersion).digest("hex");
 }
 
-async function getCurrentSourceBasisDigest(workspaceId: string, db: Db) {
+export async function getCurrentSourceBasisDigest(workspaceId: string, db: Db) {
   const documents = await db
     .select({
       documentId: documentTable.id,

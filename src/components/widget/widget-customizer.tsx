@@ -689,26 +689,30 @@ export function WidgetCustomizer({
     sessionsQuery.data?.pagination?.total && sessionsQuery.data.pagination.total > 0,
   );
 
-  const launchChecklist = getAgentLaunchChecklist({
-    readySourcesCount,
-    processingSourcesCount,
-    testCasesCount,
-    hasTestRun,
-    isEnabled: config.isEnabled,
-    hasPublishedVersion: Boolean(publication?.current),
-    hasUnpublishedChanges: Boolean(publication?.hasUnpublishedChanges),
-    authorizedDomainCount: config.allowedDomains.length,
-    hasObservedSession,
-    isSavingConfiguration: isSavingDraft,
-  });
+  const launchChecklist =
+    widgetConfigQuery.data?.readiness?.checklist ??
+    getAgentLaunchChecklist({
+      readySourcesCount,
+      processingSourcesCount,
+      testCasesCount,
+      hasTestRun,
+      isEnabled: config.isEnabled,
+      hasPublishedVersion: Boolean(publication?.current),
+      hasUnpublishedChanges: Boolean(publication?.hasUnpublishedChanges),
+      authorizedDomainCount: config.allowedDomains.length,
+      hasObservedSession,
+      isSavingConfiguration: isSavingDraft,
+    });
 
-  const launchReadiness = getAgentPublicationReadiness({
-    isEnabled: config.isEnabled,
-    hasPublishedVersion: Boolean(publication?.current),
-    hasUnpublishedChanges: Boolean(publication?.hasUnpublishedChanges),
-    authorizedDomainCount: config.allowedDomains.length,
-    isSavingConfiguration: isSavingDraft,
-  });
+  const launchReadiness =
+    widgetConfigQuery.data?.readiness?.publicationReadiness ??
+    getAgentPublicationReadiness({
+      isEnabled: config.isEnabled,
+      hasPublishedVersion: Boolean(publication?.current),
+      hasUnpublishedChanges: Boolean(publication?.hasUnpublishedChanges),
+      authorizedDomainCount: config.allowedDomains.length,
+      isSavingConfiguration: isSavingDraft,
+    });
 
   const appearanceConfig: AppearanceConfig = {
     logoUrl: config.logoUrl ?? "",

@@ -1117,6 +1117,9 @@ export function DashboardPage({
   const widgetConfig = widgetConfigQuery.data;
 
   const launchChecklist = useMemo(() => {
+    if (widgetConfig?.readiness?.checklist) {
+      return widgetConfig.readiness.checklist;
+    }
     return getAgentLaunchChecklist({
       readySourcesCount,
       processingSourcesCount,
@@ -1129,7 +1132,7 @@ export function DashboardPage({
       hasObservedSession: false,
       isSavingConfiguration: false,
     });
-  }, [readySourcesCount, processingSourcesCount, testCasesCount, hasTestRun, widgetConfig]);
+  }, [widgetConfig, readySourcesCount, processingSourcesCount, testCasesCount, hasTestRun]);
   const hasLowConversationVolume =
     !isLoading && analytics !== undefined && conversationCount > 0 && conversationCount < 5;
   const gapItems = analytics
