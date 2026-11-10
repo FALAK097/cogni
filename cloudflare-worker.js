@@ -62,7 +62,34 @@ export default {
         continue;
       }
 
-      const targetUrl = callbackUrl || `https://${appRoot}/api/internal/ingestion`;
+      const ingestionSecret = String(env.INGESTION_SHARED_SECRET || "").trim();
+      if (!ingestionSecret) {
+        console.error(
+          "Missing INGESTION_SHARED_SECRET in worker environment; retrying message:",
+          message.id,
+        );
+        const delaySeconds = Math.min(30 * 2 ** Math.max((message.attempts || 1) - 1, 0), 3600);
+        message.retry({ delaySeconds });
+        continue;
+      }
+
+      let targetUrl = `https://${appRoot}/api/internal/ingestion`;
+      if (callbackUrl) {
+        try {
+          const parsed = new URL(callbackUrl);
+          if (parsed.origin === `https://${appRoot}`) {
+            targetUrl = parsed.toString();
+          } else {
+            console.warn(
+              "Ignoring untrusted callbackUrl origin:",
+              parsed.origin,
+              "using canonical target",
+            );
+          }
+        } catch {
+          console.warn("Malformed callbackUrl, using canonical target:", callbackUrl);
+        }
+      }
 
       try {
         const caller = env.WORKER_SELF_REFERENCE ?? globalThis;
@@ -70,14 +97,14 @@ export default {
           new Request(targetUrl, {
             method: "POST",
             headers: {
-              authorization: `Bearer ${env.INGESTION_SHARED_SECRET || ""}`,
+              authorization: `Bearer ${ingestionSecret}`,
               "content-type": "application/json",
             },
             body: JSON.stringify({ workflowRunId, workspaceId }),
           }),
         );
 
-        if (response.ok || [400, 401, 409, 422].includes(response.status)) {
+        if (response.ok || [400, 409, 422].includes(response.status)) {
           if (!response.ok) {
             console.error("Ingestion job returned non-retryable status:", response.status, {
               workflowRunId,

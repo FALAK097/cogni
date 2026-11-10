@@ -12,8 +12,12 @@ import { env } from "@/lib/env/server";
 const fullSchema = { ...schema, ...relations };
 
 function createDb() {
+  const { hostname } = new URL(env.DATABASE_URL);
   const isLocal =
-    env.DATABASE_URL?.includes("localhost") || env.DATABASE_URL?.includes("127.0.0.1");
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "::1" ||
+    hostname === "[::1]";
   const client = postgres(env.DATABASE_URL, {
     max: 1,
     prepare: false,

@@ -31,16 +31,18 @@ function createAuth() {
     emailAndPassword: {
       enabled: true,
       requireEmailVerification: false,
-      async sendResetPassword({ user, url }) {
+      async sendResetPassword({ user }) {
         if (process.env.NODE_ENV !== "production") {
-          console.log(`[Better Auth Local Fallback] Reset password URL for ${user.email}: ${url}`);
+          console.log(`[Better Auth Local Fallback] Password reset requested for ${user.email}`);
         }
       },
     },
     emailVerification: {
-      async sendVerificationEmail({ user, url }) {
+      async sendVerificationEmail({ user }) {
         if (process.env.NODE_ENV !== "production") {
-          console.log(`[Better Auth Local Fallback] Verification URL for ${user.email}: ${url}`);
+          console.log(
+            `[Better Auth Local Fallback] Verification email requested for ${user.email}`,
+          );
         }
       },
     },
