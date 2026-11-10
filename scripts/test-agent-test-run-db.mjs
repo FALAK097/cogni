@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createHmac, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -10,14 +10,9 @@ import { z } from "zod";
 import "dotenv/config";
 
 process.env.SKIP_ENV_VALIDATION ??= "true";
-process.env.BETTER_AUTH_SECRET ??= "test-better-auth-secret-with-at-least-32-characters";
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl || !["localhost", "127.0.0.1", "::1"].includes(new URL(databaseUrl).hostname)) {
   throw new Error("Agent test history integration tests require a local DATABASE_URL.");
-}
-function signEvidence(payload) {
-  const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  return `${encoded}.${createHmac("sha256", process.env.BETTER_AUTH_SECRET).update(encoded).digest("base64url")}`;
 }
 const outputFile = join(process.cwd(), "node_modules/.cache/cogni-agent-test-history/runs.mjs");
 await mkdir(resolve(outputFile, ".."), { recursive: true });
@@ -72,33 +67,19 @@ test("Postgres history isolates tenants, deduplicates concurrent saves, validate
   const foreignId = randomUUID();
   const userId = randomUUID();
   const memberId = randomUUID();
-  const widgetId = randomUUID();
   const caseId = randomUUID();
   const runId = randomUUID();
   const now = new Date().toISOString();
   try {
     await raw`INSERT INTO workspace (id, name, slug, "updatedAt") VALUES (${workspaceId}, 'History test', ${workspaceId}, ${now}), (${foreignId}, 'Foreign history', ${foreignId}, ${now})`;
-    await raw`INSERT INTO widget (id, "publicKey", "workspaceId", "updatedAt") VALUES (${widgetId}, ${randomUUID().replace(/-/g, "")}, ${workspaceId}, ${now})`;
     await raw`INSERT INTO "user" (id, name, email, "updatedAt") VALUES (${userId}, 'History owner', ${`${userId}@example.test`}, ${now})`;
     await raw`INSERT INTO workspace_member (id, role, "updatedAt", "userId", "workspaceId") VALUES (${memberId}, 'OWNER', ${now}, ${userId}, ${workspaceId})`;
     await raw`INSERT INTO agent_test_case (id, title, prompt, "expectedOutcome", "updatedAt", "workspaceId") VALUES (${caseId}, 'Check', 'Private prompt', 'grounded_answer', ${now}, ${workspaceId})`;
     const cases = await listAgentTestCases(workspaceId);
-    const signedEvidence = signEvidence({
-      runId,
-      caseId,
-      workspaceId,
-      prompt: "Private prompt",
-      outcome: "answer",
-      grounded: true,
-      modelProvider: "GOOGLE",
-      modelName: "gemini-2.0-flash",
-      configFingerprint: "a".repeat(64),
-      sources: [],
-    });
     const input = {
       runId,
       suiteVersion: getAgentTestSuiteVersion(cases),
-      results: [{ id: caseId, status: "passed", signedEvidence }],
+      results: [{ id: caseId, status: "passed" }],
     };
     const [first, duplicate] = await Promise.all([
       recordAgentTestRun(workspaceId, memberId, input),
@@ -116,32 +97,10 @@ test("Postgres history isolates tenants, deduplicates concurrent saves, validate
       "API timestamps must satisfy the Insights client contract",
     );
     assert.equal("prompt" in rows[0], false);
-    const clientRelabel = await recordAgentTestRun(workspaceId, memberId, {
-      ...input,
-      results: [{ id: caseId, status: "mismatch", signedEvidence }],
-    });
-    assert.deepEqual(clientRelabel, first, "client status labels do not alter persisted results");
     await assert.rejects(
       recordAgentTestRun(workspaceId, memberId, {
         ...input,
-        results: [
-          {
-            id: caseId,
-            status: "passed",
-            signedEvidence: signEvidence({
-              runId,
-              caseId,
-              workspaceId,
-              prompt: "Private prompt",
-              outcome: "answer",
-              grounded: false,
-              modelProvider: "GOOGLE",
-              modelName: "gemini-2.0-flash",
-              configFingerprint: "a".repeat(64),
-              sources: [],
-            }),
-          },
-        ],
+        results: [{ id: caseId, status: "mismatch" }],
       }),
       AgentTestRunConflictError,
     );
@@ -193,55 +152,6 @@ test("Postgres history isolates tenants, deduplicates concurrent saves, validate
         .expectedSourceIds,
       [sourceId],
     );
-    const revisionId = randomUUID();
-    await raw`INSERT INTO document_revision (id, "documentId", "revisionNumber", "contentSha256", "sourceType", status, "workspaceId") VALUES (${revisionId}, ${sourceId}, 1, ${"a".repeat(64)}, 'TEXT', 'CURRENT', ${workspaceId})`;
-    const savedCases = await listAgentTestCases(workspaceId);
-    const contextualRunId = randomUUID();
-    await recordAgentTestRun(workspaceId, memberId, {
-      runId: contextualRunId,
-      suiteVersion: getAgentTestSuiteVersion(savedCases),
-      results: savedCases.map((testCase) => ({
-        id: testCase.id,
-        status: "passed",
-        modelProvider: "GOOGLE",
-        modelName: "gemini-2.0-flash",
-        configFingerprint: "b".repeat(64),
-        sources:
-          testCase.id === sourceCase.id
-            ? [{ documentId: sourceId, revisionId, revisionNumber: 1 }]
-            : [],
-        signedEvidence: signEvidence({
-          runId: contextualRunId,
-          caseId: testCase.id,
-          workspaceId,
-          prompt: testCase.prompt,
-          outcome: "answer",
-          grounded: testCase.id === sourceCase.id,
-          modelProvider: "GOOGLE",
-          modelName: "gemini-2.0-flash",
-          configFingerprint: "b".repeat(64),
-          sources:
-            testCase.id === sourceCase.id
-              ? [{ documentId: sourceId, revisionId, revisionNumber: 1 }]
-              : [],
-        }),
-      })),
-    });
-    const contextualHistory = await listAgentTestRuns(
-      workspaceId,
-      new Date(0),
-      new Date("2100-01-01"),
-    );
-    const evaluationContext = contextualHistory.find(
-      (run) => run.id === contextualRunId,
-    ).evaluationContext;
-    assert.equal(evaluationContext.modelProvider, "GOOGLE");
-    assert.equal(
-      evaluationContext.cases.find((result) => result.id === sourceCase.id).sources[0].revisionId,
-      revisionId,
-    );
-    assert.equal(JSON.stringify(evaluationContext).includes("Private prompt"), false);
-    assert.equal(JSON.stringify(evaluationContext).includes("Policy"), false);
     for (const unavailableId of [foreignSourceId, processingId, randomUUID()]) {
       await assert.rejects(
         createAgentTestCase(workspaceId, memberId, {

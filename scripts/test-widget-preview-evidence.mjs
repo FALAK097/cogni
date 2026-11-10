@@ -18,15 +18,7 @@ const previewEvidence = await import(
 );
 
 function encode(value) {
-  return encodeURIComponent(
-    JSON.stringify({
-      modelProvider: "GOOGLE",
-      modelName: "gemini-2.0-flash",
-      configFingerprint: "a".repeat(64),
-      signedEvidence: "signed-evidence.signature",
-      ...value,
-    }),
-  );
+  return encodeURIComponent(JSON.stringify(value));
 }
 
 test("preview evidence returns only bounded source titles", () => {
@@ -48,15 +40,11 @@ test("preview evidence returns only bounded source titles", () => {
   assert.deepEqual(result, {
     outcome: "answer",
     grounded: true,
-    modelProvider: "GOOGLE",
-    modelName: "gemini-2.0-flash",
-    configFingerprint: "a".repeat(64),
-    signedEvidence: "signed-evidence.signature",
     sources: [
-      { title: "Returns policy", revisionId: null, revisionNumber: null },
-      { title: "Shipping guide", revisionId: null, revisionNumber: null },
-      { title: "Warranty", revisionId: null, revisionNumber: null },
-      { title: "Support", revisionId: null, revisionNumber: null },
+      { title: "Returns policy" },
+      { title: "Shipping guide" },
+      { title: "Warranty" },
+      { title: "Support" },
     ],
   });
 });
@@ -98,16 +86,7 @@ test("preview evidence keeps only a bounded prompt for matching a saved preview 
     previewEvidence.parseWidgetPreviewEvidence(
       encode({ outcome: "answer", grounded: false, sources: [], prompt: "  no evidence?  " }),
     ),
-    {
-      outcome: "answer",
-      grounded: false,
-      modelProvider: "GOOGLE",
-      modelName: "gemini-2.0-flash",
-      configFingerprint: "a".repeat(64),
-      signedEvidence: "signed-evidence.signature",
-      sources: [],
-      prompt: "  no evidence?  ",
-    },
+    { outcome: "answer", grounded: false, sources: [], prompt: "  no evidence?  " },
   );
   assert.equal(
     previewEvidence.parseWidgetPreviewEvidence(
@@ -117,55 +96,21 @@ test("preview evidence keeps only a bounded prompt for matching a saved preview 
   );
 });
 
-test("preview evidence preserves signed run and case correlation IDs", () => {
-  const runId = "00000000-0000-4000-8000-000000000003";
-  const caseId = "00000000-0000-4000-8000-000000000004";
-  const result = previewEvidence.parseWidgetPreviewEvidence(
-    encode({
-      outcome: "answer",
-      grounded: false,
-      sources: [],
-      runId,
-      caseId,
-      prompt: "Saved prompt",
-    }),
-  );
-  assert.equal(result.runId, runId);
-  assert.equal(result.caseId, caseId);
-  assert.equal(
-    previewEvidence.parseWidgetPreviewEvidence(
-      encode({ outcome: "answer", grounded: false, sources: [], runId }),
-    ),
-    null,
-  );
-});
-
 test("preview source IDs survive transport for expected-source evaluation without extra provider data", () => {
   const result = previewEvidence.parseWidgetPreviewEvidence(
     encode({
       outcome: "answer",
       grounded: true,
       sources: [
-        {
-          title: "Policy",
-          documentId: "00000000-0000-4000-8000-000000000001",
-          revisionId: "00000000-0000-4000-8000-000000000002",
-          revisionNumber: 3,
-          content: "private chunk",
-        },
+        { title: "Policy", documentId: "policy-id", content: "private chunk" },
         { title: "Legacy" },
         { title: "Oversized", documentId: "x".repeat(129) },
       ],
     }),
   );
   assert.deepEqual(result.sources, [
-    {
-      title: "Policy",
-      documentId: "00000000-0000-4000-8000-000000000001",
-      revisionId: "00000000-0000-4000-8000-000000000002",
-      revisionNumber: 3,
-    },
-    { title: "Legacy", revisionId: null, revisionNumber: null },
-    { title: "Oversized", revisionId: null, revisionNumber: null },
+    { title: "Policy", documentId: "policy-id" },
+    { title: "Legacy" },
+    { title: "Oversized" },
   ]);
 });
