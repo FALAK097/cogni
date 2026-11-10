@@ -1,0 +1,102 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "cogni",
+  "main": "cloudflare-worker.js",
+  "account_id": "598a393819cd44e21ef2145dabea9a2f",
+  "compatibility_date": "2026-11-08",
+  "compatibility_flags": ["nodejs_compat"],
+  "limits": { "cpu_ms": 10000 },
+  "workers_dev": false,
+  "minify": true,
+  "upload_source_maps": false,
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS",
+  },
+  "observability": {
+    "enabled": true,
+  },
+  "routes": [{ "pattern": "cogni.falakgala.dev", "custom_domain": true }],
+  "r2_buckets": [
+    {
+      "binding": "UPLOADS",
+      "bucket_name": "widget-prod-uploads",
+    },
+    {
+      "binding": "NEXT_INC_CACHE_R2_BUCKET",
+      "bucket_name": "widget-prod-next-cache",
+    },
+  ],
+  "services": [
+    {
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "cogni",
+    },
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "NEXT_CACHE_DO_QUEUE",
+        "class_name": "DOQueueHandler",
+      },
+      {
+        "name": "NEXT_TAG_CACHE_DO_SHARDED",
+        "class_name": "DOShardedTagCache",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["DOQueueHandler", "DOShardedTagCache"],
+    },
+  ],
+  "vars": {
+    "ENV": "production",
+    "NODE_ENV": "production",
+    "NEXTJS_ENV": "production",
+    "BETTER_AUTH_URL": "https://cogni.falakgala.dev",
+    "APP_ROOT_DOMAIN": "cogni.falakgala.dev",
+    "CLOUDFLARE_ACCOUNT_ID": "598a393819cd44e21ef2145dabea9a2f",
+    "R2_BUCKET_NAME": "widget-prod-uploads",
+    "SEARCH_INDEX": "widget-prod-search",
+    "WIDGET_MODEL_PROVIDER": "GOOGLE",
+    "WIDGET_MODEL_NAME": "gemini-2.5-flash",
+  },
+  "queues": {
+    "producers": [
+      {
+        "binding": "INGESTION_QUEUE",
+        "queue": "cogni-ingestion",
+      },
+    ],
+    "consumers": [
+      {
+        "queue": "cogni-ingestion",
+        "max_batch_size": 10,
+        "max_retries": 5,
+        "retry_delay": 30,
+        "dead_letter_queue": "cogni-ingestion-dlq",
+      },
+    ],
+  },
+  "env": {
+    "development": {
+      "r2_buckets": [
+        {
+          "binding": "UPLOADS",
+          "bucket_name": "widget-development",
+        },
+        {
+          "binding": "NEXT_INC_CACHE_R2_BUCKET",
+          "bucket_name": "widget-development-next-cache",
+        },
+      ],
+      "vars": {
+        "ENV": "development",
+        "R2_BUCKET_NAME": "widget-development",
+        "SEARCH_INDEX": "cogni-search-development",
+      },
+    },
+  },
+}

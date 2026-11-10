@@ -12,9 +12,14 @@ const fullSchema = { ...schema, ...relations };
 let db: ReturnType<typeof createDb> | undefined;
 
 function createDb() {
+  const isLocal =
+    env.DATABASE_URL?.includes("localhost") || env.DATABASE_URL?.includes("127.0.0.1");
   const client = postgres(env.DATABASE_URL, {
     max: 1,
     prepare: false,
+    ssl: isLocal ? false : "require",
+    connect_timeout: 15,
+    idle_timeout: 20,
   });
 
   return drizzle(client, { schema: fullSchema });

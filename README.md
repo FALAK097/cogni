@@ -70,51 +70,54 @@ pnpm db:migrate:remote # Apply Drizzle migrations to Neon
 pnpm db:studio       # Open Drizzle Studio
 ```
 
-## Vercel Deployment
+## Cloudflare Workers Deployment
 
-The Next.js application deploys through Vercel's Git integration. OpenNext and Wrangler are not
-part of the deployment pipeline. Server routes and `src/proxy.ts` run in Vercel's Node.js runtime.
+The application runs on Cloudflare Workers using OpenNext (`@opennextjs/cloudflare`) and targets `https://cogni.falakgala.dev`.
 
-Cloudflare remains the provider for R2 object storage and AI Search. Those services are accessed
-through their S3-compatible and REST APIs, so they do not require Worker bindings.
+### CI/CD: Automated Deployment on Push to `main`
 
-### Environment & Secret Setup
+The repository is configured with a GitHub Actions workflow in [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml). Every push to the `main` branch triggers:
 
-Create a Vercel project from this repository and define these production environment variables:
+1. Dependency installation (`pnpm install --frozen-lockfile`)
+2. Code quality & type checks (`pnpm check`: oxlint, `tsc --noEmit`, oxfmt)
+3. OpenNext Cloudflare compilation (`pnpm run build:cf`)
+4. Worker deployment to Cloudflare (`cloudflare/wrangler-action@v3`)
 
-- `ENV=production`
-- `DATABASE_URL` (pooled URL, injected by the Neon integration)
-- `DATABASE_URL_UNPOOLED` (direct URL, injected by the Neon integration)
-- `GOOGLE_CLIENT_ID`
-- `GOOGLE_CLIENT_SECRET`
-- `BETTER_AUTH_SECRET`
-- `BETTER_AUTH_URL` (the final `https://` Vercel or custom production URL)
-- `CLOUDFLARE_ACCOUNT_ID`
-- `CLOUDFLARE_AI_SEARCH_TOKEN` (or `CLOUDFLARE_API_TOKEN`)
-- `R2_BUCKET_NAME`
-- `R2_ACCESS_KEY_ID`
-- `R2_SECRET_ACCESS_KEY`
-- `SEARCH_INDEX`
-- `GEMINI_API_KEY` and/or `OPENAI_API_KEY`
+#### Required GitHub Secrets
 
-Set the Vercel production domain as an authorized redirect URI in Google OAuth:
+In the GitHub repository settings (**Settings** > **Secrets and variables** > **Actions**), add:
+
+- `CLOUDFLARE_API_TOKEN`: Cloudflare API token with **Edit Cloudflare Workers** and **Account Settings: Read** permissions.
+
+### Worker Secrets & Environment Variables
+
+Non-secret variables and bindings are configured in [`wrangler.jsonc`](wrangler.jsonc). Secret credentials must be set in Cloudflare via `wrangler secret put` or via Cloudflare Dashboard (**Workers & Pages** > `cogni` > **Settings** > **Variables and Secrets**):
+
+```bash
+pnpm exec wrangler secret put DATABASE_URL
+pnpm exec wrangler secret put BETTER_AUTH_SECRET
+pnpm exec wrangler secret put GOOGLE_CLIENT_ID
+pnpm exec wrangler secret put GOOGLE_CLIENT_SECRET
+pnpm exec wrangler secret put CLOUDFLARE_API_TOKEN
+pnpm exec wrangler secret put INGESTION_SHARED_SECRET
+pnpm exec wrangler secret put OPENAI_API_KEY
+pnpm exec wrangler secret put GEMINI_API_KEY
+```
+
+### Google OAuth Redirect URI
+
+Add the production custom domain callback URI to your Google Cloud Console OAuth 2.0 Client credentials:
 
 ```text
-https://<production-domain>/api/auth/callback/google
+https://cogni.falakgala.dev/api/auth/callback/google
 ```
 
 ### Database Migrations
 
-The Neon database starts empty and `drizzle/0000_postgres_baseline.sql` is the single clean baseline.
-Apply it before the first deployment. For future schema changes, generate and apply migrations with
-the direct connection before deploying:
+Use the unpooled connection string for running migrations prior to deployment:
 
 ```bash
 DATABASE_URL_UNPOOLED="postgresql://..." pnpm db:migrate:remote
 ```
 
-Use the pooled `DATABASE_URL` for application traffic and the unpooled URL only for migrations and
-administrative tools.
-
-See [`docs/vercel-migration.md`](docs/vercel-migration.md) for the compatibility matrix, production
-cutover checklist, verification steps, and rollback plan.
+The application uses the pooled connection with `@neondatabase/serverless` / pooled PostgreSQL with `max: 1` and `prepare: false` inside Cloudflare Workers.
