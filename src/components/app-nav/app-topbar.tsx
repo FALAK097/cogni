@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 
 import { UserNav } from "@/components/app-nav/user-nav";
-import { ChevronRight, Home, MoreHorizontal, PanelLeft } from "@/components/icons";
+import { ChevronRight, MoreHorizontal, PanelLeft } from "@/components/icons";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -24,9 +24,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useKnowledgeBases } from "@/hooks/query";
-import { useSidebar } from "@/hooks/use-sidebar";
+import { useIsMobileSidebar, useSidebar } from "@/hooks/use-sidebar";
 import { cn } from "@/lib/utils";
+import { APP_PAGES } from "@/features/navigation/app-routes";
 
 type AppTopbarProps = {
   userData?: {
@@ -38,16 +38,11 @@ type AppTopbarProps = {
 };
 
 const LABELS: Record<string, string> = {
-  analytics: "Analytics",
-  "knowledge-base": "Knowledge Base",
-  conversations: "Conversations",
-
-  dashboard: "Dashboard",
-  widget: "Chat widget",
-  integrations: "Integrations",
-  settings: "Settings",
-  usage: "Usage",
-  whatsapp: "WhatsApp",
+  inbox: APP_PAGES.inbox.label,
+  insights: APP_PAGES.insights.label,
+  agent: APP_PAGES.agent.label,
+  settings: APP_PAGES.settings.label,
+  connections: "Connections",
   workspace: "Workspace",
 };
 
@@ -69,26 +64,8 @@ function formatSegment(segment: string) {
     .join(" ");
 }
 
-function getFallbackLabel(segment: string, index: number, routeSegments: string[]) {
-  const previous = routeSegments[index - 1];
-  if (previous === "agents") return "Agent";
+function getFallbackLabel(segment: string) {
   return formatSegment(segment);
-}
-
-function useBreadcrumbLabels(segments: string[]) {
-  const knowledgeBaseIndex = segments.indexOf("knowledge-base");
-  const knowledgeBaseId = knowledgeBaseIndex >= 0 ? (segments[knowledgeBaseIndex + 1] ?? "") : "";
-
-  const knowledgeBasesQuery = useKnowledgeBases();
-
-  const labels = new Map<string, string>();
-  const knowledgeBase = knowledgeBasesQuery.data?.knowledgeBases?.find(
-    (item) => item.id === knowledgeBaseId,
-  );
-
-  if (knowledgeBaseId) labels.set(knowledgeBaseId, knowledgeBase?.name ?? "Knowledge Base");
-
-  return labels;
 }
 
 function getVisibleCrumbs(crumbs: Crumb[]) {
@@ -106,20 +83,19 @@ function getBreadcrumbHref(routeSegments: string[], index: number) {
 function Breadcrumbs() {
   const pathname = usePathname();
   const segments = pathname.split("/").filter(Boolean);
-  const labels = useBreadcrumbLabels(segments);
 
-  const routeSegments = segments.length > 0 ? segments : ["dashboard"];
+  const routeSegments = segments.length > 0 ? segments : ["insights"];
   const routeCrumbs = routeSegments.map((segment, index) => {
     const isCurrent = index === routeSegments.length - 1;
 
     return {
       href: getBreadcrumbHref(routeSegments, index),
-      label: labels.get(segment) ?? getFallbackLabel(segment, index, routeSegments),
+      label: getFallbackLabel(segment),
       current: isCurrent,
     };
   });
 
-  const crumbs: Crumb[] = [{ href: "/dashboard", label: "Home" }, ...routeCrumbs];
+  const crumbs: Crumb[] = routeCrumbs;
   const isCompact = crumbs.length > 2;
   const { visible, hidden } = getVisibleCrumbs(crumbs);
 
@@ -127,12 +103,10 @@ function Breadcrumbs() {
     <Breadcrumb className="min-w-0">
       <BreadcrumbList className="flex-nowrap gap-1 text-sm sm:text-base">
         {visible.map((crumb, index) => {
-          const isHome = crumb.href === "/dashboard";
           return (
             <div
               className={cn(
                 "contents",
-                isCompact && isHome && "max-[640px]:hidden",
                 isCompact && !crumb.current && index < visible.length - 2 && "max-[640px]:hidden",
               )}
               key={`${crumb.href}-${index}`}
@@ -191,7 +165,6 @@ function Breadcrumbs() {
                   <BreadcrumbLink
                     render={<Link href={crumb.href} className="flex min-w-0 items-center gap-2" />}
                   >
-                    {crumb.href === "/dashboard" && <Home className="size-4 shrink-0" />}
                     <span className="truncate">{crumb.label}</span>
                   </BreadcrumbLink>
                 )}
@@ -205,8 +178,15 @@ function Breadcrumbs() {
 }
 
 export function AppTopbar({ userData, className }: AppTopbarProps) {
+  const pathname = usePathname();
   const toggleOpen = useSidebar((state) => state.toggleOpen);
   const sidebarDisabled = useSidebar((state) => state.settings.disabled);
+  const isMobile = useIsMobileSidebar();
+  const mobileDrawerOpen = useSidebar((state) => state.mobileDrawerOpen);
+  const isOpen = useSidebar((state) => state.isOpen);
+  const isHover = useSidebar((state) => state.isHover);
+  const isHoverOpen = useSidebar((state) => state.settings.isHoverOpen);
+  const showBreadcrumbs = !Object.values(APP_PAGES).some((page) => page.href === pathname);
   const normalizedUserData = {
     avatar: userData?.avatar ?? "",
     name: userData?.name ?? "Unknown",
@@ -219,6 +199,16 @@ export function AppTopbar({ userData, className }: AppTopbarProps) {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (
+        sidebarDisabled ||
+        event.defaultPrevented ||
+        event.altKey ||
+        (event.target instanceof HTMLElement && event.target.isContentEditable) ||
+        (event.target instanceof Element &&
+          event.target.closest("input, textarea, select, [role='dialog'], [role='alertdialog']"))
+      ) {
+        return;
+      }
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "b") {
         event.preventDefault();
         toggleOpen();
@@ -227,7 +217,7 @@ export function AppTopbar({ userData, className }: AppTopbarProps) {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [toggleOpen]);
+  }, [toggleOpen, sidebarDisabled]);
 
   return (
     <header
@@ -250,6 +240,14 @@ export function AppTopbar({ userData, className }: AppTopbarProps) {
                       className="size-9 shrink-0"
                       onClick={() => toggleOpen()}
                       aria-label={`Toggle sidebar (${shortcutLabel})`}
+                      aria-expanded={
+                        isMobile ? mobileDrawerOpen : isOpen || (isHoverOpen && isHover)
+                      }
+                      {...(!isMobile
+                        ? { "aria-controls": "workspace-desktop-navigation" }
+                        : mobileDrawerOpen
+                          ? { "aria-controls": "workspace-mobile-navigation" }
+                          : {})}
                     >
                       <PanelLeft className="size-5" />
                     </Button>
@@ -260,10 +258,10 @@ export function AppTopbar({ userData, className }: AppTopbarProps) {
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-            <div className="h-6 w-px shrink-0 bg-border" />
+            {showBreadcrumbs && <div className="h-6 w-px shrink-0 bg-border" />}
           </>
         )}
-        <Breadcrumbs />
+        {showBreadcrumbs && <Breadcrumbs />}
       </div>
       <div className="flex shrink-0 items-center gap-1 sm:gap-2">
         <ModeToggle />

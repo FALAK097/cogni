@@ -30,9 +30,10 @@ function GoogleLogo() {
 
 type AuthFormProps = {
   mode: "sign-in" | "sign-up";
+  callbackURL?: string;
 };
 
-export function AuthForm({ mode }: AuthFormProps) {
+export function AuthForm({ mode, callbackURL = "/insights" }: AuthFormProps) {
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string>();
 
@@ -42,7 +43,7 @@ export function AuthForm({ mode }: AuthFormProps) {
 
     const result = await authClient.signIn.social({
       provider: "google",
-      callbackURL: "/dashboard",
+      callbackURL,
     });
 
     if (result?.error) {

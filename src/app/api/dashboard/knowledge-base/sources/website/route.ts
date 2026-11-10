@@ -1,18 +1,31 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
-import { processDocument } from "@/features/knowledge/server/process-document";
-import { emitDomainEvent } from "@/lib/events/domain-events";
+import { enqueueDocumentProcessing } from "@/lib/jobs/ingestion";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { document as documentTable } from "@/lib/db/schema";
+import { z } from "zod";
+import { canManageWorkspace } from "@/lib/auth/permissions";
+
+const websiteSourcesSchema = z.object({
+  url: z.union([z.url(), z.array(z.url()).min(1).max(20)]),
+});
 
 export async function POST(request: Request) {
-  const { db, workspace } = await requireDashboardContext();
-  const body = (await request.json()) as { url?: string | string[] };
-
-  const urls = Array.isArray(body.url) ? body.url : body.url ? [body.url] : [];
-  if (urls.length === 0) {
-    return NextResponse.json({ error: "At least one URL is required." }, { status: 400 });
+  const { db, workspace, membership } = await requireDashboardContext();
+  if (!canManageWorkspace(membership.role)) {
+    return NextResponse.json(
+      { error: "Only workspace owners can add knowledge sources." },
+      { status: 403 },
+    );
   }
+  const parsed = websiteSourcesSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Provide between one and twenty valid URLs." },
+      { status: 400 },
+    );
+  }
+  const urls = Array.isArray(parsed.data.url) ? parsed.data.url : [parsed.data.url];
 
   const created = [];
 
@@ -30,25 +43,18 @@ export async function POST(request: Request) {
       })
       .returning();
 
-    try {
-      await processDocument({
-        db,
-        workspaceId: workspace.id,
-        documentId: document.id,
-        idempotencyKey: `document:url:${document.id}`,
-      });
-      await emitDomainEvent({
-        db,
-        workspaceId: workspace.id,
-        type: "document.ready",
-        entityId: document.id,
-      });
-    } catch {
-      // processDocument updates status on failure
-    }
+    await enqueueDocumentProcessing({
+      db,
+      workspaceId: workspace.id,
+      documentId: document.id,
+      idempotencyKey: `document:url:${document.id}`,
+    });
 
     created.push(document.id);
   }
 
-  return NextResponse.json({ addedSources: created.length, sourceIds: created });
+  return NextResponse.json(
+    { addedSources: created.length, sourceIds: created, status: "queued" },
+    { status: 202 },
+  );
 }

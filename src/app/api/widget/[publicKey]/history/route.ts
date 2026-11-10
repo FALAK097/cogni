@@ -64,12 +64,15 @@ export async function GET(
 
   const origin = getRequestOrigin(request);
   return withWidgetCors(
-    Response.json({
-      sessionId: session.id,
-      browserSessionId: session.browserSessionId,
-      token: session.token,
-      messages: toWidgetHistoryMessages(messages),
-    }),
+    Response.json(
+      {
+        sessionId: session.id,
+        browserSessionId: session.browserSessionId,
+        token: session.token,
+        messages: toWidgetHistoryMessages(messages),
+      },
+      { headers: { "Cache-Control": "private, no-store" } },
+    ),
     origin,
     validateEmbedOrigin(origin, access.allowedDomains),
   );

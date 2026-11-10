@@ -1,21 +1,12 @@
-import { ContentLayout } from "@/components/app-nav/content-layout";
-import { WidgetIntegrationsPage } from "@/components/integrations/widget-integrations-page";
-import { SITE_NAME } from "@/lib/constants";
-import { requireDashboardContext } from "@/lib/auth/dashboard-context";
+import { redirect } from "next/navigation";
 
-export const metadata = {
-  title: `Integrations | ${SITE_NAME}`,
-  description: "Connect integrations",
-};
+import { APP_ROUTES, queryStringFromSearchParams } from "@/features/navigation/app-routes";
 
-export default async function IntegrationsPage() {
-  await requireDashboardContext();
-
-  return (
-    <ContentLayout>
-      <div className="container mx-auto">
-        <WidgetIntegrationsPage />
-      </div>
-    </ContentLayout>
-  );
+export default async function LegacyIntegrationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const query = queryStringFromSearchParams(await searchParams);
+  redirect(`${APP_ROUTES.settings}${query ? `?${query}` : ""}`);
 }

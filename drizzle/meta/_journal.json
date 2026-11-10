@@ -8,6 +8,125 @@
       "when": 1784033156412,
       "tag": "0000_postgres_baseline",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1784369532484,
+      "tag": "0001_omnichannel_agent_platform",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790749807202,
+      "tag": "0002_shared_rate_limits",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790770349361,
+      "tag": "0003_inbox_cursor_pagination",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790932344451,
+      "tag": "0004_conversation_snoozing",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790935613721,
+      "tag": "0005_inbox_saved_views",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790938816282,
+      "tag": "0006_conversation_labels",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790938833874,
+      "tag": "0007_inbox_view_label_filter",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790939871556,
+      "tag": "0008_inbox_saved_replies",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790953543599,
+      "tag": "0009_agent_test_cases",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791006771345,
+      "tag": "0010_agent_publication_versions",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791028408834,
+      "tag": "0011_knowledge_gap_reviews",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791114505000,
+      "tag": "0012_durable_conversation_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791199594003,
+      "tag": "0013_ticket_lifecycle",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1791199770068,
+      "tag": "0014_ticket_workspace_constraints",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1791375809643,
+      "tag": "0015_agent_test_run_history",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1791526393048,
+      "tag": "0016_agent_test_suite_versions",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1791526941545,
+      "tag": "0017_agent_test_expected_sources",
+      "breakpoints": true
     }
   ]
 }

@@ -3,29 +3,31 @@ import { SectionLayout, SectionHeader } from "./section-layout";
 const STEPS = [
   {
     num: "01",
-    title: "Connect your website",
-    description: "Paste a single script tag. The widget appears live on your site in seconds.",
+    title: "Build your agent",
+    description: "Add website URLs, sitemaps, text, and supported files in Agent → Build.",
     color: "#6366f1",
     bg: "#eef0fe",
   },
   {
     num: "02",
-    title: "Import your knowledge",
-    description: "Sync your docs, Help Center, PDFs, and Notion pages with one click.",
+    title: "Test its answers",
+    description:
+      "Try real customer questions in Agent → Test and review the sources behind each answer.",
     color: "#10b981",
     bg: "#ecfdf5",
   },
   {
     num: "03",
-    title: "Customize the widget",
-    description: "Match your brand exactly: colors, fonts, avatar, and conversation starters.",
+    title: "Deploy your widget",
+    description:
+      "In Agent → Deploy, customize the experience, authorize your domain, and install the widget.",
     color: "#f59e0b",
     bg: "#fffbeb",
   },
   {
     num: "04",
-    title: "Go live instantly",
-    description: "Your AI agent handles questions 24/7. Your team steps in only when it matters.",
+    title: "Support customers in Inbox",
+    description: "Review conversations and reply from Inbox whenever a customer needs your team.",
     color: "#8b5cf6",
     bg: "#f5f3ff",
   },
@@ -36,8 +38,8 @@ export function HowItWorks() {
     <SectionLayout id="how-it-works">
       <SectionHeader
         label="Setup"
-        heading={<>Live in under 5 minutes.</>}
-        sub="No engineers, no complex configuration, no waiting."
+        heading={<>From knowledge to customer support.</>}
+        sub="Add your sources, test your answers, and install your widget."
         center
       />
 

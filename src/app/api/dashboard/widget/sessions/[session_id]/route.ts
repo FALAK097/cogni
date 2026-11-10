@@ -2,13 +2,25 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 
-import type { MessageJson } from "@/features/conversations/server/conversation-service";
+import {
+  appendConversationMessage,
+  recordConversationEvent,
+  updateConversationState,
+  type MessageJson,
+} from "@/features/conversations/server/conversation-service";
+import { runDbWriteOperation } from "@/lib/db/client";
+import {
+  DASHBOARD_SESSION_MESSAGE_MAX_LENGTH,
+  DASHBOARD_SESSION_PATCH_MAX_BYTES,
+  dashboardSessionPatchSchema,
+} from "@/features/conversations/dashboard-session-patch";
+import { readBoundedJson } from "@/lib/http/read-bounded-json";
 import { getDashboardEngagedVisitorSessionCond } from "@/features/widget/server/widget-data-filters";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
+import { canManageWorkspace } from "@/lib/auth/permissions";
 import {
   conversation as conversationTable,
   contact as contactTable,
-  lead as leadTable,
   visitorSession as visitorSessionTable,
 } from "@/lib/db/schema";
 
@@ -73,9 +85,6 @@ export async function GET(_request: Request, context: RouteContext) {
             },
           },
         },
-      },
-      widgetLeadCaptures: {
-        columns: { leadId: true },
       },
       conversations: {
         where: (fields, { eq, and, like }) =>
@@ -196,12 +205,27 @@ export async function PATCH(request: Request, context: RouteContext) {
   const { db, workspace, membership } = await requireDashboardContext();
   const { session_id: sessionId } = await context.params;
 
-  let body: { action?: string; message?: string };
-  try {
-    body = (await request.json()) as { action?: string; message?: string };
-  } catch {
-    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+  const parsedBody = await readBoundedJson(request, DASHBOARD_SESSION_PATCH_MAX_BYTES);
+  if (!parsedBody.ok) {
+    return NextResponse.json(
+      {
+        error:
+          parsedBody.reason === "too-large" ? "Request is too large." : "Invalid request body.",
+      },
+      { status: parsedBody.reason === "too-large" ? 413 : 400 },
+    );
   }
+
+  const parsedAction = dashboardSessionPatchSchema.safeParse(parsedBody.value);
+  if (!parsedAction.success) {
+    return NextResponse.json(
+      {
+        error: `Invalid action or message. Replies and notes must contain 1–${DASHBOARD_SESSION_MESSAGE_MAX_LENGTH} characters and include no extra fields.`,
+      },
+      { status: 400 },
+    );
+  }
+  const body = parsedAction.data;
 
   const widget = await db.query.widget.findFirst({
     where: (fields, { eq }) => eq(fields.workspaceId, workspace.id),
@@ -237,24 +261,21 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   if (body.action === "assign") {
     const nowIso = new Date().toISOString();
-    await db
-      .update(conversationTable)
-      .set({
+    await updateConversationState({
+      db,
+      workspaceId: workspace.id,
+      conversationId: conversation.id,
+      changes: {
         assignedMemberId: membership.id,
         status: "ASSIGNED",
         updatedAt: nowIso,
-      })
-      .where(eq(conversationTable.id, conversation.id));
+      },
+    });
     return NextResponse.json({ ok: true });
   }
 
   if (body.action === "reply") {
-    const message = body.message?.trim();
-    if (!message) {
-      return NextResponse.json({ error: "Message is required." }, { status: 400 });
-    }
-
-    const messagesList = parseMessages(conversation.messages);
+    const message = body.message;
     const nowIso = new Date().toISOString();
     const newMessage: MessageJson = {
       id: randomUUID(),
@@ -264,25 +285,21 @@ export async function PATCH(request: Request, context: RouteContext) {
       createdAt: nowIso,
     };
 
-    await db
-      .update(conversationTable)
-      .set({
-        lastMessageAt: nowIso,
-        updatedAt: nowIso,
-        messages: JSON.stringify([...messagesList, newMessage]),
-      })
-      .where(eq(conversationTable.id, conversation.id));
+    const appended = await appendConversationMessage({
+      db,
+      workspaceId: workspace.id,
+      conversationId: conversation.id,
+      message: newMessage,
+    });
+    if (!appended) {
+      return NextResponse.json({ error: "Conversation not found." }, { status: 404 });
+    }
 
     return NextResponse.json({ ok: true });
   }
 
   if (body.action === "note") {
-    const message = body.message?.trim();
-    if (!message) {
-      return NextResponse.json({ error: "Note is required." }, { status: 400 });
-    }
-
-    const messagesList = parseMessages(conversation.messages);
+    const message = body.message;
     const nowIso = new Date().toISOString();
     const newMessage: MessageJson = {
       id: randomUUID(),
@@ -292,13 +309,16 @@ export async function PATCH(request: Request, context: RouteContext) {
       createdAt: nowIso,
     };
 
-    await db
-      .update(conversationTable)
-      .set({
-        updatedAt: nowIso,
-        messages: JSON.stringify([...messagesList, newMessage]),
-      })
-      .where(eq(conversationTable.id, conversation.id));
+    const appended = await appendConversationMessage({
+      db,
+      workspaceId: workspace.id,
+      conversationId: conversation.id,
+      message: newMessage,
+      updateLastMessageAt: false,
+    });
+    if (!appended) {
+      return NextResponse.json({ error: "Conversation not found." }, { status: 404 });
+    }
 
     return NextResponse.json({ ok: true });
   }
@@ -307,7 +327,13 @@ export async function PATCH(request: Request, context: RouteContext) {
 }
 
 export async function DELETE(_request: Request, context: RouteContext) {
-  const { db, workspace } = await requireDashboardContext();
+  const { db, workspace, membership } = await requireDashboardContext();
+  if (!canManageWorkspace(membership.role)) {
+    return NextResponse.json(
+      { error: "Only workspace owners can delete visitor sessions." },
+      { status: 403 },
+    );
+  }
   const { session_id: sessionId } = await context.params;
   const widget = await db.query.widget.findFirst({
     where: (fields, { eq }) => eq(fields.workspaceId, workspace.id),
@@ -324,39 +350,38 @@ export async function DELETE(_request: Request, context: RouteContext) {
         eq(fields.widgetId, widget.id),
         getDashboardEngagedVisitorSessionCond(fields),
       ),
-    with: {
-      widgetLeadCaptures: {
-        columns: { leadId: true },
-      },
-    },
   });
 
   if (!session) {
     return NextResponse.json({ error: "Session not found." }, { status: 404 });
   }
 
-  const leadId = session.widgetLeadCaptures[0]?.leadId;
-  if (leadId) {
-    await db
-      .delete(leadTable)
-      .where(and(eq(leadTable.id, leadId), eq(leadTable.workspaceId, workspace.id)));
-  }
-  await db
-    .delete(conversationTable)
-    .where(
-      and(
-        eq(conversationTable.visitorSessionId, session.id),
-        eq(conversationTable.workspaceId, workspace.id),
-      ),
-    );
-  await db.delete(visitorSessionTable).where(eq(visitorSessionTable.id, session.id));
+  await runDbWriteOperation(db, async (transaction) => {
+    const conversations = await transaction
+      .select({ id: conversationTable.id })
+      .from(conversationTable)
+      .where(
+        and(
+          eq(conversationTable.visitorSessionId, session.id),
+          eq(conversationTable.workspaceId, workspace.id),
+        ),
+      );
+    for (const item of conversations) {
+      await recordConversationEvent(transaction, workspace.id, item.id, "state");
+    }
+    await transaction
+      .delete(conversationTable)
+      .where(
+        and(
+          eq(conversationTable.visitorSessionId, session.id),
+          eq(conversationTable.workspaceId, workspace.id),
+        ),
+      );
+    await transaction.delete(visitorSessionTable).where(eq(visitorSessionTable.id, session.id));
+  });
 
   if (session.contactId) {
     const hasConvos = await db.query.conversation.findFirst({
-      where: (fields, { eq }) => eq(fields.contactId, session.contactId!),
-      columns: { id: true },
-    });
-    const hasLeads = await db.query.lead.findFirst({
       where: (fields, { eq }) => eq(fields.contactId, session.contactId!),
       columns: { id: true },
     });
@@ -365,7 +390,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
       columns: { id: true },
     });
 
-    if (!hasConvos && !hasLeads && !hasSessions) {
+    if (!hasConvos && !hasSessions) {
       await db.delete(contactTable).where(eq(contactTable.id, session.contactId));
     }
   }

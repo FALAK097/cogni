@@ -3,6 +3,7 @@ import "server-only";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { MAX_UPLOAD_FILE_BYTES } from "@/features/widget/upload-limits";
 
 const uploadRoot = path.join(process.cwd(), ".uploads");
 
@@ -16,7 +17,6 @@ const allowedMimeTypes = new Set([
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ]);
 
-const maxUploadBytes = 10 * 1024 * 1024;
 const knowledgeMimeTypes = new Set([
   "application/pdf",
   "text/plain",
@@ -28,11 +28,11 @@ export function createStorageKey(workspaceId: string, filename: string) {
 }
 
 export function isAllowedUpload(mimeType: string, size: number) {
-  return allowedMimeTypes.has(mimeType) && size > 0 && size <= maxUploadBytes;
+  return allowedMimeTypes.has(mimeType) && size > 0 && size <= MAX_UPLOAD_FILE_BYTES;
 }
 
 export function isAllowedKnowledgeUpload(mimeType: string, size: number) {
-  return knowledgeMimeTypes.has(mimeType) && size > 0 && size <= maxUploadBytes;
+  return knowledgeMimeTypes.has(mimeType) && size > 0 && size <= MAX_UPLOAD_FILE_BYTES;
 }
 
 export async function saveUpload({

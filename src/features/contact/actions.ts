@@ -3,7 +3,7 @@
 import { headers } from "next/headers";
 import { z } from "zod";
 
-import { checkRateLimit } from "@/lib/rate-limit/memory";
+import { checkRateLimits, getTrustedClientIp } from "@/lib/rate-limit/shared";
 
 export type ContactActionState = {
   error?: string;
@@ -24,10 +24,18 @@ export async function submitContactAction(
   formData: FormData,
 ): Promise<ContactActionState> {
   const headerStore = await headers();
-  const ip = headerStore.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  const rateLimit = checkRateLimit({ key: `contact:${ip}`, limit: 5, windowMs: 60 * 60 * 1000 });
+  const rateLimit = await checkRateLimits([
+    {
+      key: `contact:${getTrustedClientIp(headerStore)}`,
+      limit: 5,
+      windowMs: 60 * 60 * 1000,
+    },
+  ]);
 
   if (!rateLimit.allowed) {
+    if (rateLimit.unavailable) {
+      return { error: "Service temporarily unavailable. Please try again shortly." };
+    }
     return { error: "Too many requests. Please try again later." };
   }
 
@@ -47,7 +55,6 @@ export async function submitContactAction(
   console.info("[contact]", {
     ...parsed.data,
     submittedAt: new Date().toISOString(),
-    ip,
   });
 
   return { success: true };

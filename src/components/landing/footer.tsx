@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { ThemeLogo } from "@/components/theme-logo";
 
+const COPYRIGHT_YEAR = new Date().getUTCFullYear();
+
 const FOOTER_LINKS = [
   { label: "Features", href: "#features" },
   { label: "Integrations", href: "#integrations" },
@@ -38,7 +40,7 @@ export function Footer() {
         {/* Bottom divider + copyright */}
         <div className="border-t border-gray-100 py-6">
           <p className="text-sm text-gray-400">
-            &copy; {new Date().getFullYear()} cogni Inc. All rights reserved.
+            &copy; {COPYRIGHT_YEAR} cogni Inc. All rights reserved.
           </p>
         </div>
       </div>

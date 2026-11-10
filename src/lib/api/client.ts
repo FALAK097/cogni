@@ -47,9 +47,6 @@ function mapPath(path: string) {
     );
   }
   if (path === "/api/widget/sessions") return "/api/dashboard/widget/sessions";
-  if (path === "/api/knowledge-base") {
-    return "/api/dashboard/knowledge-base";
-  }
   if (path.startsWith("/api/knowledge-base/sources/{source_id}")) {
     return path.replace(
       "/api/knowledge-base/sources/{source_id}",

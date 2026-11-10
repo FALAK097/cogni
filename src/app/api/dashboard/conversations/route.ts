@@ -1,44 +1,31 @@
 import { NextResponse } from "next/server";
 
-import { getInboxSummary, type ParsedConversation } from "@/features/conversations/server/queries";
+import { getInboxPage, mapConversationToListItem } from "@/features/conversations/server/queries";
+import { parseInboxListParams } from "@/features/conversations/inbox-pagination";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 
 export async function GET(request: Request) {
   const { workspace, membership } = await requireDashboardContext();
   const { searchParams } = new URL(request.url);
-  const query = searchParams.get("search") ?? undefined;
-  const filter = searchParams.get("filter") ?? "all";
-  const page = Number(searchParams.get("page") ?? "1");
-  const limit = Number(searchParams.get("limit") ?? "20");
+  const parsed = parseInboxListParams(searchParams);
+  if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
 
-  const summary = await getInboxSummary(
-    workspace.id,
-    query,
-    filter === "all" ? undefined : filter,
-    membership.id,
-  );
-  const start = (page - 1) * limit;
-  const slice = summary.conversations.slice(start, start + limit);
+  const result = await getInboxPage(workspace.id, {
+    query: parsed.data.search,
+    filter: parsed.data.filter === "all" ? undefined : parsed.data.filter,
+    membershipId: membership.id,
+    channel: parsed.data.channel,
+    assignee: parsed.data.assignee,
+    label: parsed.data.label,
+    limit: parsed.data.limit,
+    cursor: parsed.data.cursor,
+  });
 
   return NextResponse.json({
-    conversations: slice.map((conversation: ParsedConversation) => ({
-      id: conversation.id,
-      channel: conversation.channel === "WIDGET" ? "widget" : "widget",
-      contactName: conversation.contact?.name ?? "Unknown",
-      contactEmail: conversation.contact?.email ?? null,
-      status: conversation.status,
-      subject: conversation.subject,
-      summary: conversation.messages[0]?.body ?? conversation.subject,
-      lastMessageAt: conversation.lastMessageAt,
-      assignee: conversation.assignedMember?.user.name ?? null,
-    })),
-    counts: summary.counts,
+    conversations: result.conversations.map(mapConversationToListItem),
+    counts: result.counts,
     currentMembershipId: membership.id,
-    pagination: {
-      page,
-      limit,
-      total: summary.conversations.length,
-      pages: Math.max(1, Math.ceil(summary.conversations.length / limit)),
-    },
+    workspaceTimezone: workspace.timezone,
+    pagination: result.pagination,
   });
 }

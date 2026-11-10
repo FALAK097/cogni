@@ -22,6 +22,7 @@ import {
 } from "./documents.js";
 import { createFeedbackButtons, attachFeedbackListeners } from "./feedback.js";
 import { detectLeadCapture } from "./lead-capture.js";
+import { PREVIEW_EVIDENCE_EVENT } from "./preview-evidence.js";
 import { state, resetChatState } from "./state.js";
 import {
   getOrCreateVisitorId,
@@ -32,6 +33,7 @@ import {
   getStoredLeadInfo,
 } from "./storage.js";
 import { applyWidgetStyles } from "./styles.js";
+import { readWidgetTextStream } from "./sse.js";
 import {
   escapeHtml,
   formatTimestamp,
@@ -39,11 +41,15 @@ import {
   scrollToBottom,
   formatBotMessage,
   getCurrentTime,
+  getAssistantAnnouncement,
+  renderTeamMessageHeader,
   generateUUID,
   renderAvatarMarkup,
   renderBotAvatarMarkup,
   attachAvatarImageFallbacks,
 } from "./utils.js";
+
+let historyRefreshInFlight = false;
 
 /**
  * Create the widget DOM structure
@@ -70,23 +76,23 @@ export function createWidget() {
 				</div>
 			</div>
 			<div class="oc-header-actions">
-				<button class="oc-menu-btn">${ICONS.menu}</button>
+				<button type="button" class="oc-menu-btn" aria-label="Conversation menu" aria-expanded="false" aria-controls="oc-menu-dropdown"><span aria-hidden="true">${ICONS.menu}</span></button>
 			</div>
-			<div class="oc-menu-dropdown" id="oc-menu-dropdown">
+			<div class="oc-menu-dropdown" id="oc-menu-dropdown" role="group" aria-label="Conversation actions">
 				<button class="oc-menu-item" data-action="new_chat">
-					${ICONS.plus}
+					<span aria-hidden="true">${ICONS.plus}</span>
 					<span>Start a new chat</span>
 				</button>
 				<button class="oc-menu-item" data-action="recent_chats">
-					${ICONS.history}
+					<span aria-hidden="true">${ICONS.history}</span>
 					<span>Recent chats</span>
 				</button>
 				<button class="oc-menu-item" data-action="view_tickets">
-					${ICONS.ticket}
+					<span aria-hidden="true">${ICONS.ticket}</span>
 					<span>View tickets</span>
 				</button>
 				<button class="oc-menu-item" data-action="end_chat">
-					${ICONS.x}
+					<span aria-hidden="true">${ICONS.x}</span>
 					<span>End chat</span>
 				</button>
 			</div>
@@ -98,9 +104,9 @@ export function createWidget() {
 			</div>
 			<div class="oc-input-container">
 				<input type="file" class="oc-file-input" accept="image/*,.pdf,.txt,.docx" hidden />
-				<button type="button" class="oc-upload-btn" title="Upload file">${ICONS.fileText}</button>
-				<input type="text" class="oc-input" placeholder="${escapeHtml(config.inputPlaceholder)}" />
-				<button class="oc-send-btn" disabled>${ICONS.send}</button>
+				<button type="button" class="oc-upload-btn" aria-label="Upload file">${ICONS.fileText}</button>
+				<input type="text" class="oc-input" aria-label="Ask a question" placeholder="${escapeHtml(config.inputPlaceholder)}" />
+				<button class="oc-send-btn" aria-label="Send message" disabled>${ICONS.send}</button>
 			</div>
 			${config.showBranding ? '<div class="oc-branding">Powered by <strong>cogni</strong></div>' : ""}
 		</div>
@@ -109,14 +115,19 @@ export function createWidget() {
   // Launcher Button
   state.launcher = document.createElement("button");
   state.launcher.className = "oc-launcher";
+  state.launcher.setAttribute("type", "button");
+  state.launcher.setAttribute("aria-label", "Open chat");
+  state.launcher.setAttribute("aria-expanded", "false");
+  state.launcher.setAttribute("aria-controls", "widget-chat-window");
+  state.windowEl.id = "widget-chat-window";
   state.launcher.innerHTML = `
-		<span class="oc-launcher-chat-icon">
+		<span class="oc-launcher-chat-icon" aria-hidden="true">
 			<span class="oc-launcher-icon-wrapper">
 				${ICONS.chat}
 				<span class="oc-launcher-sparkle">${ICONS.sparkleSmall}</span>
 			</span>
 		</span>
-		<span class="oc-launcher-close-icon">${ICONS.close}</span>
+		<span class="oc-launcher-close-icon" aria-hidden="true">${ICONS.close}</span>
 	`;
 
   state.container.appendChild(state.windowEl);
@@ -133,6 +144,7 @@ export function createWidget() {
  */
 export function attachEvents() {
   state.launcher.addEventListener("click", toggleChat);
+  document.addEventListener("keydown", handleWidgetKeydown);
 
   const sendBtn = state.windowEl.querySelector(".oc-send-btn");
   sendBtn.addEventListener("click", sendMessage);
@@ -154,15 +166,11 @@ export function attachEvents() {
     e.stopPropagation();
     state.isMenuOpen = !state.isMenuOpen;
     menuDropdown.classList.toggle("is-open", state.isMenuOpen);
+    menuBtn.setAttribute("aria-expanded", String(state.isMenuOpen));
   });
 
   // Close menu when clicking outside
-  document.addEventListener("click", () => {
-    if (state.isMenuOpen) {
-      state.isMenuOpen = false;
-      menuDropdown.classList.remove("is-open");
-    }
-  });
+  document.addEventListener("click", closeWidgetMenuOnOutsideClick);
 
   // Handle menu item clicks
   const menuItems = state.windowEl.querySelectorAll(".oc-menu-item");
@@ -171,8 +179,7 @@ export function attachEvents() {
       e.stopPropagation();
       const action = item.getAttribute("data-action");
       handleMenuAction(action);
-      state.isMenuOpen = false;
-      menuDropdown.classList.remove("is-open");
+      closeWidgetMenu();
     });
   });
 
@@ -195,6 +202,50 @@ export function attachEvents() {
         console.error("widget: upload failed", error);
       }
     });
+  }
+}
+
+function closeWidgetMenu() {
+  if (!state.windowEl) return;
+  state.isMenuOpen = false;
+  state.windowEl.querySelector(".oc-menu-dropdown")?.classList.remove("is-open");
+  state.windowEl.querySelector(".oc-menu-btn")?.setAttribute("aria-expanded", "false");
+}
+
+function closeWidgetMenuOnOutsideClick() {
+  closeWidgetMenu();
+}
+
+function handleWidgetKeydown(event) {
+  if (event.key !== "Escape" || event.defaultPrevented) return;
+
+  const feedbackModal = state.container?.querySelector(".oc-feedback-modal");
+  if (feedbackModal) {
+    const feedbackButton = feedbackModal
+      .closest(".oc-feedback")
+      ?.querySelector('.oc-feedback-btn[data-feedback="negative"]');
+    feedbackModal.remove();
+    feedbackButton?.focus();
+    event.preventDefault();
+    return;
+  }
+
+  if (state.activePanel) {
+    state.windowEl?.querySelector(".oc-panel-back")?.click();
+    event.preventDefault();
+    return;
+  }
+
+  if (state.isMenuOpen) {
+    closeWidgetMenu();
+    state.windowEl?.querySelector(".oc-menu-btn")?.focus();
+    event.preventDefault();
+    return;
+  }
+
+  if (state.isOpen) {
+    toggleChat();
+    event.preventDefault();
   }
 }
 
@@ -270,6 +321,7 @@ function attachPanelHandlers(container, handlers = {}) {
     void handlers.onBack?.();
   });
   handlers.onAttach?.(container);
+  container.querySelector(".oc-panel-back")?.focus();
 }
 
 function renderRecentChatsEmptyState() {
@@ -417,7 +469,8 @@ function exitTickets() {
 }
 
 async function restoreChatView() {
-  state.messagesContainer.innerHTML = "";
+  state.messagesContainer.innerHTML =
+    '<div class="oc-panel-loading" role="status" aria-live="polite">Loading conversation…</div>';
 
   try {
     const data = await fetchSessionHistory(state.sessionDbId);
@@ -443,30 +496,30 @@ async function switchToSession(session) {
     return;
   }
 
-  const scopeKey = state.publicKey || state.config.workspaceId;
-  state.sessionDbId = session.id;
-  if (!state.preview) {
-    state.sessionToken = session.token;
-    state.sessionId = session.browserSessionId;
-    storeSessionId(state.sessionId, scopeKey);
-    storeSessionToken(state.sessionToken, scopeKey);
-  }
-
   exitPanelView();
-  resetChatState();
-  state.messagesContainer.innerHTML = "";
+  state.messagesContainer.innerHTML =
+    '<div class="oc-panel-loading" role="status" aria-live="polite">Loading conversation…</div>';
 
   try {
     const data = await fetchSessionHistory(session.id);
-    if (data?.messages?.length) {
-      restoreMessages(data.messages);
-      return;
+    if (data?.token && data?.sessionId) {
+      const scopeKey = state.publicKey || state.config.workspaceId;
+      state.sessionDbId = data.sessionId;
+      state.sessionId = data.browserSessionId || session.browserSessionId;
+      state.sessionToken = data.token;
+      storeSessionId(state.sessionId, scopeKey);
+      storeSessionToken(state.sessionToken, scopeKey);
+      resetChatState();
+      if (data.messages?.length) {
+        restoreMessages(data.messages);
+        return;
+      }
     }
   } catch (error) {
     console.error("widget: failed to load selected chat", error);
   }
 
-  addBotMessage(state.config.welcomeMessage);
+  void restoreChatView();
 }
 
 /**
@@ -476,6 +529,8 @@ export function toggleChat() {
   if (!state.windowEl || !state.launcher) return;
 
   state.isOpen = !state.isOpen;
+  state.launcher.setAttribute("aria-expanded", String(state.isOpen));
+  state.launcher.setAttribute("aria-label", state.isOpen ? "Close chat" : "Open chat");
   if (state.isOpen) {
     state.windowEl.classList.add("is-open");
     state.launcher.classList.add("is-open");
@@ -483,6 +538,8 @@ export function toggleChat() {
     setTimeout(() => state.input.focus(), 100);
     startMessagePolling();
   } else {
+    closeWidgetMenu();
+    state.launcher.focus();
     state.windowEl.classList.remove("is-open");
     state.launcher.classList.remove("is-open");
     stopMessagePolling();
@@ -509,14 +566,24 @@ function stopMessagePolling() {
 }
 
 async function refreshMessagesFromServer() {
-  if (!state.sessionDbId || state.activePanel) return;
+  if (!state.sessionDbId || state.activePanel || state.isSending || historyRefreshInFlight) return;
+  const sessionDbId = state.sessionDbId;
+  const historyLength = state.conversationHistory.length;
+  historyRefreshInFlight = true;
   try {
-    const data = await fetchSessionHistory(state.sessionDbId);
-    if (data?.messages?.length) {
+    const data = await fetchSessionHistory(sessionDbId);
+    if (
+      data?.messages?.length &&
+      state.sessionDbId === sessionDbId &&
+      state.conversationHistory.length === historyLength &&
+      !state.isSending
+    ) {
       restoreMessages(data.messages);
     }
   } catch (error) {
     console.error("widget: failed to refresh messages", error);
+  } finally {
+    historyRefreshInFlight = false;
   }
 }
 
@@ -628,21 +695,24 @@ export function restoreMessages(messages) {
   if (privacyEl) privacyEl.style.display = "none";
 
   messages.forEach((msg) => {
+    const timestamp = msg.createdAt || msg.timestamp || null;
     if (msg.role === "user") {
-      addUserMessage(msg.content, msg.timestamp, true);
+      addUserMessage(msg.content, timestamp, true);
       state.conversationHistory.push({ role: "user", content: msg.content });
     } else if (msg.role === "assistant") {
-      // Check if this is a document message
-      if (msg.metadata?.type === "documents" && msg.metadata?.documents?.length > 0) {
+      if (msg.authorType === "TEAM") {
+        addTeamMessage(msg.content, msg.authorName, timestamp);
+        // Check if this is a document message
+      } else if (msg.metadata?.type === "documents" && msg.metadata?.documents?.length > 0) {
         restoreDocumentMessage(
           msg.content,
           msg.metadata.documents,
-          msg.timestamp,
+          timestamp,
           msg.id,
           msg.feedback,
         );
       } else {
-        addBotMessage(msg.content, msg.timestamp, true, msg.id, msg.feedback);
+        addBotMessage(msg.content, timestamp, true, msg.id, msg.feedback);
       }
       state.conversationHistory.push({ role: "assistant", content: msg.content });
     }
@@ -667,6 +737,19 @@ export function addUserMessage(text, timestamp = null, isRestored = false) {
   }
 }
 
+/** Restore a public reply from a teammate without presenting it as an AI answer. */
+function addTeamMessage(text, authorName, timestamp = null) {
+  const msg = document.createElement("div");
+  msg.className = "oc-message team";
+  msg.innerHTML = `
+		${renderTeamMessageHeader(authorName)}
+		<div class="oc-bubble">${formatBotMessage(text)}</div>
+		<div class="oc-timestamp">${formatTimestamp(timestamp)}</div>
+	`;
+  state.messagesContainer.appendChild(msg);
+  scrollToBottom();
+}
+
 /**
  * Add bot message to chat
  */
@@ -676,6 +759,7 @@ export function addBotMessage(
   isRestored = false,
   messageId = null,
   existingFeedback = null,
+  announce = false,
 ) {
   const msg = document.createElement("div");
   msg.className = "oc-message bot";
@@ -691,6 +775,7 @@ export function addBotMessage(
 			<span class="oc-bot-name">${escapeHtml(state.config.agentName)}</span>
 		</div>
 		<div class="oc-bubble">${formatBotMessage(text)}</div>
+		${announce ? `<span class="oc-screen-reader-only" role="status" aria-live="polite">${escapeHtml(getAssistantAnnouncement(state.config.agentName, "error"))}</span>` : ""}
 		${feedbackHtml}
 		<div class="oc-timestamp">${formatTimestamp(timestamp)}</div>
 	`;
@@ -765,10 +850,12 @@ export function showTypingIndicator() {
 			</div>
 			<span class="oc-bot-name">${escapeHtml(state.config.agentName)}</span>
 		</div>
-		<div class="oc-bubble oc-typing-bubble">
-			<span class="oc-typing-dot"></span>
-			<span class="oc-typing-dot"></span>
-			<span class="oc-typing-dot"></span>
+		<div class="oc-bubble oc-typing-bubble" role="status" aria-live="polite" aria-label="${escapeHtml(getAssistantAnnouncement(state.config.agentName, "typing"))}">
+			<span aria-hidden="true">
+				<span class="oc-typing-dot"></span>
+				<span class="oc-typing-dot"></span>
+				<span class="oc-typing-dot"></span>
+			</span>
 		</div>
 	`;
   state.messagesContainer.appendChild(indicator);
@@ -788,7 +875,8 @@ export function removeTypingIndicator() {
  */
 export async function sendMessage() {
   const text = state.input.value.trim();
-  if (!text) return;
+  if (!text || state.isSending) return;
+  state.isSending = true;
 
   if (!state.hasInteracted) {
     state.hasInteracted = true;
@@ -812,6 +900,7 @@ export async function sendMessage() {
     const searchQuery = extractBrochureSearchQuery(text);
     searchAndDisplayDocuments(searchQuery);
     if (sendBtn) sendBtn.disabled = false;
+    state.isSending = false;
     return;
   }
 
@@ -820,6 +909,7 @@ export async function sendMessage() {
     const triggered = await detectLeadCapture(text);
     if (triggered) {
       if (sendBtn) sendBtn.disabled = false;
+      state.isSending = false;
       return;
     }
   }
@@ -832,6 +922,8 @@ export async function sendMessage() {
  * Call Widget chat API
  */
 async function callWidgetChat(userMessage, interactionId) {
+  let streamingMessage = null;
+  let responseCompleted = false;
   try {
     const leadInfo = state.savedLeadInfo
       ? {
@@ -854,41 +946,27 @@ async function callWidgetChat(userMessage, interactionId) {
 			<div class="oc-bot-header">
 				<div class="oc-bot-avatar">
 					${renderBotAvatarMarkup(state.config.logoUrl)}
-				</div>
-				<span class="oc-bot-name">${escapeHtml(state.config.agentName)}</span>
+			</div>
+			<span class="oc-bot-name">${escapeHtml(state.config.agentName)}</span>
 			</div>
 			<div class="oc-bubble oc-streaming"></div>
 			<div class="oc-timestamp">${getCurrentTime()}</div>
 		`;
     state.messagesContainer.appendChild(msg);
+    streamingMessage = msg;
     const bubble = msg.querySelector(".oc-bubble");
+    const liveStatus = document.createElement("span");
+    liveStatus.className = "oc-screen-reader-only oc-message-live-status";
+    liveStatus.setAttribute("role", "status");
+    liveStatus.setAttribute("aria-live", "polite");
+    msg.appendChild(liveStatus);
 
-    let fullResponse = "";
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      const chunk = decoder.decode(value, { stream: true });
-      const lines = chunk.split("\n");
-
-      for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          const data = line.slice(6);
-          if (data === "[DONE]") {
-            break;
-          } else if (data === "[ERROR]") {
-            throw new Error("Stream error from server");
-          } else if (data) {
-            fullResponse += data;
-            bubble.innerHTML = formatBotMessage(fullResponse);
-            scrollToBottom();
-          }
-        }
-      }
-    }
+    const fullResponse = await readWidgetTextStream(response.body, (text) => {
+      bubble.innerHTML = formatBotMessage(text);
+      scrollToBottom();
+    });
+    responseCompleted = true;
+    liveStatus.textContent = getAssistantAnnouncement(state.config.agentName);
 
     // Remove streaming class when done
     bubble.classList.remove("oc-streaming");
@@ -920,16 +998,43 @@ async function callWidgetChat(userMessage, interactionId) {
     // Re-enable send button
     const sendBtn = state.windowEl.querySelector(".oc-send-btn");
     if (sendBtn) sendBtn.disabled = false;
+    state.isSending = false;
 
     // Check if we should trigger lead capture
     await detectLeadCapture();
   } catch (error) {
     console.error("Widget: chat stream error", error);
+    const bubble = streamingMessage?.querySelector(".oc-bubble");
+    const hasPartialResponse = Boolean(bubble?.textContent?.trim());
+    if (!hasPartialResponse) streamingMessage?.remove();
+    else {
+      bubble.classList.remove("oc-streaming");
+      const liveStatus = streamingMessage?.querySelector(".oc-message-live-status");
+      if (liveStatus) {
+        liveStatus.textContent = getAssistantAnnouncement(state.config.agentName, "interrupted");
+      }
+    }
     removeTypingIndicator();
-    addBotMessage("Sorry, I'm having trouble responding right now. Please try again.");
+    addBotMessage(
+      "Sorry, I'm having trouble responding right now. Please try again.",
+      null,
+      false,
+      null,
+      null,
+      !hasPartialResponse,
+    );
+
+    if (state.preview && !responseCompleted) {
+      window.dispatchEvent(
+        new CustomEvent(PREVIEW_EVIDENCE_EVENT, {
+          detail: { outcome: "error", grounded: false, sources: [], prompt: userMessage },
+        }),
+      );
+    }
 
     const sendBtn = state.windowEl.querySelector(".oc-send-btn");
     if (sendBtn) sendBtn.disabled = false;
+    state.isSending = false;
   }
 }
 
@@ -1049,6 +1154,8 @@ function openPreviewWidget() {
   if (!state.preview || !state.windowEl || !state.launcher) return;
   if (state.isOpen) return;
   state.isOpen = true;
+  state.launcher.setAttribute("aria-expanded", "true");
+  state.launcher.setAttribute("aria-label", "Close chat");
   state.windowEl.classList.add("is-open");
   state.launcher.classList.add("is-open");
   hidePreviewMessages();
@@ -1058,6 +1165,8 @@ function openPreviewWidget() {
  * Tear down widget DOM and in-memory state (dashboard preview remounts).
  */
 export function destroyWidget() {
+  document.removeEventListener("click", closeWidgetMenuOnOutsideClick);
+  document.removeEventListener("keydown", handleWidgetKeydown);
   hidePreviewMessages();
   const container = document.getElementById("widget-container");
   if (container) container.remove();

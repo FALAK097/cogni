@@ -1,29 +1,34 @@
 import type { Db } from "@/lib/db/client";
 import { workflowRun } from "@/lib/db/schema";
+import { workflowStep } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
+import { z } from "zod";
 
 import { emitDomainEvent } from "@/lib/events/domain-events";
 import { notifyWorkspaceMembers } from "@/lib/notifications/create-notification";
 import { logError, logInfo } from "@/lib/logging/logger";
 
-export async function startWorkflowRun({
+async function startWorkflowRunWithResult({
   db,
   workspaceId,
   name,
   input,
   idempotencyKey,
+  conversationId,
 }: {
   db: Db;
   workspaceId: string;
   name: string;
   input?: Record<string, unknown>;
   idempotencyKey?: string;
+  conversationId?: string;
 }) {
   if (idempotencyKey) {
     const existing = await db.query.workflowRun.findFirst({
-      where: (run, { eq }) => eq(run.idempotencyKey, idempotencyKey),
+      where: (run, { eq, and }) =>
+        and(eq(run.workspaceId, workspaceId), eq(run.idempotencyKey, idempotencyKey)),
     });
-    if (existing) return existing;
+    if (existing) return { run: existing, created: false };
   }
 
   const results = await db
@@ -34,20 +39,143 @@ export async function startWorkflowRun({
       name,
       idempotencyKey,
       input: JSON.stringify(input ?? {}),
+      conversationId,
     })
+    .onConflictDoNothing()
     .returning();
 
-  const run = results[0];
+  const run =
+    results[0] ??
+    (idempotencyKey
+      ? await db.query.workflowRun.findFirst({
+          where: (fields, { and, eq }) =>
+            and(eq(fields.workspaceId, workspaceId), eq(fields.idempotencyKey, idempotencyKey)),
+        })
+      : undefined);
+  if (!run) throw new Error("Workflow could not be created.");
 
-  await emitDomainEvent({
+  if (results[0]) {
+    await emitDomainEvent({
+      db,
+      workspaceId,
+      type: "workflow.started",
+      entityId: run.id,
+      payload: { name },
+    });
+  }
+
+  return { run, created: Boolean(results[0]) };
+}
+
+export async function startWorkflowRun(input: Parameters<typeof startWorkflowRunWithResult>[0]) {
+  return (await startWorkflowRunWithResult(input)).run;
+}
+
+const workflowStepInputSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  kind: z.enum(["ACTION", "APPROVAL", "MESSAGE", "WAIT"]),
+  input: z.record(z.string(), z.unknown()).default({}),
+});
+
+export type WorkflowStepInput = z.infer<typeof workflowStepInputSchema>;
+
+export async function createWorkflowWithSteps({
+  db,
+  workspaceId,
+  conversationId,
+  name,
+  idempotencyKey,
+  input,
+  steps,
+}: {
+  db: Db;
+  workspaceId: string;
+  conversationId: string;
+  name: string;
+  idempotencyKey: string;
+  input: Record<string, unknown>;
+  steps: WorkflowStepInput[];
+}) {
+  const parsedSteps = z.array(workflowStepInputSchema).min(1).max(20).parse(steps);
+  const started = await startWorkflowRunWithResult({
     db,
     workspaceId,
-    type: "workflow.started",
-    entityId: run.id,
-    payload: { name },
+    conversationId,
+    name,
+    idempotencyKey,
+    input,
   });
+  const run = started.run;
+  const existingSteps = await db.query.workflowStep.findMany({
+    where: (fields, { eq, and }) =>
+      and(eq(fields.workflowRunId, run.id), eq(fields.workspaceId, workspaceId)),
+  });
+  if (!started.created || existingSteps.length > 0) {
+    return { run, steps: existingSteps, created: false };
+  }
 
-  return run;
+  const createdSteps = await db
+    .insert(workflowStep)
+    .values(
+      parsedSteps.map((step, position) => ({
+        id: crypto.randomUUID(),
+        workspaceId,
+        workflowRunId: run.id,
+        position,
+        name: step.name,
+        kind: step.kind,
+        input: JSON.stringify(step.input),
+      })),
+    )
+    .onConflictDoNothing()
+    .returning();
+  const finalSteps =
+    createdSteps.length > 0
+      ? createdSteps
+      : await db.query.workflowStep.findMany({
+          where: (fields, { eq, and }) =>
+            and(eq(fields.workflowRunId, run.id), eq(fields.workspaceId, workspaceId)),
+        });
+  return { run, steps: finalSteps, created: createdSteps.length > 0 };
+}
+
+export async function updateWorkflowStep({
+  db,
+  workspaceId,
+  runId,
+  stepId,
+  status,
+  output,
+  errorMessage,
+}: {
+  db: Db;
+  workspaceId: string;
+  runId: string;
+  stepId: string;
+  status: "RUNNING" | "WAITING_APPROVAL" | "COMPLETED" | "FAILED" | "CANCELLED";
+  output?: Record<string, unknown>;
+  errorMessage?: string;
+}) {
+  const now = new Date().toISOString();
+  const [step] = await db
+    .update(workflowStep)
+    .set({
+      status,
+      output: output ? JSON.stringify(output) : null,
+      errorMessage: errorMessage ?? null,
+      startedAt: status === "RUNNING" ? now : undefined,
+      finishedAt: ["COMPLETED", "FAILED", "CANCELLED"].includes(status) ? now : null,
+    })
+    .where(
+      and(
+        eq(workflowStep.id, stepId),
+        eq(workflowStep.workflowRunId, runId),
+        eq(workflowStep.workspaceId, workspaceId),
+      ),
+    )
+    .returning();
+  if (!step) throw new Error("Workflow step not found.");
+  return step;
 }
 
 export async function completeWorkflowRun({
@@ -121,7 +249,7 @@ export async function failWorkflowRun({
       errorMessage,
       finishedAt: terminal ? new Date().toISOString() : null,
     })
-    .where(eq(workflowRun.id, runId))
+    .where(and(eq(workflowRun.id, runId), eq(workflowRun.workspaceId, workspaceId)))
     .returning();
 
   const run = results[0];

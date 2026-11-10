@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
 
 import { listDocuments } from "@/features/knowledge/queries";
+import { toKnowledgeSourceDisplayType } from "@/features/knowledge/source-type";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 
 const DEFAULT_KB_ID = "default";
 
 function mapDocumentToSource(document: Awaited<ReturnType<typeof listDocuments>>[number]) {
-  const sourceType = document.sourceUrl ? "website" : "file";
   return {
     id: document.id,
     knowledgeBaseId: DEFAULT_KB_ID,
-    sourceType,
+    sourceType: toKnowledgeSourceDisplayType(document.sourceType),
     displayName: document.title,
     canonicalUrl: document.sourceUrl,
     previewUrl: document.sourceUrl,
@@ -43,10 +43,9 @@ export async function GET(request: Request) {
       id: DEFAULT_KB_ID,
       workspaceId: workspace.id,
       name: "Workspace Knowledge",
-      status: "ready",
       sourceCount: documents.length,
-      createdAt: documents[0]?.createdAt.toISOString() ?? new Date().toISOString(),
-      updatedAt: documents[0]?.updatedAt.toISOString() ?? new Date().toISOString(),
+      createdAt: workspace.createdAt,
+      updatedAt: documents[0]?.updatedAt.toISOString() ?? workspace.updatedAt,
     },
     sources: documents.map(mapDocumentToSource),
     count: documents.length,

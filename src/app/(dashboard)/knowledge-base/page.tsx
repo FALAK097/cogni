@@ -1,21 +1,6 @@
-import { ContentLayout } from "@/components/app-nav/content-layout";
-import { WidgetKnowledgeManager } from "@/components/workspace/widget-knowledge-manager";
-import { SITE_NAME } from "@/lib/constants";
-import { requireDashboardContext } from "@/lib/auth/dashboard-context";
-
-export const metadata = {
-  title: `Knowledge Base | ${SITE_NAME}`,
-  description: "Manage knowledge sources",
-};
+import { redirect } from "next/navigation";
+import { agentHref } from "@/features/navigation/app-routes";
 
 export default async function KnowledgeBasePage() {
-  await requireDashboardContext();
-
-  return (
-    <ContentLayout>
-      <div className="container mx-auto">
-        <WidgetKnowledgeManager />
-      </div>
-    </ContentLayout>
-  );
+  redirect(agentHref("knowledge"));
 }

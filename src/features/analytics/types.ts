@@ -9,6 +9,7 @@ export type FormattedMetricComparison = MetricComparison & {
 };
 
 export type DashboardDateRange = {
+  /** Inclusive calendar dates (YYYY-MM-DD) in the workspace timezone. */
   start: string;
   end: string;
 };
@@ -27,6 +28,7 @@ export type BreakdownItem = {
 export type TopQuestion = {
   question: string;
   count: number;
+  conversationId: string;
 };
 
 export type SatisfactionPoint = {
@@ -35,20 +37,53 @@ export type SatisfactionPoint = {
   responses: number;
 };
 
+export type NegativeFeedbackItem = {
+  conversationId: string;
+  question: string;
+  response: string;
+  reason: string | null;
+  feedbackAt: string;
+};
+
+export type UnansweredQuestionItem = {
+  conversationId: string;
+  question: string;
+  askedAt: string;
+  count: number;
+};
+
+export type KnowledgeGapReviewStatus = "OPEN" | "RESOLVED" | "IGNORED";
+
+export type KnowledgeGapSignal = "UNANSWERED" | "NO_SOURCE_MATCH";
+
+export type KnowledgeGapItem = UnansweredQuestionItem & {
+  status: KnowledgeGapReviewStatus;
+  signals: KnowledgeGapSignal[];
+};
+
+export type KnowledgeGapSummary = {
+  open: KnowledgeGapItem[];
+  resolved: KnowledgeGapItem[];
+  ignored: KnowledgeGapItem[];
+  counts: { open: number; resolved: number; ignored: number };
+};
+
 export type DashboardAnalytics = {
   dateRange: DashboardDateRange;
   previousDateRange: DashboardDateRange;
   kpis: {
     totalConversations: MetricComparison;
     uniqueUsers: MetricComparison;
-    resolvedConversations: MetricComparison;
-    avgResponseTime: FormattedMetricComparison;
-    satisfactionScore: FormattedMetricComparison & { max: number };
+    closedConversations: MetricComparison;
+    avgAiResponseTime: FormattedMetricComparison & { samples: number };
+    satisfactionScore: FormattedMetricComparison & { max: number; responses: number };
   };
   conversationsOverTime: TimeSeriesPoint[];
   conversationsBySource: BreakdownItem[];
   conversationsByStatus: BreakdownItem[];
   topQuestions: TopQuestion[];
+  negativeFeedback: NegativeFeedbackItem[];
+  knowledgeGaps: KnowledgeGapSummary;
   userEngagement: {
     messagesSent: MetricComparison;
     messagesReceived: MetricComparison;
