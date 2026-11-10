@@ -19,8 +19,6 @@ export const ingestionJobSchema = z.object({
   idempotencyKey: z.string().min(1).max(256),
 });
 
-export type IngestionJob = z.infer<typeof ingestionJobSchema>;
-
 const staleJobAgeMs = 10 * 60 * 1_000;
 const ingestionLeaseDurationMs = 2 * 60 * 1_000;
 const ingestionLeaseHeartbeatMs = 30 * 1_000;

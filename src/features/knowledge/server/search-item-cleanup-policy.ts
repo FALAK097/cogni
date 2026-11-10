@@ -2,7 +2,6 @@ const baseDelayMs = 30_000;
 const maxDelayMs = 6 * 60 * 60 * 1_000;
 export const searchItemCleanupMaxClaimBatchSize = 5;
 export const searchItemCleanupMaxRequestLimit = 100;
-export const searchItemCleanupMaxOperationPerRowMs = 20_000;
 export const searchItemCleanupClaimLeaseMs = 3 * 60 * 1_000;
 
 export function getSearchItemCleanupClaimLimit(requestedLimit: number) {

@@ -10,6 +10,7 @@ import { useWidgetConfig, useSaveWidgetConfig, usePublishWidgetConfig } from "@/
 import { isValidDomain, sanitizeDomain } from "@/lib/domain-validation";
 import { normalizeFontFamily, normalizeFontSize, normalizeLogoUrl } from "@/features/widget/domain";
 import { WIDGET_PREVIEW_RESPONSE_TIMEOUT_MS } from "@/features/widget/agent-timeouts";
+import { getWidgetSettingsLoadState } from "@/features/widget/widget-settings-state";
 import { BookingSettingsCard } from "@/features/integrations/components/booking-settings-card";
 import { WidgetKnowledgeManager } from "@/components/workspace/widget-knowledge-manager";
 import { cn } from "@/lib/utils";
@@ -585,7 +586,12 @@ export function WidgetCustomizer({
     };
   }, [config]);
 
-  if (widgetConfigQuery.isError && !widgetConfigData) {
+  const settingsLoadState = getWidgetSettingsLoadState({
+    hasData: Boolean(widgetConfigData),
+    isError: widgetConfigQuery.isError,
+  });
+
+  if (settingsLoadState === "error") {
     return (
       <div className="m-3 rounded-xl border border-border bg-card p-6" role="alert">
         <h2 className="text-base font-semibold">Couldn't load agent settings</h2>

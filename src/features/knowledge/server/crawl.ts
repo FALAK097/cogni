@@ -60,29 +60,6 @@ async function fetchText(url: string, acceptedTypes: string[]) {
   return fetchPublicText(url, acceptedTypes, maxPageBytes, fetchTimeoutMs);
 }
 
-function extractLinks(html: string, pageUrl: string, root: URL) {
-  const links: string[] = [];
-  const pattern = /<a\s+[^>]*href\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>]+))/gi;
-  let match: RegExpExecArray | null;
-
-  while ((match = pattern.exec(html))) {
-    const href = match[1] ?? match[2] ?? match[3];
-    if (!href || href.startsWith("#")) continue;
-
-    let candidate: URL;
-    try {
-      candidate = new URL(href, pageUrl);
-    } catch {
-      continue;
-    }
-
-    if (!isSameHost(candidate, root) || !shouldVisitUrl(candidate)) continue;
-    links.push(normalizeUrl(candidate));
-  }
-
-  return links;
-}
-
 function extractSitemapUrls(xml: string, root: URL) {
   const urls: string[] = [];
   const pattern = /<loc>\s*([^<]+)\s*<\/loc>/gi;
@@ -104,82 +81,6 @@ function extractSitemapUrls(xml: string, root: URL) {
   }
 
   return urls;
-}
-
-async function discoverSitemapUrls(root: URL) {
-  const urls: string[] = [];
-  const robotsUrl = new URL("/robots.txt", root);
-  const robotsText = await fetchText(robotsUrl.href, ["text/plain"]);
-
-  if (robotsText) {
-    for (const line of robotsText.split("\n")) {
-      const match = line.match(/^sitemap:\s*(\S+)/i);
-      if (match?.[1]) urls.push(match[1]);
-    }
-  }
-
-  urls.push(new URL("/sitemap.xml", root).href);
-
-  const pages: string[] = [];
-  const sitemaps = await Promise.all(
-    [...new Set(urls)].map(async (sitemapUrl) => {
-      const xml = await fetchText(sitemapUrl, [
-        "application/xml",
-        "text/xml",
-        "application/rss+xml",
-      ]);
-      return xml ? extractSitemapUrls(xml, root) : [];
-    }),
-  );
-  for (const entries of sitemaps) {
-    pages.push(...entries);
-  }
-
-  return pages;
-}
-
-export async function crawlWebsiteText(sourceUrl: string, stripHtml: (html: string) => string) {
-  const root = assertPublicHttpUrl(sourceUrl);
-  const queue = [normalizeUrl(root), ...(await discoverSitemapUrls(root))];
-  const seen = new Set<string>();
-  const pages: string[] = [];
-  let totalCharacters = 0;
-
-  while (queue.length > 0 && pages.length < maxCrawlPages && totalCharacters < maxTotalCharacters) {
-    const nextUrl = queue.shift();
-    if (!nextUrl || seen.has(nextUrl)) continue;
-    seen.add(nextUrl);
-
-    let pageUrl: URL;
-    try {
-      pageUrl = new URL(nextUrl);
-    } catch {
-      continue;
-    }
-    if (!isSameHost(pageUrl, root) || !shouldVisitUrl(pageUrl)) continue;
-
-    const html = await fetchText(nextUrl, ["text/html", "text/plain", "application/xhtml+xml"]);
-    if (!html) continue;
-
-    for (const link of extractLinks(html, nextUrl, root)) {
-      if (!seen.has(link) && queue.length < maxCrawlPages * 4) {
-        queue.push(link);
-      }
-    }
-
-    const text = stripHtml(html);
-    if (!text) continue;
-
-    const pageText = `Source URL: ${nextUrl}\n\n${text}`;
-    pages.push(pageText);
-    totalCharacters += pageText.length;
-  }
-
-  if (pages.length === 0) {
-    throw new Error("No crawlable page text found.");
-  }
-
-  return pages.join("\n\n---\n\n").slice(0, maxTotalCharacters);
 }
 
 export async function crawlSitemapText(sitemapUrl: string, stripHtml: (html: string) => string) {

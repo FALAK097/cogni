@@ -1,35 +1,6 @@
 import type { Db } from "@/lib/db/client";
 import { notification } from "@/lib/db/schema";
 
-export async function createNotification({
-  db,
-  workspaceId,
-  userId,
-  type,
-  title,
-  body,
-}: {
-  db: Db;
-  workspaceId: string;
-  userId: string;
-  type: string;
-  title: string;
-  body: string;
-}) {
-  const results = await db
-    .insert(notification)
-    .values({
-      id: crypto.randomUUID(),
-      workspaceId,
-      userId,
-      type,
-      title,
-      body,
-    })
-    .returning();
-  return results[0];
-}
-
 export async function notifyWorkspaceMembers({
   db,
   workspaceId,

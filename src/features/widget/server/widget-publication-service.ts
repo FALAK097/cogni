@@ -17,11 +17,7 @@ import {
   assertAgentTestPublishCheckCurrent,
   resolveAgentTestPublishDraftIdentity,
 } from "@/features/agent-tests/server/publish-checks";
-import {
-  getWidgetPublicationStatus,
-  toWidgetBookingConfig,
-  toWidgetSettings,
-} from "@/features/widget/server/widget-service";
+import { toWidgetBookingConfig, toWidgetSettings } from "@/features/widget/server/widget-service";
 
 type PublishWidgetDraftResult =
   | { ok: true; widget: NonNullable<Awaited<ReturnType<typeof getWidgetRecord>>> }
@@ -147,9 +143,4 @@ export async function publishWidgetDraft(
   });
   if (!savedWidget) return { ok: false, status: 404, error: "Agent configuration was not found." };
   return { ok: true, widget: savedWidget };
-}
-
-export async function getDashboardWidgetPublicationStatus(db: Db, workspaceId: string) {
-  const savedWidget = await getWidgetRecord(db, workspaceId);
-  return savedWidget ? getWidgetPublicationStatus(db, savedWidget) : null;
 }

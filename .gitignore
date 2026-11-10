@@ -53,6 +53,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+cloudflare-env.d.ts
 workers/**/worker-configuration.d.ts
+
+# neon cli
+.neon
 
 .playwright-mcp/

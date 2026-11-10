@@ -336,6 +336,7 @@ export function fetchPublicText(
   });
 }
 
+/** @public */
 export const safeFetchTestHelpers = {
   fetchWithDependencies: fetchPublicTextWithDependencies,
   readLimitedBody,

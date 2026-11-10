@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
 import localFont from "next/font/local";
@@ -31,7 +31,17 @@ const editorialFont = localFont({
 
 const THEME_INIT_SCRIPT = `(function(){try{var e=document.documentElement,t=localStorage.getItem("theme");if(!t){var d=localStorage.getItem("dashboard-theme");if(d==="dark"||d==="light"){t=d;localStorage.setItem("theme",d);localStorage.removeItem("dashboard-theme");}}if(t==="dark"||(!t&&window.matchMedia("(prefers-color-scheme: dark)").matches)){e.classList.add("dark");e.style.colorScheme="dark";}else{e.classList.remove("dark");e.style.colorScheme="light";}}catch(t){}})();`;
 
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#09090b" },
+  ],
+  width: "device-width",
+  initialScale: 1,
+};
+
 export const metadata: Metadata = {
+  metadataBase: new URL("https://cogni.falakgala.dev"),
   title: {
     default: "cogni — AI customer support",
     template: "%s · cogni",
@@ -41,6 +51,24 @@ export const metadata: Metadata = {
   icons: {
     icon: "/assets/cogni.png",
     apple: "/assets/cogni.png",
+  },
+  openGraph: {
+    title: "cogni — AI customer support",
+    description:
+      "AI-first customer support with a shared inbox, grounded answers, and human handoff.",
+    url: "https://cogni.falakgala.dev",
+    siteName: "cogni",
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "cogni — AI customer support",
+    description:
+      "AI-first customer support with a shared inbox, grounded answers, and human handoff.",
+  },
+  alternates: {
+    canonical: "/",
   },
 };
 

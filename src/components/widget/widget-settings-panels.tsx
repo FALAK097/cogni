@@ -42,22 +42,22 @@ import type {
 } from "@/features/widget/agent-readiness";
 import type { AgentTab } from "@/features/navigation/app-routes";
 import { AgentLaunchChecklistCard } from "./agent-launch-checklist-card";
-import { WIDGET_BRAND_COLOR } from "@/lib/widget-accent";
+import { BRAND_COLOR } from "@/lib/widget-accent";
 import { cn } from "@/lib/utils";
 
 export const APPEARANCE_DEFAULTS = {
-  primaryColor: WIDGET_BRAND_COLOR,
+  primaryColor: BRAND_COLOR,
   backgroundColor: "#FFFFFF",
-  headerGradientFrom: WIDGET_BRAND_COLOR,
-  headerGradientTo: WIDGET_BRAND_COLOR,
-  userBubbleColor: WIDGET_BRAND_COLOR,
+  headerGradientFrom: BRAND_COLOR,
+  headerGradientTo: BRAND_COLOR,
+  userBubbleColor: BRAND_COLOR,
   userBubbleTextColor: "#FFFFFF",
   botBubbleColor: "#F2F4F7",
   botBubbleTextColor: "#667085",
   textColor: "#101828",
   secondaryTextColor: "#667085",
   borderColor: "#EAECF0",
-  linkColor: WIDGET_BRAND_COLOR,
+  linkColor: BRAND_COLOR,
   position: "bottom-right" as const,
   theme: "light" as const,
   welcomeMessage: "Hi! 👋 How can I help you today?",

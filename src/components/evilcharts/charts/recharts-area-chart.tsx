@@ -990,7 +990,7 @@ const generateEasedGradientStops = (
  * when the shimmer has completely exited the visible area. This eliminates
  * timing drift issues from setTimeout/setInterval.
  */
-export function useLoadingData(isLoading: boolean, loadingPoints: number = 14) {
+function useLoadingData(isLoading: boolean, loadingPoints: number = 14) {
   const [loadingDataKey, setLoadingDataKey] = useState(false);
 
   // Callback fired by motion.dev when the shimmer exits the visible area

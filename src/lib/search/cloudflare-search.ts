@@ -110,12 +110,6 @@ export async function deleteCloudflareSearchItemsByKey(itemKey: string) {
   return true;
 }
 
-export async function listCloudflareSearchItemIdsByKey(itemKey: string) {
-  const client = getCloudflareSearchClient();
-  if (!client) return null;
-  return client.listItemsByKey(itemKey);
-}
-
 export async function searchCloudflareIndex({
   query,
   limit = 10,

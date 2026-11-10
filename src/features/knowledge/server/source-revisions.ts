@@ -46,27 +46,6 @@ export type SourceRevisionWriteResult =
     }
   | { status: "unsupported-source"; sourceType: string };
 
-export type SourceRevisionResolution =
-  | {
-      status: "versioned";
-      revisionId: string;
-      revisionNumber: number;
-      contentSha256: string;
-      sourceType: string;
-    }
-  | {
-      status: "deleted";
-      revisionId: string;
-      revisionNumber: number;
-      contentSha256: string;
-      sourceType: string;
-    }
-  | { status: "legacy-unversioned" }
-  | { status: "unsupported-source"; sourceType: string }
-  | { status: "not-ready"; sourceStatus: string }
-  | { status: "revision-unavailable" }
-  | { status: "not-found" };
-
 export class SourceRevisionDocumentNotFoundError extends Error {
   constructor() {
     super("Knowledge source was not found in this workspace.");
@@ -370,98 +349,6 @@ export async function recordDocumentRevisionInTransaction(
   });
 
   return { status: "created", revisionId, revisionNumber, contentSha256 };
-}
-
-export async function recordDocumentRevision(
-  db: Db,
-  input: { workspaceId: string; documentId: string; content: string },
-) {
-  return runDbWriteOperation(db, (transaction) =>
-    recordDocumentRevisionInTransaction(transaction, input),
-  );
-}
-
-/** A legacy READY source without a revision remains explicitly unversioned; never synthesize one. */
-export async function resolveDocumentRevision(
-  db: Db,
-  workspaceId: string,
-  documentId: string,
-): Promise<SourceRevisionResolution> {
-  const [source] = await db
-    .select({
-      id: documentTable.id,
-      sourceType: documentTable.sourceType,
-      status: documentTable.status,
-    })
-    .from(documentTable)
-    .where(and(eq(documentTable.id, documentId), eq(documentTable.workspaceId, workspaceId)))
-    .limit(1);
-
-  if (!source) {
-    const [deleted] = await db
-      .select({
-        id: documentRevision.id,
-        revisionNumber: documentRevision.revisionNumber,
-        contentSha256: documentRevision.contentSha256,
-        sourceType: documentRevision.sourceType,
-        status: documentRevision.status,
-      })
-      .from(documentRevision)
-      .where(
-        and(
-          eq(documentRevision.workspaceId, workspaceId),
-          eq(documentRevision.documentId, documentId),
-        ),
-      )
-      .orderBy(desc(documentRevision.revisionNumber))
-      .limit(1);
-
-    if (deleted?.status === "DELETED") {
-      return {
-        status: "deleted",
-        revisionId: deleted.id,
-        revisionNumber: deleted.revisionNumber,
-        contentSha256: deleted.contentSha256,
-        sourceType: deleted.sourceType,
-      };
-    }
-    return { status: "not-found" };
-  }
-  if (!isSupportedKnowledgeSourceType(source.sourceType)) {
-    return { status: "unsupported-source", sourceType: source.sourceType };
-  }
-  if (source.status !== "READY") {
-    return { status: "not-ready", sourceStatus: source.status };
-  }
-
-  const [latest] = await db
-    .select({
-      id: documentRevision.id,
-      revisionNumber: documentRevision.revisionNumber,
-      contentSha256: documentRevision.contentSha256,
-      sourceType: documentRevision.sourceType,
-      status: documentRevision.status,
-    })
-    .from(documentRevision)
-    .where(
-      and(
-        eq(documentRevision.workspaceId, workspaceId),
-        eq(documentRevision.documentId, documentId),
-      ),
-    )
-    .orderBy(desc(documentRevision.revisionNumber))
-    .limit(1);
-
-  if (!latest) return { status: "legacy-unversioned" };
-  if (latest.status !== "CURRENT") return { status: "revision-unavailable" };
-
-  return {
-    status: "versioned",
-    revisionId: latest.id,
-    revisionNumber: latest.revisionNumber,
-    contentSha256: latest.contentSha256,
-    sourceType: latest.sourceType,
-  };
 }
 
 /** Retain identity-only tombstones while source text, chunks, and file objects are deleted. */

@@ -8,12 +8,13 @@ interface ThemeLogoProps {
 
 export function ThemeLogo({ className, showWordmark = false, wordmarkClassName }: ThemeLogoProps) {
   return (
-    <span className="inline-flex shrink-0 items-center gap-2.5" aria-label="cogni">
+    <span className="inline-flex shrink-0 items-center gap-2.5">
       <svg
         viewBox="0 0 32 32"
         fill="none"
         className={cn("size-8 shrink-0 text-foreground", className)}
-        aria-hidden="true"
+        aria-hidden={showWordmark ? true : undefined}
+        aria-label={showWordmark ? undefined : "cogni"}
       >
         <path
           d="M8 3h16a5 5 0 0 1 5 5v13a5 5 0 0 1-5 5H13l-6 4v-4a5 5 0 0 1-4-5V8a5 5 0 0 1 5-5Z"

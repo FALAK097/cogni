@@ -108,11 +108,6 @@ export function requireData<T>(data: T | undefined, error: unknown, fallback: st
   throw new Error(fallback);
 }
 
-export async function getActiveWorkspaceId() {
-  const { data } = await api.GET<{ session?: { activeWorkspaceId?: string } }>("/api/auth/me");
-  return data?.session?.activeWorkspaceId ?? "";
-}
-
 export function getBackendOrigin() {
   if (typeof window !== "undefined") {
     return window.location.origin;

@@ -138,6 +138,7 @@ import {
   getTranscriptMessageAlignment,
   getTranscriptMessageRowClassName,
 } from "@/features/conversations/mobile-inbox-presentation";
+import { getVisitorName } from "@/lib/constants";
 
 import {
   scrollPaneClassName,
@@ -186,10 +187,7 @@ function getDisplayName(session: ConversationDetailData) {
   ) {
     return session.contactName;
   }
-  if (session.visitorId) {
-    return `Visitor ${session.visitorId.slice(0, 6)}`;
-  }
-  return "Visitor";
+  return getVisitorName(session.visitorId);
 }
 
 function getInitials(name: string) {
@@ -2835,5 +2833,3 @@ function SessionDetailsContent({
     </>
   );
 }
-
-export { SessionDetailsContent };

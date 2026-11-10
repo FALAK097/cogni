@@ -42,6 +42,3 @@ export const integrationDetailResponseSchema = z.object({
     }),
   ),
 });
-
-export type WorkspaceIntegration = z.infer<typeof workspaceIntegrationSchema>;
-export type IntegrationDetailResponse = z.infer<typeof integrationDetailResponseSchema>;

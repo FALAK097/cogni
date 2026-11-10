@@ -22,12 +22,6 @@ import {
   parsePublicQaMessages,
 } from "@/features/conversation-qa/scoring";
 
-export {
-  CONVERSATION_QA_MAX_ATTEMPTS,
-  CONVERSATION_QA_WORKFLOW_INPUT_SCHEMA_VERSION,
-  CONVERSATION_QA_WORKFLOW_NAME,
-} from "@/features/conversation-qa/scoring";
-
 type ConversationQaWorkflowCandidate = Pick<
   typeof workflowRun.$inferSelect,
   "id" | "workspaceId" | "status" | "startedAt" | "attempts" | "maxAttempts" | "input"

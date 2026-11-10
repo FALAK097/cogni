@@ -44,7 +44,3 @@ export const INTEGRATION_CATEGORIES: CategoryDefinition[] = [
     order: 8,
   },
 ];
-
-export const getCategoryById = (id: string): CategoryDefinition | undefined => {
-  return INTEGRATION_CATEGORIES.find((c) => c.id === id);
-};

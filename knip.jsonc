@@ -1,0 +1,20 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "open-next.config.ts",
+    "drizzle.remote.config.ts",
+    "scripts/**/*.{js,mjs,ts}",
+    "workers/*/src/index.ts",
+    "src/features/**/actions*.ts",
+    "src/components/ui/**/*.{ts,tsx}",
+    "src/components/icons.tsx",
+  ],
+  "project": ["src/**/*.{js,jsx,ts,tsx}", "scripts/**/*.{js,mjs,ts}", "workers/*/src/**/*.ts"],
+  "ignoreDependencies": ["tw-animate-css", "tailwindcss", "shadcn"],
+  "ignoreExportsUsedInFile": true,
+  "rules": {
+    "exports": "error",
+    "types": "warn",
+    "duplicates": "error",
+  },
+}

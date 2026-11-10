@@ -20,21 +20,31 @@ export function Footer() {
         {/* Main row */}
         <div className="flex flex-col items-start justify-between gap-8 py-12 sm:flex-row sm:items-center">
           {/* Brand */}
-          <Link href="/" className="flex shrink-0 items-center gap-2.5">
+          <Link href="/" className="flex shrink-0 items-center gap-2.5" aria-label="Cogni homepage">
             <ThemeLogo showWordmark wordmarkClassName="text-foreground" />
           </Link>
 
           {/* Nav links */}
-          <nav className="flex flex-wrap gap-x-7 gap-y-2">
-            {FOOTER_LINKS.map(({ label, href }) => (
-              <a
-                key={label}
-                href={href}
-                className="text-sm text-muted-foreground transition-colors duration-150 hover:text-foreground"
-              >
-                {label}
-              </a>
-            ))}
+          <nav className="flex flex-wrap gap-x-7 gap-y-2" aria-label="Footer navigation">
+            {FOOTER_LINKS.map(({ label, href }) =>
+              href.startsWith("/") ? (
+                <Link
+                  key={label}
+                  href={href}
+                  className="text-sm text-muted-foreground transition-colors duration-150 hover:text-foreground"
+                >
+                  {label}
+                </Link>
+              ) : (
+                <a
+                  key={label}
+                  href={href}
+                  className="text-sm text-muted-foreground transition-colors duration-150 hover:text-foreground"
+                >
+                  {label}
+                </a>
+              ),
+            )}
           </nav>
         </div>
 

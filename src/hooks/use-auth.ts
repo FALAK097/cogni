@@ -69,19 +69,6 @@ export function useSwitchWorkspace() {
   });
 }
 
-export function useCreateWorkspaceWorkspace() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (_body: { name: string }) => {
-      throw new Error("Create workspace is not available in this version.");
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.workspaces.all });
-    },
-  });
-}
-
 export function useLogout() {
   const queryClient = useQueryClient();
   const router = useRouter();

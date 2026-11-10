@@ -182,24 +182,3 @@ export async function streamWidgetAgent({
     },
   };
 }
-
-export async function streamHandoffMessage({
-  config,
-  text,
-  onFinish,
-}: {
-  config: Pick<WidgetAgentConfig, "modelProvider" | "modelName">;
-  text: string;
-  onFinish: (result: { text: string }) => Promise<void>;
-}) {
-  const result = streamText({
-    model: getWidgetModel(config.modelProvider, config.modelName),
-    instructions: "Repeat the user-provided message exactly. Do not add anything else.",
-    prompt: text,
-    onEnd: async ({ text: output }) => {
-      await onFinish({ text: output });
-    },
-  });
-
-  return result;
-}

@@ -21,9 +21,7 @@ import {
   type WidgetPublicConfig,
   type WidgetWidgetConfig,
   type WidgetBorderRadiusStyle,
-  type WidgetLauncherSize,
   type WidgetModelProvider,
-  type WidgetPosition,
   type WidgetSettings,
   type WidgetPublicationStatus,
   type WidgetPublishedConfig,
@@ -252,11 +250,4 @@ export function validateEmbedOrigin(origin: string | null, allowedDomains: strin
   } catch {
     return false;
   }
-}
-
-export function mapLauncherSizeToPixels(size: WidgetLauncherSize | WidgetPosition | string) {
-  const normalized = normalizeLauncherSize(String(size));
-  if (normalized === "sm") return 48;
-  if (normalized === "lg") return 64;
-  return 56;
 }

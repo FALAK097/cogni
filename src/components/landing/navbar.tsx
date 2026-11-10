@@ -46,9 +46,16 @@ export function Navbar() {
 
   return (
     <header className="sticky inset-x-0 top-0 z-50 border-b border-border bg-background/95">
-      <nav className="mx-auto flex min-h-20 w-full max-w-[1120px] items-center gap-6 px-6 sm:px-10">
+      <nav
+        className="mx-auto flex min-h-20 w-full max-w-[1120px] items-center gap-6 px-6 sm:px-10"
+        aria-label="Main navigation"
+      >
         {/* Logo */}
-        <Link href="/" className="flex shrink-0 items-center gap-2.5 font-semibold">
+        <Link
+          href="/"
+          className="flex shrink-0 items-center gap-2.5 font-semibold"
+          aria-label="Cogni homepage"
+        >
           <ThemeLogo showWordmark wordmarkClassName="text-foreground" />
         </Link>
 

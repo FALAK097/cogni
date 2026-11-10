@@ -6,7 +6,10 @@ import { desc } from "drizzle-orm";
 
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
 import { aggregateSatisfactionByCohort } from "@/features/analytics/aggregation";
-import { collectAiResponseTimeSamplesMs } from "@/features/analytics/response-time";
+import {
+  averageAiResponseTimeMs,
+  collectAiResponseTimeSamplesMs,
+} from "@/features/analytics/response-time";
 import { collectNegativeFeedbackItems } from "@/features/analytics/negative-feedback";
 import { collectUnansweredQuestions } from "@/features/analytics/unanswered-questions";
 import { collectNoSourceMatchQuestions } from "@/features/analytics/no-source-answers";
@@ -128,8 +131,7 @@ function aggregatePeriod(conversations: ConversationRow[], timezone: string) {
   let messagesSent = 0;
   let messagesReceived = 0;
   let engagedConversations = 0;
-  let responseTimeTotal = 0;
-  let aiResponseSamples = 0;
+  const allResponseTimes: number[] = [];
   const satisfactionResponses: { cohortDate: string; rating: "positive" | "negative" }[] = [];
   const sourceCounts = new Map<string, number>();
   const statusCounts = new Map<string, number>();
@@ -184,8 +186,7 @@ function aggregatePeriod(conversations: ConversationRow[], timezone: string) {
     }
 
     const responseTimes = collectAiResponseTimeSamplesMs(messages);
-    responseTimeTotal += responseTimes.reduce((sum, responseTime) => sum + responseTime, 0);
-    aiResponseSamples += responseTimes.length;
+    allResponseTimes.push(...responseTimes);
 
     for (const message of messages) {
       if (message.feedback === "positive" || message.feedback === "negative") {
@@ -205,7 +206,8 @@ function aggregatePeriod(conversations: ConversationRow[], timezone: string) {
 
   const totalConversations = conversations.length;
   const uniqueUserCount = uniqueUsers.size;
-  const avgAiResponseTimeMs = aiResponseSamples > 0 ? responseTimeTotal / aiResponseSamples : 0;
+  const aiResponseSamples = allResponseTimes.length;
+  const avgAiResponseTimeMs = averageAiResponseTimeMs(allResponseTimes) ?? 0;
   const satisfaction = aggregateSatisfactionByCohort(satisfactionResponses);
 
   const feedbackTotal = satisfaction.positive + satisfaction.negative;

@@ -52,6 +52,7 @@ import {
 import { getConversationTargetIndex } from "@/features/conversations/list-keyboard-navigation";
 import type { InboxChannel } from "@/features/conversations/inbox-pagination";
 import { normalizeTimezone } from "@/features/conversations/snooze-schedule";
+import { getVisitorName } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
 import { scrollPaneClassName } from "./conversation-layout";
@@ -81,10 +82,7 @@ function getDisplayName(conversation: ConversationSummary) {
   ) {
     return conversation.contactName;
   }
-  if (conversation.visitorId) {
-    return `Visitor ${conversation.visitorId.slice(0, 6)}`;
-  }
-  return "Visitor";
+  return getVisitorName(conversation.visitorId);
 }
 
 function getInitials(name: string) {

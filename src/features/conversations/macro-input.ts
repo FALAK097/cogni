@@ -19,5 +19,3 @@ export const inboxMacroInputSchema = z.object({
     .max(4_000)
     .refine((content) => !hasUnsafeControlCharacter(content)),
 });
-
-export type InboxMacroInput = z.infer<typeof inboxMacroInputSchema>;
