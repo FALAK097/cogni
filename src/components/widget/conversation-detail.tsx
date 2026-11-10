@@ -34,6 +34,7 @@ import {
   Pause,
   Play,
   Plus,
+  MessageSquare,
   Send,
   RotateCcw,
   Sparkles,
@@ -421,9 +422,6 @@ export function ConversationDetail({
   }, [transcriptMessages]);
 
   const displayName = session ? getDisplayName(session) : "";
-  const replyTarget = session
-    ? `To ${session.contactEmail || session.contactPhone || displayName} · ${getConversationChannelLabel(session.conversationChannel)}`
-    : "";
   const firstVisitorQuestion = session?.messages.find((m) => m.role === "user")?.content;
   const membersQuery = useWorkspaceMembers();
   const assignedMemberName =
@@ -720,7 +718,9 @@ export function ConversationDetail({
   if (!session) return null;
 
   const isAssignedToMe = session.assigneeId === session.currentMembershipId;
-  const replyTargetLabel = `Replying to ${displayName} via ${getConversationChannelLabel(session.conversationChannel)}`;
+  const replyTarget = session
+    ? `To ${session.contactEmail || session.contactPhone || displayName} · ${getConversationChannelLabel(session.conversationChannel)}`
+    : "";
   const replyContextLabel = getReplyContextLabel(
     displayName,
     getConversationChannelLabel(session.conversationChannel),
@@ -771,7 +771,14 @@ export function ConversationDetail({
             <AlertDialogDescription>
               The channel may already have delivered your last reply, but Cogni could not confirm
               it. Check the channel before sending this message again; resending can create a
-              duplicate.
+              duplicate. Learn about uncertain delivery in the{" "}
+              <Link
+                href="/help#human-takeover"
+                className="underline underline-offset-2 hover:text-foreground"
+              >
+                human takeover guide
+              </Link>
+              .
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1255,10 +1262,16 @@ export function ConversationDetail({
                   <ChevronDown className="size-3.5" aria-hidden="true" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
-                  <DropdownMenuItem className="min-h-11 sm:min-h-9" onClick={() => setComposerMode("reply")}>
+                  <DropdownMenuItem
+                    className="min-h-11 sm:min-h-9"
+                    onClick={() => setComposerMode("reply")}
+                  >
                     Reply to customer
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="min-h-11 sm:min-h-9" onClick={() => setComposerMode("note")}>
+                  <DropdownMenuItem
+                    className="min-h-11 sm:min-h-9"
+                    onClick={() => setComposerMode("note")}
+                  >
                     Internal note
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -1572,6 +1585,8 @@ function MessageBubble({
   message,
   session,
   displayName,
+  canManage,
+  onCreateTest,
 }: {
   message: WidgetMessage;
   session: ConversationDetailData;

@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import Image from "next/image";
 import type { ReactNode } from "react";
 import { useRef, useState } from "react";
@@ -1109,6 +1111,16 @@ export function WidgetInstallationPanel({
             {allowedDomains.length === 0 ? (
               <div className="py-2">
                 <p className="text-sm text-muted-foreground">No domains authorized yet</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  The widget enforces origin allowlisting.{" "}
+                  <Link
+                    href="/help#widget-installation"
+                    className="underline underline-offset-2 hover:text-foreground"
+                  >
+                    View authorized domains and CSP guide
+                  </Link>
+                  .
+                </p>
               </div>
             ) : null}
           </div>
@@ -1125,6 +1137,16 @@ export function WidgetInstallationPanel({
             <pre className="max-h-48 overflow-x-auto rounded-lg bg-muted p-4 font-mono text-xs leading-5 text-foreground">
               {embedScript}
             </pre>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Need help with embed placement or Content Security Policy (CSP)?{" "}
+              <Link
+                href="/help#widget-installation"
+                className="underline underline-offset-2 hover:text-foreground"
+              >
+                View widget installation &amp; CSP troubleshooting
+              </Link>
+              .
+            </p>
             <Button
               type="button"
               size="icon-sm"
@@ -1171,6 +1193,16 @@ export function WidgetVersionHistory({
         <summary className="cursor-pointer rounded-xl px-4 py-3 text-sm font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
           Version history
         </summary>
+        <p className="px-4 pb-2 text-xs text-muted-foreground">
+          Learn about draft preview vs live publication and rollback in the{" "}
+          <Link
+            href="/help#publication"
+            className="underline underline-offset-2 hover:text-foreground"
+          >
+            publication guide
+          </Link>
+          .
+        </p>
         <ol className="divide-y divide-border border-t border-border">
           {versions.map((version) => {
             const isCurrent = version.version === currentVersion;

@@ -89,7 +89,8 @@
     "test:analytics-knowledge-gap-review-route": "node --test scripts/test-analytics-knowledge-gap-review-route.mjs",
     "test:navigation-routes": "node --test scripts/test-navigation-routes.mjs",
     "test:dashboard-session-patch": "node --test scripts/test-dashboard-session-patch.mjs",
-    "test:avatars": "node --test scripts/test-avatar-generator.mjs"
+    "test:avatars": "node --test scripts/test-avatar-generator.mjs",
+    "test:customer-setup-troubleshooting": "node --test scripts/test-customer-setup-troubleshooting.mjs"
   },
   "dependencies": {
     "@ai-sdk/google": "4.0.87",

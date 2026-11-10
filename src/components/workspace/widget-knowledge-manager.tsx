@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { formatDistanceToNow } from "date-fns";
 import { parseAsStringLiteral, useQueryState } from "nuqs";
 import {
@@ -536,10 +538,18 @@ function KnowledgeEmptyState({
         description="Add a website URL, upload documents, or paste text to teach your AI assistant how to answer questions."
       >
         {canManage ? (
-          <Button size="sm" className="h-9 rounded-xl shadow-none" onClick={onAddFirstSource}>
-            <Plus className="mr-1.5 h-4 w-4" />
-            Add Source
-          </Button>
+          <div className="flex flex-col items-center gap-2">
+            <Button size="sm" className="h-9 rounded-xl shadow-none" onClick={onAddFirstSource}>
+              <Plus className="mr-1.5 h-4 w-4" />
+              Add Source
+            </Button>
+            <Link
+              href="/help#knowledge-sources"
+              className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+            >
+              Learn about supported formats and ingestion
+            </Link>
+          </div>
         ) : (
           <p className="text-sm text-muted-foreground">Ask a workspace owner to add a source.</p>
         )}

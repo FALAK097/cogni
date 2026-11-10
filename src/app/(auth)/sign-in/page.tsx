@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { AuthForm } from "@/components/auth/auth-form";
 import { safeReturnPath } from "@/lib/auth/return-path";
 
@@ -26,6 +27,15 @@ export default async function SignInPage({
       </div>
 
       <AuthForm mode="sign-in" callbackURL={callbackURL} />
+      <p className="text-center text-xs text-muted-foreground">
+        Trouble signing in?{" "}
+        <Link
+          href="/help#google-auth"
+          className="underline underline-offset-2 hover:text-foreground"
+        >
+          View Google auth setup guide
+        </Link>
+      </p>
     </div>
   );
 }

@@ -8,6 +8,7 @@ const FOOTER_LINKS = [
   { label: "Integrations", href: "#integrations" },
   { label: "How It Works", href: "#how-it-works" },
   { label: "FAQ", href: "#faq" },
+  { label: "Help", href: "/help" },
   { label: "Privacy", href: "/privacy-policy" },
   { label: "Terms", href: "/terms" },
 ] as const;
