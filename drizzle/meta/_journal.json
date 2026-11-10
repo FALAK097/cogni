@@ -211,6 +211,13 @@
       "when": 1793279136278,
       "tag": "0029_conversation_qa_inactivity_cursor",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1793280000000,
+      "tag": "0030_ingestion_worker_leases",
+      "breakpoints": true
     }
   ]
 }

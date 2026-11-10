@@ -19,7 +19,9 @@ export async function GET(request: Request) {
 
   const db = getDb();
   const rateLimitBucketsPruned = await pruneExpiredRateLimitBuckets();
-  const result = await drainIngestionQueue(db, 10);
+  const result = await drainIngestionQueue(db, 10, {
+    allowStaleRunning: env.INGESTION_RECLAIM_STALE !== "false",
+  });
   const searchCleanup = await drainSearchItemCleanup(db, 50);
   const conversationQa = await drainConversationQaQueue(db, 4);
   return NextResponse.json({
