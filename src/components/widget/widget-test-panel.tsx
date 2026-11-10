@@ -2,17 +2,14 @@ import Link from "next/link";
 
 import { useState, type FormEvent } from "react";
 
-import {
-  BookOpen,
-  CheckCircle2,
-  ExternalLink,
-  MessageCircle,
-  Pencil,
-  Play,
-  Plus,
-  Trash2,
-} from "@/components/icons";
+import { BookOpen, CheckCircle2, ExternalLink, MoreVertical, Play, Plus } from "@/components/icons";
 import { EmptyState } from "@/components/ui/empty-state";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { useKnowledgeBaseSources } from "@/hooks/query/use-knowledge-base";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -63,6 +60,8 @@ function WidgetTestResult({
   busy: boolean;
   onRetry: (prompt: string) => void;
 }) {
+  if (!evidence && !error) return null;
+
   return (
     <>
       {error ? (
@@ -85,13 +84,8 @@ function WidgetTestResult({
         </div>
       ) : null}
 
-      <section
-        aria-labelledby="preview-evidence-heading"
-        aria-live="polite"
-        className="rounded-xl border border-border/70 bg-card p-4"
-      >
+      <section aria-labelledby="preview-evidence-heading" aria-live="polite" className="py-4">
         <div className="flex items-center gap-2">
-          <MessageCircle className="size-4 text-muted-foreground" aria-hidden="true" />
           <h3 id="preview-evidence-heading" className="text-sm font-semibold">
             Latest test result
           </h3>
@@ -101,7 +95,7 @@ function WidgetTestResult({
             Send a message in the preview to see its source or handoff evidence here.
           </p>
         ) : evidence.outcome === "handoff" ? (
-          <div className="mt-3 rounded-lg border border-border/60 bg-muted/30 p-3">
+          <div className="mt-3 py-3">
             <p className="text-sm font-medium">Handoff rule matched</p>
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
               The preview returned the configured human-handoff response. No customer conversation
@@ -155,7 +149,7 @@ function WidgetTestResult({
             </ul>
           </div>
         ) : (
-          <div className="mt-3 rounded-lg border border-border/60 bg-muted/30 p-3">
+          <div className="mt-3 py-3">
             <p className="text-sm font-medium">No matching knowledge source</p>
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
               Review this answer as ungrounded. Check your source coverage and fallback instructions
@@ -348,105 +342,91 @@ export function WidgetTestPanel({
       <header className="space-y-1.5">
         <h2 className="text-base font-semibold tracking-tight">Test your agent</h2>
         <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
-          Try a customer question in the preview, then check which knowledge sources were retrieved
-          or whether a handoff rule matched.
+          Try a question in the preview, or run a saved test.
         </p>
       </header>
 
-      <section
-        aria-labelledby="preview-guidance-heading"
-        className="space-y-4 rounded-xl border border-border/70 bg-card p-4 sm:p-5"
-      >
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h3 id="preview-guidance-heading" className="text-sm font-semibold">
-              Try a scenario
-            </h3>
-            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              Send a prompt from the preview beside this panel. These examples run there directly.
+      <details className="group/scenarios">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between text-sm font-medium [&::-webkit-details-marker]:hidden">
+          Try a scenario <span aria-hidden="true">+</span>
+        </summary>
+        <div className="space-y-5 pt-4">
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">Grounded answer</p>
+            {visibleSuggestions.length > 0 ? (
+              <ul className="space-y-2" aria-label="Suggested grounded questions">
+                {visibleSuggestions.map((suggestion) => (
+                  <li key={suggestion}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-auto min-h-10 w-full justify-between gap-3 whitespace-normal rounded-lg px-3 py-2 text-left text-sm font-normal"
+                      onClick={() => void tryPrompt(suggestion)}
+                      disabled={isBusy}
+                      aria-label={`Run preview question: ${suggestion}`}
+                    >
+                      <span className="line-clamp-2 min-w-0">{suggestion}</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        {sendingPrompt === suggestion ? "Sending…" : "Run"}
+                      </span>
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Add a suggested question in{" "}
+                <Link
+                  href={agentHref()}
+                  className="rounded-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                >
+                  Agent → Build
+                </Link>
+                , then return here to test a prompt tailored to your agent.
+              </p>
+            )}
+          </div>
+
+          <div className="rounded-lg bg-muted/40 px-3 py-2.5">
+            <p className="text-xs font-medium text-foreground">No-evidence check</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              Ask about a topic your sources do not cover to check how the agent handles missing
+              evidence.
             </p>
           </div>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 px-2.5 py-1 text-xs font-medium text-foreground">
-            <span className="size-1.5 rounded-full bg-primary" aria-hidden="true" />
-            Safe preview
-          </span>
-        </div>
 
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground">Grounded answer</p>
-          {visibleSuggestions.length > 0 ? (
-            <ul className="space-y-2" aria-label="Suggested grounded questions">
-              {visibleSuggestions.map((suggestion) => (
-                <li key={suggestion}>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-auto min-h-10 w-full justify-between gap-3 whitespace-normal rounded-lg px-3 py-2 text-left text-sm font-normal"
-                    onClick={() => void tryPrompt(suggestion)}
-                    disabled={isBusy}
-                    aria-label={`Run preview question: ${suggestion}`}
-                  >
-                    <span className="line-clamp-2 min-w-0">{suggestion}</span>
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      {sendingPrompt === suggestion ? "Sending…" : "Run"}
-                    </span>
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              Add a suggested question in{" "}
-              <Link
-                href={agentHref()}
-                className="rounded-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-              >
-                Agent → Build
-              </Link>
-              , then return here to test a prompt tailored to your agent.
-            </p>
-          )}
+          <div className="space-y-2 border-t border-border/70 pt-3">
+            <p className="text-xs font-medium text-muted-foreground">Human handoff</p>
+            {visibleTerms.length > 0 ? (
+              <ul className="flex flex-wrap gap-2" aria-label="Configured handoff terms">
+                {visibleTerms.map((term) => (
+                  <li key={term}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="min-h-9 rounded-lg px-3 text-sm"
+                      onClick={() => void tryPrompt(term)}
+                      disabled={isBusy}
+                      aria-label={`Run handoff preview using ${term}`}
+                    >
+                      {sendingPrompt === term ? "Sending…" : term}
+                    </Button>
+                  </li>
+                ))}
+                {handoffTerms.length > visibleTerms.length ? (
+                  <li className="self-center px-1 text-xs text-muted-foreground">
+                    +{handoffTerms.length - visibleTerms.length} more configured
+                  </li>
+                ) : null}
+              </ul>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                No handoff terms yet. Add them in Build to test escalation.
+              </p>
+            )}
+          </div>
         </div>
-
-        <div className="rounded-lg bg-muted/40 px-3 py-2.5">
-          <p className="text-xs font-medium text-foreground">No-evidence check</p>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            Ask about a topic your sources do not cover to check how the agent handles missing
-            evidence.
-          </p>
-        </div>
-
-        <div className="space-y-2 border-t border-border/70 pt-3">
-          <p className="text-xs font-medium text-muted-foreground">Human handoff</p>
-          {visibleTerms.length > 0 ? (
-            <ul className="flex flex-wrap gap-2" aria-label="Configured handoff terms">
-              {visibleTerms.map((term) => (
-                <li key={term}>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="min-h-9 rounded-lg px-3 text-sm"
-                    onClick={() => void tryPrompt(term)}
-                    disabled={isBusy}
-                    aria-label={`Run handoff preview using ${term}`}
-                  >
-                    {sendingPrompt === term ? "Sending…" : term}
-                  </Button>
-                </li>
-              ))}
-              {handoffTerms.length > visibleTerms.length ? (
-                <li className="self-center px-1 text-xs text-muted-foreground">
-                  +{handoffTerms.length - visibleTerms.length} more configured
-                </li>
-              ) : null}
-            </ul>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              No handoff terms yet. Add them in Build to test escalation.
-            </p>
-          )}
-        </div>
-      </section>
+      </details>
       <WidgetTestResult
         evidence={evidence}
         error={tryError}
@@ -465,18 +445,12 @@ export function WidgetTestPanel({
         </output>
       ) : null}
 
-      <section
-        aria-labelledby="saved-tests-heading"
-        className="space-y-3 rounded-xl border border-border/70 bg-card p-4"
-      >
+      <section aria-labelledby="saved-tests-heading" className="space-y-3 py-4">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h3 id="saved-tests-heading" className="text-sm font-semibold">
               Saved tests
             </h3>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Reusable prompts; each run stays in preview.
-            </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {canManage && (casesQuery.data?.cases.length ?? 0) > 0 ? (
@@ -510,7 +484,7 @@ export function WidgetTestPanel({
           <output aria-busy="true" aria-label="Loading saved tests" className="space-y-2">
             <div aria-hidden="true" className="space-y-2">
               {Array.from({ length: 2 }).map((_, index) => (
-                <div key={index} className="rounded-lg border border-border/60 p-3">
+                <div key={index} className="py-4">
                   <Skeleton className="h-4 w-40 max-w-[70%]" />
                   <Skeleton className="mt-2 h-3 w-3/4" />
                   <Skeleton className="mt-3 h-7 w-24 rounded-md" />
@@ -594,7 +568,7 @@ export function WidgetTestPanel({
                 )
               : false;
             return (
-              <li key={testCase.id} className="rounded-lg border border-border/60 p-3">
+              <li key={testCase.id} className="py-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="break-words text-sm font-medium">{testCase.title}</p>
@@ -641,38 +615,42 @@ export function WidgetTestPanel({
                       )}
                     </Button>
                     {canManage ? (
-                      <>
-                        <Button
-                          type="button"
-                          size="icon-sm"
-                          variant="ghost"
-                          aria-label={`Edit ${testCase.title}`}
-                          disabled={isBusy}
-                          onClick={() => openEdit(testCase)}
-                        >
-                          <Pencil className="size-4" aria-hidden="true" />
-                        </Button>
-                        <Button
-                          type="button"
-                          size="icon-sm"
-                          variant="ghost"
-                          aria-label={`Delete ${testCase.title}`}
-                          disabled={deleteCase.isPending || isBusy}
-                          onClick={() =>
-                            void deleteCase
-                              .mutateAsync(testCase.id)
-                              .catch((error: unknown) =>
-                                setTryError(
-                                  error instanceof Error
-                                    ? error.message
-                                    : "Couldn't delete this test.",
-                                ),
-                              )
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          render={
+                            <Button
+                              type="button"
+                              size="icon-sm"
+                              variant="ghost"
+                              aria-label={`More actions for ${testCase.title}`}
+                              disabled={isBusy || deleteCase.isPending}
+                            />
                           }
                         >
-                          <Trash2 className="size-4" aria-hidden="true" />
-                        </Button>
-                      </>
+                          <MoreVertical className="size-4" aria-hidden="true" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openEdit(testCase)}>
+                            Edit test
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() =>
+                              void deleteCase
+                                .mutateAsync(testCase.id)
+                                .catch((error: unknown) =>
+                                  setTryError(
+                                    error instanceof Error
+                                      ? error.message
+                                      : "Couldn't delete this test.",
+                                  ),
+                                )
+                            }
+                          >
+                            Delete test
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     ) : null}
                   </div>
                 </div>
@@ -681,10 +659,7 @@ export function WidgetTestPanel({
           })}
         </ul>
         {showForm ? (
-          <form
-            className="space-y-3 rounded-lg border border-border/70 bg-muted/20 p-3"
-            onSubmit={(event) => void submitCase(event)}
-          >
+          <form className="space-y-4 py-5" onSubmit={(event) => void submitCase(event)}>
             <label htmlFor="agent-test-title" className="block space-y-1.5 text-sm font-medium">
               Test name
               <Input

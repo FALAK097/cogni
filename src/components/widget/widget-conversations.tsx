@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { parseAsString, useQueryStates } from "nuqs";
 
@@ -15,6 +15,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 
 import {
@@ -69,6 +75,8 @@ const FILTER_TABS: Array<{
   { value: "tickets", label: "Tickets", countKey: "tickets" },
 ];
 
+const subscribeToHydration = () => () => {};
+
 const EMPTY_COUNTS = {
   total: 0,
   all: 0,
@@ -82,6 +90,11 @@ const EMPTY_COUNTS = {
 
 export function WidgetConversations({ canManage }: WidgetConversationsProps) {
   useInboxConversationEvents();
+  const hydrated = useSyncExternalStore(
+    subscribeToHydration,
+    () => true,
+    () => false,
+  );
   const [inboxQuery, setInboxQuery] = useQueryStates(
     {
       view: parseAsString.withDefault("all"),
@@ -89,7 +102,7 @@ export function WidgetConversations({ canManage }: WidgetConversationsProps) {
     },
     { clearOnDefault: true, history: "push", scroll: false, shallow: true },
   );
-  const selectedConversationId = inboxQuery.conversationId || null;
+  const selectedConversationId = hydrated ? inboxQuery.conversationId || null : null;
   const setSelectedConversationId = (
     conversationId: string | null,
     history: "push" | "replace" = "push",
@@ -112,11 +125,12 @@ export function WidgetConversations({ canManage }: WidgetConversationsProps) {
   const deleteSavedView = useDeleteInboxSavedView();
   const savedViews = useMemo(() => savedViewsData?.views ?? [], [savedViewsData]);
   const selectedSavedView = savedViews.find((view) => view.id === inboxQuery.view) ?? null;
-  const filter =
-    selectedSavedView?.filter ??
-    (FILTER_TABS.some((tab) => tab.value === inboxQuery.view)
-      ? (inboxQuery.view as ConversationFilter)
-      : "all");
+  const filter = !hydrated
+    ? "all"
+    : (selectedSavedView?.filter ??
+      (FILTER_TABS.some((tab) => tab.value === inboxQuery.view)
+        ? (inboxQuery.view as ConversationFilter)
+        : "all"));
   const previousView = useRef(inboxQuery.view);
   const preserveFacetStateForView = useRef<string | null>(null);
 
@@ -165,8 +179,6 @@ export function WidgetConversations({ canManage }: WidgetConversationsProps) {
   });
   const activeView = FILTER_TABS.find((tab) => tab.value === filter);
   const activeViewCount = activeView ? counts[activeView.countKey] : 0;
-  const activeCountKind =
-    filter === "snoozed" ? "snoozed" : filter === "tickets" ? "tickets" : "unread";
   const composerDraftKey = `${workspaceId}:${selectedConversationId ?? ""}`;
   const composerDraft = composerDrafts[composerDraftKey] ?? EMPTY_CONVERSATION_COMPOSER_DRAFT;
   const backToConversationList = () => {
@@ -187,14 +199,19 @@ export function WidgetConversations({ canManage }: WidgetConversationsProps) {
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-sidebar">
-      <header className="shrink-0 bg-sidebar px-4 pt-3 sm:px-5 sm:pt-4 lg:pt-4">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-card">
+      <header
+        className={cn(
+          "shrink-0 bg-card px-4 py-3 sm:px-5 xl:p-0",
+          selectedConversationId && "hidden lg:block",
+        )}
+      >
+        <h1 className="text-xl font-medium tracking-tight text-foreground xl:sr-only">
           {APP_PAGES.inbox.label}
         </h1>
 
         {!isWorkspaceInboxEmpty ? (
-          <div className="mt-2 flex gap-1.5 lg:mt-3">
+          <div className="mt-2 flex gap-1.5 xl:hidden">
             <Select
               value={selectedSavedView?.id ?? filter}
               onValueChange={(value) => {
@@ -214,26 +231,19 @@ export function WidgetConversations({ canManage }: WidgetConversationsProps) {
                 </SelectValue>
                 {!selectedSavedView && activeViewCount > 0 ? (
                   <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                    {activeViewCount} {activeCountKind}
+                    {activeViewCount}
                   </span>
                 ) : null}
               </SelectTrigger>
               <SelectContent align="start" alignItemWithTrigger={false} className="w-64 rounded-xl">
                 {FILTER_TABS.map((tab) => {
                   const count = counts[tab.countKey];
-                  const countKind =
-                    tab.value === "snoozed"
-                      ? "snoozed"
-                      : tab.value === "tickets"
-                        ? "tickets"
-                        : "unread";
-
                   return (
                     <SelectItem key={tab.value} value={tab.value} className="min-h-10 rounded-lg">
                       <span>{tab.label}</span>
                       {count > 0 ? (
                         <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                          {count} {countKind}
+                          {count}
                         </span>
                       ) : null}
                     </SelectItem>
@@ -333,11 +343,105 @@ export function WidgetConversations({ canManage }: WidgetConversationsProps) {
           </section>
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1 gap-2.5 p-2 sm:px-4 sm:pb-4">
+        <div className="flex min-h-0 flex-1 border-t border-border xl:border-t-0">
+          <nav
+            aria-label="Inbox views"
+            className="hidden w-44 shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-background px-3 py-5 xl:flex 2xl:w-48"
+          >
+            <p className="px-3 pb-3 text-xs font-medium text-muted-foreground">Conversations</p>
+            {FILTER_TABS.filter((tab) => !["unread", "snoozed", "tickets"].includes(tab.value)).map(
+              (tab) => {
+                const count = counts[tab.countKey];
+                return (
+                  <button
+                    key={tab.value}
+                    type="button"
+                    aria-current={!selectedSavedView && filter === tab.value ? "page" : false}
+                    onClick={() => void setInboxQuery({ view: tab.value, conversationId: "" })}
+                    className={cn(
+                      "flex min-h-10 items-center gap-2.5 rounded-xl px-3 text-left text-sm transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                      !selectedSavedView && filter === tab.value && "bg-secondary font-medium",
+                    )}
+                  >
+                    <span className="min-w-0 flex-1 truncate">{tab.label}</span>
+                    {count > 0 ? (
+                      <span
+                        className="text-xs tabular-nums text-muted-foreground"
+                        title={`${count} items`}
+                        aria-label={`${count} items`}
+                      >
+                        {count}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              },
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    className="min-h-10 justify-start px-3 text-sm text-muted-foreground"
+                  />
+                }
+              >
+                {["unread", "snoozed", "tickets"].includes(filter)
+                  ? activeView?.label
+                  : "More views"}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {FILTER_TABS.filter((tab) =>
+                  ["unread", "snoozed", "tickets"].includes(tab.value),
+                ).map((tab) => (
+                  <DropdownMenuItem
+                    key={tab.value}
+                    onClick={() => void setInboxQuery({ view: tab.value, conversationId: "" })}
+                  >
+                    {tab.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {savedViews.length > 0 ? (
+              <p className="mt-6 border-t border-border px-3 pt-5 pb-2 text-xs font-medium text-muted-foreground">
+                Shared views
+              </p>
+            ) : null}
+            {savedViews.map((view) => (
+              <button
+                key={view.id}
+                type="button"
+                aria-current={selectedSavedView?.id === view.id ? "page" : false}
+                onClick={() => void setInboxQuery({ view: view.id, conversationId: "" })}
+                className={cn(
+                  "flex min-h-10 items-center gap-2.5 rounded-xl px-3 text-left text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring",
+                  selectedSavedView?.id === view.id && "bg-secondary font-medium",
+                )}
+              >
+                <MessageSquare className="size-4 shrink-0" />
+                <span className="truncate">{view.name}</span>
+              </button>
+            ))}
+            {canDeleteSavedView && selectedSavedView ? (
+              <Button
+                type="button"
+                variant="ghost"
+                className="mt-3 justify-start text-xs text-muted-foreground"
+                onClick={() => {
+                  setDeleteViewError(null);
+                  setDeleteViewOpen(true);
+                }}
+              >
+                <Trash2 className="size-3.5" />
+                Delete shared view
+              </Button>
+            ) : null}
+          </nav>
           <div
             className={cn(
               panelBoxClassName,
-              "w-full shrink-0 lg:w-[300px] xl:w-[320px]",
+              "w-full shrink-0 lg:w-[300px] xl:w-[304px]",
               selectedConversationId ? "hidden lg:flex" : "flex",
             )}
           >
@@ -394,7 +498,9 @@ export function WidgetConversations({ canManage }: WidgetConversationsProps) {
             )}
           </div>
 
-          <div className={cn(detailsColumnClassName, "hidden w-[280px] shrink-0 xl:flex")}>
+          <div
+            className={cn(detailsColumnClassName, "hidden w-[264px] shrink-0 min-[1440px]:flex")}
+          >
             {selectedConversationId ? (
               <ConversationDetail
                 key={selectedConversationId}
@@ -405,7 +511,7 @@ export function WidgetConversations({ canManage }: WidgetConversationsProps) {
                 part="details"
               />
             ) : (
-              <div className="flex h-full items-center justify-center rounded-xl border border-border/60 bg-card p-4">
+              <div className="flex h-full items-center justify-center border-l border-border bg-card p-4">
                 <p className="text-center text-xs text-muted-foreground">
                   Select a conversation to view contact details
                 </p>

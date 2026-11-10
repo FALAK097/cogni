@@ -23,7 +23,7 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/70 bg-muted/20 text-center",
+        "flex flex-col items-center justify-center text-center",
         compact ? "min-h-[220px] p-5" : "min-h-[280px] p-6 sm:p-8",
         className,
       )}
@@ -31,8 +31,8 @@ export function EmptyState({
       {Icon ? (
         <span
           className={cn(
-            "flex items-center justify-center border border-border/60 bg-card text-muted-foreground shadow-sm",
-            compact ? "mb-3 size-10 rounded-lg" : "mb-4 size-11 rounded-xl",
+            "flex items-center justify-center text-muted-foreground",
+            compact ? "mb-3 size-10" : "mb-4 size-11",
           )}
         >
           <Icon className={compact ? "size-4" : "size-[18px]"} aria-hidden="true" />

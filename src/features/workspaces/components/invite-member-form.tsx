@@ -2,7 +2,7 @@
 
 import { useActionState, useRef, useState } from "react";
 
-import { CheckCircle2, Copy, UserPlus } from "@/components/icons";
+import { CheckCircle2, Copy } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { inviteMemberAction, type MemberActionState } from "@/features/workspaces/actions-members";
@@ -39,23 +39,10 @@ export function InviteMemberForm({ canManage }: { canManage: boolean }) {
     : null;
 
   return (
-    <section
-      aria-labelledby="invite-member-heading"
-      className="rounded-xl border bg-card p-4 sm:p-5"
-    >
-      <div className="flex items-start gap-3">
-        <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <UserPlus className="size-4" aria-hidden="true" />
-        </span>
-        <div>
-          <h3 id="invite-member-heading" className="text-sm font-semibold">
-            Invite a teammate
-          </h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Create a secure, seven-day invite link for their work email.
-          </p>
-        </div>
-      </div>
+    <section aria-labelledby="invite-member-heading" className="py-5">
+      <h3 id="invite-member-heading" className="text-sm font-semibold">
+        Invite a teammate
+      </h3>
 
       <form
         action={formAction}
@@ -87,8 +74,7 @@ export function InviteMemberForm({ canManage }: { canManage: boolean }) {
             <option value="OWNER">Owner</option>
           </select>
         </label>
-        <Button type="submit" disabled={!canManage || pending} className="h-10 gap-2 rounded-lg">
-          <UserPlus className="size-4" aria-hidden="true" />
+        <Button type="submit" disabled={!canManage || pending} className="h-10">
           {pending ? "Creating link…" : "Create invite"}
         </Button>
       </form>
@@ -100,7 +86,7 @@ export function InviteMemberForm({ canManage }: { canManage: boolean }) {
       ) : null}
 
       {inviteUrl ? (
-        <div className="mt-4 rounded-lg border border-border/70 bg-muted/20 p-3">
+        <div className="mt-4 space-y-2">
           <label htmlFor="workspace-invite-link" className="text-xs font-medium text-foreground">
             Invite link for {state.inviteEmail}
           </label>
