@@ -84,20 +84,13 @@ pnpm db:studio       # Open Drizzle Studio
 
 The application runs on Cloudflare Workers using OpenNext (`@opennextjs/cloudflare`) and targets `https://cogni.falakgala.dev`.
 
-### CI/CD: Automated Deployment on Push to `main`
+### Automated Deployment via Cloudflare Workers Builds (Git Integration)
 
-The repository is configured with a GitHub Actions workflow in [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml). Every push to the `main` branch triggers:
+The `cogni` Worker is natively integrated with GitHub using Cloudflare Workers Builds (`cf builds triggers`). Every push to the `main` branch automatically triggers:
 
-1. Dependency installation (`pnpm install --frozen-lockfile`)
-2. Code quality & type checks (`pnpm check`: oxlint, `tsc --noEmit`, oxfmt)
-3. OpenNext Cloudflare compilation (`pnpm run build:cf`)
-4. Worker deployment to Cloudflare (`cloudflare/wrangler-action@v3`)
-
-#### Required GitHub Secrets
-
-In the GitHub repository settings (**Settings** > **Secrets and variables** > **Actions**), add:
-
-- `CLOUDFLARE_API_TOKEN`: Cloudflare API token with **Edit Cloudflare Workers** and **Account Settings: Read** permissions.
+1. Repository checkout (`FALAK097/cogni` on branch `main`)
+2. OpenNext Cloudflare compilation (`pnpm run build:cf`)
+3. Worker deployment to Cloudflare (`npx wrangler deploy`)
 
 ### Worker Secrets & Environment Variables
 
