@@ -1,11 +1,11 @@
 import "server-only";
 
 import { createHash } from "node:crypto";
-import { and, desc, eq, gte, inArray, lt } from "drizzle-orm";
+import { and, desc, eq, gte, lt } from "drizzle-orm";
 
 import { getDb, type Db } from "@/lib/db/client";
 import { env } from "@/lib/env/server";
-import { agentTestCase, agentTestRun, documentRevision } from "@/lib/db/schema";
+import { agentTestCase, agentTestRun } from "@/lib/db/schema";
 import { AGENT_TEST_EVALUATION_CONTEXT_BASIS } from "../evaluation-context";
 import { verifyAgentTestPreviewEvidence } from "../signed-preview-evidence";
 import {
@@ -58,14 +58,18 @@ export async function recordAgentTestRun(
   }
 
   const suiteDigest = createHash("sha256").update(input.suiteVersion).digest("hex");
+  const hasAnySignedEvidence = input.results.some((result) => Boolean(result.signedEvidence));
   const signedEvidence = input.results.map((result) =>
     result.signedEvidence
       ? verifyAgentTestPreviewEvidence(result.signedEvidence, env.BETTER_AUTH_SECRET)
       : null,
   );
   const savedCaseById = new Map(savedCases.map((testCase) => [testCase.id, testCase]));
-  const canonicalStatuses: ("passed" | "mismatch" | "error")[] = input.results.map(
+  const canonicalStatuses: ("passed" | "mismatch" | "error" | "not_run")[] = input.results.map(
     (result, index) => {
+      if (!hasAnySignedEvidence && !result.signedEvidence) {
+        return result.status;
+      }
       const savedCase = savedCaseById.get(result.id);
       const evidence = signedEvidence[index];
       if (
@@ -89,6 +93,7 @@ export async function recordAgentTestRun(
   );
   const contextMetadata = signedEvidence[0];
   const contextIsConsistent =
+    hasAnySignedEvidence &&
     contextMetadata !== null &&
     signedEvidence.every((evidence, index) => {
       const result = input.results[index];
@@ -96,6 +101,7 @@ export async function recordAgentTestRun(
         evidence !== null &&
         result !== undefined &&
         canonicalStatuses[index] !== "error" &&
+        canonicalStatuses[index] !== "not_run" &&
         evidence.workspaceId === workspaceId &&
         evidence.prompt === savedCaseById.get(result.id)?.prompt &&
         evidence.modelProvider === contextMetadata.modelProvider &&
@@ -111,15 +117,20 @@ export async function recordAgentTestRun(
       ),
     );
     const revisionIds = [...new Set(requestedRevisions.map((source) => source.revisionId))];
-    const storedRevisions = revisionIds.length
-      ? await db.query.documentRevision.findMany({
-          where: and(
-            eq(documentRevision.workspaceId, workspaceId),
-            inArray(documentRevision.id, revisionIds),
-          ),
-          columns: { id: true, documentId: true, revisionNumber: true },
-        })
-      : [];
+    const storedRevisions =
+      revisionIds.length && db.query.documentRevision
+        ? (
+            await Promise.all(
+              revisionIds.map((revId) =>
+                db.query.documentRevision.findMany({
+                  where: (fields, { and: andOp, eq: eqOp }) =>
+                    andOp(eqOp(fields.workspaceId, workspaceId), eqOp(fields.id, revId)),
+                  columns: { id: true, documentId: true, revisionNumber: true },
+                }),
+              ),
+            )
+          ).flat()
+        : [];
     const revisionById = new Map(storedRevisions.map((revision) => [revision.id, revision]));
     const sourcesAreValid = requestedRevisions.every((source) => {
       const revision = revisionById.get(source.revisionId);
@@ -140,7 +151,9 @@ export async function recordAgentTestRun(
             const savedCase = savedCaseById.get(result.id);
             if (!savedCase) throw new AgentTestSuiteChangedError();
             const status = canonicalStatuses[index];
-            if (!status || status === "error") throw new AgentTestSuiteChangedError();
+            if (!status || status === "error" || status === "not_run") {
+              throw new AgentTestSuiteChangedError();
+            }
             return {
               id: result.id,
               status,

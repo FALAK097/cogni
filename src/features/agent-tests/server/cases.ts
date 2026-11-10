@@ -8,13 +8,12 @@ import { agentTestCase, document, widget } from "@/lib/db/schema";
 import type { AgentTestCaseInput } from "../input";
 
 async function lockWorkspaceWidget(db: Db, workspaceId: string) {
-  const [saved] = await db
+  await db
     .select({ id: widget.id })
     .from(widget)
     .where(eq(widget.workspaceId, workspaceId))
     .limit(1)
     .for("update");
-  if (!saved) throw new Error("Agent configuration was not found.");
 }
 
 export class AgentTestCaseTitleConflictError extends Error {

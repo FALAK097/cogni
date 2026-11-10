@@ -16,7 +16,6 @@ import {
   getWidgetPublicationStatus,
   toWidgetSettings,
 } from "@/features/widget/server/widget-service";
-import { getWorkspaceActivationReadiness } from "@/features/widget/server/agent-readiness-service";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { widget as widgetTable } from "@/lib/db/schema";
 
@@ -181,6 +180,8 @@ export async function GET() {
   const widget = await ensureWorkspaceWidget(db, workspace.id);
   const settings = toWidgetSettings(widget);
   const publication = await getWidgetPublicationStatus(db, widget);
+  const { getWorkspaceActivationReadiness } =
+    await import("@/features/widget/server/agent-readiness-service");
   const readiness = await getWorkspaceActivationReadiness(db, workspace.id);
 
   return NextResponse.json({

@@ -13,10 +13,12 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { sql } from "drizzle-orm";
+import * as orm from "drizzle-orm";
 
 import { BRAND_COLOR } from "@/lib/widget-accent";
 import type { WidgetPublicationSnapshot } from "@/features/widget/publication";
+
+const { sql } = orm;
 
 const timestampString = () => timestamp({ mode: "string", withTimezone: true });
 const numeric = timestampString;

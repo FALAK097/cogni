@@ -3,8 +3,6 @@ import { randomUUID } from "node:crypto";
 import { enqueueDocumentProcessing } from "@/lib/jobs/ingestion";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { document as documentTable } from "@/lib/db/schema";
-import { runDbWriteOperation } from "@/lib/db/client";
-import { lockWorkspaceSourceBasisInTransaction } from "@/features/knowledge/server/source-revisions";
 import { z } from "zod";
 import { canManageWorkspace } from "@/lib/auth/permissions";
 
@@ -30,6 +28,9 @@ export async function POST(request: Request) {
   const urls = Array.isArray(parsed.data.url) ? parsed.data.url : [parsed.data.url];
 
   const created = [];
+  const { runDbWriteOperation } = await import("@/lib/db/client");
+  const { lockWorkspaceSourceBasisInTransaction } =
+    await import("@/features/knowledge/server/source-revisions");
 
   for (const sourceUrl of urls) {
     const [document] = await runDbWriteOperation(db, async (transaction) => {

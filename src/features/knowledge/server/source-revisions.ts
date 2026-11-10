@@ -1,13 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
-import { and, asc, desc, eq, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
+import * as orm from "drizzle-orm";
 
-import {
-  document as documentTable,
-  documentRevision,
-  domainEvent,
-  searchItemCleanup,
-  widget,
-} from "@/lib/db/schema";
+import * as schema from "@/lib/db/schema";
 import { runDbWriteOperation, type Db } from "@/lib/db/client";
 import {
   deleteCloudflareSearchItem,
@@ -21,6 +15,15 @@ import {
   getSearchItemCleanupRetryDelayMs,
   searchItemCleanupClaimLeaseMs,
 } from "@/features/knowledge/server/search-item-cleanup-policy";
+
+const { and, asc, desc, eq, inArray, isNotNull, isNull, lte, or } = orm;
+const {
+  document: documentTable,
+  documentRevision,
+  domainEvent,
+  searchItemCleanup,
+  widget,
+} = schema;
 
 const supportedSourceTypes = new Set(["URL", "SITEMAP", "TXT", "TEXT", "PDF", "DOCX"]);
 

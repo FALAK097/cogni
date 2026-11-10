@@ -1,9 +1,9 @@
-import "server-only";
+import "../cloudflare/server-only";
 
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
-import * as schema from "./schema";
+import * as schema from "@/lib/db/schema";
 import * as relations from "./relations";
 import { env } from "@/lib/env/server";
 

@@ -1,22 +1,27 @@
-import "server-only";
+import "../../../lib/cloudflare/server-only";
 
 import { createHash } from "node:crypto";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import * as orm from "drizzle-orm";
 import type { Db } from "@/lib/db/client";
-import {
+import * as schema from "@/lib/db/schema";
+
+const { and, asc, desc, eq, inArray } = orm;
+const {
   agentTestCase,
   agentTestPublishCheck,
-  conversation as conversationTable,
-  document as documentTable,
+  conversation: conversationTable,
+  document: documentTable,
   visitorSession,
   widgetPublication,
-} from "@/lib/db/schema";
-import { getAgentTestSuiteVersion } from "@/features/agent-tests/input";
+} = schema;
+import * as agentTestsInput from "@/features/agent-tests/input";
 import {
   getCurrentSourceBasisDigest,
   resolveAgentTestPublishDraftIdentity,
   AgentTestPublishCheckError,
 } from "@/features/agent-tests/server/publish-checks";
+
+const { getAgentTestSuiteVersion } = agentTestsInput;
 import {
   ensureWorkspaceWidget,
   getWidgetPublicationStatus,

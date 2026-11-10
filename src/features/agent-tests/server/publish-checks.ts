@@ -1,18 +1,21 @@
-import "server-only";
+import "../../../lib/cloudflare/server-only";
 
 import { createHash, randomUUID } from "node:crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import * as orm from "drizzle-orm";
 
 import { getDb, type Db } from "@/lib/db/client";
 import { env } from "@/lib/env/server";
-import {
+import * as schema from "@/lib/db/schema";
+
+const { and, eq, inArray } = orm;
+const {
   agentTestCase,
   agentTestPublishCheck,
-  document as documentTable,
+  document: documentTable,
   documentRevision,
   widget,
   widgetPublication,
-} from "@/lib/db/schema";
+} = schema;
 import { getAgentTestSuiteVersion, matchesAgentTestOutcome } from "../input";
 import {
   resolveAgentTestPublishCandidateIdentity,
@@ -24,7 +27,9 @@ import {
   parseWidgetPublicationSnapshot,
 } from "@/features/widget/publication";
 import { isSupportedKnowledgeSourceType } from "@/features/knowledge/server/source-revisions";
-import { toWidgetPublishedConfig } from "@/features/widget/server/widget-service";
+import * as widgetService from "@/features/widget/server/widget-service";
+
+const { toWidgetPublishedConfig } = widgetService;
 
 export class AgentTestPublishCheckError extends Error {
   constructor(message: string) {
