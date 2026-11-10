@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 
 import { AppTopbar } from "@/components/app-nav/app-topbar";
 import { Sidebar } from "@/components/app-nav/sidebar";
-import { useSidebar } from "@/hooks/use-sidebar";
+import { useSidebar, useSidebarClientReady } from "@/hooks/use-sidebar";
 import { cn } from "@/lib/utils";
 
 type UserData = {
@@ -24,11 +24,11 @@ type DashboardShellProps = {
 export function DashboardShell({
   children,
   userData,
-  initialSidebarOpen = true,
+  initialSidebarOpen = false,
 }: DashboardShellProps) {
   const isOpen = useSidebar((state) => state.isOpen);
   const isHover = useSidebar((state) => state.isHover);
-  const hasHydrated = useSidebar((state) => state.hasHydrated);
+  const hasHydrated = useSidebarClientReady();
   const settings = useSidebar((state) => state.settings);
   const setHasHydrated = useSidebar((state) => state.setHasHydrated);
 
@@ -53,13 +53,17 @@ export function DashboardShell({
       <Sidebar initialOpen={initialSidebarOpen} />
       <main
         className={cn(
-          "bg-sidebar text-foreground transition-[margin-left] duration-150 motion-reduce:transition-none",
+          "bg-background text-foreground transition-[margin-left] duration-150 motion-reduce:transition-none",
           !settings.disabled && (!desktopOpenState ? "lg:ml-14" : "lg:ml-56"),
           "print:ml-0 print:w-full print:overflow-visible",
           isFullBleedPage ? "flex h-svh flex-col overflow-hidden" : "min-h-screen",
         )}
       >
-        <AppTopbar userData={userData} className={cn(isFullBleedPage && "lg:hidden")} />
+        <AppTopbar
+          userData={userData}
+          initialSidebarOpen={initialSidebarOpen}
+          className={isFullBleedPage ? "lg:hidden" : undefined}
+        />
         <div
           id="workspace-content"
           tabIndex={-1}

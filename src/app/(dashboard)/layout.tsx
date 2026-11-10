@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 import { DashboardShell } from "@/components/app-nav/dashboard-shell";
-import { generateUserAvatarUrl, getStableBackgroundColor } from "@/lib/avatar-generator";
+import { generateUserAvatarUrl } from "@/lib/avatar-generator";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { SITE_NAME } from "@/lib/constants";
 
@@ -15,11 +15,7 @@ export const dynamic = "force-dynamic";
 export default async function DashboardShellLayout({ children }: { children: ReactNode }) {
   const { session } = await requireDashboardContext();
 
-  const avatarUrl =
-    session.user.image ||
-    generateUserAvatarUrl(session.user.email, {
-      backgroundColor: getStableBackgroundColor(session.user.email),
-    });
+  const avatarUrl = session.user.image || generateUserAvatarUrl(session.user.email);
 
   const userData = {
     name: session.user.name || "User",

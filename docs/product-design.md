@@ -11,17 +11,23 @@ from live takeover. Intercom separates agent and helpdesk concepts while sharing
 context. Chatwoot's routes separate conversations, inbox configuration, contacts, captain,
 help center, campaigns and settings.
 
-Adopt those information and interaction patterns in Cogni. Keep Geist, Tailwind v4, shadcn/Base
-UI, Hugeicons, TanStack Query and the existing OKLCH token system. Do not copy competitor logos,
+Adopt those information and interaction patterns in Cogni. Keep Tailwind v4, shadcn/Base UI,
+Hugeicons, TanStack Query, the semantic application tokens, and the locally hosted Inter and
+Instrument Serif typography defined below. Do not copy competitor logos,
 customer evidence or decorative assets. Exact private dashboard CSS/font metrics were not
 inspected; the dimensions below are Cogni design decisions, not extracted competitor values.
 
-## Visual system
+## Visual system (historical direction, superseded)
 
-Professional support software should spend attention on the conversation. Use one neutral ramp,
-Cogni's blue interactive accent, and only needed success/warning/danger status ramps. Filled
-accent marks one primary action in each task pane; selected rows use low-contrast neutral/accent
-surfaces. Never use danger for benign actions. Status always has a word/icon, not color alone.
+The current dashboard palette and typography are defined in
+[`design/product-design-system.md`](design/product-design-system.md). That document supersedes
+the earlier blue-accent and Geist-only visual choices below. Keep this specification as the
+product-flow and interaction reference; do not reintroduce the retired blue primary token.
+
+Professional support software should spend attention on the conversation. Use the current neutral
+palette, and only needed success/warning/danger status ramps. Filled primary marks one primary
+action in each task pane; selected rows use the documented low-contrast neutral surface. Never use
+danger for benign actions. Status always has a word/icon, not color alone.
 
 Use existing semantic tokens (`background`, `card`, `foreground`, `muted-foreground`, `border`,
 `primary` and corresponding foreground). Add missing role tokens rather than borrowing a border
@@ -30,7 +36,7 @@ separate measured migration; a value looking plausible does not prove contrast.
 
 | Role               | Specification                                                                    |
 | ------------------ | -------------------------------------------------------------------------------- |
-| App body           | Geist 14px, weight 400+, line height 1.5                                         |
+| App body           | Inter 14px, weight 400+, line height 1.5                                         |
 | Secondary metadata | 12–13px; preserve selectable text; measure real contrast                         |
 | Page title         | 20–24px semibold; one semantic h1                                                |
 | Long content       | 16px / 1.5–1.6; max 60–75ch                                                      |

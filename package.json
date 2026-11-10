@@ -111,6 +111,7 @@
     "@tanstack/react-table": "^9.2.4",
     "ai": "7.0.127",
     "better-auth": "^1.7.7",
+    "blobatar": "2.7.0",
     "chat": "^4.41.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

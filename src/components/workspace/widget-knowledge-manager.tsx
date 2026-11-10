@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { formatDistanceToNow } from "date-fns";
 import { parseAsStringLiteral, useQueryState } from "nuqs";
 import {
@@ -485,7 +487,7 @@ function KnowledgeSourcesPanel({
   retryingSourceId: string | null;
 }) {
   return (
-    <div className="overflow-hidden rounded-[20px] border border-border/60 bg-transparent shadow-none [--card-spacing:0rem]">
+    <div className="overflow-hidden bg-transparent shadow-none [--card-spacing:0rem]">
       {isInitialLoading ? (
         <KnowledgeBaseSkeleton />
       ) : isError ? (
@@ -536,10 +538,18 @@ function KnowledgeEmptyState({
         description="Add a website URL, upload documents, or paste text to teach your AI assistant how to answer questions."
       >
         {canManage ? (
-          <Button size="sm" className="h-9 rounded-xl shadow-none" onClick={onAddFirstSource}>
-            <Plus className="mr-1.5 h-4 w-4" />
-            Add Source
-          </Button>
+          <div className="flex flex-col items-center gap-2">
+            <Button size="sm" className="h-9 rounded-xl shadow-none" onClick={onAddFirstSource}>
+              <Plus className="mr-1.5 h-4 w-4" />
+              Add Source
+            </Button>
+            <Link
+              href="/help#knowledge-sources"
+              className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+            >
+              Learn about supported formats and ingestion
+            </Link>
+          </div>
         ) : (
           <p className="text-sm text-muted-foreground">Ask a workspace owner to add a source.</p>
         )}
@@ -574,12 +584,9 @@ function KnowledgeSourcesMobileList({
         const isReady = source.status === "ready" || source.status === "indexed";
 
         return (
-          <div
-            key={source.id}
-            className="rounded-2xl border border-border/60 bg-card p-4 shadow-sm"
-          >
+          <div key={source.id} className="border-b border-border py-4">
             <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 text-muted-foreground">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center text-muted-foreground">
                 <Icon className="h-4 w-4" />
               </div>
               <div className="min-w-0 flex-1">
@@ -849,7 +856,7 @@ function SourceIdentity({ source }: { source: KnowledgeBaseSource }) {
 
   return (
     <div className="flex min-w-0 items-center gap-3.5">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 text-muted-foreground">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center text-muted-foreground">
         <Icon className="h-4 w-4" />
       </div>
       <div className="min-w-0 space-y-0.5">
@@ -1069,7 +1076,7 @@ function AddSourceMenu({ onSelect }: { onSelect: (dialog: Exclude<AddDialog, nul
           closeOnClick={false}
           onClick={() => onSelect(item.dialog)}
         >
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-muted/30 text-muted-foreground">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center text-muted-foreground">
             <item.icon className="h-4 w-4" />
           </span>
           <span className="space-y-0.5">

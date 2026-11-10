@@ -15,56 +15,41 @@ const NAV_LINKS = [
   { label: "FAQ", href: "#faq", section: "faq" },
 ] as const;
 
-/** Track which section is currently in the viewport */
+const SECTION_IDS = NAV_LINKS.map((link) => link.section);
+
 function useActiveSection(sectionIds: readonly string[]) {
-  const [active, setActive] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState<string | null>(null);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
         const visibleSection = entries.find((entry) => entry.isIntersecting);
-        if (visibleSection) setActive(visibleSection.target.id);
+        if (visibleSection) setActiveSection(visibleSection.target.id);
       },
       { rootMargin: "-20% 0px -65% 0px", threshold: 0 },
     );
 
-    sectionIds.forEach((id) => {
-      const section = document.getElementById(id);
+    for (const sectionId of sectionIds) {
+      const section = document.getElementById(sectionId);
       if (section) observer.observe(section);
-    });
+    }
 
     return () => observer.disconnect();
   }, [sectionIds]);
 
-  return active;
+  return activeSection;
 }
 
-const SECTION_IDS = NAV_LINKS.map((l) => l.section);
-
 export function Navbar() {
-  const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const activeSection = useActiveSection(SECTION_IDS);
 
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
   return (
-    <header className="fixed inset-x-0 top-4 z-50 flex justify-center px-4 sm:px-5">
-      <nav
-        className={cn(
-          "flex w-full max-w-5xl items-center gap-3 rounded-2xl border px-4 py-2.5 transition-[background-color,border-color,box-shadow] duration-300 sm:gap-6 sm:px-5",
-          scrolled
-            ? "border-white/60 bg-white/90 shadow-[0_8px_32px_rgba(0,0,0,0.10)] backdrop-blur-xl"
-            : "border-white/40 bg-white/60 backdrop-blur-md",
-        )}
-      >
+    <header className="sticky inset-x-0 top-0 z-50 border-b border-border bg-background/95">
+      <nav className="mx-auto flex min-h-20 w-full max-w-[1120px] items-center gap-6 px-6 sm:px-10">
         {/* Logo */}
         <Link href="/" className="flex shrink-0 items-center gap-2.5 font-semibold">
-          <ThemeLogo showWordmark wordmarkClassName="text-gray-900" />
+          <ThemeLogo showWordmark wordmarkClassName="text-foreground" />
         </Link>
 
         {/* Nav links with active highlight — desktop */}
@@ -79,7 +64,7 @@ export function Navbar() {
                   "relative flex min-h-10 items-center rounded-lg px-3 py-1.5 text-sm font-medium transition-colors duration-150",
                   isActive
                     ? "bg-primary/8 text-primary"
-                    : "text-gray-600 hover:bg-gray-100/80 hover:text-gray-900",
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
                 )}
               >
                 {label}
@@ -97,7 +82,7 @@ export function Navbar() {
             href="/sign-in"
             className={cn(
               buttonVariants({ size: "sm" }),
-              "hidden h-9 rounded-xl px-5 text-sm shadow-sm shadow-primary/20 md:inline-flex",
+              "hidden h-10 px-5 text-sm md:inline-flex",
             )}
           >
             Get started
@@ -105,7 +90,7 @@ export function Navbar() {
 
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger
-              className="inline-flex size-11 items-center justify-center rounded-xl border border-gray-200/80 bg-white/80 text-gray-700 transition-colors hover:bg-white md:hidden"
+              className="inline-flex size-11 items-center justify-center rounded-xl border border-border bg-card text-foreground transition-colors hover:bg-muted md:hidden"
               aria-label="Open navigation menu"
             >
               <Menu className="size-5" />
@@ -115,9 +100,9 @@ export function Navbar() {
               className="w-[min(100vw-2rem,320px)] px-0"
               title="Navigation"
             >
-              <SheetHeader className="border-b border-gray-100 px-5 pb-4">
+              <SheetHeader className="border-b border-border px-5 pb-4">
                 <SheetTitle className="flex items-center gap-2.5 text-left">
-                  <ThemeLogo showWordmark wordmarkClassName="text-gray-900" />
+                  <ThemeLogo showWordmark wordmarkClassName="text-foreground" />
                 </SheetTitle>
               </SheetHeader>
               <nav className="flex flex-col gap-1 px-3 py-4">
@@ -130,7 +115,7 @@ export function Navbar() {
                       onClick={() => setMobileOpen(false)}
                       className={cn(
                         "rounded-xl px-4 py-3 text-base font-medium transition-colors",
-                        isActive ? "bg-primary/10 text-primary" : "text-gray-700 hover:bg-gray-100",
+                        isActive ? "bg-primary/10 text-primary" : "text-foreground hover:bg-muted",
                       )}
                     >
                       {label}
@@ -138,11 +123,11 @@ export function Navbar() {
                   );
                 })}
               </nav>
-              <div className="mt-auto border-t border-gray-100 px-5 py-4">
+              <div className="mt-auto border-t border-border px-5 py-4">
                 <Link
                   href="/sign-in"
                   onClick={() => setMobileOpen(false)}
-                  className={cn(buttonVariants(), "h-11 w-full rounded-xl")}
+                  className={cn(buttonVariants(), "h-11 w-full")}
                 >
                   Get started
                 </Link>

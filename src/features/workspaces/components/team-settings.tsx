@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 
+import { generateUserAvatarUrl } from "@/lib/avatar-generator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -161,18 +162,12 @@ export function TeamSettings({
 }) {
   return (
     <div className="space-y-5">
-      <section
-        aria-labelledby="team-people-heading"
-        className="overflow-hidden rounded-xl border bg-card"
-      >
+      <section aria-labelledby="team-people-heading" className="overflow-hidden">
         <header className="flex items-start justify-between gap-3 border-b px-4 py-4 sm:px-5">
           <div>
             <h3 id="team-people-heading" className="text-sm font-semibold">
               People
             </h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Workspace members and the access level they have.
-            </p>
           </div>
           <Badge variant="secondary">{members.length}</Badge>
         </header>
@@ -187,7 +182,7 @@ export function TeamSettings({
               >
                 <div className="flex min-w-0 flex-1 items-center gap-3">
                   <Avatar className="size-9 shrink-0">
-                    <AvatarImage src={member.image ?? undefined} alt="" />
+                    <AvatarImage src={member.image || generateUserAvatarUrl(member.email)} alt="" />
                     <AvatarFallback className="text-xs">
                       {getInitials(member.name, member.email)}
                     </AvatarFallback>
@@ -222,10 +217,7 @@ export function TeamSettings({
       {canManage ? (
         <>
           <InviteMemberForm canManage />
-          <section
-            aria-labelledby="pending-invites-heading"
-            className="overflow-hidden rounded-xl border bg-card"
-          >
+          <section aria-labelledby="pending-invites-heading" className="overflow-hidden">
             <header className="border-b px-4 py-4 sm:px-5">
               <h3 id="pending-invites-heading" className="text-sm font-semibold">
                 Pending invites
@@ -252,9 +244,7 @@ export function TeamSettings({
                 ))}
               </ul>
             ) : (
-              <p className="px-4 py-5 text-sm text-muted-foreground sm:px-5">
-                No one is waiting to join. New invites will appear here until accepted or expired.
-              </p>
+              <p className="px-4 py-5 text-sm text-muted-foreground sm:px-5">No pending invites.</p>
             )}
           </section>
         </>
