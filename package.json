@@ -6,7 +6,7 @@
     "dev": "node scripts/build-widget.js && next dev --webpack --port 3000",
     "build:widget": "node scripts/build-widget.js",
     "build": "pnpm build:widget && NEXT_TELEMETRY_DISABLED=1 next build --webpack",
-    "build:cf": "pnpm build:widget && opennextjs-cloudflare build",
+    "build:cf": "SKIP_ENV_VALIDATION=1 pnpm build:widget && SKIP_ENV_VALIDATION=1 opennextjs-cloudflare build",
     "preview:cf": "opennextjs-cloudflare build && wrangler dev",
     "deploy:cf": "opennextjs-cloudflare build && wrangler deploy",
     "cf:typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
