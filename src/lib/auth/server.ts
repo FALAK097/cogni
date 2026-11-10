@@ -2,6 +2,7 @@ import "server-only";
 
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { betterAuth } from "better-auth";
+import { cache } from "react";
 
 import { ensureDefaultWorkspace } from "@/lib/auth/provision-workspace";
 import { getDb } from "@/lib/db/client";
@@ -28,17 +29,19 @@ function createAuth() {
       schema: schema,
     }),
     emailAndPassword: {
-      enabled:
-        process.env.NODE_ENV !== "production" ||
-        process.env.LOCAL_DEV_EMAIL_PASSWORD_AUTH === "true",
+      enabled: true,
       requireEmailVerification: false,
       async sendResetPassword({ user, url }) {
-        console.log(`[Better Auth Local Fallback] Reset password URL for ${user.email}: ${url}`);
+        if (process.env.NODE_ENV !== "production") {
+          console.log(`[Better Auth Local Fallback] Reset password URL for ${user.email}: ${url}`);
+        }
       },
     },
     emailVerification: {
       async sendVerificationEmail({ user, url }) {
-        console.log(`[Better Auth Local Fallback] Verification URL for ${user.email}: ${url}`);
+        if (process.env.NODE_ENV !== "production") {
+          console.log(`[Better Auth Local Fallback] Verification URL for ${user.email}: ${url}`);
+        }
       },
     },
     socialProviders,
@@ -66,9 +69,4 @@ function createAuth() {
   });
 }
 
-let auth: ReturnType<typeof createAuth> | undefined;
-
-export function getAuth(): ReturnType<typeof createAuth> {
-  auth ??= createAuth();
-  return auth;
-}
+export const getAuth = cache(() => createAuth());

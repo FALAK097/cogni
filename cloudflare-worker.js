@@ -77,7 +77,7 @@ export default {
           }),
         );
 
-        if (response.ok || [400, 401, 404, 409, 422].includes(response.status)) {
+        if (response.ok || [400, 401, 409, 422].includes(response.status)) {
           if (!response.ok) {
             console.error("Ingestion job returned non-retryable status:", response.status, {
               workflowRunId,

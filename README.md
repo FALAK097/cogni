@@ -102,6 +102,8 @@ pnpm exec wrangler secret put CLOUDFLARE_API_TOKEN
 pnpm exec wrangler secret put INGESTION_SHARED_SECRET
 pnpm exec wrangler secret put OPENAI_API_KEY
 pnpm exec wrangler secret put GEMINI_API_KEY
+pnpm exec wrangler secret put R2_ACCESS_KEY_ID
+pnpm exec wrangler secret put R2_SECRET_ACCESS_KEY
 ```
 
 ### Google OAuth Redirect URI
