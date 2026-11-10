@@ -22,8 +22,8 @@ function createAuth() {
 
   return betterAuth({
     appName: "cogni",
-    baseURL: env.BETTER_AUTH_URL,
-    secret: env.BETTER_AUTH_SECRET,
+    baseURL: env.BETTER_AUTH_URL || "https://cogni.falakgala.dev",
+    secret: env.BETTER_AUTH_SECRET || "cogni-build-fixture-secret-not-for-runtime-2026",
     database: drizzleAdapter(db, {
       provider: "pg",
       schema: schema,

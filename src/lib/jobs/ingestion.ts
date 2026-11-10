@@ -76,7 +76,10 @@ export async function enqueueDocumentProcessing({
 
 async function publishCloudflareIngestionJob(workflowRunId: string, workspaceId: string) {
   if (!env.CLOUDFLARE_INGESTION_QUEUE_URL || !env.INGESTION_SHARED_SECRET) return false;
-  const callbackUrl = new URL("/api/internal/ingestion", env.BETTER_AUTH_URL);
+  const callbackUrl = new URL(
+    "/api/internal/ingestion",
+    env.BETTER_AUTH_URL || "https://cogni.falakgala.dev",
+  );
   if (callbackUrl.protocol !== "https:") return false;
 
   try {

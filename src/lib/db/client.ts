@@ -12,13 +12,19 @@ import { env } from "@/lib/env/server";
 const fullSchema = { ...schema, ...relations };
 
 function createDb() {
-  const { hostname } = new URL(env.DATABASE_URL);
-  const isLocal =
-    hostname === "localhost" ||
-    hostname === "127.0.0.1" ||
-    hostname === "::1" ||
-    hostname === "[::1]";
-  const client = postgres(env.DATABASE_URL, {
+  const dbUrl = env.DATABASE_URL || "postgresql://cogni:cogni@127.0.0.1:5432/cogni";
+  let isLocal = false;
+  try {
+    const { hostname } = new URL(dbUrl);
+    isLocal =
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "::1" ||
+      hostname === "[::1]";
+  } catch {
+    isLocal = false;
+  }
+  const client = postgres(dbUrl, {
     max: 1,
     prepare: false,
     ssl: isLocal ? false : "require",

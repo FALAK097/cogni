@@ -92,7 +92,7 @@ export async function replayAgentTestComparison(
   });
   if (!improvement) return null;
 
-  const configuredOrigin = new URL(env.BETTER_AUTH_URL).origin;
+  const configuredOrigin = new URL(env.BETTER_AUTH_URL || "https://cogni.falakgala.dev").origin;
   if (new URL(input.origin).origin !== configuredOrigin) {
     throw new AgentTestComparisonOriginError();
   }
