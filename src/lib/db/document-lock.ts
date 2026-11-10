@@ -6,7 +6,6 @@ import { env } from "@/lib/env/server";
 import { resolveDocumentLockDatabaseUrl } from "@/lib/db/document-lock-config";
 
 const lockConnectionLimit = 2;
-const lockDatabaseUrl = resolveDocumentLockDatabaseUrl(env.DATABASE_URL, env.DATABASE_URL_UNPOOLED);
 
 let reservedLockSlots = 0;
 
@@ -26,6 +25,11 @@ export async function acquireDocumentLock(
     await wait(100);
   }
   reservedLockSlots += 1;
+
+  const lockDatabaseUrl = resolveDocumentLockDatabaseUrl(
+    env.DATABASE_URL || "postgresql://cogni:cogni@127.0.0.1:5432/cogni",
+    env.DATABASE_URL_UNPOOLED,
+  );
 
   let connection: ReturnType<typeof postgres> | undefined;
   let acquired = false;
