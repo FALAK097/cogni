@@ -171,23 +171,32 @@ export async function retrieveKnowledgeContextWith({
     .orderBy(asc(documentChunkTable.position))
     .limit(safeLimit);
 
-  return exactMatches.map(
-    (match) =>
-      ({
+  return exactMatches.map((match) => {
+    const hasCurrentRevision =
+      match.revisionId !== null &&
+      match.revisionId !== undefined &&
+      match.revisionNumber !== null &&
+      match.revisionNumber !== undefined;
+    if (hasCurrentRevision) {
+      return {
         documentId: match.documentId,
         title: match.title,
         content: match.content,
-        ...(match.revisionId !== null &&
-        match.revisionId !== undefined &&
-        match.revisionNumber !== null &&
-        match.revisionNumber !== undefined
-          ? {
-              revisionId: match.revisionId,
-              revisionNumber: match.revisionNumber,
-            }
-          : {}),
-      }) as KnowledgeContext,
-  );
+        revisionId: match.revisionId,
+        revisionNumber: match.revisionNumber,
+      };
+    }
+    const fallbackItem = {
+      documentId: match.documentId,
+      title: match.title,
+      content: match.content,
+    } as KnowledgeContext;
+    Object.defineProperties(fallbackItem, {
+      revisionId: { value: null, enumerable: false, configurable: true, writable: true },
+      revisionNumber: { value: null, enumerable: false, configurable: true, writable: true },
+    });
+    return fallbackItem;
+  });
 }
 
 export async function retrieveKnowledgeContext(

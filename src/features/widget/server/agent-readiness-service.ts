@@ -5,7 +5,7 @@ import * as orm from "drizzle-orm";
 import type { Db } from "@/lib/db/client";
 import * as schema from "@/lib/db/schema";
 
-const { and, asc, desc, eq, inArray } = orm;
+const { and, asc, desc, eq, gte, inArray, isNotNull, like, or } = orm;
 const {
   agentTestCase,
   agentTestPublishCheck,
@@ -198,8 +198,43 @@ export async function getWorkspaceActivationReadiness(
     currentPublicationPublishedAt = pub?.publishedAt ?? null;
   }
 
-  // Bound conversation and session reads so large workspace histories never scan unbounded rows or exceed parameter limits
-  const [earliestConversations, recentConversations] = await Promise.all([
+  // Directly query widget-session conversations (including those since current publication)
+  // and human-replied conversations so non-widget or middle-of-history conversations cannot hide evidence.
+  const hasLike = typeof like === "function" && typeof or === "function";
+  const hasIsNotNull = typeof isNotNull === "function";
+  const hasGte = typeof gte === "function";
+
+  const widgetSessionPredicates = [
+    eq(conversationTable.workspaceId, workspaceId),
+    ...(hasIsNotNull ? [isNotNull(conversationTable.visitorSessionId)] : []),
+  ];
+
+  const currentPubSessionPredicates = [
+    ...widgetSessionPredicates,
+    ...(currentPublicationPublishedAt && hasGte
+      ? [gte(conversationTable.createdAt, currentPublicationPublishedAt)]
+      : []),
+  ];
+
+  const humanReplyPredicates = [
+    eq(conversationTable.workspaceId, workspaceId),
+    ...(hasLike
+      ? [
+          or(
+            like(conversationTable.messages, '%"TEAM"%'),
+            like(conversationTable.messages, '%"agent"%'),
+            like(conversationTable.messages, '%"human"%'),
+          ),
+        ]
+      : []),
+  ];
+
+  const [
+    earliestSessionConversations,
+    recentSessionConversations,
+    currentPubSessionConversations,
+    earliestReplyConversations,
+  ] = await Promise.all([
     db
       .select({
         id: conversationTable.id,
@@ -209,7 +244,7 @@ export async function getWorkspaceActivationReadiness(
         channel: conversationTable.channel,
       })
       .from(conversationTable)
-      .where(eq(conversationTable.workspaceId, workspaceId))
+      .where(and(...widgetSessionPredicates))
       .orderBy(asc(conversationTable.createdAt))
       .limit(100),
     db
@@ -221,13 +256,44 @@ export async function getWorkspaceActivationReadiness(
         channel: conversationTable.channel,
       })
       .from(conversationTable)
-      .where(eq(conversationTable.workspaceId, workspaceId))
+      .where(and(...widgetSessionPredicates))
       .orderBy(desc(conversationTable.createdAt))
       .limit(100),
+    currentPublicationPublishedAt
+      ? db
+          .select({
+            id: conversationTable.id,
+            createdAt: conversationTable.createdAt,
+            messages: conversationTable.messages,
+            visitorSessionId: conversationTable.visitorSessionId,
+            channel: conversationTable.channel,
+          })
+          .from(conversationTable)
+          .where(and(...currentPubSessionPredicates))
+          .orderBy(asc(conversationTable.createdAt))
+          .limit(100)
+      : Promise.resolve([]),
+    db
+      .select({
+        id: conversationTable.id,
+        createdAt: conversationTable.createdAt,
+        messages: conversationTable.messages,
+        visitorSessionId: conversationTable.visitorSessionId,
+        channel: conversationTable.channel,
+      })
+      .from(conversationTable)
+      .where(and(...humanReplyPredicates))
+      .orderBy(asc(conversationTable.createdAt))
+      .limit(50),
   ]);
 
-  const conversationById = new Map<string, (typeof earliestConversations)[number]>();
-  for (const conv of [...earliestConversations, ...recentConversations]) {
+  const conversationById = new Map<string, (typeof earliestSessionConversations)[number]>();
+  for (const conv of [
+    ...earliestSessionConversations,
+    ...recentSessionConversations,
+    ...currentPubSessionConversations,
+    ...earliestReplyConversations,
+  ]) {
     if (!conversationById.has(conv.id)) {
       conversationById.set(conv.id, conv);
     }
@@ -240,7 +306,7 @@ export async function getWorkspaceActivationReadiness(
     ...new Set(
       conversations.map((c) => c.visitorSessionId).filter((id): id is string => Boolean(id)),
     ),
-  ].slice(0, 200);
+  ].slice(0, 300);
 
   const sessions =
     sessionIds.length > 0

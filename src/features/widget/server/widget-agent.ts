@@ -132,8 +132,8 @@ export async function streamWidgetAgent({
           sources: sources.map((source) => ({
             documentId: source.documentId,
             title: source.title,
-            revisionId: source.revisionId,
-            revisionNumber: source.revisionNumber,
+            revisionId: source.revisionId ?? null,
+            revisionNumber: source.revisionNumber ?? null,
           })),
           citations: [
             ...new Map(

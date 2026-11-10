@@ -16,8 +16,8 @@ const signedPreviewEvidencePayloadSchema = z.object({
       z
         .object({
           documentId: z.string().uuid(),
-          revisionId: z.string().uuid().nullable(),
-          revisionNumber: z.number().int().positive().nullable(),
+          revisionId: z.string().uuid().nullable().default(null),
+          revisionNumber: z.number().int().positive().nullable().default(null),
         })
         .refine((source) => (source.revisionId === null) === (source.revisionNumber === null)),
     )
