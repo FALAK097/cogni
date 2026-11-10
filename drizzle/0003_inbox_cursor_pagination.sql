@@ -1,0 +1,1 @@
+CREATE INDEX "conversation_workspaceId_lastMessageAt_id_idx" ON "conversation" USING btree ("workspaceId","lastMessageAt","id");

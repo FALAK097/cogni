@@ -1,27 +1,23 @@
 import "server-only";
 
 import { and, eq, ne, gt, like, sql } from "drizzle-orm";
-import { alias } from "drizzle-orm/pg-core";
 import {
   conversation as conversationTable,
   visitorSession as visitorSessionTable,
 } from "@/lib/db/schema";
-
-const engagedConversationTable = alias(conversationTable, "engaged_conversation");
-const engagedVisitorSessionTable = alias(visitorSessionTable, "engaged_visitor_session");
 
 export function getHasWidgetConversationCond(
   s: Pick<typeof visitorSessionTable, "id">,
   requireVisitorMessage = true,
 ) {
   const visitorMessageCond = requireVisitorMessage
-    ? sql`and ${engagedConversationTable.messages} like '%"authorType":"VISITOR"%'`
+    ? sql`and "engaged_conversation"."messages" like '%"authorType":"VISITOR"%'`
     : sql.empty();
 
   return sql`exists (
-    select 1 from ${engagedConversationTable}
-    where ${engagedConversationTable.visitorSessionId} = ${s.id}
-      and ${engagedConversationTable.channel} = 'WIDGET'
+    select 1 from "conversation" as "engaged_conversation"
+    where "engaged_conversation"."visitorSessionId" = ${s.id}
+      and "engaged_conversation"."channel" = 'WIDGET'
       ${visitorMessageCond}
   )`;
 }
@@ -36,11 +32,15 @@ export function getEngagedVisitorSessionCond(
   );
 }
 
-/** Dashboard inbox lists every engaged session, including dashboard preview chats. */
+/** Dashboard inbox hides dashboard preview chats. */
 export function getDashboardEngagedVisitorSessionCond(
-  s: Pick<typeof visitorSessionTable, "id" | "messageCount">,
+  s: Pick<typeof visitorSessionTable, "id" | "messageCount" | "hostname">,
 ) {
-  return and(gt(s.messageCount, 0), getHasWidgetConversationCond(s));
+  return and(
+    ne(s.hostname, "dashboard-preview"),
+    gt(s.messageCount, 0),
+    getHasWidgetConversationCond(s),
+  );
 }
 
 export function getWidgetConversationCond(
@@ -52,10 +52,10 @@ export function getWidgetConversationCond(
     eq(c.channel, "WIDGET"),
     like(c.messages, '%"authorType":"VISITOR"%'),
     sql`exists (
-      select 1 from ${engagedVisitorSessionTable}
-      where ${engagedVisitorSessionTable.id} = ${c.visitorSessionId}
-        and ${engagedVisitorSessionTable.hostname} != 'dashboard-preview'
-        and ${engagedVisitorSessionTable.messageCount} > 0
+      select 1 from "visitor_session" as "engaged_visitor_session"
+      where "engaged_visitor_session"."id" = ${c.visitorSessionId}
+        and "engaged_visitor_session"."hostname" != 'dashboard-preview'
+        and "engaged_visitor_session"."messageCount" > 0
     )`,
   );
 }

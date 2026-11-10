@@ -3,10 +3,15 @@ import "server-only";
 import type { Db } from "@/lib/db/client";
 
 import {
+  getPublishedWidgetConfig,
   getPublicWidget,
+  settingsFromPublishedConfig,
+  toWidgetBookingConfig,
+  toWidgetWidgetConfig,
   toWidgetPublicConfig,
   validateEmbedOrigin,
 } from "@/features/widget/server/widget-service";
+import { parseJsonArray } from "@/features/widget/domain";
 import { getRequestOrigin } from "@/features/widget/server/widget-utils";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 
@@ -21,8 +26,17 @@ export async function assertPublicWidgetAccess(
     return { error: Response.json({ error: "Widget is unavailable." }, { status: 404 }) };
   }
 
+  const publishedConfig = options?.preview ? null : await getPublishedWidgetConfig(db, widget);
+  if (!options?.preview && !publishedConfig) {
+    return { error: Response.json({ error: "Widget is unavailable." }, { status: 404 }) };
+  }
+  const settings = publishedConfig
+    ? settingsFromPublishedConfig(widget, publishedConfig)
+    : toWidgetWidgetConfig(widget);
+  const bookingSettings = publishedConfig?.booking ?? toWidgetBookingConfig(widget);
+
   const origin = getRequestOrigin(request);
-  const allowedDomains = JSON.parse(widget.authorizedDomains || "[]") as string[];
+  const allowedDomains = parseJsonArray(widget.authorizedDomains);
 
   if (!options?.preview && !validateEmbedOrigin(origin, allowedDomains)) {
     return { error: Response.json({ error: "This domain is not authorized." }, { status: 403 }) };
@@ -30,7 +44,9 @@ export async function assertPublicWidgetAccess(
 
   return {
     widget,
-    config: toWidgetPublicConfig(widget),
+    settings,
+    bookingSettings,
+    config: toWidgetPublicConfig(settings),
     origin,
     allowedDomains,
   };
@@ -92,7 +108,8 @@ export async function getAuthorizedVisitorSession(db: Db, publicKey: string, tok
     session &&
     session.widget &&
     session.widget.publicKey === publicKey &&
-    session.widget.isEnabled
+    session.widget.isEnabled &&
+    (await getPublishedWidgetConfig(db, session.widget)) !== null
   ) {
     return session;
   }

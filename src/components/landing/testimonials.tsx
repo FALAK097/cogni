@@ -68,6 +68,7 @@ export function Testimonials() {
                   alt={t.name}
                   width={44}
                   height={44}
+                  unoptimized
                   className="size-11 rounded-full object-cover ring-2 ring-border/50"
                 />
                 <div>

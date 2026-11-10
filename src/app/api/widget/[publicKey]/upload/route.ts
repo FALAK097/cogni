@@ -20,8 +20,9 @@ import {
 import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
 import { getDb } from "@/lib/db/client";
 import { attachment as attachmentTable } from "@/lib/db/schema";
-import { checkRateLimit } from "@/lib/rate-limit/memory";
+import { checkRateLimits, getTrustedClientIp } from "@/lib/rate-limit/shared";
 import { deleteObject, isAllowedUpload, saveObject, uploadPublicPath } from "@/lib/storage/index";
+import { isOversizedUploadRequest } from "@/features/widget/upload-limits";
 
 const metadataSchema = z.object({
   hostname: z.string().trim().min(1).max(253),
@@ -46,6 +47,44 @@ export async function POST(
   { params }: { params: Promise<{ publicKey: string }> },
 ) {
   const { publicKey } = await params;
+  const db = getDb();
+  const access = await assertPublicWidgetAccess(db, publicKey, request);
+  if ("error" in access) return access.error;
+
+  const token = bearerToken(request);
+  if (!token) {
+    return Response.json({ error: "Widget session is required." }, { status: 401 });
+  }
+  const rateLimit = await checkRateLimits([
+    {
+      key: `widget-public:ip:${getTrustedClientIp(request.headers)}`,
+      limit: 240,
+      windowMs: 60_000,
+    },
+    {
+      key: `widget-public:workspace:${access.widget.workspaceId}`,
+      limit: 1000,
+      windowMs: 60_000,
+    },
+    { key: `widget-upload:visitor:${token}`, limit: 10, windowMs: 60_000 },
+  ]);
+  if (!rateLimit.allowed) {
+    if (rateLimit.unavailable) {
+      return Response.json({ error: "Service temporarily unavailable." }, { status: 503 });
+    }
+    return Response.json(
+      { error: "Too many uploads. Wait a moment before trying again." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(Math.ceil(rateLimit.retryAfterMs / 1000)) },
+      },
+    );
+  }
+
+  if (isOversizedUploadRequest(request.headers.get("content-length"))) {
+    return Response.json({ error: "This upload exceeds the allowed size." }, { status: 413 });
+  }
+
   const formData = await request.formData();
   const file = formData.get("file");
   const sessionId = formData.get("sessionId");
@@ -75,26 +114,6 @@ export async function POST(
     !z.string().uuid().safeParse(interactionId).success
   ) {
     return Response.json({ error: "Invalid upload metadata." }, { status: 400 });
-  }
-
-  const db = getDb();
-  const access = await assertPublicWidgetAccess(db, publicKey, request);
-  if ("error" in access) return access.error;
-
-  const token = bearerToken(request);
-  if (!token) {
-    return Response.json({ error: "Widget session is required." }, { status: 401 });
-  }
-  const rateLimit = checkRateLimit({
-    key: `widget-upload:${token}`,
-    limit: 10,
-    windowMs: 60_000,
-  });
-  if (!rateLimit.allowed) {
-    return Response.json(
-      { error: "Too many uploads. Wait a moment before trying again." },
-      { status: 429 },
-    );
   }
 
   const authorizedSession = token ? await getAuthorizedVisitorSession(db, publicKey, token) : null;

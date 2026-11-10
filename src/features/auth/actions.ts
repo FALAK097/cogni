@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { APP_ROUTES } from "@/features/navigation/app-routes";
 import { eq } from "drizzle-orm";
 import { user } from "@/lib/db/schema";
 
@@ -33,6 +34,6 @@ export async function updateProfileAction(
     .set({ name: parsed.data.name, updatedAt: new Date() })
     .where(eq(user.id, session.user.id));
 
-  revalidatePath("/dashboard/settings");
+  revalidatePath(APP_ROUTES.settings);
   return { savedAt: Date.now() };
 }

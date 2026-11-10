@@ -1,15 +1,22 @@
+import {
+  monitorWidgetConversation,
+  shouldStopWidgetResponse,
+} from "@/features/widget/server/conversation-monitor";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
 
 import {
   recordAiMessage,
   recordVisitorMessage,
   startVisitorConversation,
+  updateConversationState,
   type MessageJson,
 } from "@/features/conversations/server/conversation-service";
 import { handoffReply, matchesEscalationKeywords } from "@/features/conversations/server/handoff";
-import type { WidgetModelProvider } from "@/features/widget/domain";
+import type { WidgetModelProvider, WidgetWidgetConfig } from "@/features/widget/domain";
+import { resolveAgentTestModelIdentity } from "@/features/agent-tests/evaluation-context";
+import { getAgentTestPublishPreview } from "@/features/agent-tests/server/publish-checks";
+import { signAgentTestPreviewEvidence } from "@/features/agent-tests/signed-preview-evidence";
 import {
   assertPublicWidgetAccess,
   bearerToken,
@@ -17,9 +24,15 @@ import {
 } from "@/features/widget/server/widget-public";
 import { verifyWidgetBootstrapToken } from "@/features/widget/server/widget-bootstrap";
 import { streamWidgetAgent } from "@/features/widget/server/widget-agent";
-import { getPublicWidget, validateEmbedOrigin } from "@/features/widget/server/widget-service";
+import {
+  getPublicWidget,
+  toWidgetWidgetConfig,
+  validateEmbedOrigin,
+} from "@/features/widget/server/widget-service";
 import {
   createWidgetSseStream,
+  interruptWidgetTextStream,
+  readWidgetModelText,
   getRequestOrigin,
   widgetHistoryToUiMessages,
   widgetPreflightResponse,
@@ -34,11 +47,13 @@ import {
 } from "@/lib/ai/telemetry";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { getDb } from "@/lib/db/client";
-import { conversation as conversationTable } from "@/lib/db/schema";
+import { agentTestPublishCheck } from "@/lib/db/schema";
+import { and, eq } from "drizzle-orm";
+import { canManageWorkspace } from "@/lib/auth/permissions";
 import { emitDomainEvent } from "@/lib/events/domain-events";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { notifyWorkspaceMembers } from "@/lib/notifications/create-notification";
-import { checkRateLimit } from "@/lib/rate-limit/memory";
+import { checkRateLimits, getTrustedClientIp } from "@/lib/rate-limit/shared";
 import { env } from "@/lib/env/server";
 
 export const maxDuration = 60;
@@ -51,59 +66,92 @@ const PREVIEW_HOSTNAME = "dashboard-preview";
 
 const nullableText = (max: number) => z.string().trim().max(max).nullable().default(null);
 
-const chatRequestSchema = z.object({
-  sessionId: z.string().uuid(),
-  interactionId: z.string().uuid(),
-  visitorId: z.string().uuid().nullable().default(null),
-  message: z.string().trim().min(1).max(4_000),
-  history: z
-    .array(
-      z.object({
-        role: z.enum(["user", "assistant"]),
-        content: z.string().trim().min(1).max(4_000),
+const chatRequestSchema = z
+  .object({
+    sessionId: z.string().uuid(),
+    interactionId: z.string().uuid(),
+    visitorId: z.string().uuid().nullable().default(null),
+    message: z.string().trim().min(1).max(4_000),
+    history: z
+      .array(
+        z.object({
+          role: z.enum(["user", "assistant"]),
+          content: z.string().trim().min(1).max(4_000),
+        }),
+      )
+      .min(1)
+      .max(50),
+    leadInfo: z
+      .object({
+        name: nullableText(100),
+        email: z.email().nullable().default(null),
+        phone: nullableText(30),
+      })
+      .nullable()
+      .default(null),
+    preview: z.boolean().default(false),
+    previewRunId: z.string().uuid().optional(),
+    previewCaseId: z.string().uuid().optional(),
+    metadata: z
+      .object({
+        hostname: nullableText(253),
+        pageUrl: nullableText(2_000),
+        referrer: nullableText(2_000),
+        browser: nullableText(100),
+        deviceType: nullableText(50),
+        os: nullableText(100),
+        country: nullableText(100),
+        city: nullableText(100),
+        timezone: nullableText(100),
+        language: nullableText(50),
+        screenSize: nullableText(50),
+      })
+      .default({
+        hostname: null,
+        pageUrl: null,
+        referrer: null,
+        browser: null,
+        deviceType: null,
+        os: null,
+        country: null,
+        city: null,
+        timezone: null,
+        language: null,
+        screenSize: null,
       }),
-    )
-    .min(1)
-    .max(50),
-  leadInfo: z
-    .object({
-      name: nullableText(100),
-      email: z.email().nullable().default(null),
-      phone: nullableText(30),
-    })
-    .nullable()
-    .default(null),
-  preview: z.boolean().default(false),
-  metadata: z
-    .object({
-      hostname: nullableText(253),
-      pageUrl: nullableText(2_000),
-      referrer: nullableText(2_000),
-      browser: nullableText(100),
-      deviceType: nullableText(50),
-      os: nullableText(100),
-      country: nullableText(100),
-      city: nullableText(100),
-      timezone: nullableText(100),
-      language: nullableText(50),
-      screenSize: nullableText(50),
-    })
-    .default({
-      hostname: null,
-      pageUrl: null,
-      referrer: null,
-      browser: null,
-      deviceType: null,
-      os: null,
-      country: null,
-      city: null,
-      timezone: null,
-      language: null,
-      screenSize: null,
-    }),
-});
+  })
+  .refine(
+    (body) =>
+      (body.previewRunId === undefined && body.previewCaseId === undefined) ||
+      (body.preview && body.previewRunId !== undefined && body.previewCaseId !== undefined),
+    "Preview run and case IDs must be provided together for dashboard previews.",
+  );
 
-function streamHeaders(session?: { id: string; token: string }) {
+type WidgetPreviewEvidence = {
+  runId?: string;
+  caseId?: string;
+  outcome: "answer" | "handoff";
+  grounded: boolean;
+  modelProvider: WidgetModelProvider;
+  modelName: string;
+  configFingerprint: string;
+  sources: {
+    documentId: string;
+    title: string;
+    revisionId: string | null;
+    revisionNumber: number | null;
+  }[];
+  prompt: string;
+  signedEvidence?: string;
+};
+
+function streamHeaders(
+  session?: { id: string; token: string },
+  previewEvidence?: WidgetPreviewEvidence,
+  previewWorkspaceId?: string,
+  previewRunId?: string,
+  previewCaseId?: string,
+) {
   const headers = new Headers({
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache",
@@ -112,6 +160,47 @@ function streamHeaders(session?: { id: string; token: string }) {
   if (session) {
     headers.set("X-Widget-Session-Id", session.id);
     headers.set("X-Widget-Session-Token", session.token);
+  }
+  if (previewEvidence && previewWorkspaceId) {
+    const binding =
+      previewRunId && previewCaseId ? { runId: previewRunId, caseId: previewCaseId } : undefined;
+    const signedEvidence = binding
+      ? signAgentTestPreviewEvidence(
+          {
+            ...binding,
+            workspaceId: previewWorkspaceId,
+            prompt: previewEvidence.prompt,
+            outcome: previewEvidence.outcome,
+            grounded: previewEvidence.grounded,
+            modelProvider: previewEvidence.modelProvider,
+            modelName: previewEvidence.modelName,
+            configFingerprint: previewEvidence.configFingerprint,
+            sources: previewEvidence.sources.slice(0, 4).map((source) => ({
+              documentId: source.documentId,
+              revisionId: source.revisionId,
+              revisionNumber: source.revisionNumber,
+            })),
+          },
+          env.BETTER_AUTH_SECRET,
+        )
+      : undefined;
+    headers.set(
+      "X-Widget-Preview-Evidence",
+      encodeURIComponent(
+        JSON.stringify({
+          ...previewEvidence,
+          ...binding,
+          prompt: previewEvidence.prompt.length <= 1_000 ? previewEvidence.prompt : undefined,
+          ...(signedEvidence ? { signedEvidence } : {}),
+          sources: previewEvidence.sources.slice(0, 4).map((source) => ({
+            documentId: source.documentId,
+            revisionId: source.revisionId,
+            revisionNumber: source.revisionNumber,
+            title: source.title.slice(0, 160),
+          })),
+        }),
+      ),
+    );
   }
   return headers;
 }
@@ -142,21 +231,80 @@ export async function POST(
   let access:
     | {
         widget: NonNullable<Awaited<ReturnType<typeof getPublicWidget>>>;
+        settings: WidgetWidgetConfig;
         origin: string | null;
         allowedDomains: string[];
       }
     | { error: Response };
+  let previewIdentity: ReturnType<typeof resolveAgentTestModelIdentity> | null = null;
 
   if (isPreview) {
     try {
-      const { workspace } = await requireDashboardContext();
+      const { workspace, session, membership } = await requireDashboardContext();
       const widget = await getPublicWidget(db, publicKey);
       if (!widget || widget.workspaceId !== workspace.id) {
         return Response.json({ error: "Preview access denied." }, { status: 403 });
       }
 
+      let settings = toWidgetWidgetConfig(widget);
+      let publishPreview = null;
+      if (body.previewRunId) {
+        const checkExists = await db.query.agentTestPublishCheck.findFirst({
+          where: and(
+            eq(agentTestPublishCheck.id, body.previewRunId),
+            eq(agentTestPublishCheck.workspaceId, workspace.id),
+          ),
+          columns: { id: true },
+        });
+        if (checkExists) {
+          if (!canManageWorkspace(membership.role)) {
+            return Response.json({ error: "Preview access denied." }, { status: 403 });
+          }
+          publishPreview = await getAgentTestPublishPreview(
+            {
+              workspaceId: workspace.id,
+              membershipId: membership.id,
+              checkId: body.previewRunId,
+              caseId: body.previewCaseId!,
+            },
+            db,
+          );
+          if (!publishPreview) {
+            return Response.json(
+              { error: "This suite comparison is out of date. Start it again." },
+              { status: 409 },
+            );
+          }
+          previewIdentity = publishPreview.identity;
+          if (publishPreview.settings) settings = publishPreview.settings;
+        }
+      }
+
+      const rateLimit = await checkRateLimits([
+        { key: `widget-preview:user:${session.user.id}`, limit: 30, windowMs: 60_000 },
+        { key: `widget-preview:workspace:${workspace.id}`, limit: 300, windowMs: 60_000 },
+        {
+          key: `widget-preview:ip:${getTrustedClientIp(request.headers)}`,
+          limit: 60,
+          windowMs: 60_000,
+        },
+      ]);
+      if (!rateLimit.allowed) {
+        if (rateLimit.unavailable) {
+          return Response.json({ error: "Preview is temporarily unavailable." }, { status: 503 });
+        }
+        return Response.json(
+          { error: "Too many preview messages. Wait a moment before trying again." },
+          {
+            status: 429,
+            headers: { "Retry-After": String(Math.ceil(rateLimit.retryAfterMs / 1000)) },
+          },
+        );
+      }
+
       access = {
         widget,
+        settings,
         origin: getRequestOrigin(request),
         allowedDomains: JSON.parse(widget.authorizedDomains || "[]") as string[],
       };
@@ -168,6 +316,21 @@ export async function POST(
     if ("error" in publicAccess) return publicAccess.error;
     access = publicAccess;
   }
+
+  const {
+    modelProvider: effectiveModelProvider,
+    modelName: effectiveModelName,
+    configFingerprint,
+  } = previewIdentity ??
+  resolveAgentTestModelIdentity(
+    {
+      id: access.widget.id,
+      updatedAt: access.widget.updatedAt,
+      modelProvider: access.settings.modelProvider,
+      modelName: access.settings.modelName,
+    },
+    { provider: env.WIDGET_MODEL_PROVIDER, modelName: env.WIDGET_MODEL_NAME },
+  );
 
   const hostname = isPreview
     ? PREVIEW_HOSTNAME
@@ -185,15 +348,29 @@ export async function POST(
   }
 
   if (!isPreview) {
-    const rateLimit = checkRateLimit({
-      key: `widget-chat:${token}`,
-      limit: 20,
-      windowMs: 60_000,
-    });
+    const rateLimit = await checkRateLimits([
+      {
+        key: `widget-public:ip:${getTrustedClientIp(request.headers)}`,
+        limit: 240,
+        windowMs: 60_000,
+      },
+      {
+        key: `widget-public:workspace:${access.widget.workspaceId}`,
+        limit: 1000,
+        windowMs: 60_000,
+      },
+      { key: `widget-chat:visitor:${token}`, limit: 20, windowMs: 60_000 },
+    ]);
     if (!rateLimit.allowed) {
+      if (rateLimit.unavailable) {
+        return Response.json({ error: "Service temporarily unavailable." }, { status: 503 });
+      }
       return Response.json(
         { error: "Too many messages. Wait a moment before trying again." },
-        { status: 429 },
+        {
+          status: 429,
+          headers: { "Retry-After": String(Math.ceil(rateLimit.retryAfterMs / 1000)) },
+        },
       );
     }
   }
@@ -229,48 +406,57 @@ export async function POST(
     return Response.json({ error: "Widget session is already active." }, { status: 401 });
   }
 
-  const started = authorizedSession
-    ? {
-        visitorSession: authorizedSession,
-        ...(await recordVisitorMessage({
-          db,
-          visitorSession: authorizedSession,
-          text: body.message,
-          clientMessageId: body.interactionId,
-        })),
-      }
-    : bootstrapSession.session && bootstrapSession.conversation
+  const started = isPreview
+    ? null
+    : authorizedSession
       ? {
-          visitorSession: bootstrapSession.session,
-          conversation: bootstrapSession.conversation,
-          visitorMessageId: bootstrapSession.visitorMessageId,
-          replayed: true,
+          visitorSession: authorizedSession,
+          ...(await recordVisitorMessage({
+            db,
+            visitorSession: authorizedSession,
+            text: body.message,
+            clientMessageId: body.interactionId,
+          })),
         }
-      : await startVisitorConversation({
-          db,
-          widget: access.widget,
-          hostname,
-          browserSessionId: body.sessionId,
-          visitorId: bootstrapClaims?.visitorId ?? body.visitorId ?? randomUUID(),
-          metadata: {
-            ...body.metadata,
-            country: body.metadata.country ?? request.headers.get("x-vercel-ip-country"),
-            city: body.metadata.city ?? request.headers.get("x-vercel-ip-city"),
-            timezone: body.metadata.timezone ?? request.headers.get("x-vercel-ip-timezone"),
-          },
-          identity: {
-            name: body.leadInfo?.name ?? null,
-            email: body.leadInfo?.email ?? null,
-          },
-          text: body.message,
-          clientMessageId: body.interactionId,
-        });
+      : bootstrapSession.session && bootstrapSession.conversation
+        ? {
+            visitorSession: bootstrapSession.session,
+            conversation: bootstrapSession.conversation,
+            visitorMessageId: bootstrapSession.visitorMessageId,
+            replayed: true,
+          }
+        : await startVisitorConversation({
+            db,
+            widget: access.widget,
+            hostname,
+            browserSessionId: body.sessionId,
+            visitorId: bootstrapClaims?.visitorId ?? body.visitorId ?? randomUUID(),
+            metadata: {
+              ...body.metadata,
+              country: body.metadata.country ?? request.headers.get("x-vercel-ip-country"),
+              city: body.metadata.city ?? request.headers.get("x-vercel-ip-city"),
+              timezone: body.metadata.timezone ?? request.headers.get("x-vercel-ip-timezone"),
+            },
+            identity: {
+              name: body.leadInfo?.name ?? null,
+              email: body.leadInfo?.email ?? null,
+            },
+            text: body.message,
+            clientMessageId: body.interactionId,
+          });
 
-  const { visitorSession, conversation, visitorMessageId, replayed } = started;
-  const widget = visitorSession.widget;
-  if (replayed) {
+  const visitorSession = started?.visitorSession ?? null;
+  const conversation = started?.conversation ?? null;
+  const conversationId = conversation?.id ?? randomUUID();
+  const contactId = conversation?.contactId ?? null;
+  const visitorMessageId = started?.visitorMessageId ?? body.interactionId;
+  const replayed = started?.replayed ?? false;
+  const widget = access.widget;
+  const settings = access.settings;
+  if (replayed && conversation) {
     const conv = await db.query.conversation.findFirst({
-      where: (fields, { eq }) => eq(fields.id, conversation.id),
+      where: (fields, { eq, and }) =>
+        and(eq(fields.id, conversation.id), eq(fields.workspaceId, widget.workspace.id)),
       columns: { messages: true },
     });
     const list = JSON.parse(conv?.messages || "[]") as MessageJson[];
@@ -284,7 +470,7 @@ export async function POST(
               yield existingReply.body;
             })(),
           ),
-          { headers: streamHeaders(visitorSession) },
+          { headers: streamHeaders(visitorSession ?? undefined) },
         ),
         origin,
         validateEmbedOrigin(origin, access.allowedDomains),
@@ -292,21 +478,26 @@ export async function POST(
     }
   }
 
-  const activeConversation = await db.query.conversation.findFirst({
-    where: (fields, { eq }) => eq(fields.id, conversation.id),
-    columns: { aiPaused: true, status: true },
-  });
-  const shouldEscalate = matchesEscalationKeywords(body.message, widget.escalationKeywords);
+  const activeConversation = isPreview
+    ? null
+    : await db.query.conversation.findFirst({
+        where: (fields, { eq, and }) =>
+          and(eq(fields.id, conversationId), eq(fields.workspaceId, widget.workspace.id)),
+        columns: { aiPaused: true, status: true },
+      });
+  const shouldEscalate = matchesEscalationKeywords(body.message, settings.escalationKeywords);
 
-  if (shouldEscalate && activeConversation?.status !== "ESCALATED") {
-    await db
-      .update(conversationTable)
-      .set({
+  if (!isPreview && shouldEscalate && activeConversation?.status !== "ESCALATED") {
+    await updateConversationState({
+      db,
+      workspaceId: widget.workspace.id,
+      conversationId,
+      changes: {
         status: "ESCALATED",
         aiPaused: true,
         updatedAt: new Date().toISOString(),
-      })
-      .where(eq(conversationTable.id, conversation.id));
+      },
+    });
     await notifyWorkspaceMembers({
       db,
       workspaceId: widget.workspace.id,
@@ -318,31 +509,39 @@ export async function POST(
       db,
       workspaceId: widget.workspace.id,
       type: "escalation.triggered",
-      entityId: conversation.id,
+      entityId: conversationId,
     });
   }
 
   const origin = getRequestOrigin(request);
   const corsAllowed = validateEmbedOrigin(origin, access.allowedDomains);
-  const respondWithText = (text: string) => {
+  const respondWithText = (text: string, previewEvidence?: WidgetPreviewEvidence) => {
     const stream = createWidgetSseStream(
       (async function* () {
         yield text;
       })(),
       {
         onComplete: async () => {
-          await recordAiMessage({
-            db,
-            conversationId: conversation.id,
-            text,
-            replyToMessageId: visitorMessageId,
-          });
+          if (!isPreview) {
+            await recordAiMessage({
+              db,
+              conversationId,
+              text,
+              replyToMessageId: visitorMessageId,
+            });
+          }
         },
       },
     );
     return withWidgetCors(
       new Response(stream, {
-        headers: streamHeaders(visitorSession),
+        headers: streamHeaders(
+          visitorSession ?? undefined,
+          isPreview ? previewEvidence : undefined,
+          isPreview ? widget.workspace.id : undefined,
+          isPreview ? body.previewRunId : undefined,
+          isPreview ? body.previewCaseId : undefined,
+        ),
       }),
       origin,
       corsAllowed,
@@ -350,30 +549,55 @@ export async function POST(
   };
 
   if (activeConversation?.aiPaused || shouldEscalate) {
-    return respondWithText(handoffReply);
+    return respondWithText(
+      handoffReply,
+      isPreview && shouldEscalate
+        ? {
+            outcome: "handoff",
+            grounded: false,
+            sources: [],
+            prompt: body.message,
+            modelProvider: effectiveModelProvider,
+            modelName: effectiveModelName,
+            configFingerprint,
+          }
+        : undefined,
+    );
   }
 
   let run: { id: string; startedAtMs: number } | null = null;
 
   try {
-    const memoryContext = await buildAgentMemoryContext({
-      db,
-      workspaceId: widget.workspace.id,
-      conversationId: conversation.id,
-      contactId: conversation.contactId,
-    });
+    const memoryContext = isPreview
+      ? ""
+      : await buildAgentMemoryContext({
+          db,
+          workspaceId: widget.workspace.id,
+          conversationId,
+          contactId: contactId ?? "",
+        });
+    const latestConversationState = isPreview
+      ? null
+      : await db.query.conversation.findFirst({
+          where: (fields, { eq, and }) =>
+            and(eq(fields.id, conversationId), eq(fields.workspaceId, widget.workspace.id)),
+          columns: { aiPaused: true, status: true },
+        });
+    if (!isPreview && shouldStopWidgetResponse(latestConversationState ?? null)) {
+      return respondWithText(handoffReply);
+    }
+
     const runtimeContext = buildWidgetAgentRuntimeContext({
       workspaceId: widget.workspace.id,
       widgetId: widget.id,
-      conversationId: conversation.id,
-      contactId: conversation.contactId,
-      visitorSessionId: isPreview ? null : visitorSession.id,
+      conversationId,
+      contactId: contactId ?? "",
+      visitorSessionId: isPreview ? null : (visitorSession?.id ?? null),
       locale: body.metadata.language,
     });
 
-    const resolvedModelProvider =
-      env.WIDGET_MODEL_PROVIDER ?? (widget.modelProvider as WidgetModelProvider);
-    const resolvedModelName = env.WIDGET_MODEL_NAME ?? widget.modelName;
+    const resolvedModelProvider = effectiveModelProvider;
+    const resolvedModelName = effectiveModelName;
 
     run = isPreview
       ? null
@@ -385,20 +609,33 @@ export async function POST(
         });
     const result = await streamWidgetAgent({
       config: {
-        displayName: widget.displayName,
-        instructions: widget.instructions,
-        escalationKeywords: widget.escalationKeywords,
+        displayName: settings.displayName,
+        instructions: settings.instructions,
+        escalationKeywords: settings.escalationKeywords,
         modelProvider: resolvedModelProvider,
         modelName: resolvedModelName,
         workspaceName: widget.workspace.name,
         workspaceId: widget.workspace.id,
         latestUserMessage: body.message,
         memoryContext,
+        allowActions: !isPreview,
         documentIds: null,
         runTimeoutMs: runtimeContext.runTimeoutMs,
+        db,
+        conversationId,
+        agentRunId: run?.id ?? null,
       },
       messages: historyMessages,
-      onFinish: async ({ text, inputTokens, outputTokens, totalTokens, finishReason, sources }) => {
+      onFinish: async ({
+        text,
+        inputTokens,
+        outputTokens,
+        totalTokens,
+        finishReason,
+        sources,
+        citations,
+        retrievalOutcome,
+      }) => {
         if (!text.trim()) {
           if (run) {
             await completeAgentRun({
@@ -412,12 +649,17 @@ export async function POST(
           }
           return;
         }
-        await recordAiMessage({
-          db,
-          conversationId: conversation.id,
-          text,
-          replyToMessageId: visitorMessageId,
-        });
+        if (!isPreview) {
+          await recordAiMessage({
+            db,
+            conversationId,
+            text,
+            replyToMessageId: visitorMessageId,
+            citations,
+            retrievalOutcome,
+            rejectInactive: true,
+          });
+        }
         if (run) {
           await completeAgentRun({
             db,
@@ -431,7 +673,7 @@ export async function POST(
         logInfo("widget.ai.response.completed", {
           workspaceId: widget.workspace.id,
           widgetId: widget.id,
-          conversationId: conversation.id,
+          conversationId,
           agentRunId: run?.id ?? null,
           inputTokens,
           outputTokens,
@@ -451,17 +693,55 @@ export async function POST(
         logError("widget.ai.response.failed", {
           workspaceId: widget.workspace.id,
           widgetId: widget.id,
-          conversationId: conversation.id,
+          conversationId,
           agentRunId: run?.id ?? null,
           error: error instanceof Error ? error.message : "Unknown model error",
         });
       },
     });
 
+    const stopMonitoring = isPreview
+      ? () => {}
+      : await monitorWidgetConversation({
+          readState: async () =>
+            (await db.query.conversation.findFirst({
+              where: (fields, { eq, and }) =>
+                and(eq(fields.id, conversationId), eq(fields.workspaceId, widget.workspace.id)),
+              columns: { aiPaused: true, status: true },
+            })) ?? null,
+          interrupt: result.interruptForTakeover,
+        });
+
     return withWidgetCors(
-      new Response(createWidgetSseStream(result.textStream), {
-        headers: streamHeaders(visitorSession),
-      }),
+      new Response(
+        createWidgetSseStream(
+          interruptWidgetTextStream(readWidgetModelText(result.fullStream), result.abortSignal),
+          {
+            onComplete: result.waitForCompletion,
+            onFinally: stopMonitoring,
+            onCancel: result.interruptForTakeover,
+          },
+        ),
+        {
+          headers: streamHeaders(
+            visitorSession ?? undefined,
+            isPreview
+              ? {
+                  outcome: "answer",
+                  grounded: result.sources.length > 0,
+                  sources: result.sources,
+                  prompt: body.message,
+                  modelProvider: effectiveModelProvider,
+                  modelName: effectiveModelName,
+                  configFingerprint,
+                }
+              : undefined,
+            isPreview ? widget.workspace.id : undefined,
+            isPreview ? body.previewRunId : undefined,
+            isPreview ? body.previewCaseId : undefined,
+          ),
+        },
+      ),
       origin,
       corsAllowed,
     );
@@ -477,7 +757,7 @@ export async function POST(
     logError("widget.chat.failed", {
       workspaceId: widget.workspace.id,
       widgetId: widget.id,
-      conversationId: conversation.id,
+      conversationId,
       error: error instanceof Error ? error.message : "Unknown error",
     });
     return Response.json({ error: "The assistant is unavailable right now." }, { status: 503 });

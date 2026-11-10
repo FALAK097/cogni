@@ -1,4 +1,5 @@
 import { getDashboardAnalytics } from "@/features/analytics/server/dashboard-analytics";
+import { InvalidAnalyticsDateRangeError } from "@/features/analytics/date-range";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 
 export async function GET(request: Request) {
@@ -7,6 +8,19 @@ export async function GET(request: Request) {
   const startDate = url.searchParams.get("startDate");
   const endDate = url.searchParams.get("endDate");
 
-  const analytics = await getDashboardAnalytics(db, workspace.id, startDate, endDate);
-  return Response.json(analytics);
+  try {
+    const analytics = await getDashboardAnalytics(
+      db,
+      workspace.id,
+      startDate,
+      endDate,
+      workspace.timezone,
+    );
+    return Response.json(analytics);
+  } catch (error) {
+    if (error instanceof InvalidAnalyticsDateRangeError) {
+      return Response.json({ error: error.message }, { status: 400 });
+    }
+    throw error;
+  }
 }

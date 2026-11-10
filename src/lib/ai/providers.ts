@@ -28,10 +28,17 @@ function getGoogleProvider() {
 }
 
 export function getWidgetModel(provider: WidgetModelProvider, modelName: string) {
-  const resolvedProvider = env.WIDGET_MODEL_PROVIDER ?? provider;
-  const resolvedModelName = env.WIDGET_MODEL_NAME ?? modelName;
+  const identity = resolveWidgetModelIdentity(provider, modelName);
 
-  return resolvedProvider === "GOOGLE"
-    ? getGoogleProvider()(resolvedModelName)
-    : getOpenAIProvider()(resolvedModelName);
+  return identity.modelProvider === "GOOGLE"
+    ? getGoogleProvider()(identity.modelName)
+    : getOpenAIProvider()(identity.modelName);
+}
+
+/** Mirrors the provider/model identity used by getWidgetModel, including workspace overrides. */
+export function resolveWidgetModelIdentity(provider: WidgetModelProvider, modelName: string) {
+  return {
+    modelProvider: env.WIDGET_MODEL_PROVIDER ?? provider,
+    modelName: env.WIDGET_MODEL_NAME ?? modelName,
+  };
 }

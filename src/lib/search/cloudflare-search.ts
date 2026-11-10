@@ -1,8 +1,10 @@
-import "server-only";
+import "../cloudflare/server-only";
+
+import { z } from "zod";
 
 import { env } from "@/lib/env/server";
+import { createCloudflareSearchClient } from "@/lib/search/cloudflare-search-client";
 
-type CloudflareSearchMetadata = Record<string, string | number | boolean>;
 type CloudflareSearchFilterValue =
   | string
   | number
@@ -23,6 +25,26 @@ export type CloudflareSearchChunk = {
   };
 };
 
+const cloudflareSearchChunkSchema = z.object({
+  id: z.string().min(1),
+  score: z.number().finite(),
+  text: z.string(),
+  item: z
+    .object({
+      key: z.string().optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
+    })
+    .optional(),
+});
+
+const cloudflareSearchResponseSchema = z.object({
+  result: z
+    .object({
+      chunks: z.array(z.unknown()).optional(),
+    })
+    .optional(),
+});
+
 const maxSearchTextCharacters = 3_500_000;
 
 function getCloudflareSearchToken() {
@@ -40,7 +62,14 @@ function getCloudflareSearchBaseUrl() {
 
   const accountId = encodeURIComponent(env.CLOUDFLARE_ACCOUNT_ID);
   const instanceName = encodeURIComponent(env.SEARCH_INDEX);
-  return `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai-search/instances/${instanceName}`;
+  return `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai-search/namespaces/default/instances/${instanceName}`;
+}
+
+function getCloudflareSearchClient() {
+  const token = getCloudflareSearchToken();
+  const baseUrl = getCloudflareSearchBaseUrl();
+  if (!token || !baseUrl) return null;
+  return createCloudflareSearchClient({ baseUrl, token });
 }
 
 export async function uploadCloudflareSearchDocument({
@@ -48,45 +77,43 @@ export async function uploadCloudflareSearchDocument({
   workspaceId,
   title,
   text,
+  itemKey = `${documentId}.txt`,
 }: {
   documentId: string;
   workspaceId: string;
   title: string;
   text: string;
-}) {
-  if (!isCloudflareSearchConfigured()) {
-    return;
-  }
-
-  const indexedText = text.slice(0, maxSearchTextCharacters);
-  const metadata: CloudflareSearchMetadata = {
-    documentid: documentId,
-    workspaceid: workspaceId,
+  itemKey?: string;
+}): Promise<string | null> {
+  const client = getCloudflareSearchClient();
+  if (!client) return null;
+  return client.uploadDocument({
+    documentId,
+    workspaceId,
     title,
-  };
-
-  const token = getCloudflareSearchToken();
-  const baseUrl = getCloudflareSearchBaseUrl();
-  if (!token || !baseUrl) {
-    return;
-  }
-
-  const formData = new FormData();
-  formData.set("file", new Blob([indexedText], { type: "text/plain" }), `${documentId}.txt`);
-  formData.set("metadata", JSON.stringify(metadata));
-  formData.set("wait_for_completion", "true");
-
-  const response = await fetch(`${baseUrl}/items`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    body: formData,
+    text: text.slice(0, maxSearchTextCharacters),
+    itemKey,
   });
+}
 
-  if (!response.ok) {
-    throw new Error("Could not index document in Cloudflare AI Search.");
-  }
+export async function deleteCloudflareSearchItem(itemId: string) {
+  const client = getCloudflareSearchClient();
+  if (!client) return false;
+  await client.deleteItem(itemId);
+  return true;
+}
+
+export async function deleteCloudflareSearchItemsByKey(itemKey: string) {
+  const client = getCloudflareSearchClient();
+  if (!client) return false;
+  await client.deleteItemsByKey(itemKey);
+  return true;
+}
+
+export async function listCloudflareSearchItemIdsByKey(itemKey: string) {
+  const client = getCloudflareSearchClient();
+  if (!client) return null;
+  return client.listItemsByKey(itemKey);
 }
 
 export async function searchCloudflareIndex({
@@ -105,6 +132,7 @@ export async function searchCloudflareIndex({
   const searchOptions = {
     retrieval: {
       max_num_results: limit,
+      match_threshold: 0.4,
       filters,
     },
   };
@@ -130,9 +158,11 @@ export async function searchCloudflareIndex({
     return [];
   }
 
-  const payload = (await response.json()) as {
-    result?: { chunks?: CloudflareSearchChunk[] };
-  };
+  const payload = cloudflareSearchResponseSchema.safeParse(await response.json().catch(() => null));
+  if (!payload.success) return [];
 
-  return payload.result?.chunks ?? [];
+  return (payload.data.result?.chunks ?? []).flatMap((chunk) => {
+    const parsedChunk = cloudflareSearchChunkSchema.safeParse(chunk);
+    return parsedChunk.success ? [parsedChunk.data] : [];
+  });
 }

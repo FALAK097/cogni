@@ -1,8 +1,12 @@
 import type { Db } from "@/lib/db/client";
-import { eq } from "drizzle-orm";
-import { document as documentTable } from "@/lib/db/schema";
 
 import { extractDocumentText, indexDocumentContent } from "@/features/knowledge/server/extract";
+import {
+  claimKnowledgeSourceProcessingAttempt,
+  emitKnowledgeSourceReadyIfCurrent,
+  failKnowledgeSourceProcessingAttempt,
+} from "@/features/knowledge/server/source-revisions";
+import { acquireDocumentLock } from "@/lib/db/document-lock";
 import { logError } from "@/lib/logging/logger";
 import { completeWorkflowRun, failWorkflowRun, startWorkflowRun } from "@/lib/workflows/runner";
 
@@ -11,11 +15,15 @@ export async function processDocument({
   workspaceId,
   documentId,
   idempotencyKey,
+  leaseToken,
+  assertLease = async () => {},
 }: {
   db: Db;
   workspaceId: string;
   documentId: string;
   idempotencyKey: string;
+  leaseToken?: string;
+  assertLease?: () => Promise<void>;
 }) {
   const document = await db.query.document.findFirst({
     where: (fields, { eq, and }) =>
@@ -34,7 +42,34 @@ export async function processDocument({
     input: { documentId },
   });
 
+  const documentLockKey = `${workspaceId}:${document.id}`;
+  let releaseDocumentLock: (() => Promise<void>) | undefined;
+  if (leaseToken) {
+    releaseDocumentLock = await acquireDocumentLock(documentLockKey, assertLease);
+  }
+
+  let processingToken: number | null = null;
+  let chunkCount = 0;
+  let result: Awaited<ReturnType<typeof indexDocumentContent>> | null = null;
+
   try {
+    await assertLease();
+    processingToken = await claimKnowledgeSourceProcessingAttempt(db, {
+      workspaceId,
+      documentId: document.id,
+    });
+    if (processingToken === null) {
+      await completeWorkflowRun({
+        db,
+        workspaceId,
+        runId: run.id,
+        output: { documentId, status: "stale" },
+        leaseToken,
+      });
+      return;
+    }
+
+    await assertLease();
     const text = await extractDocumentText({
       sourceType: document.sourceType,
       sourceUrl: document.sourceUrl,
@@ -42,38 +77,38 @@ export async function processDocument({
       mimeType: document.mimeType,
     });
 
-    await indexDocumentContent(db, document.id, text, workspaceId);
-
-    await db
-      .update(documentTable)
-      .set({
-        status: "READY",
-        errorMessage: null,
-        updatedAt: new Date().toISOString(),
-      })
-      .where(eq(documentTable.id, document.id));
-
-    await completeWorkflowRun({
-      db,
-      workspaceId,
-      runId: run.id,
-      output: { documentId, chunkCount: text.length },
-    });
+    await assertLease();
+    chunkCount = text.length;
+    result = await indexDocumentContent(db, document.id, text, workspaceId, processingToken);
+    await assertLease();
   } catch (error) {
     const message = error instanceof Error ? error.message : "Processing failed.";
-    await db
-      .update(documentTable)
-      .set({
-        status: "FAILED",
+    await assertLease();
+    if (processingToken !== null) {
+      const failed = await failKnowledgeSourceProcessingAttempt(db, {
+        workspaceId,
+        documentId: document.id,
+        processingToken,
         errorMessage: message,
-        updatedAt: new Date().toISOString(),
-      })
-      .where(eq(documentTable.id, document.id));
+      });
+      if (!failed) {
+        await completeWorkflowRun({
+          db,
+          workspaceId,
+          runId: run.id,
+          output: { documentId, status: "stale" },
+          leaseToken,
+        });
+        return;
+      }
+    }
+
     await failWorkflowRun({
       db,
       workspaceId,
       runId: run.id,
       errorMessage: message,
+      leaseToken,
     });
     logError("knowledge.document.processing_failed", {
       workspaceId,
@@ -82,5 +117,31 @@ export async function processDocument({
       error: message,
     });
     throw error;
+  } finally {
+    await releaseDocumentLock?.();
   }
+
+  if (!result || result.status === "stale") {
+    await completeWorkflowRun({
+      workspaceId,
+      db,
+      runId: run.id,
+      output: { documentId, status: "stale" },
+      leaseToken,
+    });
+    return;
+  }
+
+  await completeWorkflowRun({
+    db,
+    workspaceId,
+    runId: run.id,
+    output: { documentId, chunkCount },
+    leaseToken,
+  });
+  await emitKnowledgeSourceReadyIfCurrent(db, {
+    workspaceId,
+    documentId,
+    readyToken: result.readyToken,
+  });
 }

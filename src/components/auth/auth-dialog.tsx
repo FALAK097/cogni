@@ -51,7 +51,7 @@ export function AuthDialog({
     try {
       const result = await authClient.signIn.social({
         provider: "google",
-        callbackURL: "/dashboard",
+        callbackURL: "/insights",
       });
 
       if (result?.error) {
@@ -75,7 +75,7 @@ export function AuthDialog({
           name: name.trim() || "User",
           email: email.trim(),
           password,
-          callbackURL: "/dashboard",
+          callbackURL: "/insights",
         });
 
         if (result?.error) {
@@ -87,7 +87,7 @@ export function AuthDialog({
         const result = await authClient.signIn.email({
           email: email.trim(),
           password,
-          callbackURL: "/dashboard",
+          callbackURL: "/insights",
         });
 
         if (result?.error) {
@@ -98,7 +98,7 @@ export function AuthDialog({
       }
 
       setOpen(false);
-      window.location.assign("/dashboard");
+      window.location.assign("/insights");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication failed.");
       setIsPending(false);

@@ -1,0 +1,1 @@
+ALTER TABLE "conversation_qa_evaluation" ADD CONSTRAINT "conversation_qa_evaluation_error_code_check" CHECK ("conversation_qa_evaluation"."errorCode" is null or "conversation_qa_evaluation"."errorCode" = 'EVALUATION_FAILED');

@@ -1,13 +1,5 @@
-import {
-  getRequestOrigin,
-  widgetPreflightResponse,
-  withWidgetCors,
-} from "@/features/widget/server/widget-utils";
-import {
-  getPublicWidget,
-  toWidgetPublicConfig,
-  validateEmbedOrigin,
-} from "@/features/widget/server/widget-service";
+import { widgetPreflightResponse, withWidgetCors } from "@/features/widget/server/widget-utils";
+import { assertPublicWidgetAccess } from "@/features/widget/server/widget-public";
 import { getDb } from "@/lib/db/client";
 
 export async function GET(
@@ -15,23 +7,9 @@ export async function GET(
   { params }: { params: Promise<{ publicKey: string }> },
 ) {
   const { publicKey } = await params;
-  const db = getDb();
-  const widget = await getPublicWidget(db, publicKey);
-
-  if (!widget || !widget.isEnabled) {
-    return Response.json({ error: "Widget is unavailable." }, { status: 404 });
-  }
-
-  const origin = getRequestOrigin(request);
-  const allowedDomains = JSON.parse(widget.authorizedDomains || "[]") as string[];
-  const allowed = validateEmbedOrigin(origin, allowedDomains);
-  if (!allowed) {
-    return Response.json({ error: "This domain is not authorized." }, { status: 403 });
-  }
-
-  const config = toWidgetPublicConfig(widget);
-
-  return withWidgetCors(Response.json(config), origin, allowed);
+  const access = await assertPublicWidgetAccess(getDb(), publicKey, request);
+  if ("error" in access) return access.error;
+  return withWidgetCors(Response.json(access.config), access.origin, true);
 }
 
 export async function OPTIONS(request: Request) {

@@ -7,7 +7,40 @@ import { searchDocuments, saveMessage } from "./api.js";
 import { renderBotAvatarMarkup } from "./utils.js";
 import { ICONS, BROCHURE_KEYWORDS } from "./constants.js";
 import { state } from "./state.js";
-import { escapeHtml, scrollToBottom, getCurrentTime, formatBotMessage } from "./utils.js";
+import {
+  escapeHtml,
+  getSafeDocumentHref,
+  scrollToBottom,
+  getCurrentTime,
+  formatBotMessage,
+} from "./utils.js";
+
+export function normalizeWidgetDocument(doc) {
+  return {
+    fileName: doc.fileName || doc.title || doc.name || doc.documentName || "Document",
+    description: doc.description || doc.documentDescription || "",
+    fileUrl: doc.fileUrl || doc.url || "",
+  };
+}
+
+export function renderDocumentCard(doc) {
+  const { fileName, description, fileUrl } = normalizeWidgetDocument(doc);
+  const href = getSafeDocumentHref(fileUrl);
+  const action = href
+    ? `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" class="oc-document-download" title="Open document in a new tab" aria-label="Open ${escapeHtml(fileName)} in a new tab">${ICONS.externalLink}</a>`
+    : "";
+
+  return `
+			<div class="oc-document-card">
+				<div class="oc-document-icon">${ICONS.fileText}</div>
+				<div class="oc-document-info">
+					<p class="oc-document-name">${escapeHtml(fileName)}</p>
+					${description ? `<p class="oc-document-desc">${escapeHtml(description)}</p>` : ""}
+				</div>
+				${action}
+			</div>
+		`;
+}
 
 /**
  * Check if message contains brochure-related keywords
@@ -87,26 +120,7 @@ export async function searchAndDisplayDocuments(searchQuery = null) {
     const docDiv = document.createElement("div");
     docDiv.className = "oc-message bot";
 
-    let documentsHtml = '<div class="oc-documents">';
-    documents.forEach((doc) => {
-      const fileName = doc.fileName || doc.name || "Document";
-      const fileDesc = doc.description || doc.documentName || "";
-      const fileUrl = doc.fileUrl || doc.url;
-
-      documentsHtml += `
-				<div class="oc-document-card">
-					<div class="oc-document-icon">${ICONS.fileText}</div>
-					<div class="oc-document-info">
-						<p class="oc-document-name">${escapeHtml(fileName)}</p>
-						${fileDesc ? `<p class="oc-document-desc">${escapeHtml(fileDesc)}</p>` : ""}
-					</div>
-					<a href="${escapeHtml(fileUrl)}" target="_blank" download class="oc-document-download" title="Download">
-						${ICONS.download}
-					</a>
-				</div>
-			`;
-    });
-    documentsHtml += "</div>";
+    const documentsHtml = `<div class="oc-documents">${documents.map(renderDocumentCard).join("")}</div>`;
 
     docDiv.innerHTML = `
 			<div class="oc-bot-header">
@@ -127,11 +141,7 @@ export async function searchAndDisplayDocuments(searchQuery = null) {
     // Save document message with metadata
     const docMetadata = {
       type: "documents",
-      documents: documents.map((doc) => ({
-        fileName: doc.fileName || doc.name || "Document",
-        description: doc.description || doc.documentName || "",
-        fileUrl: doc.fileUrl || doc.url,
-      })),
+      documents: documents.map(normalizeWidgetDocument),
     };
     saveMessage("assistant", "Here are the documents I found for you:", docMetadata);
   } catch (error) {
@@ -155,20 +165,7 @@ export function restoreDocumentMessage(text, documents, timestamp, messageId, ex
   msg.className = "oc-message bot";
 
   let documentsHtml = '<div class="oc-documents">';
-  documents.forEach((doc) => {
-    documentsHtml += `
-			<div class="oc-document-card">
-				<div class="oc-document-icon">${ICONS.fileText}</div>
-				<div class="oc-document-info">
-					<p class="oc-document-name">${escapeHtml(doc.fileName)}</p>
-					${doc.description ? `<p class="oc-document-desc">${escapeHtml(doc.description)}</p>` : ""}
-				</div>
-				<a href="${escapeHtml(doc.fileUrl)}" target="_blank" download class="oc-document-download" title="Download">
-					${ICONS.download}
-				</a>
-			</div>
-		`;
-  });
+  documentsHtml += documents.map(renderDocumentCard).join("");
   documentsHtml += "</div>";
 
   // Import feedback functions dynamically

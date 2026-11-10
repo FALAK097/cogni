@@ -2,6 +2,17 @@ import { useSyncExternalStore } from "react";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
+const subscribeToClientMount = () => () => {};
+
+/** Keep persisted sidebar state out of the first server/client render. */
+export function useSidebarClientReady(): boolean {
+  return useSyncExternalStore(
+    subscribeToClientMount,
+    () => true,
+    () => false,
+  );
+}
+
 export const MOBILE_SIDEBAR_BREAKPOINT = 1024;
 
 export function isMobileSidebarViewport(): boolean {

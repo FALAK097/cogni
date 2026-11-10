@@ -4,13 +4,13 @@ import { cn } from "@/lib/utils";
 
 const showcases = [
   {
-    title: "Widget Customization",
-    description: "Design a chat experience that feels like a natural extension of your brand.",
+    title: "Agent",
+    description: "Build, test, and deploy an AI support agent grounded in your trusted sources.",
     bullets: [
-      "Live preview builder",
-      "Custom themes and colors",
-      "Conversation starters",
-      "Suggested questions",
+      "Add website, text, and file sources",
+      "Test answers before launch",
+      "Customize the chat experience",
+      "Deploy your support widget",
     ],
     imageClass: "bg-blue-50/50 dark:bg-blue-950/20",
     illustration: (
@@ -27,54 +27,7 @@ const showcases = [
     ),
   },
   {
-    title: "AI Knowledge Base",
-    description: "Connect your sources once and let the AI keep everything in sync automatically.",
-    bullets: [
-      "Real-time website syncing",
-      "PDF & Document parsing",
-      "Integration with Notion",
-      "Source management dashboard",
-    ],
-    imageClass: "bg-emerald-50/50 dark:bg-emerald-950/20",
-    illustration: (
-      <div className="flex h-full w-full items-center justify-center p-8">
-        <div className="w-full max-w-sm rounded-2xl border bg-background shadow-xl p-4 space-y-3">
-          <div className="flex items-center gap-3 rounded-xl border bg-card p-3">
-            <div className="size-8 rounded bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold text-xs">
-              DOC
-            </div>
-            <div className="flex-1 space-y-1">
-              <div className="h-2 w-1/2 rounded bg-muted-foreground/30" />
-              <div className="h-1 w-1/3 rounded bg-muted-foreground/20" />
-            </div>
-            <div className="size-4 rounded-full bg-emerald-500" />
-          </div>
-          <div className="flex items-center gap-3 rounded-xl border bg-card p-3">
-            <div className="size-8 rounded bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs">
-              WEB
-            </div>
-            <div className="flex-1 space-y-1">
-              <div className="h-2 w-2/3 rounded bg-muted-foreground/30" />
-              <div className="h-1 w-1/2 rounded bg-muted-foreground/20" />
-            </div>
-            <div className="size-4 rounded-full bg-emerald-500" />
-          </div>
-          <div className="flex items-center gap-3 rounded-xl border bg-card p-3 opacity-50">
-            <div className="size-8 rounded bg-orange-100 flex items-center justify-center text-orange-600 font-bold text-xs">
-              PDF
-            </div>
-            <div className="flex-1 space-y-1">
-              <div className="h-2 w-1/2 rounded bg-muted-foreground/30" />
-              <div className="h-1 w-1/4 rounded bg-muted-foreground/20" />
-            </div>
-            <div className="size-4 rounded-full bg-orange-500 animate-pulse" />
-          </div>
-        </div>
-      </div>
-    ),
-  },
-  {
-    title: "Conversations",
+    title: "Inbox",
     description: "One unified inbox where humans and AI work together seamlessly.",
     bullets: [
       "Shared inbox view",
@@ -112,7 +65,7 @@ const showcases = [
     ),
   },
   {
-    title: "Analytics",
+    title: "Insights",
     description: "Understand your support performance and identify knowledge gaps instantly.",
     bullets: [
       "Resolution rate tracking",

@@ -1,0 +1,973 @@
+import Link from "next/link";
+
+import { useState, type FormEvent } from "react";
+
+import { BookOpen, CheckCircle2, ExternalLink, MoreVertical, Play, Plus } from "@/components/icons";
+import { EmptyState } from "@/components/ui/empty-state";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { useKnowledgeBaseSources } from "@/hooks/query/use-knowledge-base";
+import { Skeleton } from "@/components/ui/skeleton";
+import { agentHref } from "@/features/navigation/app-routes";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { runAgentTestSuite, type AgentTestSuiteResult } from "@/features/agent-tests/run-suite";
+import {
+  useAgentTestCases,
+  useDeleteAgentTestCase,
+  useRecordAgentTestRun,
+  useStartAgentTestPublishCheck,
+  useRecordAgentTestPublishCheckResults,
+  useSaveAgentTestCase,
+  type AgentTestCase,
+} from "@/hooks/query";
+import {
+  getAgentTestSuiteVersion,
+  matchesAgentTestOutcome,
+  type AgentTestExpectedOutcome,
+} from "@/features/agent-tests/input";
+import { runAgentTestCase } from "@/features/agent-tests/run-case";
+
+export type WidgetPreviewEvidence = {
+  runId?: string;
+  caseId?: string;
+  outcome: "answer" | "handoff" | "error";
+  grounded: boolean;
+  modelProvider?: "OPENAI" | "GOOGLE";
+  modelName?: string;
+  configFingerprint?: string;
+  signedEvidence?: string;
+  sources: {
+    documentId?: string;
+    title: string;
+    revisionId?: string | null;
+    revisionNumber?: number | null;
+  }[];
+  prompt?: string;
+};
+
+function publishResultLabel(status: AgentTestSuiteResult["status"] | undefined) {
+  if (status === "passed") return "Passed";
+  if (status === "mismatch") return "Needs review";
+  if (status === "error") return "Could not run";
+  if (status === "not_run") return "Not run";
+  return "Unavailable";
+}
+
+function getHandoffTerms(value: string) {
+  return value
+    .split(/[\n,]+/)
+    .map((term) => term.trim())
+    .filter(Boolean);
+}
+
+function WidgetTestResult({
+  evidence,
+  error,
+  retryPrompt,
+  retryLabel,
+  busy,
+  onRetry,
+}: {
+  evidence: WidgetPreviewEvidence | null;
+  error: string | null;
+  retryPrompt: string | null;
+  retryLabel: string;
+  busy: boolean;
+  onRetry: (prompt: string) => void;
+}) {
+  if (!evidence && !error) return null;
+
+  return (
+    <>
+      {error ? (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/20 bg-destructive/5 px-3.5 py-3"
+        >
+          <p className="min-w-0 flex-1 text-sm text-destructive">{error}</p>
+          {retryPrompt ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-10 shrink-0"
+              disabled={busy}
+              onClick={() => onRetry(retryPrompt)}
+            >
+              {retryLabel}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+
+      <section aria-labelledby="preview-evidence-heading" aria-live="polite" className="py-4">
+        <div className="flex items-center gap-2">
+          <h3 id="preview-evidence-heading" className="text-sm font-semibold">
+            Latest test result
+          </h3>
+        </div>
+        {!evidence ? (
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+            Send a message in the preview to see its source or handoff evidence here.
+          </p>
+        ) : evidence.outcome === "handoff" ? (
+          <div className="mt-3 py-3">
+            <p className="text-sm font-medium">Handoff rule matched</p>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+              The preview returned the configured human-handoff response. No customer conversation
+              was created.
+            </p>
+          </div>
+        ) : evidence.outcome === "error" ? (
+          <div className="mt-3 rounded-lg border border-destructive/20 bg-destructive/5 p-3">
+            <p className="text-sm font-medium">The agent couldn&apos;t complete this test</p>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+              The preview didn&apos;t receive an answer. Check the model connection and try again.
+            </p>
+            {evidence.prompt ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-3 min-h-10"
+                disabled={busy}
+                onClick={() => onRetry(evidence.prompt ?? "")}
+              >
+                Retry this question
+              </Button>
+            ) : null}
+          </div>
+        ) : evidence.grounded && evidence.sources.length > 0 ? (
+          <div className="mt-3">
+            <p className="flex items-center gap-2 text-sm font-medium">
+              <CheckCircle2 className="size-4 text-primary" aria-hidden="true" />
+              Knowledge sources retrieved
+            </p>
+            <ul className="mt-2 space-y-2">
+              {evidence.sources.map((source) => (
+                <li
+                  key={source.documentId ?? source.title}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-card/60 px-3 py-2 text-xs leading-relaxed text-muted-foreground"
+                >
+                  <div className="flex min-w-0 items-center gap-2">
+                    <BookOpen className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
+                    <span className="truncate font-medium text-foreground">{source.title}</span>
+                  </div>
+                  <a
+                    href="#build"
+                    className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+                    title="Inspect source in Knowledge Base"
+                  >
+                    <span>Inspect</span>
+                    <ExternalLink className="size-3" aria-hidden="true" />
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <div className="mt-3 py-3">
+            <p className="text-sm font-medium">No matching knowledge source</p>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+              Review this answer as ungrounded. Check your source coverage and fallback instructions
+              before deploying.
+            </p>
+          </div>
+        )}
+      </section>
+    </>
+  );
+}
+
+export function WidgetTestPanel({
+  escalationKeywords,
+  suggestions,
+  evidence,
+  sendingPrompt,
+  canManage,
+  onTryPrompt,
+  onResetPreview,
+  onPublishCheckComplete,
+}: {
+  escalationKeywords: string;
+  suggestions: string[];
+  evidence: WidgetPreviewEvidence | null;
+  sendingPrompt: string | null;
+  canManage: boolean;
+  onTryPrompt: (
+    prompt: string,
+    binding?: { runId: string; caseId: string },
+  ) => Promise<WidgetPreviewEvidence | null>;
+  onResetPreview: () => Promise<boolean>;
+  onPublishCheckComplete: (checkId: string | null) => void;
+}) {
+  const [tryError, setTryError] = useState<string | null>(null);
+  const [retryPrompt, setRetryPrompt] = useState<string | null>(null);
+  const [retryCase, setRetryCase] = useState<AgentTestCase | null>(null);
+  const [editingCase, setEditingCase] = useState<AgentTestCase | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [title, setTitle] = useState("");
+  const [prompt, setPrompt] = useState("");
+  const [expectedOutcome, setExpectedOutcome] =
+    useState<AgentTestExpectedOutcome>("grounded_answer");
+  const [expectedSourceIds, setExpectedSourceIds] = useState<string[]>([]);
+  const sourcesQuery = useKnowledgeBaseSources(null, { enabled: showForm });
+  const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
+  const [resettingCaseId, setResettingCaseId] = useState<string | null>(null);
+  const [batchProgress, setBatchProgress] = useState<{
+    index: number;
+    total: number;
+    title: string;
+  } | null>(null);
+  const [batchResults, setBatchResults] = useState<Record<string, AgentTestSuiteResult>>({});
+  const [baselineBatchResults, setBaselineBatchResults] = useState<
+    Record<string, AgentTestSuiteResult>
+  >({});
+  const casesQuery = useAgentTestCases();
+  const saveCase = useSaveAgentTestCase();
+  const deleteCase = useDeleteAgentTestCase();
+  const recordRun = useRecordAgentTestRun();
+  const startPublishCheck = useStartAgentTestPublishCheck();
+  const recordPublishCheck = useRecordAgentTestPublishCheckResults();
+  const [publishCheckStage, setPublishCheckStage] = useState<string | null>(null);
+  const [publishCheckMessage, setPublishCheckMessage] = useState<string | null>(null);
+  const [publishBaselineAvailable, setPublishBaselineAvailable] = useState<boolean | null>(null);
+  const isPublishCheckBusy =
+    publishCheckStage !== null || startPublishCheck.isPending || recordPublishCheck.isPending;
+  const handoffTerms = getHandoffTerms(escalationKeywords);
+  const visibleTerms = handoffTerms.slice(0, 5);
+  const visibleSuggestions = [...new Set(suggestions.map((suggestion) => suggestion.trim()))]
+    .filter((suggestion) => suggestion.length > 0 && suggestion.length <= 500)
+    .slice(0, 3);
+  const isBusy =
+    sendingPrompt !== null ||
+    resettingCaseId !== null ||
+    batchProgress !== null ||
+    recordRun.isPending ||
+    isPublishCheckBusy;
+
+  const tryPrompt = async (prompt: string) => {
+    if (isBusy) return null;
+    setTryError(null);
+    setRetryCase(null);
+    setRetryPrompt(prompt);
+    try {
+      const previewEvidence = await onTryPrompt(prompt);
+      if (!previewEvidence) {
+        setTryError(
+          "No test result arrived. Check the preview and model connection, then try again.",
+        );
+      } else {
+        setRetryPrompt(null);
+      }
+      return previewEvidence;
+    } catch {
+      setTryError("Couldn't send that test. Retry the preview and try again.");
+      return null;
+    }
+  };
+
+  const openCreate = () => {
+    setEditingCase(null);
+    setTitle("");
+    setPrompt("");
+    setExpectedOutcome("grounded_answer");
+    setExpectedSourceIds([]);
+    setShowForm(true);
+  };
+
+  const openEdit = (testCase: AgentTestCase) => {
+    setEditingCase(testCase);
+    setTitle(testCase.title);
+    setPrompt(testCase.prompt);
+    setExpectedOutcome(testCase.expectedOutcome);
+    setExpectedSourceIds(testCase.expectedSourceIds ?? []);
+    setShowForm(true);
+  };
+
+  const runCase = async (testCase: AgentTestCase) => {
+    if (isBusy) return;
+    setTryError(null);
+    setBatchResults({});
+    setBaselineBatchResults({});
+    setPublishCheckMessage(null);
+    setPublishBaselineAvailable(null);
+    setActiveCaseId(testCase.id);
+    setRetryCase(testCase);
+    setRetryPrompt(testCase.prompt);
+    setResettingCaseId(testCase.id);
+    const result = await runAgentTestCase({
+      resetPreview: onResetPreview,
+      runPrompt: () => onTryPrompt(testCase.prompt),
+      isErrorResult: (previewEvidence) => previewEvidence.outcome === "error",
+    });
+    setResettingCaseId(null);
+    if (result.status !== "completed") {
+      setTryError(
+        result.status === "reset_failed"
+          ? "The preview couldn't reset. Retry this saved test to run it again."
+          : "Couldn't complete this test. Retry the saved test to run it again.",
+      );
+      setActiveCaseId(null);
+      return;
+    }
+    setRetryCase(null);
+    setRetryPrompt(null);
+  };
+
+  const runAllCases = async () => {
+    const savedCases = casesQuery.data?.cases ?? [];
+    if (savedCases.length === 0 || isBusy) return;
+    setTryError(null);
+    setRetryCase(null);
+    setRetryPrompt(null);
+    setActiveCaseId(null);
+    setBatchResults({});
+    setBaselineBatchResults({});
+    const runId = crypto.randomUUID();
+    const results = await runAgentTestSuite(savedCases, {
+      resetPreview: onResetPreview,
+      runPrompt: (testCase) => onTryPrompt(testCase.prompt, { runId, caseId: testCase.id }),
+      onCaseStart: (testCase, index) =>
+        setBatchProgress({ index: index + 1, total: savedCases.length, title: testCase.title }),
+      onResult: (result) => setBatchResults((current) => ({ ...current, [result.id]: result })),
+    });
+    setBatchProgress(null);
+    let historyError: string | null = null;
+    if (canManage && results.length > 0) {
+      try {
+        await recordRun.mutateAsync({
+          runId,
+          suiteVersion: getAgentTestSuiteVersion(savedCases),
+          results: results.map(({ id, status, evidence }) => ({
+            id,
+            status,
+            ...(evidence?.modelProvider ? { modelProvider: evidence.modelProvider } : {}),
+            ...(evidence?.modelName ? { modelName: evidence.modelName } : {}),
+            ...(evidence?.configFingerprint
+              ? { configFingerprint: evidence.configFingerprint }
+              : {}),
+            ...(evidence?.signedEvidence ? { signedEvidence: evidence.signedEvidence } : {}),
+            ...(evidence
+              ? {
+                  sources: (evidence.sources ?? []).flatMap((source) =>
+                    source.documentId
+                      ? [
+                          {
+                            documentId: source.documentId,
+                            revisionId: source.revisionId ?? null,
+                            revisionNumber: source.revisionNumber ?? null,
+                          },
+                        ]
+                      : [],
+                  ),
+                }
+              : {}),
+          })),
+        });
+      } catch {
+        historyError =
+          "The tests finished, but their summary couldn’t be saved to Insights. Run the suite again to retry.";
+      }
+    }
+    if (results.some((result) => result.status === "error" || result.status === "not_run")) {
+      setTryError(
+        [
+          "Some tests couldn’t run because the preview did not complete. Review each result.",
+          ...(historyError ? [historyError] : []),
+        ].join(" "),
+      );
+    } else if (historyError) {
+      setTryError(historyError);
+    }
+  };
+
+  const compareSuiteForPublish = async () => {
+    const savedCases = casesQuery.data?.cases ?? [];
+    if (savedCases.length === 0 || isBusy) return;
+    onPublishCheckComplete(null);
+    setPublishCheckMessage(null);
+    setPublishBaselineAvailable(null);
+    setTryError(null);
+    setBatchResults({});
+    setBaselineBatchResults({});
+    setRetryCase(null);
+    setRetryPrompt(null);
+    try {
+      const check = await startPublishCheck.mutateAsync();
+      setPublishBaselineAvailable(check.baselineRequired);
+      const runVariant = async (variant: "baseline" | "draft") => {
+        setPublishCheckStage(
+          variant === "baseline"
+            ? "Comparing the current published agent"
+            : "Comparing the current draft",
+        );
+        const results = await runAgentTestSuite(savedCases, {
+          resetPreview: onResetPreview,
+          runPrompt: (testCase) =>
+            onTryPrompt(testCase.prompt, { runId: check.id, caseId: testCase.id }),
+          onCaseStart: (testCase, index) =>
+            setBatchProgress({ index: index + 1, total: savedCases.length, title: testCase.title }),
+          onResult: (result) => {
+            if (variant === "baseline") {
+              setBaselineBatchResults((current) => ({ ...current, [result.id]: result }));
+            } else {
+              setBatchResults((current) => ({ ...current, [result.id]: result }));
+            }
+          },
+        });
+        setBatchProgress(null);
+        if (
+          results.some(
+            (result) =>
+              result.status === "error" ||
+              result.status === "not_run" ||
+              !result.evidence?.signedEvidence,
+          )
+        ) {
+          throw new Error(
+            "Every saved test must finish with verified preview evidence before publishing.",
+          );
+        }
+        await recordPublishCheck.mutateAsync({
+          checkId: check.id,
+          variant,
+          results: results.map(({ id, status, evidence }) => ({
+            id,
+            status,
+            ...(evidence?.signedEvidence ? { signedEvidence: evidence.signedEvidence } : {}),
+          })),
+        });
+        return results;
+      };
+      if (check.baselineRequired) await runVariant("baseline");
+      const draftResults = await runVariant("draft");
+      const passed = draftResults.filter((result) => result.status === "passed").length;
+      const allPassed = passed === savedCases.length;
+      onPublishCheckComplete(allPassed ? check.id : null);
+      setPublishCheckStage(null);
+      setPublishCheckMessage(
+        allPassed
+          ? `${check.baselineRequired ? "Published baseline and draft compared" : "First publish: no published baseline exists; draft compared"} · ${passed}/${savedCases.length} draft tests passed. Receipt is tied to these tests, knowledge revisions, and configuration.`
+          : `Comparison complete · ${passed}/${savedCases.length} draft tests passed. Publishing stays blocked until every draft test passes.`,
+      );
+    } catch (error) {
+      setBatchProgress(null);
+      setPublishCheckStage(null);
+      setTryError(error instanceof Error ? error.message : "Couldn't verify the full saved suite.");
+    }
+  };
+
+  const submitCase = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    try {
+      await saveCase.mutateAsync({
+        ...(editingCase ? { id: editingCase.id } : {}),
+        title,
+        prompt,
+        expectedOutcome,
+        expectedSourceIds: expectedOutcome === "grounded_answer" ? expectedSourceIds : [],
+      });
+      onPublishCheckComplete(null);
+      setShowForm(false);
+      setTryError(null);
+    } catch (error) {
+      setTryError(error instanceof Error ? error.message : "Couldn't save this test.");
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <header className="space-y-1.5">
+        <h2 className="text-base font-semibold tracking-tight">Test your agent</h2>
+        <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
+          Try a question in the preview, or run a saved test.
+        </p>
+      </header>
+
+      <details className="group/scenarios">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between text-sm font-medium [&::-webkit-details-marker]:hidden">
+          Try a scenario <span aria-hidden="true">+</span>
+        </summary>
+        <div className="space-y-5 pt-4">
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">Grounded answer</p>
+            {visibleSuggestions.length > 0 ? (
+              <ul className="space-y-2" aria-label="Suggested grounded questions">
+                {visibleSuggestions.map((suggestion) => (
+                  <li key={suggestion}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-auto min-h-10 w-full justify-between gap-3 whitespace-normal rounded-lg px-3 py-2 text-left text-sm font-normal"
+                      onClick={() => void tryPrompt(suggestion)}
+                      disabled={isBusy}
+                      aria-label={`Run preview question: ${suggestion}`}
+                    >
+                      <span className="line-clamp-2 min-w-0">{suggestion}</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        {sendingPrompt === suggestion ? "Sending…" : "Run"}
+                      </span>
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Add a suggested question in{" "}
+                <Link
+                  href={agentHref()}
+                  className="rounded-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                >
+                  Agent → Build
+                </Link>
+                , then return here to test a prompt tailored to your agent.
+              </p>
+            )}
+          </div>
+
+          <div className="rounded-lg bg-muted/40 px-3 py-2.5">
+            <p className="text-xs font-medium text-foreground">No-evidence check</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              Ask about a topic your sources do not cover to check how the agent handles missing
+              evidence.
+            </p>
+          </div>
+
+          <div className="space-y-2 border-t border-border/70 pt-3">
+            <p className="text-xs font-medium text-muted-foreground">Human handoff</p>
+            {visibleTerms.length > 0 ? (
+              <ul className="flex flex-wrap gap-2" aria-label="Configured handoff terms">
+                {visibleTerms.map((term) => (
+                  <li key={term}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="min-h-9 rounded-lg px-3 text-sm"
+                      onClick={() => void tryPrompt(term)}
+                      disabled={isBusy}
+                      aria-label={`Run handoff preview using ${term}`}
+                    >
+                      {sendingPrompt === term ? "Sending…" : term}
+                    </Button>
+                  </li>
+                ))}
+                {handoffTerms.length > visibleTerms.length ? (
+                  <li className="self-center px-1 text-xs text-muted-foreground">
+                    +{handoffTerms.length - visibleTerms.length} more configured
+                  </li>
+                ) : null}
+              </ul>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                No handoff terms yet. Add them in Build to test escalation.
+              </p>
+            )}
+          </div>
+        </div>
+      </details>
+      <WidgetTestResult
+        evidence={evidence}
+        error={tryError}
+        retryPrompt={retryPrompt}
+        retryLabel={retryCase ? "Retry saved test" : "Retry preview"}
+        busy={isBusy}
+        onRetry={(prompt) => void (retryCase ? runCase(retryCase) : tryPrompt(prompt))}
+      />
+      {sendingPrompt ? (
+        <output
+          className="flex items-center gap-2 text-sm text-muted-foreground"
+          aria-live="polite"
+        >
+          <span className="size-2 animate-pulse rounded-full bg-primary motion-reduce:animate-none" />
+          Waiting for the agent response. This can take up to about a minute.
+        </output>
+      ) : null}
+
+      <section aria-labelledby="saved-tests-heading" className="space-y-3 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 id="saved-tests-heading" className="text-sm font-semibold">
+              Saved tests
+            </h3>
+            {canManage ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Publishing requires a fresh full-suite comparison. Answers stay transient; preview
+                actions are disabled.
+              </p>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {canManage && (casesQuery.data?.cases.length ?? 0) > 0 ? (
+              <>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-8 rounded-lg"
+                  onClick={() => void runAllCases()}
+                  disabled={isBusy}
+                >
+                  <Play className="size-3.5" aria-hidden="true" />
+                  {recordRun.isPending ? "Saving…" : "Run all"}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-8 rounded-lg"
+                  onClick={() => void compareSuiteForPublish()}
+                  disabled={isBusy}
+                >
+                  <CheckCircle2 className="size-3.5" aria-hidden="true" />
+                  {isPublishCheckBusy ? "Comparing…" : "Compare to publish"}
+                </Button>
+              </>
+            ) : null}
+            {canManage ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 rounded-lg"
+                onClick={openCreate}
+                disabled={isBusy}
+              >
+                <Plus className="size-4" aria-hidden="true" /> Add test
+              </Button>
+            ) : null}
+          </div>
+        </div>
+        {publishCheckMessage ? (
+          <output
+            aria-live="polite"
+            className="block rounded-lg bg-muted/50 px-3 py-2 text-xs leading-relaxed text-muted-foreground"
+          >
+            {publishCheckMessage}
+          </output>
+        ) : null}
+        {casesQuery.isLoading ? (
+          <output aria-busy="true" aria-label="Loading saved tests" className="space-y-2">
+            <div aria-hidden="true" className="space-y-2">
+              {Array.from({ length: 2 }).map((_, index) => (
+                <div key={index} className="py-4">
+                  <Skeleton className="h-4 w-40 max-w-[70%]" />
+                  <Skeleton className="mt-2 h-3 w-3/4" />
+                  <Skeleton className="mt-3 h-7 w-24 rounded-md" />
+                </div>
+              ))}
+            </div>
+          </output>
+        ) : null}
+        {casesQuery.isError ? (
+          <div
+            role={casesQuery.data ? undefined : "alert"}
+            aria-live={casesQuery.data ? "polite" : undefined}
+            className="flex flex-col gap-3 rounded-lg border border-border/70 bg-muted/30 px-3.5 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+          >
+            <p className="text-muted-foreground">
+              {casesQuery.data
+                ? "Couldn’t refresh saved tests. Showing the last loaded results."
+                : "Saved tests could not be loaded. Try again."}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="min-h-9 shrink-0"
+              onClick={() => void casesQuery.refetch()}
+              disabled={casesQuery.isFetching}
+            >
+              {casesQuery.isFetching ? "Retrying…" : "Try again"}
+            </Button>
+          </div>
+        ) : null}
+        {casesQuery.data?.cases.length === 0 ? (
+          <EmptyState
+            title="No saved tests yet"
+            className="min-h-[120px] rounded-lg bg-muted/20 p-4 sm:p-4"
+            description={
+              canManage
+                ? "Add a reusable prompt to rerun an important agent check."
+                : "A workspace owner can add reusable checks for the team."
+            }
+          />
+        ) : null}
+        {batchProgress ? (
+          <p className="text-xs text-muted-foreground" aria-live="polite">
+            {publishCheckStage ? `${publishCheckStage} · ` : ""}Running {batchProgress.index} of{" "}
+            {batchProgress.total}: {batchProgress.title}
+          </p>
+        ) : null}
+        {batchResults && Object.keys(batchResults).length > 0 && !batchProgress ? (
+          <p className="text-xs text-muted-foreground" aria-live="polite">
+            Latest run:{" "}
+            {Object.values(batchResults).filter((result) => result.status === "passed").length}{" "}
+            passed ·{" "}
+            {Object.values(batchResults).filter((result) => result.status === "mismatch").length}{" "}
+            need review ·{" "}
+            {Object.values(batchResults).filter((result) => result.status === "error").length}{" "}
+            couldn’t run
+            {Object.values(batchResults).filter((result) => result.status === "not_run").length > 0
+              ? ` · ${Object.values(batchResults).filter((result) => result.status === "not_run").length} not run`
+              : ""}
+          </p>
+        ) : null}
+        <ul className="space-y-2">
+          {casesQuery.data?.cases.map((testCase) => {
+            const outcomeLabel =
+              testCase.expectedOutcome === "grounded_answer"
+                ? "Sources retrieved"
+                : testCase.expectedOutcome === "no_evidence"
+                  ? "No evidence"
+                  : "Human handoff";
+            const suiteResult = batchResults[testCase.id];
+            const evaluated =
+              suiteResult?.evidence ??
+              (activeCaseId === testCase.id && evidence && evidence.prompt === testCase.prompt
+                ? evidence
+                : null);
+            const passed = evaluated
+              ? matchesAgentTestOutcome(
+                  testCase.expectedOutcome,
+                  evaluated,
+                  testCase.expectedSourceIds ?? [],
+                )
+              : false;
+            return (
+              <li key={testCase.id} className="py-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="break-words text-sm font-medium">{testCase.title}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {outcomeLabel}
+                      {testCase.expectedSourceIds.length > 0
+                        ? ` · ${testCase.expectedSourceIds.length} required ${testCase.expectedSourceIds.length === 1 ? "source" : "sources"}`
+                        : ""}
+                    </p>
+                    <p className="mt-2 line-clamp-2 break-words text-sm text-muted-foreground">
+                      {testCase.prompt}
+                    </p>
+                    {publishCheckMessage ? (
+                      <p className="mt-2 text-xs font-medium text-muted-foreground">
+                        Published:{" "}
+                        {publishBaselineAvailable
+                          ? publishResultLabel(baselineBatchResults[testCase.id]?.status)
+                          : "No prior publication"}
+                        {" · "}Draft: {publishResultLabel(batchResults[testCase.id]?.status)}
+                      </p>
+                    ) : null}
+                    {suiteResult?.status === "not_run" ? (
+                      <p className="mt-2 text-xs text-muted-foreground">Not run</p>
+                    ) : suiteResult?.status === "error" && !evaluated ? (
+                      <p className="mt-2 text-xs font-medium text-destructive">
+                        Run didn’t complete; try again
+                      </p>
+                    ) : evaluated ? (
+                      <p
+                        className={`mt-2 text-xs font-medium ${passed ? "text-primary" : "text-muted-foreground"}`}
+                      >
+                        {evaluated.outcome === "error"
+                          ? "Run didn’t complete; try again"
+                          : passed
+                            ? "Passed"
+                            : "Result differs from expectation"}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Button
+                      type="button"
+                      size="icon-sm"
+                      variant="ghost"
+                      aria-label={`Run ${testCase.title}`}
+                      disabled={isBusy}
+                      onClick={() => void runCase(testCase)}
+                    >
+                      {resettingCaseId === testCase.id ? (
+                        "…"
+                      ) : (
+                        <Play className="size-4" aria-hidden="true" />
+                      )}
+                    </Button>
+                    {canManage ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          render={
+                            <Button
+                              type="button"
+                              size="icon-sm"
+                              variant="ghost"
+                              aria-label={`More actions for ${testCase.title}`}
+                              disabled={isBusy || deleteCase.isPending}
+                            />
+                          }
+                        >
+                          <MoreVertical className="size-4" aria-hidden="true" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openEdit(testCase)}>
+                            Edit test
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() =>
+                              void deleteCase
+                                .mutateAsync(testCase.id)
+                                .then(() => onPublishCheckComplete(null))
+                                .catch((error: unknown) =>
+                                  setTryError(
+                                    error instanceof Error
+                                      ? error.message
+                                      : "Couldn't delete this test.",
+                                  ),
+                                )
+                            }
+                          >
+                            Delete test
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : null}
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+        {showForm ? (
+          <form className="space-y-4 py-5" onSubmit={(event) => void submitCase(event)}>
+            <label htmlFor="agent-test-title" className="block space-y-1.5 text-sm font-medium">
+              Test name
+              <Input
+                id="agent-test-title"
+                maxLength={80}
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                required
+                placeholder="Billing question"
+              />
+            </label>
+            <label htmlFor="agent-test-prompt" className="block space-y-1.5 text-sm font-medium">
+              Prompt
+              <Textarea
+                id="agent-test-prompt"
+                maxLength={1_000}
+                value={prompt}
+                onChange={(event) => setPrompt(event.target.value)}
+                required
+                placeholder="How do I update my billing details?"
+              />
+            </label>
+            <label className="block space-y-1.5 text-sm font-medium">
+              Expected result
+              <select
+                className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+                value={expectedOutcome}
+                onChange={(event) =>
+                  setExpectedOutcome(event.target.value as AgentTestExpectedOutcome)
+                }
+              >
+                <option value="grounded_answer">Sources retrieved</option>
+                <option value="no_evidence">No evidence</option>
+                <option value="human_handoff">Human handoff</option>
+              </select>
+            </label>
+            {expectedOutcome === "grounded_answer" ? (
+              <fieldset className="space-y-2">
+                <legend className="text-sm font-medium">Required sources (optional)</legend>
+                <p className="text-xs text-muted-foreground">
+                  All selected sources must be retrieved. Up to four; this checks source coverage,
+                  not answer correctness.
+                </p>
+                {sourcesQuery.isLoading ? (
+                  <output className="text-xs text-muted-foreground">Loading sources…</output>
+                ) : null}
+                {sourcesQuery.isError ? (
+                  <div role="alert" className="flex flex-wrap items-center gap-2 text-xs">
+                    <span>Sources couldn’t be loaded.</span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void sourcesQuery.refetch()}
+                      disabled={sourcesQuery.isFetching}
+                    >
+                      Try again
+                    </Button>
+                  </div>
+                ) : null}
+                <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-border/60 p-2">
+                  {(sourcesQuery.data?.sources ?? [])
+                    .filter((source) => source.status === "ready")
+                    .map((source) => (
+                      <label key={source.id} className="flex min-h-9 items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={expectedSourceIds.includes(source.id)}
+                          disabled={
+                            !expectedSourceIds.includes(source.id) && expectedSourceIds.length >= 4
+                          }
+                          onChange={(event) =>
+                            setExpectedSourceIds((ids) =>
+                              event.target.checked
+                                ? [...ids, source.id]
+                                : ids.filter((id) => id !== source.id),
+                            )
+                          }
+                          className="size-4 shrink-0 accent-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                        />
+                        <span className="break-words">{source.displayName}</span>
+                      </label>
+                    ))}
+                  {sourcesQuery.isSuccess &&
+                  !sourcesQuery.data.sources.some((source) => source.status === "ready") ? (
+                    <p className="text-xs text-muted-foreground">
+                      No ready sources yet. Add and index knowledge in Agent before requiring a
+                      source.
+                    </p>
+                  ) : null}
+                  {expectedSourceIds
+                    .filter(
+                      (id) =>
+                        sourcesQuery.isSuccess &&
+                        !sourcesQuery.data.sources.some(
+                          (source) => source.id === id && source.status === "ready",
+                        ),
+                    )
+                    .map((id) => (
+                      <label
+                        key={id}
+                        className="flex min-h-9 items-center gap-2 text-sm text-muted-foreground"
+                      >
+                        <input
+                          type="checkbox"
+                          checked
+                          onChange={() =>
+                            setExpectedSourceIds((ids) => ids.filter((value) => value !== id))
+                          }
+                          className="size-4 shrink-0 accent-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                        />
+                        <span>Unavailable source — uncheck to remove</span>
+                      </label>
+                    ))}
+                </div>
+              </fieldset>
+            ) : null}
+            <div className="flex justify-end gap-2">
+              <Button type="button" size="sm" variant="ghost" onClick={() => setShowForm(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" size="sm" disabled={saveCase.isPending}>
+                {saveCase.isPending ? "Saving…" : editingCase ? "Save changes" : "Save test"}
+              </Button>
+            </div>
+          </form>
+        ) : null}
+      </section>
+    </div>
+  );
+}

@@ -1,0 +1,732 @@
+import assert from "node:assert/strict";
+import "dotenv/config";
+import { mkdtemp, rm, symlink } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+import { after, before, test } from "node:test";
+import { randomUUID } from "node:crypto";
+import { build } from "esbuild";
+import postgres from "postgres";
+import { readWidgetTextStream } from "../public/widget/sse.js";
+
+process.env.SKIP_ENV_VALIDATION ??= "true";
+
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl || !["localhost", "127.0.0.1", "::1"].includes(new URL(databaseUrl).hostname)) {
+  throw new Error("Conversation append integration tests require a local DATABASE_URL.");
+}
+
+const outputDirectory = await mkdtemp(join(tmpdir(), "cogni-conversation-test-"));
+const outputFile = join(outputDirectory, "conversation.mjs");
+await symlink(join(process.cwd(), "node_modules"), join(outputDirectory, "node_modules"), "dir");
+
+await build({
+  stdin: {
+    contents: `
+      export {
+        appendConversationMessage,
+        deliverAiReplyIfActive,
+        getVisitorConversationMessages,
+        markVisitorMessagesAsRead,
+        recordVisitorMessage,
+        recordAiMessage,
+        setConversationStatus,
+        setAiMessageFeedback,
+      } from "@/features/conversations/server/conversation-service";
+      export { createWidgetSseStream } from "@/features/widget/server/widget-utils";
+      export { runDbWriteOperation } from "@/lib/db/client";
+      import { drizzle } from "drizzle-orm/postgres-js";
+      import * as schema from "@/lib/db/schema";
+      import * as relations from "@/lib/db/relations";
+      export const createTestDb = (client) => drizzle(client, { schema: { ...schema, ...relations } });
+    `,
+    resolveDir: process.cwd(),
+    sourcefile: "conversation-test-entry.ts",
+  },
+  outfile: outputFile,
+  bundle: true,
+  platform: "node",
+  format: "esm",
+  packages: "external",
+  alias: { "@": resolve("src") },
+  plugins: [
+    {
+      name: "server-only-test-stub",
+      setup(buildContext) {
+        buildContext.onResolve({ filter: /^server-only$/ }, () => ({
+          path: "server-only",
+          namespace: "server-only-test-stub",
+        }));
+        buildContext.onLoad({ filter: /.*/, namespace: "server-only-test-stub" }, () => ({
+          contents: "export {};",
+          loader: "js",
+        }));
+      },
+    },
+  ],
+});
+
+const {
+  appendConversationMessage,
+  deliverAiReplyIfActive,
+  getVisitorConversationMessages,
+  markVisitorMessagesAsRead,
+  recordVisitorMessage,
+  recordAiMessage,
+  setConversationStatus,
+  setAiMessageFeedback,
+  runDbWriteOperation,
+  createWidgetSseStream,
+  createTestDb,
+} = await import(`${pathToFileURL(outputFile).href}?build=${randomUUID()}`);
+const raw = postgres(databaseUrl, { max: 2 });
+const appClients = Array.from({ length: 3 }, () => postgres(databaseUrl, { max: 1 }));
+const appDatabases = appClients.map((client) => createTestDb(client));
+const workspaceId = randomUUID();
+const contactId = randomUUID();
+const widgetId = randomUUID();
+const visitorSessionId = randomUUID();
+const firstMessageSessionId = randomUUID();
+const conversationId = randomUUID();
+const userId = randomUUID();
+const memberId = randomUUID();
+const now = new Date().toISOString();
+
+before(async () => {
+  await raw`INSERT INTO "workspace" ("id", "name", "slug", "updatedAt") VALUES (${workspaceId}, 'Rate test', ${`test-${workspaceId}`}, ${now})`;
+  await raw`INSERT INTO "user" ("id", "name", "email", "updatedAt") VALUES (${userId}, 'Test member', ${`${userId}@example.test`}, ${now})`;
+  await raw`INSERT INTO "workspace_member" ("id", "userId", "workspaceId", "updatedAt") VALUES (${memberId}, ${userId}, ${workspaceId}, ${now})`;
+  await raw`INSERT INTO "contact" ("id", "name", "updatedAt", "workspaceId") VALUES (${contactId}, 'Test visitor', ${now}, ${workspaceId})`;
+  await raw`INSERT INTO "widget" ("id", "publicKey", "updatedAt", "workspaceId") VALUES (${widgetId}, ${`test-${widgetId}`}, ${now}, ${workspaceId})`;
+  await raw`INSERT INTO "visitor_session" ("id", "token", "hostname", "expiresAt", "updatedAt", "widgetId", "contactId") VALUES (${visitorSessionId}, ${randomUUID()}, 'localhost', ${new Date(Date.now() + 86_400_000).toISOString()}, ${now}, ${widgetId}, ${contactId}), (${firstMessageSessionId}, ${randomUUID()}, 'localhost', ${new Date(Date.now() + 86_400_000).toISOString()}, ${now}, ${widgetId}, NULL)`;
+  await raw`INSERT INTO "conversation" ("id", "subject", "updatedAt", "workspaceId", "contactId", "widgetId", "visitorSessionId", "messages") VALUES (${conversationId}, 'Concurrent append test', ${now}, ${workspaceId}, ${contactId}, ${widgetId}, ${visitorSessionId}, '[]')`;
+});
+
+after(async () => {
+  await raw`DELETE FROM "workspace" WHERE "id" = ${workspaceId}`;
+  await raw`DELETE FROM "user" WHERE "id" = ${userId}`;
+  await Promise.all(appClients.map((client) => client.end({ timeout: 5 })));
+  await raw.end({ timeout: 5 });
+  await rm(outputDirectory, { recursive: true, force: true });
+});
+
+test("concurrent transcript appends preserve every message", async () => {
+  const messages = Array.from({ length: 40 }, (_, index) => ({
+    id: randomUUID(),
+    body: `message-${index}`,
+    authorType: "TEAM",
+    visibility: "INTERNAL",
+    createdAt: new Date().toISOString(),
+  }));
+
+  const results = await Promise.all(
+    messages.map((message, index) =>
+      appendConversationMessage({
+        db: appDatabases[index % appDatabases.length],
+        workspaceId,
+        conversationId,
+        message,
+      }),
+    ),
+  );
+  assert.equal(results.filter((result) => result?.inserted).length, messages.length);
+
+  const [row] = await raw`SELECT "messages" FROM "conversation" WHERE "id" = ${conversationId}`;
+  const storedMessages = JSON.parse(row.messages);
+  assert.equal(storedMessages.length, messages.length);
+  assert.deepEqual(
+    new Set(storedMessages.map((message) => message.id)),
+    new Set(messages.map((message) => message.id)),
+  );
+  const [eventCount] = await raw`
+    SELECT count(*)::int AS count
+    FROM "conversation_event"
+    WHERE "workspaceId" = ${workspaceId} AND "conversationId" = ${conversationId}
+  `;
+  assert.equal(Number(eventCount.count), messages.length);
+});
+
+test("duplicate webhook deliveries append only once", async () => {
+  const clientId = randomUUID();
+  const deliveries = await Promise.all(
+    Array.from({ length: 12 }, (_, index) =>
+      appendConversationMessage({
+        db: appDatabases[index % appDatabases.length],
+        workspaceId,
+        conversationId,
+        message: {
+          id: randomUUID(),
+          body: `retry-${index}`,
+          authorType: "VISITOR",
+          visibility: "PUBLIC",
+          clientId,
+          createdAt: new Date().toISOString(),
+        },
+      }),
+    ),
+  );
+  const [row] = await raw`SELECT "messages" FROM "conversation" WHERE "id" = ${conversationId}`;
+  const storedMessages = JSON.parse(row.messages);
+  const matching = storedMessages.filter((message) => message.clientId === clientId);
+
+  assert.equal(matching.length, 1);
+  assert.equal(deliveries.filter((delivery) => delivery?.inserted).length, 1);
+  assert.ok(deliveries.every((delivery) => delivery?.message.id === matching[0].id));
+  const [eventCount] = await raw`
+    SELECT count(*)::int AS count
+    FROM "conversation_event"
+    WHERE "workspaceId" = ${workspaceId} AND "conversationId" = ${conversationId}
+  `;
+  assert.equal(Number(eventCount.count), 41);
+});
+
+test("conversation events roll back with their transcript write", async () => {
+  const eventCount = async () => {
+    const [result] = await raw`
+      SELECT count(*)::int AS count
+      FROM "conversation_event"
+      WHERE "workspaceId" = ${workspaceId} AND "conversationId" = ${conversationId}
+    `;
+    return Number(result.count);
+  };
+  const before = await eventCount();
+
+  await assert.rejects(
+    runDbWriteOperation(appDatabases[0], async (transaction) => {
+      await appendConversationMessage({
+        db: transaction,
+        workspaceId,
+        conversationId,
+        message: {
+          id: randomUUID(),
+          body: "This transaction must roll back.",
+          authorType: "TEAM",
+          visibility: "INTERNAL",
+          createdAt: new Date().toISOString(),
+        },
+      });
+      throw new Error("rollback test");
+    }),
+    /rollback test/,
+  );
+
+  assert.equal(await eventCount(), before);
+});
+
+test("team author names are preserved in transcript messages", async () => {
+  const messageId = randomUUID();
+  await appendConversationMessage({
+    db: appDatabases[0],
+    workspaceId,
+    conversationId,
+    message: {
+      id: messageId,
+      body: "I’ll check that for you.",
+      authorType: "TEAM",
+      authorName: "Mina Support",
+      visibility: "PUBLIC",
+      createdAt: new Date().toISOString(),
+    },
+  });
+
+  const [row] = await raw`SELECT "messages" FROM "conversation" WHERE "id" = ${conversationId}`;
+  const storedMessages = JSON.parse(row.messages);
+  const message = storedMessages.find((entry) => entry.id === messageId);
+
+  assert.equal(message.authorName, "Mina Support");
+});
+
+test("public conversation history never includes attributed internal notes", async () => {
+  const messageId = randomUUID();
+  await appendConversationMessage({
+    db: appDatabases[0],
+    workspaceId,
+    conversationId,
+    message: {
+      id: messageId,
+      body: "Internal handoff context",
+      authorType: "TEAM",
+      authorName: "Mina Support",
+      visibility: "INTERNAL",
+      createdAt: new Date().toISOString(),
+    },
+  });
+
+  const publicMessages = await getVisitorConversationMessages({
+    db: appDatabases[0],
+    visitorSessionId,
+  });
+
+  assert.ok(publicMessages.every((message) => message.visibility !== "INTERNAL"));
+  assert.ok(publicMessages.every((message) => message.id !== messageId));
+});
+
+test("AI citation metadata is persisted with bounded, deduplicated source evidence", async () => {
+  const replyToMessageId = randomUUID();
+  const persisted = await recordAiMessage({
+    db: appDatabases[0],
+    conversationId,
+    text: "The return window is 30 days.\n\nSources:\n- Returns policy",
+    replyToMessageId,
+    retrievalOutcome: "SOURCES_FOUND",
+    rejectInactive: true,
+    citations: [
+      {
+        documentId: "returns-policy",
+        title: "Returns policy".repeat(20),
+        excerpt: ` ${"Customers may return an item within 30 days. ".repeat(12)} `,
+      },
+      {
+        documentId: "shipping-policy",
+        title: "Shipping policy",
+        excerpt: "Orders ship in 2 days.",
+      },
+      { documentId: "third-source", title: "Third source", excerpt: "Third excerpt." },
+      { documentId: "fourth-source", title: "Fourth source", excerpt: "Fourth excerpt." },
+      { documentId: "fifth-source", title: "Fifth source", excerpt: "Not stored." },
+      { documentId: "returns-policy", title: "Returns policy duplicate", excerpt: "Duplicate." },
+    ],
+  });
+
+  assert.ok(persisted);
+  assert.equal(persisted.retrievalOutcome, "SOURCES_FOUND");
+  assert.equal(persisted.citations?.length, 4);
+  assert.equal(persisted.citations?.[0]?.title.length, 160);
+  assert.equal(persisted.citations?.[0]?.excerpt.length, 360);
+  assert.equal(persisted.citations?.[0]?.excerpt.startsWith("Customers"), true);
+  assert.equal(
+    persisted.citations?.some((citation) => citation.documentId === "fifth-source"),
+    false,
+  );
+  assert.equal(
+    persisted.citations?.filter((citation) => citation.documentId === "returns-policy").length,
+    1,
+  );
+});
+
+test("AI appends are denied after takeover and all appends stay workspace scoped", async () => {
+  await raw`UPDATE "conversation" SET "aiPaused" = true WHERE "id" = ${conversationId}`;
+  const paused = await appendConversationMessage({
+    db: appDatabases[0],
+    workspaceId,
+    conversationId,
+    message: {
+      id: randomUUID(),
+      body: "must be suppressed",
+      authorType: "AI",
+      visibility: "PUBLIC",
+      createdAt: new Date().toISOString(),
+    },
+    requireAiActive: true,
+  });
+  assert.equal(paused, null);
+
+  const foreignWorkspace = await appendConversationMessage({
+    db: appDatabases[1],
+    workspaceId: randomUUID(),
+    conversationId,
+    message: {
+      id: randomUUID(),
+      body: "must not cross workspace boundary",
+      authorType: "TEAM",
+      visibility: "INTERNAL",
+      createdAt: new Date().toISOString(),
+    },
+  });
+  assert.equal(foreignWorkspace, null);
+});
+
+test("channel AI delivery waits behind an in-flight reply before takeover commits", async () => {
+  await raw`UPDATE "conversation" SET "aiPaused" = false, "status" = 'OPEN' WHERE "id" = ${conversationId}`;
+  let enterDelivery;
+  let releaseDelivery;
+  const deliveryEntered = new Promise((resolve) => {
+    enterDelivery = resolve;
+  });
+  const deliveryGate = new Promise((resolve) => {
+    releaseDelivery = resolve;
+  });
+  const deliveryOrder = [];
+  const message = {
+    id: randomUUID(),
+    body: "A reply sent through the channel",
+    authorType: "AI",
+    visibility: "PUBLIC",
+    replyToMessageId: randomUUID(),
+    createdAt: new Date().toISOString(),
+  };
+
+  const delivery = deliverAiReplyIfActive({
+    db: appDatabases[0],
+    workspaceId,
+    conversationId,
+    message,
+    deliver: async () => {
+      deliveryOrder.push("send-started");
+      enterDelivery();
+      await deliveryGate;
+      deliveryOrder.push("send-finished");
+    },
+  });
+  await deliveryEntered;
+
+  const takeover =
+    appClients[1]`UPDATE "conversation" SET "aiPaused" = true, "status" = 'ASSIGNED' WHERE "id" = ${conversationId}`.then(
+      () => deliveryOrder.push("takeover-committed"),
+    );
+  const lockDeadline = Date.now() + 3_000;
+  let takeoverBlocked = false;
+  while (!takeoverBlocked && Date.now() < lockDeadline) {
+    const [activity] = await raw`
+      SELECT "wait_event_type"
+      FROM pg_stat_activity
+      WHERE "wait_event_type" = 'Lock'
+        AND "query" LIKE 'UPDATE "conversation" SET "aiPaused"%'
+      LIMIT 1
+    `;
+    takeoverBlocked = Boolean(activity);
+    if (!takeoverBlocked) await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  assert.equal(takeoverBlocked, true, "takeover update must wait on the outbound send row lock");
+  assert.deepEqual(deliveryOrder, ["send-started"]);
+
+  releaseDelivery();
+  assert.equal(await delivery, true);
+  await takeover;
+  assert.deepEqual(deliveryOrder, ["send-started", "send-finished", "takeover-committed"]);
+  const persisted = await raw`SELECT "messages" FROM "conversation" WHERE "id" = ${conversationId}`;
+  assert.equal(
+    JSON.parse(persisted[0].messages).some((entry) => entry.id === message.id),
+    true,
+  );
+});
+
+test("channel AI delivery is suppressed when takeover commits first", async () => {
+  await raw`UPDATE "conversation" SET "aiPaused" = true, "status" = 'ASSIGNED' WHERE "id" = ${conversationId}`;
+  let deliveryCalled = false;
+  const delivered = await deliverAiReplyIfActive({
+    db: appDatabases[0],
+    workspaceId,
+    conversationId,
+    message: {
+      id: randomUUID(),
+      body: "This must not send",
+      authorType: "AI",
+      visibility: "PUBLIC",
+      replyToMessageId: randomUUID(),
+      createdAt: new Date().toISOString(),
+    },
+    deliver: async () => {
+      deliveryCalled = true;
+    },
+  });
+  assert.equal(delivered, false);
+  assert.equal(deliveryCalled, false);
+});
+
+test("escalation blocks AI persistence and provider delivery even when pause is false", async () => {
+  await raw`UPDATE "conversation" SET "aiPaused" = false, "status" = 'ESCALATED' WHERE "id" = ${conversationId}`;
+  const message = {
+    id: randomUUID(),
+    body: "An AI reply after handoff",
+    authorType: "AI",
+    visibility: "PUBLIC",
+    replyToMessageId: randomUUID(),
+    createdAt: new Date().toISOString(),
+  };
+  assert.equal(
+    await appendConversationMessage({
+      db: appDatabases[0],
+      workspaceId,
+      conversationId,
+      message,
+      requireAiActive: true,
+    }),
+    null,
+  );
+  assert.equal(
+    await recordAiMessage({
+      db: appDatabases[0],
+      conversationId,
+      text: message.body,
+      replyToMessageId: message.replyToMessageId,
+    }),
+    null,
+  );
+  let deliveryCalls = 0;
+  assert.equal(
+    await deliverAiReplyIfActive({
+      db: appDatabases[0],
+      workspaceId,
+      conversationId,
+      message,
+      deliver: async () => {
+        deliveryCalls += 1;
+      },
+    }),
+    false,
+  );
+  assert.equal(deliveryCalls, 0);
+  const [row] = await raw`SELECT "messages" FROM "conversation" WHERE "id" = ${conversationId}`;
+  assert.equal(
+    JSON.parse(row.messages).some(
+      (entry) => entry.id === message.id || entry.replyToMessageId === message.replyToMessageId,
+    ),
+    false,
+  );
+  // Human replies remain available after handoff.
+  assert.ok(
+    await appendConversationMessage({
+      db: appDatabases[0],
+      workspaceId,
+      conversationId,
+      message: {
+        id: randomUUID(),
+        body: "A teammate can help",
+        authorType: "TEAM",
+        visibility: "PUBLIC",
+        createdAt: new Date().toISOString(),
+      },
+    }),
+  );
+});
+
+test("takeover at final persistence rejects stream completion without a successful client callback", async () => {
+  for (const [status, paused] of [
+    ["OPEN", true],
+    ["ESCALATED", false],
+    ["CLOSED", false],
+  ]) {
+    await raw`UPDATE "conversation" SET "aiPaused" = ${paused}, "status" = ${status} WHERE "id" = ${conversationId}`;
+    let completed = false;
+    const stream = createWidgetSseStream(
+      (async function* () {
+        yield "An answer generated before takeover";
+      })(),
+      {
+        onComplete: async () => {
+          await recordAiMessage({
+            db: appDatabases[0],
+            conversationId,
+            text: "An answer generated before takeover",
+            replyToMessageId: randomUUID(),
+            rejectInactive: true,
+          });
+        },
+      },
+    );
+    await assert.rejects(
+      readWidgetTextStream(stream, () => {}).then((text) => {
+        completed = true;
+        return text;
+      }),
+      /could not complete/,
+    );
+    assert.equal(completed, false);
+  }
+});
+
+test("channel AI delivery rolls back its transcript write when provider delivery fails", async () => {
+  await raw`UPDATE "conversation" SET "aiPaused" = false, "status" = 'OPEN' WHERE "id" = ${conversationId}`;
+  const message = {
+    id: randomUUID(),
+    body: "A provider rejected this reply",
+    authorType: "AI",
+    visibility: "PUBLIC",
+    replyToMessageId: randomUUID(),
+    createdAt: new Date().toISOString(),
+  };
+  await assert.rejects(
+    deliverAiReplyIfActive({
+      db: appDatabases[0],
+      workspaceId,
+      conversationId,
+      message,
+      deliver: async () => {
+        throw new Error("Provider rejected the reply");
+      },
+    }),
+    /Provider rejected the reply/,
+  );
+  const [persisted] =
+    await raw`SELECT "messages" FROM "conversation" WHERE "id" = ${conversationId}`;
+  assert.equal(
+    JSON.parse(persisted.messages).some((entry) => entry.id === message.id),
+    false,
+  );
+});
+
+test("simultaneous first visitor messages create one conversation and preserve every message", async () => {
+  const visitorSession = {
+    id: firstMessageSessionId,
+    contactId: null,
+    widget: { id: widgetId, workspace: { id: workspaceId } },
+  };
+  const uniqueMessages = Array.from({ length: 20 }, (_, index) => ({
+    text: `first-${index}`,
+    clientMessageId: randomUUID(),
+  }));
+  const duplicateId = randomUUID();
+  const deliveries = [
+    ...uniqueMessages,
+    ...Array.from({ length: 8 }, (_, index) => ({
+      text: `duplicate-${index}`,
+      clientMessageId: duplicateId,
+    })),
+  ];
+
+  await Promise.all(
+    deliveries.map(({ text, clientMessageId }, index) =>
+      recordVisitorMessage({
+        db: appDatabases[index % appDatabases.length],
+        visitorSession,
+        text,
+        clientMessageId,
+      }),
+    ),
+  );
+
+  const rows =
+    await raw`SELECT "messages" FROM "conversation" WHERE "visitorSessionId" = ${firstMessageSessionId} AND "workspaceId" = ${workspaceId}`;
+  assert.equal(rows.length, 1);
+  const messages = JSON.parse(rows[0].messages);
+  assert.equal(messages.length, uniqueMessages.length + 1);
+  assert.equal(messages.filter((message) => message.clientId === duplicateId).length, 1);
+});
+
+test("feedback updates preserve concurrent transcript appends and stay tenant scoped", async () => {
+  await raw`UPDATE "conversation" SET "messages" = ${JSON.stringify([{ id: "ai-response", body: "Hello", authorType: "AI", createdAt: now }])} WHERE "id" = ${conversationId} AND "workspaceId" = ${workspaceId}`;
+  const feedbackWrite = setAiMessageFeedback({
+    db: appDatabases[0],
+    conversationId,
+    workspaceId,
+    visitorSessionId,
+    messageId: "ai-response",
+    feedback: "negative",
+    reason: "Not helpful",
+    feedbackAt: new Date().toISOString(),
+  });
+  const appendWrites = Array.from({ length: 20 }, (_, index) =>
+    appendConversationMessage({
+      db: appDatabases[(index + 1) % appDatabases.length],
+      workspaceId,
+      conversationId,
+      message: {
+        id: randomUUID(),
+        body: `parallel-${index}`,
+        authorType: "TEAM",
+        visibility: "INTERNAL",
+        createdAt: new Date().toISOString(),
+      },
+    }),
+  );
+
+  assert.equal(await feedbackWrite, true);
+  await Promise.all(appendWrites);
+
+  const [row] =
+    await raw`SELECT "messages" FROM "conversation" WHERE "id" = ${conversationId} AND "workspaceId" = ${workspaceId}`;
+  const messages = JSON.parse(row.messages);
+  assert.equal(messages.length, 21);
+  assert.equal(messages[0].feedback, "negative");
+  assert.equal(messages[0].feedbackReason, "Not helpful");
+  assert.ok(messages[0].feedbackAt);
+
+  const foreignWorkspaceUpdate = await setAiMessageFeedback({
+    db: appDatabases[0],
+    conversationId,
+    workspaceId: randomUUID(),
+    visitorSessionId,
+    messageId: "ai-response",
+    feedback: "positive",
+    reason: null,
+    feedbackAt: new Date().toISOString(),
+  });
+  assert.equal(foreignWorkspaceUpdate, false);
+});
+
+test("marking visitor messages read preserves concurrent transcript appends", async () => {
+  await raw`UPDATE "conversation" SET "messages" = ${JSON.stringify([
+    { id: "visitor-unread", body: "Question", authorType: "VISITOR", createdAt: now },
+    { id: "ai-response", body: "Hello", authorType: "AI", createdAt: now },
+    {
+      id: "visitor-arrived-after-open",
+      body: "One more question",
+      authorType: "VISITOR",
+      createdAt: now,
+    },
+  ])} WHERE "id" = ${conversationId} AND "workspaceId" = ${workspaceId}`;
+  const readAt = new Date().toISOString();
+  const readWrite = markVisitorMessagesAsRead({
+    db: appDatabases[0],
+    workspaceId,
+    conversationId,
+    throughMessageId: "visitor-unread",
+    readAt,
+  });
+  const appendWrites = Array.from({ length: 20 }, (_, index) =>
+    appendConversationMessage({
+      db: appDatabases[(index + 1) % appDatabases.length],
+      workspaceId,
+      conversationId,
+      message: {
+        id: randomUUID(),
+        body: `read-race-${index}`,
+        authorType: index === 0 ? "VISITOR" : "TEAM",
+        visibility: index === 0 ? "PUBLIC" : "INTERNAL",
+        createdAt: new Date().toISOString(),
+      },
+    }),
+  );
+
+  assert.equal(await readWrite, true);
+  await Promise.all(appendWrites);
+
+  const [row] =
+    await raw`SELECT "messages" FROM "conversation" WHERE "id" = ${conversationId} AND "workspaceId" = ${workspaceId}`;
+  const messages = JSON.parse(row.messages);
+  assert.equal(messages.length, 23);
+  assert.equal(messages[0].readAt, readAt);
+  assert.equal(messages[1].readAt, undefined);
+  assert.equal(messages[2].readAt, undefined);
+
+  const foreignWorkspaceRead = await markVisitorMessagesAsRead({
+    db: appDatabases[0],
+    workspaceId: randomUUID(),
+    conversationId,
+    throughMessageId: "visitor-unread",
+    readAt,
+  });
+  assert.equal(foreignWorkspaceRead, false);
+});
+
+test("conversation status is tenant scoped and reopening preserves assignment", async () => {
+  await raw`UPDATE "conversation" SET "assignedMemberId" = ${memberId}, "status" = 'ASSIGNED' WHERE "id" = ${conversationId} AND "workspaceId" = ${workspaceId}`;
+
+  const closed = await setConversationStatus({
+    db: appDatabases[0],
+    workspaceId,
+    conversationId,
+    status: "CLOSED",
+  });
+  assert.equal(closed?.status, "CLOSED");
+  assert.equal(closed?.assignedMemberId, memberId);
+
+  const reopened = await setConversationStatus({
+    db: appDatabases[1],
+    workspaceId,
+    conversationId,
+    status: "OPEN",
+  });
+  assert.equal(reopened?.status, "ASSIGNED");
+  assert.equal(reopened?.assignedMemberId, memberId);
+
+  const foreignWorkspaceUpdate = await setConversationStatus({
+    db: appDatabases[0],
+    workspaceId: randomUUID(),
+    conversationId,
+    status: "CLOSED",
+  });
+  assert.equal(foreignWorkspaceUpdate, null);
+});

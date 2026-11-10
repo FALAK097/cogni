@@ -13,8 +13,12 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { getQueryClient } from "@/lib/query-client";
 
 const DASHBOARD_ROUTE_PREFIXES = [
+  "/agent",
+  "/inbox",
+  "/insights",
+  "/settings",
   "/dashboard",
-  "/widget",
+  "/playground",
   "/conversations",
   "/knowledge-base",
   "/integrations",

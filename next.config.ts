@@ -3,6 +3,17 @@ import type { NextConfig } from "next";
 import "./src/lib/env/server";
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ["127.0.0.1"],
+  serverExternalPackages: [
+    "chat",
+    "pdf-parse",
+    "@chat-adapter/discord",
+    "@chat-adapter/gchat",
+    "@chat-adapter/slack",
+    "@chat-adapter/state-pg",
+    "@chat-adapter/teams",
+    "@chat-adapter/whatsapp",
+  ],
   experimental: {
     optimizePackageImports: ["@hugeicons/core-free-icons"],
   },

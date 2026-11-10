@@ -1,10 +1,10 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
+import Link from "next/link";
 import { Ellipsis } from "@/components/icons";
 
 import { CollapseMenuButton } from "@/components/app-nav/collapse-menu-button";
-import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { closeMobileSidebar } from "@/hooks/use-sidebar";
 import { buildMenuList } from "@/lib/menu-list";
@@ -24,18 +24,17 @@ const getHrefPathname = (href: string) => {
 
 const isMenuActive = (pathname: string, href: string) => {
   const hrefPathname = getHrefPathname(href);
-  if (hrefPathname === "/") return pathname === "/" || pathname === "/dashboard";
+  if (hrefPathname === "/") return pathname === "/" || pathname === "/insights";
   return pathname === hrefPathname || pathname.startsWith(`${hrefPathname}/`);
 };
 
 export function Menu({ isOpen }: MenuProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const menuItems = buildMenuList();
 
   return (
-    <nav className="w-full h-full">
-      <ul className="flex flex-col w-full min-h-[calc(100vh-48px-36px-16px-56px)] lg:min-h-[calc(100vh-32px-40px-56px)] items-stretch px-3">
+    <nav className="w-full" aria-label="Workspace">
+      <ul className={cn("flex w-full flex-col items-stretch", isOpen === false ? "px-2" : "px-3")}>
         {menuItems.map(({ groupLabel, menus }) => (
           <li
             className={cn("w-full", groupLabel ? "py-2" : "")}
@@ -72,50 +71,44 @@ export function Menu({ isOpen }: MenuProps) {
 
               if (!submenus || submenus.length === 0) {
                 const button = (
-                  <Button
-                    variant={isCurrentActive ? "secondary" : "ghost"}
+                  <Link
+                    href={href}
+                    aria-label={label}
+                    aria-current={isCurrentActive ? "page" : false}
                     className={cn(
-                      "w-full h-10 mb-2 relative overflow-hidden group cursor-pointer flex items-center transition-[justify-content,padding]",
-                      isOpen === false ? "justify-center px-0" : "justify-start px-4",
-                      isCurrentActive && "shadow-sm",
+                      "w-full min-h-11 lg:min-h-10 mb-1 rounded-lg relative overflow-hidden group cursor-pointer flex items-center transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                      isOpen === false ? "justify-center px-0" : "justify-start px-3 gap-3",
+                      isCurrentActive
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium shadow-xs"
+                        : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                     )}
-                    onClick={() => {
-                      closeMobileSidebar();
-                      router.push(href);
-                    }}
+                    onClick={() => closeMobileSidebar()}
                   >
                     {isCurrentActive && (
-                      <div className="absolute inset-0 transition-opacity duration-300 opacity-100">
-                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,0,0,0.02)_1px,transparent_1px)] dark:bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[length:4px_4px]" />
-                      </div>
-                    )}
-                    {isCurrentActive && (
-                      <div className="absolute inset-0 p-px transition-opacity duration-300 rounded-md opacity-100 -z-10 bg-gradient-to-br from-transparent via-border to-transparent" />
+                      <span
+                        className="absolute left-0 top-2 bottom-2 w-0.5 rounded-r bg-primary"
+                        aria-hidden="true"
+                      />
                     )}
                     <span
                       className={cn(
-                        isOpen === false ? "" : "mr-4",
-                        "flex-shrink-0 flex items-center justify-center",
+                        "flex-shrink-0 flex items-center justify-center transition-colors duration-150",
+                        isCurrentActive
+                          ? "text-primary"
+                          : "text-muted-foreground group-hover:text-sidebar-foreground",
                       )}
                     >
-                      <Icon size={18} className={isCurrentActive ? "text-primary" : ""} />
+                      <Icon size={18} />
                     </span>
                     {isOpen !== false && (
-                      <p
-                        className={cn(
-                          "flex-1 min-w-0 truncate text-left",
-                          isCurrentActive && "font-medium text-primary",
-                        )}
-                      >
-                        {label}
-                      </p>
+                      <p className="flex-1 min-w-0 truncate text-left text-sm">{label}</p>
                     )}
                     {isOpen && submenus && submenus.length > 0 && (
                       <span className="ml-auto px-1.5 py-0.5 text-xs rounded-full bg-primary/10 text-primary">
                         {submenus.length}
                       </span>
                     )}
-                  </Button>
+                  </Link>
                 );
 
                 return (

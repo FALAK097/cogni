@@ -43,7 +43,7 @@ export const requireDashboardContext = cache(async function requireDashboardCont
     pathname.startsWith("/dashboard/onboarding") || pathname.startsWith("/onboarding");
 
   if (onOnboardingRoute) {
-    redirect("/dashboard");
+    redirect("/insights");
   }
 
   const membership =
