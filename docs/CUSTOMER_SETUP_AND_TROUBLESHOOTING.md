@@ -52,9 +52,10 @@ Cogni's AI agent answers customer questions strictly grounded in your configured
 
 - **Source Stuck in `pending` or `processing`**: Sources are processed asynchronously by the background ingestion queue. If a job stalls due to queue backpressure or unhandled worker errors, wait for the queue to drain, or delete and re-register the source. The **Retry** action is available only after a source enters `failed` status.
 - **Source `failed`**: Review the failure message in the table. Click **Retry** on the failed source row once the transient error (e.g., rate limit, network timeout) is cleared. For website pages, ensure the URL is publicly reachable without authentication or CAPTCHAs. For documents, verify the PDF contains extractable text (scanned image-only PDFs require OCR preprocessing).
-- **Knowledge Sources Go Live Immediately**:
+- **Knowledge Sources & Authorized Domains Apply Immediately**:
   - As soon as a source transitions to `ready` / `indexed`, its vectorized chunks are **immediately available to both the Test Console and live visitor conversations** via RAG retrieval.
-  - Knowledge chunks are not gated behind the "Publish Changes" button. **Widget publication and rollback apply to agent configuration and behavior settings** (system prompt, greeting, appearance, allowed domains), NOT to knowledge base content. Knowledge changes cannot be undone through widget version rollback.
+  - Authorized domain changes also apply immediately to live origin validation upon saving.
+  - Knowledge chunks and authorized domains are not held in drafts or gated behind the "Publish Changes" button. **Widget publication and rollback apply to agent behavior settings** (system prompt, greeting, suggested questions, appearance), NOT to knowledge base content or domain allowlists. Neither knowledge edits nor domain changes can be undone through widget version rollback.
 
 ---
 
@@ -82,6 +83,7 @@ The widget validates the hosting site's `window.location.origin` against the wor
 1. In **Agent → Customize & Deploy**, navigate to **Authorized Domains**.
 2. Add your hostnames (e.g., `app.example.com`, `https://example.com`, or `localhost:3000` for development).
 3. If an unauthorized domain loads the script, the widget refuses to initialize and logs an unauthorized origin rejection to the browser console.
+4. **Immediate Effect**: Changes to authorized domains apply immediately upon saving and are NOT held in drafts. If a domain is removed by mistake, re-add it manually; widget version rollback does not restore domain allowlists.
 
 ### Content Security Policy (CSP) Directives
 
@@ -114,10 +116,10 @@ Cogni separates **draft configuration** from **live visitor behavior** to preven
 
 ### How Publication Works
 
-- Edits made in **Build** (greeting, system prompt, suggested questions, appearance, allowed domains) are saved as a **Draft**.
+- Edits made in **Build** (greeting, system prompt, suggested questions, appearance) are saved as a **Draft**.
 - The draft configuration can be thoroughly tested in the embedded **Test Console** (`/agent#test`) without affecting live visitors.
-- When satisfied, click **Publish Changes** in `/agent#deploy`. This creates an immutable publication record (`v1`, `v2`, etc.) and immediately promotes the draft configuration to live visitors.
-- **Important**: Publication snapshots capture widget settings and agent behavior parameters, not knowledge source documents (which go live immediately upon indexing).
+- When satisfied, click **Publish Changes** in `/agent#deploy`. This creates an immutable publication record (`v1`, `v2`, etc.) and immediately promotes the draft behavior settings to live visitors.
+- **Important**: Publication snapshots capture widget customization settings (prompt, greeting, suggested questions, appearance). They do NOT include knowledge source documents or authorized domains, both of which apply immediately upon saving.
 
 ### Rollback
 
@@ -125,7 +127,7 @@ If a published widget configuration causes unwanted behavior or regression:
 
 1. Navigate to **Agent → Deploy → Publication History**.
 2. Select any previously verified publication snapshot.
-3. Click **Roll Back to This Version**. The widget instantly reverts its configuration to that historical snapshot. (Note: rollback restores widget behavior settings, not deleted or modified knowledge base documents).
+3. Click **Roll Back to This Version**. The widget instantly reverts its configuration to that historical snapshot. (Note: rollback restores widget behavior settings; it does not restore deleted or modified knowledge base documents or domain allowlists, which must be managed directly).
 
 ---
 

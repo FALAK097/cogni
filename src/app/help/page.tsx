@@ -183,6 +183,8 @@ export default function HelpPage() {
                 authorized domains. Configure your allowed domains in{" "}
                 <strong>Agent → Customize &amp; Deploy → Authorized Domains</strong>. If loaded on
                 an unlisted domain, the widget halts and reports an unauthorized origin rejection.
+                Changes to authorized domains apply immediately upon saving and are not held in
+                publication drafts.
               </p>
               <h3 className="pt-2 text-sm font-semibold text-foreground">
                 Content Security Policy (CSP) Directives
@@ -221,8 +223,9 @@ img-src 'self' https://<your-cogni-domain> data: blob:;`}
               <li>
                 <strong>Rollback:</strong> In <strong>Publication History</strong>, view previous
                 releases and click <strong>Roll Back to This Version</strong> to restore a verified
-                earlier configuration. (Note: rollback restores widget behavior settings, not
-                knowledge documents, which are live upon indexing).
+                earlier configuration. (Note: rollback restores widget behavior settings; it does
+                not restore knowledge documents or domain allowlists, which apply immediately upon
+                saving).
               </li>
             </ul>
           </section>
