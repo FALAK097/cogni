@@ -6,6 +6,10 @@
     "dev": "node scripts/build-widget.js && next dev --webpack --port 3000",
     "build:widget": "node scripts/build-widget.js",
     "build": "pnpm build:widget && NEXT_TELEMETRY_DISABLED=1 next build --webpack",
+    "build:cf": "pnpm build:widget && opennextjs-cloudflare build",
+    "preview:cf": "opennextjs-cloudflare build && wrangler dev",
+    "deploy:cf": "opennextjs-cloudflare build && wrangler deploy",
+    "cf:typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
     "start": "next start",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
@@ -98,13 +102,14 @@
     "@chat-adapter/gchat": "^4.41.1",
     "@chat-adapter/slack": "^4.41.1",
     "@chat-adapter/state-pg": "^4.41.1",
-    "@chat-adapter/teams": "4.41.1",
+    "@chat-adapter/teams": "^4.44.0",
     "@chat-adapter/whatsapp": "^4.41.1",
     "@composio/core": "^0.22.0",
     "@composio/vercel": "^0.12.1",
     "@hookform/resolvers": "^5.9.1",
     "@hugeicons/core-free-icons": "^4.3.5",
     "@hugeicons/react": "^1.1.10",
+    "@neondatabase/serverless": "^1.2.0",
     "@t3-oss/env-nextjs": "^0.13.11",
     "@tanstack/react-form": "^1.33.5",
     "@tanstack/react-query": "^5.104.0",
@@ -141,6 +146,7 @@
   "devDependencies": {
     "@commitlint/cli": "^21.2.3",
     "@commitlint/config-conventional": "^21.2.3",
+    "@opennextjs/cloudflare": "1.20.16",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^24.19.1",
     "@types/react": "^19.3.0",
@@ -157,7 +163,7 @@
     "shadcn": "^4.21.1",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
-    "wrangler": "^4.146.0"
+    "wrangler": "^4.158.0"
   },
   "lint-staged": {
     "*": "oxfmt --no-error-on-unmatched-pattern",

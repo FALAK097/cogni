@@ -3,18 +3,28 @@ import "../cloudflare/server-only";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
+import { cache } from "react";
+
 import * as schema from "@/lib/db/schema";
 import * as relations from "./relations";
 import { env } from "@/lib/env/server";
 
 const fullSchema = { ...schema, ...relations };
 
-let db: ReturnType<typeof createDb> | undefined;
-
 function createDb() {
+  const { hostname } = new URL(env.DATABASE_URL);
+  const isLocal =
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "::1" ||
+    hostname === "[::1]";
   const client = postgres(env.DATABASE_URL, {
     max: 1,
     prepare: false,
+    ssl: isLocal ? false : "require",
+    connect_timeout: 15,
+    idle_timeout: 1,
+    max_lifetime: 5,
   });
 
   return drizzle(client, { schema: fullSchema });
@@ -22,15 +32,7 @@ function createDb() {
 
 export type Db = ReturnType<typeof createDb>;
 
-export function getDb(): Db {
-  if (db) {
-    return db;
-  }
-
-  db = createDb();
-
-  return db;
-}
+export const getDb = cache(() => createDb());
 
 /**
  * Runs a multi-statement write operation in a database transaction.
