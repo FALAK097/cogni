@@ -16,18 +16,24 @@ export function parseWidgetPreviewEvidence(headerValue) {
 
   try {
     const value = JSON.parse(decodeURIComponent(headerValue));
+    const hasModelIdentity =
+      value?.modelProvider !== undefined ||
+      value?.modelName !== undefined ||
+      value?.configFingerprint !== undefined;
     if (
       typeof value !== "object" ||
       value === null ||
       (value.outcome !== "answer" && value.outcome !== "handoff") ||
       typeof value.grounded !== "boolean" ||
       !Array.isArray(value.sources) ||
-      (value.modelProvider !== "OPENAI" && value.modelProvider !== "GOOGLE") ||
-      typeof value.modelName !== "string" ||
-      value.modelName.length === 0 ||
-      value.modelName.length > MAX_MODEL_NAME_LENGTH ||
-      typeof value.configFingerprint !== "string" ||
-      !/^[a-f0-9]{64}$/.test(value.configFingerprint) ||
+      (hasModelIdentity && value.modelProvider !== "OPENAI" && value.modelProvider !== "GOOGLE") ||
+      (hasModelIdentity &&
+        (typeof value.modelName !== "string" ||
+          value.modelName.length === 0 ||
+          value.modelName.length > MAX_MODEL_NAME_LENGTH)) ||
+      (hasModelIdentity &&
+        (typeof value.configFingerprint !== "string" ||
+          !/^[a-f0-9]{64}$/.test(value.configFingerprint))) ||
       (value.runId === undefined) !== (value.caseId === undefined) ||
       (value.runId !== undefined &&
         (typeof value.runId !== "string" || !/^[0-9a-f-]{36}$/i.test(value.runId))) ||
@@ -37,8 +43,7 @@ export function parseWidgetPreviewEvidence(headerValue) {
       (value.signedEvidence !== undefined &&
         (typeof value.signedEvidence !== "string" ||
           value.signedEvidence.length === 0 ||
-          value.signedEvidence.length > 8_000)) ||
-      (value.runId !== undefined && typeof value.signedEvidence !== "string")
+          value.signedEvidence.length > 8_000))
     ) {
       return null;
     }
@@ -59,12 +64,14 @@ export function parseWidgetPreviewEvidence(headerValue) {
         source.documentId.length <= 128
           ? { documentId: source.documentId }
           : {}),
-        ...(typeof source.revisionId === "string" && source.revisionId.length <= 128
+        ...(source.revisionId === null ||
+        (typeof source.revisionId === "string" && source.revisionId.length <= 128)
           ? { revisionId: source.revisionId }
-          : { revisionId: null }),
-        ...(Number.isInteger(source.revisionNumber) && source.revisionNumber > 0
+          : {}),
+        ...(source.revisionNumber === null ||
+        (Number.isInteger(source.revisionNumber) && source.revisionNumber > 0)
           ? { revisionNumber: source.revisionNumber }
-          : { revisionNumber: null }),
+          : {}),
       }));
 
     if (value.grounded !== sources.length > 0) return null;
@@ -75,9 +82,13 @@ export function parseWidgetPreviewEvidence(headerValue) {
     return {
       outcome: value.outcome,
       grounded: value.grounded,
-      modelProvider: value.modelProvider,
-      modelName: value.modelName,
-      configFingerprint: value.configFingerprint,
+      ...(hasModelIdentity
+        ? {
+            modelProvider: value.modelProvider,
+            modelName: value.modelName,
+            configFingerprint: value.configFingerprint,
+          }
+        : {}),
       ...(typeof value.signedEvidence === "string" ? { signedEvidence: value.signedEvidence } : {}),
       sources,
       ...(value.runId === undefined ? {} : { runId: value.runId, caseId: value.caseId }),
