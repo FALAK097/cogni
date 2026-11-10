@@ -144,7 +144,19 @@ export function getAgentLaunchChecklist(input: {
   const steps: ReadinessStep[] = [];
 
   // Step 1: Knowledge Base
-  if (input.processingSourcesCount > 0) {
+  if (input.knowledgeState === "failed") {
+    steps.push({
+      id: "knowledge",
+      title: "Index knowledge sources",
+      description:
+        "One or more knowledge sources failed to index. Retry or remove failed sources to verify grounding.",
+      status: "action_required",
+      evidenceState: "failed",
+      actionLabel: "Fix knowledge",
+      actionType: "navigate",
+      targetTab: "build",
+    });
+  } else if (input.processingSourcesCount > 0 || input.knowledgeState === "stale") {
     steps.push({
       id: "knowledge",
       title: "Index knowledge sources",
@@ -155,7 +167,7 @@ export function getAgentLaunchChecklist(input: {
       actionType: "navigate",
       targetTab: "build",
     });
-  } else if (input.readySourcesCount > 0) {
+  } else if (input.readySourcesCount > 0 || input.knowledgeState === "verified") {
     steps.push({
       id: "knowledge",
       title: "Index knowledge sources",
