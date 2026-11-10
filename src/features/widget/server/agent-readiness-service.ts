@@ -35,6 +35,22 @@ import {
   type ReadinessEvidenceState,
 } from "@/features/widget/agent-readiness";
 
+function matchAllowedDomain(hostname: string, allowedHostname: string) {
+  const normalizedHost = hostname.trim().toLowerCase();
+  const normalizedAllowed = allowedHostname.trim().toLowerCase();
+  if (normalizedAllowed.startsWith("*.")) {
+    const root = normalizedAllowed.slice(2);
+    return normalizedHost !== root && normalizedHost.endsWith(`.${root}`);
+  }
+  return normalizedHost === normalizedAllowed;
+}
+
+function toIsoTimestamp(value: string | number | null | undefined): string | null {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = typeof value === "number" ? new Date(value) : new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
 function digestSuite(suiteVersion: string) {
   return createHash("sha256").update(suiteVersion).digest("hex");
 }
@@ -119,6 +135,14 @@ export async function getWorkspaceActivationReadiness(
     .orderBy(desc(agentTestPublishCheck.createdAt))
     .limit(1);
 
+  const checkMatchesPublishedVersion = Boolean(
+    latestCheck &&
+    (latestCheck.basePublishedVersion === saved.publishedVersion ||
+      (!publication.hasUnpublishedChanges &&
+        saved.publishedVersion > 0 &&
+        latestCheck.basePublishedVersion === saved.publishedVersion - 1)),
+  );
+
   let testState: ReadinessEvidenceState = "unknown";
   if (testCasesCount === 0 || !latestCheck) {
     testState = "unknown";
@@ -126,7 +150,7 @@ export async function getWorkspaceActivationReadiness(
     latestCheck.candidateFingerprint !== candidateFingerprint ||
     latestCheck.sourceBasisDigest !== sourceBasisDigest ||
     latestCheck.suiteDigest !== testSuiteDigest ||
-    latestCheck.basePublishedVersion !== saved.publishedVersion
+    !checkMatchesPublishedVersion
   ) {
     testState = "stale";
   } else if (
@@ -174,22 +198,49 @@ export async function getWorkspaceActivationReadiness(
     currentPublicationPublishedAt = pub?.publishedAt ?? null;
   }
 
-  // Find conversations strictly scoped to workspaceId
-  const conversations = await db
-    .select({
-      id: conversationTable.id,
-      createdAt: conversationTable.createdAt,
-      messages: conversationTable.messages,
-      visitorSessionId: conversationTable.visitorSessionId,
-      channel: conversationTable.channel,
-    })
-    .from(conversationTable)
-    .where(eq(conversationTable.workspaceId, workspaceId))
-    .orderBy(asc(conversationTable.createdAt));
+  // Bound conversation and session reads so large workspace histories never scan unbounded rows or exceed parameter limits
+  const [earliestConversations, recentConversations] = await Promise.all([
+    db
+      .select({
+        id: conversationTable.id,
+        createdAt: conversationTable.createdAt,
+        messages: conversationTable.messages,
+        visitorSessionId: conversationTable.visitorSessionId,
+        channel: conversationTable.channel,
+      })
+      .from(conversationTable)
+      .where(eq(conversationTable.workspaceId, workspaceId))
+      .orderBy(asc(conversationTable.createdAt))
+      .limit(100),
+    db
+      .select({
+        id: conversationTable.id,
+        createdAt: conversationTable.createdAt,
+        messages: conversationTable.messages,
+        visitorSessionId: conversationTable.visitorSessionId,
+        channel: conversationTable.channel,
+      })
+      .from(conversationTable)
+      .where(eq(conversationTable.workspaceId, workspaceId))
+      .orderBy(desc(conversationTable.createdAt))
+      .limit(100),
+  ]);
 
-  const sessionIds = conversations
-    .map((c) => c.visitorSessionId)
-    .filter((id): id is string => Boolean(id));
+  const conversationById = new Map<string, (typeof earliestConversations)[number]>();
+  for (const conv of [...earliestConversations, ...recentConversations]) {
+    if (!conversationById.has(conv.id)) {
+      conversationById.set(conv.id, conv);
+    }
+  }
+  const conversations = [...conversationById.values()].sort(
+    (left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt),
+  );
+
+  const sessionIds = [
+    ...new Set(
+      conversations.map((c) => c.visitorSessionId).filter((id): id is string => Boolean(id)),
+    ),
+  ].slice(0, 200);
 
   const sessions =
     sessionIds.length > 0
@@ -204,7 +255,6 @@ export async function getWorkspaceActivationReadiness(
       : [];
 
   const sessionById = new Map(sessions.map((s) => [s.id, s]));
-  const allowedSet = new Set(settings.authorizedDomains.map((d) => d.toLowerCase()));
 
   const milestones: ActivationMilestones = {
     firstLiveQuestion: { achieved: false, timestamp: null, detail: null },
@@ -213,28 +263,43 @@ export async function getWorkspaceActivationReadiness(
 
   let hasQualifyingSessionOnCurrentPublication = false;
   let hasAnyHistoricalSession = false;
+  const currentPubEpoch = currentPublicationPublishedAt
+    ? Date.parse(currentPublicationPublishedAt)
+    : Number.NaN;
 
   for (const conv of conversations) {
-    let parsedMessages: Array<{ role?: string; content?: string; createdAt?: string }> = [];
+    let parsedMessages: Array<{
+      authorType?: string;
+      body?: string;
+      isInternal?: boolean;
+      role?: string;
+      content?: string;
+      createdAt?: string;
+    }> = [];
     try {
-      parsedMessages = JSON.parse(conv.messages || "[]");
+      const raw = JSON.parse(conv.messages || "[]");
+      parsedMessages = Array.isArray(raw) ? raw : [];
     } catch {
       parsedMessages = [];
     }
 
-    const hasVisitorQuestion = parsedMessages.some(
-      (m) =>
-        (m.role === "user" || m.role === "visitor") && m.content && m.content.trim().length > 0,
-    );
+    const hasVisitorQuestion = parsedMessages.some((m) => {
+      const text = (typeof m.body === "string" ? m.body : m.content) ?? "";
+      if (text.trim().length === 0) return false;
+      return m.authorType === "VISITOR" || m.role === "user" || m.role === "visitor";
+    });
 
-    const humanReply = parsedMessages.find(
-      (m) => (m.role === "agent" || m.role === "human") && m.content && m.content.trim().length > 0,
-    );
+    const humanReply = parsedMessages.find((m) => {
+      if (m.isInternal) return false;
+      const text = (typeof m.body === "string" ? m.body : m.content) ?? "";
+      if (text.trim().length === 0) return false;
+      return m.authorType === "TEAM" || m.role === "agent" || m.role === "human";
+    });
 
     if (humanReply && !milestones.firstHumanReply.achieved) {
       milestones.firstHumanReply = {
         achieved: true,
-        timestamp: conv.createdAt ? new Date(Number(conv.createdAt)).toISOString() : null,
+        timestamp: toIsoTimestamp(humanReply.createdAt) ?? toIsoTimestamp(conv.createdAt),
         detail: `Conversation ${conv.id}`,
       };
     }
@@ -243,18 +308,21 @@ export async function getWorkspaceActivationReadiness(
       const sess = sessionById.get(conv.visitorSessionId);
       if (sess) {
         hasAnyHistoricalSession = true;
-        const domainMatches = allowedSet.has(sess.hostname.toLowerCase());
+        const domainMatches = settings.authorizedDomains.some((allowed) =>
+          matchAllowedDomain(sess.hostname, allowed),
+        );
+        const sessionEpoch = sess.createdAt ? Date.parse(sess.createdAt) : Number.NaN;
         const isCurrentPub =
-          currentPublicationPublishedAt &&
-          sess.createdAt &&
-          new Date(Number(sess.createdAt)) >= new Date(currentPublicationPublishedAt);
+          !Number.isNaN(currentPubEpoch) &&
+          !Number.isNaN(sessionEpoch) &&
+          sessionEpoch >= currentPubEpoch;
 
         if (domainMatches && isCurrentPub && hasVisitorQuestion) {
           hasQualifyingSessionOnCurrentPublication = true;
           if (!milestones.firstLiveQuestion.achieved) {
             milestones.firstLiveQuestion = {
               achieved: true,
-              timestamp: sess.createdAt ? new Date(Number(sess.createdAt)).toISOString() : null,
+              timestamp: toIsoTimestamp(sess.createdAt),
               detail: `From ${sess.hostname}`,
             };
           }

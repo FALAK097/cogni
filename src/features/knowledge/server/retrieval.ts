@@ -154,20 +154,40 @@ export async function retrieveKnowledgeContextWith({
       documentId: documentTable.id,
       title: documentTable.title,
       content: documentChunkTable.content,
+      revisionId: documentRevision.id,
+      revisionNumber: documentRevision.revisionNumber,
     })
     .from(documentChunkTable)
     .innerJoin(documentTable, eq(documentChunkTable.documentId, documentTable.id))
+    .leftJoin(
+      documentRevision,
+      and(
+        eq(documentRevision.documentId, documentTable.id),
+        eq(documentRevision.workspaceId, documentTable.workspaceId),
+        eq(documentRevision.status, "CURRENT"),
+      ),
+    )
     .where(and(...lexicalConditions))
     .orderBy(asc(documentChunkTable.position))
     .limit(safeLimit);
 
-  return exactMatches.map((match) => ({
-    documentId: match.documentId,
-    title: match.title,
-    content: match.content,
-    revisionId: null,
-    revisionNumber: null,
-  }));
+  return exactMatches.map(
+    (match) =>
+      ({
+        documentId: match.documentId,
+        title: match.title,
+        content: match.content,
+        ...(match.revisionId !== null &&
+        match.revisionId !== undefined &&
+        match.revisionNumber !== null &&
+        match.revisionNumber !== undefined
+          ? {
+              revisionId: match.revisionId,
+              revisionNumber: match.revisionNumber,
+            }
+          : {}),
+      }) as KnowledgeContext,
+  );
 }
 
 export async function retrieveKnowledgeContext(

@@ -302,9 +302,11 @@ export function WidgetCustomizer({
             ? `Draft saved · published v${publication.current.version}`
             : `Published · v${publication.current.version}`
           : "Draft saved · not published";
+  const requiresPublishCheck =
+    !testCasesQuery.isSuccess || (testCasesQuery.data?.cases.length ?? 0) > 0;
   const canPublishChanges =
     canManage &&
-    Boolean(publishCheckId) &&
+    (!requiresPublishCheck || Boolean(publishCheckId)) &&
     Boolean(publication?.hasUnpublishedChanges) &&
     !isSavingDraft &&
     !publishWidgetConfigMutation.isPending;

@@ -348,7 +348,10 @@ async function enqueueInactiveConversationQa({
       return false;
     }
     if (latest && state.version <= latest.version) {
-      if (!["COMPLETED", "SKIPPED", "STALE"].includes(latest.status)) {
+      const isTerminalEvaluation =
+        ["COMPLETED", "SKIPPED", "STALE"].includes(latest.status) ||
+        (latest.status === "FAILED" && Boolean(latest.completedAt));
+      if (!isTerminalEvaluation) {
         await recordInactivityObservation({
           db: transaction,
           workspaceId,
@@ -481,14 +484,62 @@ async function expireExhaustedStaleRun(
 /** Scans a bounded inactive set, then claims and processes a bounded number of durable runs. */
 export async function drainConversationQaQueue(db: Db, limit = 4, now = new Date()) {
   const boundedLimit = Math.max(1, Math.min(limit, 4));
-  // Workspace IDs are the scheduler's only cross-tenant discovery query. All
-  // conversation and workflow reads below are explicitly tenant-scoped.
-  const workspaceIds = await db
-    .select({ id: workspace.id })
-    .from(workspace)
-    .orderBy(asc(workspace.id))
-    .limit(1_000);
-  const workspaceScope = workspaceIds.map((tenant) => tenant.id);
+  const staleBefore = new Date(now.getTime() - 20 * 60 * 1000).toISOString();
+  // Discover tenant IDs with due inactive conversations or pending QA workflow runs
+  // ordered by due work so workspaces beyond the first 1,000 are never starved.
+  const [inactiveWorkspaceRows, workflowWorkspaceRows] = await Promise.all([
+    db
+      .select({ id: workspace.id })
+      .from(conversation)
+      .innerJoin(workspace, eq(workspace.id, conversation.workspaceId))
+      .leftJoin(
+        conversationQaState,
+        and(
+          eq(conversationQaState.workspaceId, conversation.workspaceId),
+          eq(conversationQaState.conversationId, conversation.id),
+        ),
+      )
+      .where(
+        and(
+          inArray(conversation.status, ["OPEN", "ASSIGNED", "ESCALATED"]),
+          or(
+            isNull(conversationQaState.conversationId),
+            isNull(conversationQaState.lastObservedMessageAt),
+            gt(conversation.lastMessageAt, conversationQaState.lastObservedMessageAt),
+            and(
+              isNotNull(conversationQaState.nextEligibleAt),
+              lte(conversationQaState.nextEligibleAt, now.toISOString()),
+            ),
+          ),
+        ),
+      )
+      .orderBy(asc(conversation.lastMessageAt))
+      .limit(200),
+    db
+      .select({ id: workspace.id })
+      .from(workflowRun)
+      .innerJoin(workspace, eq(workspace.id, workflowRun.workspaceId))
+      .where(
+        and(
+          eq(workflowRun.name, CONVERSATION_QA_WORKFLOW_NAME),
+          or(
+            inArray(workflowRun.status, ["QUEUED", "FAILED"]),
+            and(eq(workflowRun.status, "RUNNING"), lt(workflowRun.startedAt, staleBefore)),
+          ),
+        ),
+      )
+      .orderBy(asc(workflowRun.startedAt))
+      .limit(200),
+  ]);
+  const workspaceScope = [
+    ...new Set([
+      ...inactiveWorkspaceRows.map((tenant) => tenant.id),
+      ...workflowWorkspaceRows.map((tenant) => tenant.id),
+    ]),
+  ];
+  if (workspaceScope.length === 0) {
+    return { inactivityQueued: 0, processed: 0 };
+  }
   const inactiveCandidates = await db
     .select({ id: conversation.id, workspaceId: conversation.workspaceId })
     .from(conversation)
@@ -548,10 +599,7 @@ export async function drainConversationQaQueue(db: Db, limit = 4, now = new Date
         eq(workflowRun.name, CONVERSATION_QA_WORKFLOW_NAME),
         or(
           inArray(workflowRun.status, ["QUEUED", "FAILED"]),
-          and(
-            eq(workflowRun.status, "RUNNING"),
-            lt(workflowRun.startedAt, new Date(now.getTime() - 20 * 60 * 1000).toISOString()),
-          ),
+          and(eq(workflowRun.status, "RUNNING"), lt(workflowRun.startedAt, staleBefore)),
         ),
       ),
     )
