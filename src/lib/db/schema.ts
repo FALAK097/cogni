@@ -13,10 +13,12 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { sql } from "drizzle-orm";
+import * as orm from "drizzle-orm";
 
 import { BRAND_COLOR } from "@/lib/widget-accent";
 import type { WidgetPublicationSnapshot } from "@/features/widget/publication";
+
+const { sql } = orm;
 
 const timestampString = () => timestamp({ mode: "string", withTimezone: true });
 const numeric = timestampString;
@@ -248,6 +250,133 @@ export const conversation = pgTable(
   ],
 );
 
+export const conversationQaState = pgTable(
+  "conversation_qa_state",
+  {
+    workspaceId: text()
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    conversationId: text().notNull(),
+    version: integer().default(1).notNull(),
+    lastObservedMessageAt: timestampString(),
+    nextEligibleAt: timestampString(),
+    updatedAt: timestampString()
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.workspaceId, table.conversationId] }),
+    foreignKey({
+      columns: [table.workspaceId, table.conversationId],
+      foreignColumns: [conversation.workspaceId, conversation.id],
+      name: "conversation_qa_state_workspace_conversation_fk",
+    })
+      .onDelete("cascade")
+      .onUpdate("cascade"),
+    check("conversation_qa_state_version_check", sql`${table.version} > 0`),
+  ],
+);
+
+/** Stores only bounded evaluator labels and usage; never transcript or evaluator prose. */
+export const conversationQaEvaluation = pgTable(
+  "conversation_qa_evaluation",
+  {
+    id: text().primaryKey().notNull(),
+    workspaceId: text()
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    conversationId: text().notNull(),
+    version: integer().notNull(),
+    status: text().default("QUEUED").notNull(),
+    trigger: text().notNull(),
+    publicMessageAt: timestampString().notNull(),
+    helpfulness: integer(),
+    grounding: integer(),
+    sentiment: text(),
+    topics: jsonb().$type<string[]>().default([]).notNull(),
+    escalationOutcome: text(),
+    reasonCodes: jsonb().$type<string[]>().default([]).notNull(),
+    lowScore: boolean(),
+    modelProvider: text(),
+    modelName: text(),
+    inputTokens: integer(),
+    outputTokens: integer(),
+    errorCode: text(),
+    createdAt: timestampString()
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+    completedAt: timestampString(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.workspaceId, table.conversationId],
+      foreignColumns: [conversation.workspaceId, conversation.id],
+      name: "conversation_qa_evaluation_workspace_conversation_fk",
+    })
+      .onDelete("cascade")
+      .onUpdate("cascade"),
+    uniqueIndex("conversation_qa_evaluation_workspace_conversation_version_key").on(
+      table.workspaceId,
+      table.conversationId,
+      table.version,
+    ),
+    index("conversation_qa_evaluation_workspace_createdAt_idx").on(
+      table.workspaceId,
+      table.createdAt,
+    ),
+    index("conversation_qa_evaluation_workspace_status_createdAt_idx").on(
+      table.workspaceId,
+      table.status,
+      table.createdAt,
+    ),
+    check("conversation_qa_evaluation_version_check", sql`${table.version} > 0`),
+    check(
+      "conversation_qa_evaluation_status_check",
+      sql`${table.status} in ('QUEUED', 'RUNNING', 'COMPLETED', 'FAILED', 'SKIPPED', 'STALE')`,
+    ),
+    check(
+      "conversation_qa_evaluation_trigger_check",
+      sql`${table.trigger} in ('CLOSED', 'INACTIVE')`,
+    ),
+    check(
+      "conversation_qa_evaluation_scores_check",
+      sql`(${table.helpfulness} is null or ${table.helpfulness} between 1 and 5) and (${table.grounding} is null or ${table.grounding} between 1 and 5)`,
+    ),
+    check(
+      "conversation_qa_evaluation_result_check",
+      sql`(${table.status} <> 'COMPLETED' or (${table.helpfulness} is not null and ${table.grounding} is not null and ${table.sentiment} is not null and ${table.escalationOutcome} is not null and ${table.lowScore} is not null and ${table.lowScore} = (${table.grounding} < 3 or ${table.escalationOutcome} = 'MISSED' or ${table.helpfulness} + ${table.grounding} < 6)))`,
+    ),
+    check(
+      "conversation_qa_evaluation_sentiment_check",
+      sql`${table.sentiment} is null or ${table.sentiment} in ('positive', 'neutral', 'negative', 'mixed')`,
+    ),
+    check(
+      "conversation_qa_evaluation_escalation_check",
+      sql`${table.escalationOutcome} is null or ${table.escalationOutcome} in ('NONE', 'RESOLVED', 'PENDING', 'MISSED', 'NOT_APPLICABLE')`,
+    ),
+    check(
+      "conversation_qa_evaluation_topics_check",
+      sql`jsonb_typeof(${table.topics}) = 'array' and jsonb_array_length(${table.topics}) <= 3 and ${table.topics} <@ '["account_access", "billing", "integrations", "pricing", "product_usage", "technical_issue", "cancellation", "other"]'::jsonb`,
+    ),
+    check(
+      "conversation_qa_evaluation_reason_codes_check",
+      sql`jsonb_typeof(${table.reasonCodes}) = 'array' and jsonb_array_length(${table.reasonCodes}) <= 4 and ${table.reasonCodes} <@ '["ANSWER_UNCLEAR", "FACT_UNSUPPORTED", "QUESTION_UNANSWERED", "ESCALATION_MISSED", "TONE_MISMATCH", "GOOD_RESOLUTION", "INSUFFICIENT_CONTEXT"]'::jsonb`,
+    ),
+    check(
+      "conversation_qa_evaluation_model_check",
+      sql`(${table.modelProvider} is null or ${table.modelProvider} in ('OPENAI', 'GOOGLE')) and (${table.modelName} is null or length(${table.modelName}) between 1 and 256)`,
+    ),
+    check(
+      "conversation_qa_evaluation_usage_check",
+      sql`(${table.inputTokens} is null or ${table.inputTokens} >= 0) and (${table.outputTokens} is null or ${table.outputTokens} >= 0)`,
+    ),
+    check(
+      "conversation_qa_evaluation_error_code_check",
+      sql`${table.errorCode} is null or ${table.errorCode} = 'EVALUATION_FAILED'`,
+    ),
+  ],
+);
+
 export const ticketStatus = pgEnum("ticket_status", ["OPEN", "PENDING", "RESOLVED"]);
 export const ticketPriority = pgEnum("ticket_priority", ["LOW", "NORMAL", "HIGH", "URGENT"]);
 
@@ -420,6 +549,7 @@ export const agentTestCase = pgTable(
     }),
   },
   (table) => [
+    uniqueIndex("agent_test_case_workspace_id_key").on(table.workspaceId, table.id),
     uniqueIndex("agent_test_case_workspace_title_key").on(
       table.workspaceId,
       sql`lower(${table.title})`,
@@ -434,6 +564,19 @@ export const agentTestRun = pgTable(
     id: text().primaryKey().notNull(),
     resultDigest: text().notNull(),
     suiteDigest: text(),
+    evaluationContext: jsonb().$type<{
+      version: 1;
+      configFingerprint: string;
+      configBasis: "widget-draft-revision-v1";
+      modelProvider: "OPENAI" | "GOOGLE";
+      modelName: string;
+      cases: {
+        id: string;
+        status: "passed" | "mismatch" | "error" | "not_run";
+        caseUpdatedAt: string;
+        sources: { documentId: string; revisionId: string | null; revisionNumber: number | null }[];
+      }[];
+    } | null>(),
     caseCount: integer().notNull(),
     passedCount: integer().notNull(),
     mismatchCount: integer().notNull(),
@@ -451,6 +594,7 @@ export const agentTestRun = pgTable(
     }),
   },
   (table) => [
+    uniqueIndex("agent_test_run_workspace_id_key").on(table.workspaceId, table.id),
     index("agent_test_run_workspace_createdAt_idx").on(table.workspaceId, table.createdAt),
     check(
       "agent_test_run_counts_nonnegative_check",
@@ -459,6 +603,242 @@ export const agentTestRun = pgTable(
     check(
       "agent_test_run_counts_match_check",
       sql`${table.caseCount} = ${table.passedCount} + ${table.mismatchCount} + ${table.errorCount} + ${table.notRunCount}`,
+    ),
+  ],
+);
+
+export const agentTestImprovementStatus = pgEnum("agent_test_improvement_status", [
+  "OPEN",
+  "RESOLVED",
+  "DISMISSED",
+]);
+
+export const agentTestImprovement = pgTable(
+  "agent_test_improvement",
+  {
+    id: text().primaryKey().notNull(),
+    workspaceId: text()
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    runId: text().notNull(),
+    caseId: text().notNull(),
+    caseSnapshot: jsonb()
+      .$type<{
+        title: string;
+        prompt: string;
+        expectedOutcome: "grounded_answer" | "no_evidence" | "human_handoff";
+        expectedSourceIds: string[];
+      }>()
+      .notNull(),
+    evaluationReferences: jsonb()
+      .$type<{
+        configBasis: "widget-draft-revision-v1";
+        configFingerprint: string;
+        modelProvider: "OPENAI" | "GOOGLE";
+        modelName: string;
+        sources: { documentId: string; revisionId: string | null; revisionNumber: number | null }[];
+      }>()
+      .notNull(),
+    failureSourceIds: jsonb().$type<string[]>().default([]).notNull(),
+    rationale: text().notNull(),
+    status: agentTestImprovementStatus().default("OPEN").notNull(),
+    createdByMembershipId: text().references(() => workspaceMember.id, {
+      onDelete: "set null",
+      onUpdate: "cascade",
+    }),
+    createdAt: timestampString()
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+    reviewedByMembershipId: text().references(() => workspaceMember.id, {
+      onDelete: "set null",
+      onUpdate: "cascade",
+    }),
+    reviewedAt: timestampString(),
+    reviewNote: text(),
+    updatedAt: timestampString()
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("agent_test_improvement_workspace_id_key").on(table.workspaceId, table.id),
+    foreignKey({
+      columns: [table.workspaceId, table.runId],
+      foreignColumns: [agentTestRun.workspaceId, agentTestRun.id],
+      name: "agent_test_improvement_workspace_run_fk",
+    })
+      .onDelete("cascade")
+      .onUpdate("cascade"),
+    index("agent_test_improvement_workspace_status_createdAt_idx").on(
+      table.workspaceId,
+      table.status,
+      table.createdAt,
+    ),
+    uniqueIndex("agent_test_improvement_workspace_run_case_key").on(
+      table.workspaceId,
+      table.runId,
+      table.caseId,
+    ),
+    check(
+      "agent_test_improvement_review_state_check",
+      sql`(${table.status} = 'OPEN' and ${table.reviewedAt} is null) or (${table.status} <> 'OPEN' and ${table.reviewedAt} is not null)`,
+    ),
+  ],
+);
+
+export const agentTestComparisonStatus = pgEnum("agent_test_comparison_status", [
+  "PENDING",
+  "COMPLETE",
+  "ERROR",
+]);
+
+export const agentTestComparison = pgTable(
+  "agent_test_comparison",
+  {
+    id: text().primaryKey().notNull(),
+    workspaceId: text()
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    improvementId: text().notNull(),
+    idempotencyKey: text().notNull(),
+    caseSnapshot: jsonb()
+      .$type<{
+        title: string;
+        prompt: string;
+        expectedOutcome: "grounded_answer" | "no_evidence" | "human_handoff";
+        expectedSourceIds: string[];
+      }>()
+      .notNull(),
+    baselineReferences: jsonb().$type<{
+      configBasis: "widget-draft-revision-v1";
+      configFingerprint: string;
+      modelProvider: "OPENAI" | "GOOGLE";
+      modelName: string;
+      sources: { documentId: string; revisionId: string | null; revisionNumber: number | null }[];
+    } | null>(),
+    replayReferences: jsonb().$type<{
+      configFingerprint: string;
+      modelProvider: "OPENAI" | "GOOGLE";
+      modelName: string;
+      sources: { documentId: string; revisionId: string | null; revisionNumber: number | null }[];
+    } | null>(),
+    baselineOutcome: text(),
+    replayOutcome: text(),
+    replayStatus: text(),
+    status: agentTestComparisonStatus().default("PENDING").notNull(),
+    errorCode: text(),
+    createdByMembershipId: text().references(() => workspaceMember.id, {
+      onDelete: "set null",
+      onUpdate: "cascade",
+    }),
+    createdAt: timestampString()
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+    completedAt: timestampString(),
+  },
+  (table) => [
+    uniqueIndex("agent_test_comparison_workspace_id_key").on(table.workspaceId, table.id),
+    uniqueIndex("agent_test_comparison_workspace_idempotency_key").on(
+      table.workspaceId,
+      table.idempotencyKey,
+    ),
+    foreignKey({
+      columns: [table.workspaceId, table.improvementId],
+      foreignColumns: [agentTestImprovement.workspaceId, agentTestImprovement.id],
+      name: "agent_test_comparison_workspace_improvement_fk",
+    })
+      .onDelete("cascade")
+      .onUpdate("cascade"),
+    index("agent_test_comparison_workspace_createdAt_idx").on(table.workspaceId, table.createdAt),
+    check(
+      "agent_test_comparison_status_result_check",
+      sql`(${table.status} = 'PENDING' and ${table.completedAt} is null) or (${table.status} <> 'PENDING' and ${table.completedAt} is not null)`,
+    ),
+  ],
+);
+
+export const agentTestPublishCheckStatus = pgEnum("agent_test_publish_check_status", [
+  "PENDING_BASELINE",
+  "PENDING_DRAFT",
+  "COMPLETE",
+  "ERROR",
+]);
+
+/** A text-free, owner-created receipt binding full-suite outcomes to exact publish inputs. */
+export const agentTestPublishCheck = pgTable(
+  "agent_test_publish_check",
+  {
+    id: text().primaryKey().notNull(),
+    workspaceId: text()
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    widgetId: text()
+      .notNull()
+      .references(() => widget.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    createdByMembershipId: text().references(() => workspaceMember.id, {
+      onDelete: "set null",
+      onUpdate: "cascade",
+    }),
+    suiteDigest: text().notNull(),
+    sourceBasisDigest: text().notNull(),
+    basePublishedVersion: integer().notNull(),
+    candidateFingerprint: text().notNull(),
+    baselineRequestDigest: text(),
+    candidateRequestDigest: text(),
+    baselineReferences: jsonb().$type<{
+      configFingerprint: string;
+      modelProvider: "OPENAI" | "GOOGLE";
+      modelName: string;
+      results: {
+        caseId: string;
+        status: "passed" | "mismatch";
+        sources: { documentId: string; revisionId: string; revisionNumber: number }[];
+      }[];
+    } | null>(),
+    candidateReferences: jsonb().$type<{
+      configFingerprint: string;
+      modelProvider: "OPENAI" | "GOOGLE";
+      modelName: string;
+      results: {
+        caseId: string;
+        status: "passed" | "mismatch";
+        sources: { documentId: string; revisionId: string; revisionNumber: number }[];
+      }[];
+    } | null>(),
+    status: agentTestPublishCheckStatus().notNull(),
+    createdAt: timestampString()
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+    completedAt: timestampString(),
+  },
+  (table) => [
+    uniqueIndex("agent_test_publish_check_workspace_id_key").on(table.workspaceId, table.id),
+    index("agent_test_publish_check_workspace_createdAt_idx").on(
+      table.workspaceId,
+      table.createdAt,
+    ),
+    check(
+      "agent_test_publish_check_suite_digest_check",
+      sql`${table.suiteDigest} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "agent_test_publish_check_candidate_fingerprint_check",
+      sql`${table.candidateFingerprint} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "agent_test_publish_check_source_basis_digest_check",
+      sql`${table.sourceBasisDigest} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "agent_test_publish_check_request_digest_check",
+      sql`(${table.baselineRequestDigest} is null or ${table.baselineRequestDigest} ~ '^[0-9a-f]{64}$') and (${table.candidateRequestDigest} is null or ${table.candidateRequestDigest} ~ '^[0-9a-f]{64}$')`,
+    ),
+    check(
+      "agent_test_publish_check_version_nonnegative_check",
+      sql`${table.basePublishedVersion} >= 0`,
+    ),
+    check(
+      "agent_test_publish_check_result_state_check",
+      sql`(${table.status} = 'PENDING_BASELINE' and ${table.baselineReferences} is null and ${table.candidateReferences} is null and ${table.completedAt} is null) or (${table.status} = 'PENDING_DRAFT' and ${table.candidateReferences} is null and ${table.completedAt} is null) or (${table.status} = 'COMPLETE' and ${table.candidateReferences} is not null and ${table.completedAt} is not null) or (${table.status} = 'ERROR' and ${table.completedAt} is not null)`,
     ),
   ],
 );
@@ -705,6 +1085,85 @@ export const document = pgTable(
   ],
 );
 
+/**
+ * Content identities for successfully indexed knowledge sources. This table intentionally keeps
+ * documentId as an opaque value instead of a foreign key: deleting a source removes its content,
+ * but retains a minimal tombstone so later evaluations can report that a cited revision was
+ * deleted. No source text, URL, filename, or provider response is stored here.
+ */
+export const documentRevision = pgTable(
+  "document_revision",
+  {
+    id: text().primaryKey().notNull(),
+    documentId: text().notNull(),
+    revisionNumber: integer().notNull(),
+    contentSha256: text().notNull(),
+    sourceType: text().notNull(),
+    providerItemId: text(),
+    providerItemKey: text(),
+    status: text().default("CURRENT").notNull(),
+    createdAt: numeric()
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+    retiredAt: numeric(),
+    workspaceId: text()
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
+  },
+  (table) => [
+    uniqueIndex("document_revision_workspace_document_number_key").on(
+      table.workspaceId,
+      table.documentId,
+      table.revisionNumber,
+    ),
+    uniqueIndex("document_revision_current_key")
+      .on(table.workspaceId, table.documentId)
+      .where(sql`${table.status} = 'CURRENT'`),
+    index("document_revision_workspace_document_createdAt_idx").on(
+      table.workspaceId,
+      table.documentId,
+      table.createdAt,
+    ),
+    check("document_revision_number_positive_check", sql`${table.revisionNumber} > 0`),
+    check("document_revision_hash_sha256_check", sql`${table.contentSha256} ~ '^[0-9a-f]{64}$'`),
+    check(
+      "document_revision_status_check",
+      sql`${table.status} in ('CURRENT', 'SUPERSEDED', 'DELETED')`,
+    ),
+  ],
+);
+
+/** Retryable provider erasure records; these contain item identity only, never indexed content. */
+export const searchItemCleanup = pgTable(
+  "search_item_cleanup",
+  {
+    id: text().primaryKey().notNull(),
+    itemId: text(),
+    itemKey: text().notNull(),
+    documentId: text().notNull(),
+    attempts: integer().default(0).notNull(),
+    nextAttemptAt: numeric()
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+    claimedUntil: numeric(),
+    createdAt: numeric()
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+    updatedAt: numeric().notNull(),
+    workspaceId: text()
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
+  },
+  (table) => [
+    index("search_item_cleanup_due_idx").on(table.nextAttemptAt, table.claimedUntil),
+    index("search_item_cleanup_workspace_due_idx").on(
+      table.workspaceId,
+      table.nextAttemptAt,
+      table.claimedUntil,
+    ),
+  ],
+);
+
 export const documentChunk = pgTable(
   "document_chunk",
   {
@@ -834,6 +1293,8 @@ export const workflowRun = pgTable(
     errorMessage: text(),
     attempts: integer().default(0).notNull(),
     maxAttempts: integer().default(3).notNull(),
+    leaseToken: text(),
+    leaseExpiresAt: numeric(),
     startedAt: numeric()
       .default(sql`(CURRENT_TIMESTAMP)`)
       .notNull(),

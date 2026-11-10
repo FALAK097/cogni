@@ -13,11 +13,18 @@ import type {
   WidgetBorderRadiusStyle,
   WidgetPublicationStatus,
 } from "@/features/widget/domain";
+import type { EvidenceBoundReadiness } from "@/features/widget/agent-readiness";
 import { toast } from "@/components/ui/use-toast";
 import type {
   AgentTestCaseInput,
+  AgentTestImprovement,
   AgentTestRunHistory,
   AgentTestRunInput,
+} from "@/features/agent-tests/input";
+import {
+  agentTestEvaluationContextSchema,
+  createAgentTestImprovementSchema,
+  updateAgentTestImprovementSchema,
 } from "@/features/agent-tests/input";
 import { parseInboxConversationEventsResponse } from "@/features/conversations/inbox-events";
 
@@ -26,6 +33,7 @@ export type DashboardWidgetConfig = Omit<WidgetWidgetConfig, "borderRadius"> & {
   allowedDomains: string[];
   borderRadius: WidgetBorderRadiusStyle;
   publication: WidgetPublicationStatus;
+  readiness?: EvidenceBoundReadiness;
 };
 
 export type AgentTestCase = AgentTestCaseInput & {
@@ -288,14 +296,19 @@ export function usePublishWidgetConfig() {
     mutationFn: async ({
       workspaceId,
       restoreVersion,
+      publishCheckId,
     }: {
       workspaceId: string;
       restoreVersion?: number;
+      publishCheckId?: string;
     }) => {
       const response = await fetch("/api/dashboard/widget/publish", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(restoreVersion ? { restoreVersion } : {}),
+        body: JSON.stringify({
+          ...(restoreVersion ? { restoreVersion } : {}),
+          ...(publishCheckId && !restoreVersion ? { publishCheckId } : {}),
+        }),
       });
       const result: unknown = await response.json().catch(() => null);
       if (!response.ok) {
@@ -832,6 +845,7 @@ export function useAgentTestRunHistory(startDate: string, endDate: string) {
                 .string()
                 .regex(/^[a-f0-9]{64}$/)
                 .nullable(),
+              evaluationContext: agentTestEvaluationContextSchema.nullable(),
               caseCount: z.number().int().nonnegative(),
               passedCount: z.number().int().nonnegative(),
               mismatchCount: z.number().int().nonnegative(),
@@ -870,6 +884,263 @@ export function useRecordAgentTestRun() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.widget.agentTestRuns.all });
+    },
+  });
+}
+
+export function useStartAgentTestPublishCheck() {
+  return useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/dashboard/agent-test-publish-checks", { method: "POST" });
+      const body: unknown = await response.json().catch(() => null);
+      const parsed = z
+        .object({
+          check: z.object({
+            id: z.string().uuid(),
+            suiteDigest: z.string().regex(/^[a-f0-9]{64}$/),
+            basePublishedVersion: z.number().int().nonnegative(),
+            baselineRequired: z.boolean(),
+          }),
+        })
+        .safeParse(body);
+      if (!response.ok || !parsed.success) {
+        const error = z.object({ error: z.string() }).safeParse(body);
+        throw new Error(
+          error.success ? error.data.error : "Couldn't start the publish comparison.",
+        );
+      }
+      return parsed.data.check;
+    },
+  });
+}
+
+export function useRecordAgentTestPublishCheckResults() {
+  return useMutation({
+    mutationFn: async (input: {
+      checkId: string;
+      variant: "baseline" | "draft";
+      results: {
+        id: string;
+        status: "passed" | "mismatch" | "error" | "not_run";
+        signedEvidence?: string;
+      }[];
+    }) => {
+      const response = await fetch("/api/dashboard/agent-test-publish-checks", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      const body: unknown = await response.json().catch(() => null);
+      const parsed = z
+        .object({
+          result: z.object({
+            status: z.enum(["PENDING_DRAFT", "COMPLETE"]),
+            passedCount: z.number().int().nonnegative(),
+            mismatchCount: z.number().int().nonnegative(),
+          }),
+        })
+        .safeParse(body);
+      if (!response.ok || !parsed.success) {
+        const error = z.object({ error: z.string() }).safeParse(body);
+        throw new Error(error.success ? error.data.error : "Couldn't verify the full saved suite.");
+      }
+      return parsed.data.result;
+    },
+  });
+}
+
+const agentTestImprovementResponseSchema = z.object({
+  id: z.string().uuid(),
+  runId: z.string().uuid(),
+  caseId: z.string().uuid(),
+  caseSnapshot: z.object({
+    title: z.string(),
+    prompt: z.string(),
+    expectedOutcome: z.enum(["grounded_answer", "no_evidence", "human_handoff"]),
+    expectedSourceIds: z.array(z.string().uuid()),
+  }),
+  evaluationReferences: z.object({
+    configBasis: z.literal("widget-draft-revision-v1"),
+    configFingerprint: z.string().regex(/^[a-f0-9]{64}$/u),
+    modelProvider: z.enum(["OPENAI", "GOOGLE"]),
+    modelName: z.string().min(1),
+    sources: z.array(
+      z.object({
+        documentId: z.string().uuid(),
+        revisionId: z.string().uuid().nullable(),
+        revisionNumber: z.number().int().positive().nullable(),
+      }),
+    ),
+  }),
+  failureSourceIds: z.array(z.string().uuid()),
+  rationale: z.string(),
+  status: z.enum(["OPEN", "RESOLVED", "DISMISSED"]),
+  createdAt: z.string().datetime({ offset: true }),
+  reviewedAt: z.string().datetime({ offset: true }).nullable(),
+  reviewNote: z.string().nullable(),
+});
+
+export function useAgentTestImprovements() {
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useQuery<{ items: AgentTestImprovement[] }>({
+    queryKey: queryKeys.widget.agentTestImprovements(workspaceId),
+    enabled: Boolean(workspaceId),
+    queryFn: async () => {
+      const response = await fetch("/api/dashboard/agent-test-improvements");
+      const body: unknown = await response.json().catch(() => null);
+      const parsed = z
+        .object({ items: z.array(agentTestImprovementResponseSchema) })
+        .safeParse(body);
+      if (!response.ok || !parsed.success) {
+        const error = z.object({ error: z.string() }).safeParse(body);
+        throw new Error(error.success ? error.data.error : "Could not load the review queue.");
+      }
+      return parsed.data as { items: AgentTestImprovement[] };
+    },
+  });
+}
+
+export function useCreateAgentTestImprovement() {
+  const queryClient = useQueryClient();
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useMutation({
+    mutationFn: async (input: { runId: string; caseId: string; rationale: string }) => {
+      const parsed = createAgentTestImprovementSchema.safeParse(input);
+      if (!parsed.success) throw new Error("Improvement details are invalid.");
+      const response = await fetch("/api/dashboard/agent-test-improvements", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(parsed.data),
+      });
+      const body: unknown = await response.json().catch(() => null);
+      const result = z.object({ item: agentTestImprovementResponseSchema }).safeParse(body);
+      if (!response.ok || !result.success) {
+        const error = z.object({ error: z.string() }).safeParse(body);
+        throw new Error(error.success ? error.data.error : "Could not create this review item.");
+      }
+      return result.data.item;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.widget.agentTestImprovements(workspaceId),
+      });
+    },
+  });
+}
+
+export function useReviewAgentTestImprovement() {
+  const queryClient = useQueryClient();
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useMutation({
+    mutationFn: async (input: {
+      id: string;
+      status: "RESOLVED" | "DISMISSED";
+      reviewNote?: string | null;
+    }) => {
+      const parsed = updateAgentTestImprovementSchema.safeParse({
+        status: input.status,
+        reviewNote: input.reviewNote,
+      });
+      if (!parsed.success) throw new Error("Review details are invalid.");
+      const response = await fetch(
+        `/api/dashboard/agent-test-improvements/${encodeURIComponent(input.id)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(parsed.data),
+        },
+      );
+      const body: unknown = await response.json().catch(() => null);
+      const result = z.object({ item: agentTestImprovementResponseSchema }).safeParse(body);
+      if (!response.ok || !result.success) {
+        const error = z.object({ error: z.string() }).safeParse(body);
+        throw new Error(error.success ? error.data.error : "Could not update this review item.");
+      }
+      return result.data.item;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.widget.agentTestImprovements(workspaceId),
+      });
+    },
+  });
+}
+
+const agentTestComparisonResponseSchema = z.object({
+  id: z.string().uuid(),
+  improvementId: z.string().uuid(),
+  caseSnapshot: z.object({
+    title: z.string(),
+    prompt: z.string(),
+    expectedOutcome: z.enum(["grounded_answer", "no_evidence", "human_handoff"]),
+    expectedSourceIds: z.array(z.string().uuid()),
+  }),
+  baselineReferences: z.unknown().nullable(),
+  replayReferences: z.unknown().nullable(),
+  baselineOutcome: z.string().nullable(),
+  replayOutcome: z.string().nullable(),
+  replayStatus: z.string().nullable(),
+  status: z.enum(["PENDING", "COMPLETE", "ERROR"]),
+  createdAt: z.string().datetime({ offset: true }),
+  completedAt: z.string().datetime({ offset: true }).nullable(),
+});
+
+export function useAgentTestComparisons() {
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useQuery({
+    queryKey: queryKeys.widget.agentTestComparisons(workspaceId),
+    enabled: Boolean(workspaceId),
+    queryFn: async () => {
+      const response = await fetch("/api/dashboard/agent-test-comparisons");
+      const body: unknown = await response.json().catch(() => null);
+      const parsed = z
+        .object({ comparisons: z.array(agentTestComparisonResponseSchema) })
+        .safeParse(body);
+      if (!response.ok || !parsed.success) {
+        const error = z.object({ error: z.string() }).safeParse(body);
+        throw new Error(error.success ? error.data.error : "Could not load replay comparisons.");
+      }
+      return parsed.data;
+    },
+  });
+}
+
+export function useReplayAgentTestComparison() {
+  const queryClient = useQueryClient();
+  const workspaceId = useActiveWorkspaceId() ?? "";
+  return useMutation({
+    mutationFn: async (input: { improvementId: string; idempotencyKey: string }) => {
+      const response = await fetch("/api/dashboard/agent-test-comparisons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      const body: unknown = await response.json().catch(() => null);
+      const parsed = z
+        .object({
+          comparison: z.object({
+            id: z.string().uuid(),
+            status: z.enum(["PENDING", "COMPLETE", "ERROR"]),
+            baselineOutcome: z.string().nullable(),
+            replayOutcome: z.string().nullable(),
+            replayStatus: z.string().nullable(),
+            baselineReferences: z.unknown().nullable(),
+            replayReferences: z.unknown().nullable(),
+          }),
+          answerText: z.string().nullable(),
+          replayed: z.boolean(),
+        })
+        .safeParse(body);
+      if (!response.ok || !parsed.success) {
+        const error = z.object({ error: z.string() }).safeParse(body);
+        throw new Error(error.success ? error.data.error : "Could not replay this saved check.");
+      }
+      return parsed.data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.widget.agentTestComparisons(workspaceId),
+      });
     },
   });
 }

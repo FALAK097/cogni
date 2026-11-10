@@ -3,7 +3,9 @@ import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db/client";
 import { env } from "@/lib/env/server";
 import { drainIngestionQueue } from "@/lib/jobs/ingestion";
+import { drainSearchItemCleanup } from "@/features/knowledge/server/source-revisions";
 import { pruneExpiredRateLimitBuckets } from "@/lib/rate-limit/shared";
+import { drainConversationQaQueue } from "@/features/conversation-qa/server/queue";
 
 export const maxDuration = 300;
 
@@ -17,6 +19,16 @@ export async function GET(request: Request) {
 
   const db = getDb();
   const rateLimitBucketsPruned = await pruneExpiredRateLimitBuckets();
-  const result = await drainIngestionQueue(db, 10);
-  return NextResponse.json({ ok: true, rateLimitBucketsPruned, ...result });
+  const result = await drainIngestionQueue(db, 10, {
+    allowStaleRunning: env.INGESTION_RECLAIM_STALE !== "false",
+  });
+  const searchCleanup = await drainSearchItemCleanup(db, 50);
+  const conversationQa = await drainConversationQaQueue(db, 4);
+  return NextResponse.json({
+    ok: true,
+    rateLimitBucketsPruned,
+    ...result,
+    ...searchCleanup,
+    conversationQa,
+  });
 }

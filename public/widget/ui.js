@@ -873,7 +873,7 @@ export function removeTypingIndicator() {
 /**
  * Send message
  */
-export async function sendMessage() {
+export async function sendMessage(previewBinding = null) {
   const text = state.input.value.trim();
   if (!text || state.isSending) return;
   state.isSending = true;
@@ -915,13 +915,13 @@ export async function sendMessage() {
   }
 
   showTypingIndicator();
-  await callWidgetChat(text, generateUUID());
+  await callWidgetChat(text, generateUUID(), previewBinding);
 }
 
 /**
  * Call Widget chat API
  */
-async function callWidgetChat(userMessage, interactionId) {
+async function callWidgetChat(userMessage, interactionId, previewBinding = null) {
   let streamingMessage = null;
   let responseCompleted = false;
   try {
@@ -935,7 +935,14 @@ async function callWidgetChat(userMessage, interactionId) {
 
     const historyToSend = state.conversationHistory.slice(-20);
 
-    const response = await callWidgetChatAPI(userMessage, historyToSend, leadInfo, interactionId);
+    const response = await callWidgetChatAPI(
+      userMessage,
+      historyToSend,
+      leadInfo,
+      interactionId,
+      true,
+      previewBinding,
+    );
 
     removeTypingIndicator();
 

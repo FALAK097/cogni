@@ -26,6 +26,27 @@ export function isPreviewEvidence(value: unknown): value is WidgetPreviewEvidenc
   }
 
   if (
+    (evidence.runId === undefined) !== (evidence.caseId === undefined) ||
+    (evidence.modelProvider !== undefined &&
+      evidence.modelProvider !== "OPENAI" &&
+      evidence.modelProvider !== "GOOGLE") ||
+    (evidence.modelName !== undefined &&
+      (typeof evidence.modelName !== "string" || evidence.modelName.length > 120)) ||
+    (evidence.configFingerprint !== undefined &&
+      (typeof evidence.configFingerprint !== "string" ||
+        !/^[a-f0-9]{64}$/.test(evidence.configFingerprint))) ||
+    (evidence.signedEvidence !== undefined &&
+      (typeof evidence.signedEvidence !== "string" || evidence.signedEvidence.length > 8_000)) ||
+    (evidence.runId !== undefined &&
+      (typeof evidence.runId !== "string" || !/^[0-9a-f-]{36}$/i.test(evidence.runId))) ||
+    (evidence.caseId !== undefined &&
+      (typeof evidence.caseId !== "string" || !/^[0-9a-f-]{36}$/i.test(evidence.caseId))) ||
+    (evidence.runId !== undefined && typeof evidence.signedEvidence !== "string")
+  ) {
+    return false;
+  }
+
+  if (
     evidence.prompt !== undefined &&
     (typeof evidence.prompt !== "string" || evidence.prompt.length > 1_000)
   ) {
@@ -43,7 +64,13 @@ export function isPreviewEvidence(value: unknown): value is WidgetPreviewEvidenc
         (!("documentId" in source) ||
           (typeof source.documentId === "string" &&
             source.documentId.length > 0 &&
-            source.documentId.length <= 128)),
+            source.documentId.length <= 128)) &&
+        (!("revisionId" in source) ||
+          source.revisionId === null ||
+          (typeof source.revisionId === "string" && source.revisionId.length <= 128)) &&
+        (!("revisionNumber" in source) ||
+          source.revisionNumber === null ||
+          (typeof source.revisionNumber === "number" && Number.isInteger(source.revisionNumber))),
     )
   ) {
     return false;

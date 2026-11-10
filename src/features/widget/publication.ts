@@ -7,7 +7,7 @@ import {
   stringifyJsonArray,
   type WidgetPublishedConfig,
   type WidgetWidgetConfig,
-} from "@/features/widget/domain";
+} from "./domain";
 
 const hexColor = z.string().regex(/^#[0-9a-f]{6}$/i);
 

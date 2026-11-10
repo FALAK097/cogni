@@ -12,11 +12,42 @@ export type ReadinessStepId = "knowledge" | "test" | "publish" | "install";
 export type ReadinessStepStatus = "complete" | "in_progress" | "action_required" | "pending";
 export type ReadinessActionType = "navigate" | "publish" | "resume" | "domain";
 
+export type ReadinessEvidenceState = "unknown" | "stale" | "failed" | "verified";
+
+export type ReadinessMilestone = {
+  achieved: boolean;
+  timestamp: string | null;
+  detail: string | null;
+};
+
+export type ActivationMilestones = {
+  firstLiveQuestion: ReadinessMilestone;
+  firstHumanReply: ReadinessMilestone;
+};
+
+export type EvidenceBoundReadiness = {
+  workspaceId: string;
+  widgetId: string;
+  configFingerprint: string;
+  sourceBasisDigest: string | null;
+  testSuiteDigest: string | null;
+  publishedVersion: number;
+  authorizedDomains: string[];
+  knowledgeState: ReadinessEvidenceState;
+  testState: ReadinessEvidenceState;
+  publishState: ReadinessEvidenceState;
+  installState: ReadinessEvidenceState;
+  milestones: ActivationMilestones;
+  checklist: AgentLaunchChecklist;
+  publicationReadiness: AgentPublicationReadiness;
+};
+
 export interface ReadinessStep {
   id: ReadinessStepId;
   title: string;
   description: string;
   status: ReadinessStepStatus;
+  evidenceState?: ReadinessEvidenceState;
   actionLabel: string | null;
   actionType: ReadinessActionType | null;
   targetTab: "build" | "test" | "deploy";
@@ -29,6 +60,7 @@ export interface AgentLaunchChecklist {
   percent: number;
   currentStep: ReadinessStep | null;
   steps: ReadinessStep[];
+  milestones?: ActivationMilestones;
 }
 
 export function getAgentPublicationReadiness(input: {
@@ -103,26 +135,45 @@ export function getAgentLaunchChecklist(input: {
   authorizedDomainCount: number;
   hasObservedSession: boolean;
   isSavingConfiguration: boolean;
+  knowledgeState?: ReadinessEvidenceState;
+  testState?: ReadinessEvidenceState;
+  publishState?: ReadinessEvidenceState;
+  installState?: ReadinessEvidenceState;
+  milestones?: ActivationMilestones;
 }): AgentLaunchChecklist {
   const steps: ReadinessStep[] = [];
 
   // Step 1: Knowledge Base
-  if (input.processingSourcesCount > 0) {
+  if (input.knowledgeState === "failed") {
+    steps.push({
+      id: "knowledge",
+      title: "Index knowledge sources",
+      description:
+        "One or more knowledge sources failed to index. Retry or remove failed sources to verify grounding.",
+      status: "action_required",
+      evidenceState: "failed",
+      actionLabel: "Fix knowledge",
+      actionType: "navigate",
+      targetTab: "build",
+    });
+  } else if (input.processingSourcesCount > 0 || input.knowledgeState === "stale") {
     steps.push({
       id: "knowledge",
       title: "Index knowledge sources",
       description: `${input.processingSourcesCount} source(s) are currently processing. Grounded answers will activate once indexed.`,
       status: "in_progress",
+      evidenceState: "stale",
       actionLabel: "View knowledge",
       actionType: "navigate",
       targetTab: "build",
     });
-  } else if (input.readySourcesCount > 0) {
+  } else if (input.readySourcesCount > 0 || input.knowledgeState === "verified") {
     steps.push({
       id: "knowledge",
       title: "Index knowledge sources",
       description: `${input.readySourcesCount} indexed source(s) ready for grounded answers.`,
       status: "complete",
+      evidenceState: "verified",
       actionLabel: null,
       actionType: null,
       targetTab: "build",
@@ -134,6 +185,7 @@ export function getAgentLaunchChecklist(input: {
       description:
         "Add help docs, website pages, or FAQs so your agent can provide grounded answers.",
       status: "action_required",
+      evidenceState: "unknown",
       actionLabel: "Add knowledge",
       actionType: "navigate",
       targetTab: "build",
@@ -141,14 +193,39 @@ export function getAgentLaunchChecklist(input: {
   }
 
   // Step 2: Testing & Evaluation
-  if (input.hasTestRun) {
+  if (input.testState === "verified" || (!input.testState && input.hasTestRun)) {
     steps.push({
       id: "test",
       title: "Verify test suite",
-      description: `${input.testCasesCount} regression test case(s) verified in preview.`,
+      description: `${input.testCasesCount} regression test case(s) verified against current draft and knowledge.`,
       status: "complete",
+      evidenceState: "verified",
       actionLabel: null,
       actionType: null,
+      targetTab: "test",
+    });
+  } else if (input.testState === "stale") {
+    steps.push({
+      id: "test",
+      title: "Verify test suite",
+      description:
+        "Draft settings, knowledge sources, or saved tests changed since last verification. Re-run comparison before publishing.",
+      status: "action_required",
+      evidenceState: "stale",
+      actionLabel: "Re-run suite",
+      actionType: "navigate",
+      targetTab: "test",
+    });
+  } else if (input.testState === "failed") {
+    steps.push({
+      id: "test",
+      title: "Verify test suite",
+      description:
+        "Saved test suite has failing cases or regressions against draft. Resolve them to satisfy publish gate.",
+      status: "action_required",
+      evidenceState: "failed",
+      actionLabel: "Resolve failures",
+      actionType: "navigate",
       targetTab: "test",
     });
   } else if (input.testCasesCount > 0) {
@@ -157,6 +234,7 @@ export function getAgentLaunchChecklist(input: {
       title: "Verify test suite",
       description: `${input.testCasesCount} saved test case(s) ready to run against preview.`,
       status: "action_required",
+      evidenceState: "unknown",
       actionLabel: "Run tests",
       actionType: "navigate",
       targetTab: "test",
@@ -168,6 +246,7 @@ export function getAgentLaunchChecklist(input: {
       description:
         "Create test cases to confirm grounded answers, missing knowledge handling, and handoffs.",
       status: input.readySourcesCount > 0 ? "action_required" : "pending",
+      evidenceState: "unknown",
       actionLabel: "Add test case",
       actionType: "navigate",
       targetTab: "test",
@@ -181,6 +260,7 @@ export function getAgentLaunchChecklist(input: {
       title: "Publish agent configuration",
       description: "Saving configuration changes...",
       status: "in_progress",
+      evidenceState: "unknown",
       actionLabel: null,
       actionType: null,
       targetTab: "build",
@@ -191,6 +271,7 @@ export function getAgentLaunchChecklist(input: {
       title: "Publish agent configuration",
       description: "Visitor access is paused. Resume access to allow live conversations.",
       status: "action_required",
+      evidenceState: "failed",
       actionLabel: "Resume access",
       actionType: "resume",
       targetTab: "deploy",
@@ -201,6 +282,7 @@ export function getAgentLaunchChecklist(input: {
       title: "Publish agent configuration",
       description: "Publish your agent to activate current instructions and knowledge.",
       status: "action_required",
+      evidenceState: "unknown",
       actionLabel: "Review and publish",
       actionType: "publish",
       targetTab: "build",
@@ -211,6 +293,7 @@ export function getAgentLaunchChecklist(input: {
       title: "Publish agent configuration",
       description: "Saved draft changes are pending publication.",
       status: "action_required",
+      evidenceState: "stale",
       actionLabel: "Publish changes",
       actionType: "publish",
       targetTab: "build",
@@ -221,6 +304,7 @@ export function getAgentLaunchChecklist(input: {
       title: "Publish agent configuration",
       description: "Agent version is published and active.",
       status: "complete",
+      evidenceState: "verified",
       actionLabel: null,
       actionType: null,
       targetTab: "deploy",
@@ -234,28 +318,47 @@ export function getAgentLaunchChecklist(input: {
       title: "Authorize domain and install",
       description: "Add at least one authorized domain before installing the widget snippet.",
       status: "action_required",
+      evidenceState: "unknown",
       actionLabel: "Add domain",
       actionType: "domain",
       targetTab: "deploy",
     });
-  } else if (!input.hasObservedSession) {
+  } else if (input.installState === "stale") {
     steps.push({
       id: "install",
       title: "Authorize domain and install",
-      description: `Authorized on ${input.authorizedDomainCount} domain(s). Embed the widget snippet to observe first visitor conversation.`,
-      status: input.hasPublishedVersion && input.isEnabled ? "action_required" : "pending",
+      description:
+        "Past visitor conversation was observed on a prior version or unapproved domain. Verify on current publication.",
+      status: "action_required",
+      evidenceState: "stale",
       actionLabel: "Copy embed code",
       actionType: "navigate",
+      targetTab: "deploy",
+    });
+  } else if (
+    input.installState === "verified" ||
+    (!input.installState && input.hasObservedSession)
+  ) {
+    steps.push({
+      id: "install",
+      title: "Authorize domain and install",
+      description:
+        "Widget verified on authorized domain(s) with live visitor activity on current publication.",
+      status: "complete",
+      evidenceState: "verified",
+      actionLabel: null,
+      actionType: null,
       targetTab: "deploy",
     });
   } else {
     steps.push({
       id: "install",
       title: "Authorize domain and install",
-      description: "Widget verified on authorized domain(s) with live visitor activity.",
-      status: "complete",
-      actionLabel: null,
-      actionType: null,
+      description: `Authorized on ${input.authorizedDomainCount} domain(s). Embed the widget snippet to observe first live visitor question.`,
+      status: input.hasPublishedVersion && input.isEnabled ? "action_required" : "pending",
+      evidenceState: "unknown",
+      actionLabel: "Copy embed code",
+      actionType: "navigate",
       targetTab: "deploy",
     });
   }
@@ -273,5 +376,6 @@ export function getAgentLaunchChecklist(input: {
     percent,
     currentStep,
     steps,
+    milestones: input.milestones,
   };
 }

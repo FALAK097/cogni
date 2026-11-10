@@ -127,6 +127,97 @@
       "when": 1791526941545,
       "tag": "0017_agent_test_expected_sources",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793081164899,
+      "tag": "0018_document_source_revisions",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793081932740,
+      "tag": "0019_cloudflare_search_item_lifecycle",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1793082309822,
+      "tag": "0020_search_item_cleanup_backoff_claims",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1793095239456,
+      "tag": "0021_agent_test_evaluation_context",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1793097458927,
+      "tag": "0022_agent_test_improvements",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1793100034493,
+      "tag": "0023_agent_test_case_comparisons",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793167652762,
+      "tag": "0024_agent_test_publish_check",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1793168283055,
+      "tag": "0025_agent_test_publish_receipt_bindings",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1793278664633,
+      "tag": "0026_conversation_qa_scoring",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1793278792822,
+      "tag": "0027_conversation_qa_scoring_constraints",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1793278894945,
+      "tag": "0028_conversation_qa_scoring_error_code",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1793279136278,
+      "tag": "0029_conversation_qa_inactivity_cursor",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1793280000000,
+      "tag": "0030_ingestion_worker_leases",
+      "breakpoints": true
     }
   ]
 }

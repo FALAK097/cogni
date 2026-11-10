@@ -85,6 +85,8 @@ import {
 } from "@/features/analytics/insights-url-state";
 import { agentHref, APP_PAGES, APP_ROUTES } from "@/features/navigation/app-routes";
 import { CreateAgentTestCaseDialog } from "@/features/agent-tests/components/create-agent-test-case-dialog";
+import { AgentTestImprovementQueue } from "@/features/agent-tests/components/agent-test-improvement-queue";
+import { ConversationQaInsights } from "@/features/conversation-qa/components/conversation-qa-insights";
 import type { AgentTestExpectedOutcome } from "@/features/agent-tests/input";
 import { useAddManualTextSource, useKnowledgeBaseSources } from "@/hooks/query/use-knowledge-base";
 import { useAgentTestCases, useWidgetConfig } from "@/hooks/query/use-widget";
@@ -1103,6 +1105,9 @@ export function DashboardPage({
   const widgetConfig = widgetConfigQuery.data;
 
   const launchChecklist = useMemo(() => {
+    if (widgetConfig?.readiness?.checklist) {
+      return widgetConfig.readiness.checklist;
+    }
     return getAgentLaunchChecklist({
       readySourcesCount,
       processingSourcesCount,
@@ -1115,7 +1120,7 @@ export function DashboardPage({
       hasObservedSession: false,
       isSavingConfiguration: false,
     });
-  }, [readySourcesCount, processingSourcesCount, testCasesCount, hasTestRun, widgetConfig]);
+  }, [widgetConfig, readySourcesCount, processingSourcesCount, testCasesCount, hasTestRun]);
   const hasLowConversationVolume =
     !isLoading && analytics !== undefined && conversationCount > 0 && conversationCount < 5;
   const gapItems = analytics
@@ -1166,6 +1171,50 @@ export function DashboardPage({
     [agentTestRunsQuery.data?.runs, insightsQuery.tests],
   );
   const agentTestRuns = testHistory.runs;
+  const currentTestCases = useMemo(
+    () => new Map((testCasesQuery.data?.cases ?? []).map((testCase) => [testCase.id, testCase])),
+    [testCasesQuery.data?.cases],
+  );
+  const { failedCases: failedAgentTestCases, unavailableFailureCount } = useMemo(() => {
+    const failures: {
+      runId: string;
+      caseId: string;
+      title: string;
+      prompt: string;
+      expectedOutcome: AgentTestExpectedOutcome;
+      expectedSourceIds: string[];
+      sourceIds: string[];
+      failedAt: string;
+    }[] = [];
+    let unavailable = 0;
+    for (const run of [...agentTestRuns].reverse()) {
+      const cases = run.evaluationContext?.cases;
+      if (!cases) {
+        unavailable += run.mismatchCount;
+        continue;
+      }
+      for (const testCase of cases) {
+        if (testCase.status !== "mismatch") continue;
+        const savedCase = currentTestCases.get(testCase.id);
+        if (!savedCase || new Date(savedCase.updatedAt).toISOString() !== testCase.caseUpdatedAt) {
+          unavailable += 1;
+          continue;
+        }
+        failures.push({
+          runId: run.id,
+          caseId: savedCase.id,
+          title: savedCase.title,
+          prompt: savedCase.prompt,
+          expectedOutcome: savedCase.expectedOutcome,
+          expectedSourceIds: savedCase.expectedSourceIds,
+          sourceIds: [...new Set(testCase.sources.map((source) => source.documentId))],
+          failedAt: run.createdAt,
+        });
+      }
+      if (failures.length >= 12) break;
+    }
+    return { failedCases: failures.slice(0, 12), unavailableFailureCount: unavailable };
+  }, [agentTestRuns, currentTestCases]);
   const agentTestRunChartData = useMemo(
     () =>
       (agentTestRuns ?? []).map((run) => {
@@ -1179,6 +1228,8 @@ export function DashboardPage({
             mismatches: run.mismatchCount,
             errors: run.errorCount,
             notRun: run.notRunCount,
+            contextAvailable: run.evaluationContext ? 1 : 0,
+            contextMissing: run.evaluationContext ? 0 : 1,
           },
         };
       }),
@@ -1302,6 +1353,8 @@ export function DashboardPage({
             )}
           </div>
         </header>
+
+        <ConversationQaInsights />
 
         {dateRangeNotice ? (
           <output
@@ -2220,12 +2273,21 @@ export function DashboardPage({
                     { key: "mismatches", label: "Mismatches" },
                     { key: "errors", label: "Errors" },
                     { key: "notRun", label: "Not run" },
+                    { key: "contextAvailable", label: "Context available" },
+                    { key: "contextMissing", label: "Context missing" },
                   ]}
                   yAxisDomain={[0, 100]}
                   allowDecimals={false}
                   ariaLabel="Saved test pass rate by run"
                 />
               )}
+              {canManage ? (
+                <AgentTestImprovementQueue
+                  failedCases={failedAgentTestCases}
+                  unavailableFailureCount={unavailableFailureCount}
+                  canReview={canManage}
+                />
+              ) : null}
             </DashboardCard>
           </section>
         ) : null}

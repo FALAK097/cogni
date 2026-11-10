@@ -4,14 +4,24 @@ import { and, asc, eq, ilike, inArray } from "drizzle-orm";
 
 import type { Db } from "@/lib/db/client";
 import { getDb } from "@/lib/db/client";
-import { document as documentTable, documentChunk as documentChunkTable } from "@/lib/db/schema";
+import {
+  document as documentTable,
+  documentChunk as documentChunkTable,
+  documentRevision,
+} from "@/lib/db/schema";
 import {
   type CloudflareSearchChunk,
   type CloudflareSearchFilters,
   searchCloudflareIndex,
 } from "@/lib/search/cloudflare-search";
 
-type KnowledgeContext = { documentId: string; title: string; content: string };
+type KnowledgeContext = {
+  documentId: string;
+  title: string;
+  content: string;
+  revisionId: string | null;
+  revisionNumber: number | null;
+};
 type SearchKnowledge = typeof searchCloudflareIndex;
 
 function readSearchMetadataString(metadata: Record<string, unknown> | undefined, key: string) {
@@ -71,18 +81,61 @@ export async function retrieveKnowledgeContextWith({
     }
 
     const documents = await db
-      .select({ id: documentTable.id, title: documentTable.title })
+      .select({
+        id: documentTable.id,
+        title: documentTable.title,
+        providerItemKey: documentRevision.providerItemKey,
+        revisionId: documentRevision.id,
+        revisionNumber: documentRevision.revisionNumber,
+      })
       .from(documentTable)
+      .leftJoin(
+        documentRevision,
+        and(
+          eq(documentRevision.documentId, documentTable.id),
+          eq(documentRevision.workspaceId, documentTable.workspaceId),
+          eq(documentRevision.status, "CURRENT"),
+        ),
+      )
       .where(and(...documentConditions));
     const titlesByDocumentId = new Map(
       documents.map((document) => [document.id, document.title] as const),
+    );
+    const keysByDocumentId = new Map(
+      documents.map((document) => [document.id, document.providerItemKey ?? `${document.id}.txt`]),
+    );
+    const revisionsByDocumentId = new Map(
+      documents.map((document) => [
+        document.id,
+        {
+          revisionId: document.revisionId ?? null,
+          revisionNumber: document.revisionNumber ?? null,
+        },
+      ]),
     );
 
     const contexts = searchMatches.flatMap((match: CloudflareSearchChunk) => {
       const documentId = readSearchMetadataString(match.item?.metadata, "documentId");
       const title = documentId ? titlesByDocumentId.get(documentId) : null;
-      if (!documentId || !title || !match.text.trim()) return [];
-      return [{ documentId, title, content: match.text }];
+      const currentItemKey = documentId ? keysByDocumentId.get(documentId) : null;
+      if (
+        !documentId ||
+        !title ||
+        !currentItemKey ||
+        match.item?.key !== currentItemKey ||
+        !match.text.trim()
+      )
+        return [];
+      const revision = revisionsByDocumentId.get(documentId);
+      return [
+        {
+          documentId,
+          title,
+          content: match.text,
+          revisionId: revision?.revisionId ?? null,
+          revisionNumber: revision?.revisionNumber ?? null,
+        },
+      ];
     });
     if (contexts.length > 0) return contexts.slice(0, safeLimit);
   }
@@ -101,18 +154,49 @@ export async function retrieveKnowledgeContextWith({
       documentId: documentTable.id,
       title: documentTable.title,
       content: documentChunkTable.content,
+      revisionId: documentRevision.id,
+      revisionNumber: documentRevision.revisionNumber,
     })
     .from(documentChunkTable)
     .innerJoin(documentTable, eq(documentChunkTable.documentId, documentTable.id))
+    .leftJoin(
+      documentRevision,
+      and(
+        eq(documentRevision.documentId, documentTable.id),
+        eq(documentRevision.workspaceId, documentTable.workspaceId),
+        eq(documentRevision.status, "CURRENT"),
+      ),
+    )
     .where(and(...lexicalConditions))
     .orderBy(asc(documentChunkTable.position))
     .limit(safeLimit);
 
-  return exactMatches.map((match) => ({
-    documentId: match.documentId,
-    title: match.title,
-    content: match.content,
-  }));
+  return exactMatches.map((match) => {
+    const hasCurrentRevision =
+      match.revisionId !== null &&
+      match.revisionId !== undefined &&
+      match.revisionNumber !== null &&
+      match.revisionNumber !== undefined;
+    if (hasCurrentRevision) {
+      return {
+        documentId: match.documentId,
+        title: match.title,
+        content: match.content,
+        revisionId: match.revisionId,
+        revisionNumber: match.revisionNumber,
+      };
+    }
+    const fallbackItem = {
+      documentId: match.documentId,
+      title: match.title,
+      content: match.content,
+    } as KnowledgeContext;
+    Object.defineProperties(fallbackItem, {
+      revisionId: { value: null, enumerable: false, configurable: true, writable: true },
+      revisionNumber: { value: null, enumerable: false, configurable: true, writable: true },
+    });
+    return fallbackItem;
+  });
 }
 
 export async function retrieveKnowledgeContext(

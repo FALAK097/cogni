@@ -21,6 +21,8 @@ import {
   useAgentTestCases,
   useDeleteAgentTestCase,
   useRecordAgentTestRun,
+  useStartAgentTestPublishCheck,
+  useRecordAgentTestPublishCheckResults,
   useSaveAgentTestCase,
   type AgentTestCase,
 } from "@/hooks/query";
@@ -32,11 +34,30 @@ import {
 import { runAgentTestCase } from "@/features/agent-tests/run-case";
 
 export type WidgetPreviewEvidence = {
+  runId?: string;
+  caseId?: string;
   outcome: "answer" | "handoff" | "error";
   grounded: boolean;
-  sources: { documentId?: string; title: string }[];
+  modelProvider?: "OPENAI" | "GOOGLE";
+  modelName?: string;
+  configFingerprint?: string;
+  signedEvidence?: string;
+  sources: {
+    documentId?: string;
+    title: string;
+    revisionId?: string | null;
+    revisionNumber?: number | null;
+  }[];
   prompt?: string;
 };
+
+function publishResultLabel(status: AgentTestSuiteResult["status"] | undefined) {
+  if (status === "passed") return "Passed";
+  if (status === "mismatch") return "Needs review";
+  if (status === "error") return "Could not run";
+  if (status === "not_run") return "Not run";
+  return "Unavailable";
+}
 
 function getHandoffTerms(value: string) {
   return value
@@ -170,14 +191,19 @@ export function WidgetTestPanel({
   canManage,
   onTryPrompt,
   onResetPreview,
+  onPublishCheckComplete,
 }: {
   escalationKeywords: string;
   suggestions: string[];
   evidence: WidgetPreviewEvidence | null;
   sendingPrompt: string | null;
   canManage: boolean;
-  onTryPrompt: (prompt: string) => Promise<WidgetPreviewEvidence | null>;
+  onTryPrompt: (
+    prompt: string,
+    binding?: { runId: string; caseId: string },
+  ) => Promise<WidgetPreviewEvidence | null>;
   onResetPreview: () => Promise<boolean>;
+  onPublishCheckComplete: (checkId: string | null) => void;
 }) {
   const [tryError, setTryError] = useState<string | null>(null);
   const [retryPrompt, setRetryPrompt] = useState<string | null>(null);
@@ -198,10 +224,20 @@ export function WidgetTestPanel({
     title: string;
   } | null>(null);
   const [batchResults, setBatchResults] = useState<Record<string, AgentTestSuiteResult>>({});
+  const [baselineBatchResults, setBaselineBatchResults] = useState<
+    Record<string, AgentTestSuiteResult>
+  >({});
   const casesQuery = useAgentTestCases();
   const saveCase = useSaveAgentTestCase();
   const deleteCase = useDeleteAgentTestCase();
   const recordRun = useRecordAgentTestRun();
+  const startPublishCheck = useStartAgentTestPublishCheck();
+  const recordPublishCheck = useRecordAgentTestPublishCheckResults();
+  const [publishCheckStage, setPublishCheckStage] = useState<string | null>(null);
+  const [publishCheckMessage, setPublishCheckMessage] = useState<string | null>(null);
+  const [publishBaselineAvailable, setPublishBaselineAvailable] = useState<boolean | null>(null);
+  const isPublishCheckBusy =
+    publishCheckStage !== null || startPublishCheck.isPending || recordPublishCheck.isPending;
   const handoffTerms = getHandoffTerms(escalationKeywords);
   const visibleTerms = handoffTerms.slice(0, 5);
   const visibleSuggestions = [...new Set(suggestions.map((suggestion) => suggestion.trim()))]
@@ -211,7 +247,8 @@ export function WidgetTestPanel({
     sendingPrompt !== null ||
     resettingCaseId !== null ||
     batchProgress !== null ||
-    recordRun.isPending;
+    recordRun.isPending ||
+    isPublishCheckBusy;
 
   const tryPrompt = async (prompt: string) => {
     if (isBusy) return null;
@@ -256,6 +293,9 @@ export function WidgetTestPanel({
     if (isBusy) return;
     setTryError(null);
     setBatchResults({});
+    setBaselineBatchResults({});
+    setPublishCheckMessage(null);
+    setPublishBaselineAvailable(null);
     setActiveCaseId(testCase.id);
     setRetryCase(testCase);
     setRetryPrompt(testCase.prompt);
@@ -287,9 +327,11 @@ export function WidgetTestPanel({
     setRetryPrompt(null);
     setActiveCaseId(null);
     setBatchResults({});
+    setBaselineBatchResults({});
+    const runId = crypto.randomUUID();
     const results = await runAgentTestSuite(savedCases, {
       resetPreview: onResetPreview,
-      runPrompt: (testCase) => onTryPrompt(testCase.prompt),
+      runPrompt: (testCase) => onTryPrompt(testCase.prompt, { runId, caseId: testCase.id }),
       onCaseStart: (testCase, index) =>
         setBatchProgress({ index: index + 1, total: savedCases.length, title: testCase.title }),
       onResult: (result) => setBatchResults((current) => ({ ...current, [result.id]: result })),
@@ -299,9 +341,33 @@ export function WidgetTestPanel({
     if (canManage && results.length > 0) {
       try {
         await recordRun.mutateAsync({
-          runId: crypto.randomUUID(),
+          runId,
           suiteVersion: getAgentTestSuiteVersion(savedCases),
-          results: results.map(({ id, status }) => ({ id, status })),
+          results: results.map(({ id, status, evidence }) => ({
+            id,
+            status,
+            ...(evidence?.modelProvider ? { modelProvider: evidence.modelProvider } : {}),
+            ...(evidence?.modelName ? { modelName: evidence.modelName } : {}),
+            ...(evidence?.configFingerprint
+              ? { configFingerprint: evidence.configFingerprint }
+              : {}),
+            ...(evidence?.signedEvidence ? { signedEvidence: evidence.signedEvidence } : {}),
+            ...(evidence
+              ? {
+                  sources: (evidence.sources ?? []).flatMap((source) =>
+                    source.documentId
+                      ? [
+                          {
+                            documentId: source.documentId,
+                            revisionId: source.revisionId ?? null,
+                            revisionNumber: source.revisionNumber ?? null,
+                          },
+                        ]
+                      : [],
+                  ),
+                }
+              : {}),
+          })),
         });
       } catch {
         historyError =
@@ -320,6 +386,82 @@ export function WidgetTestPanel({
     }
   };
 
+  const compareSuiteForPublish = async () => {
+    const savedCases = casesQuery.data?.cases ?? [];
+    if (savedCases.length === 0 || isBusy) return;
+    onPublishCheckComplete(null);
+    setPublishCheckMessage(null);
+    setPublishBaselineAvailable(null);
+    setTryError(null);
+    setBatchResults({});
+    setBaselineBatchResults({});
+    setRetryCase(null);
+    setRetryPrompt(null);
+    try {
+      const check = await startPublishCheck.mutateAsync();
+      setPublishBaselineAvailable(check.baselineRequired);
+      const runVariant = async (variant: "baseline" | "draft") => {
+        setPublishCheckStage(
+          variant === "baseline"
+            ? "Comparing the current published agent"
+            : "Comparing the current draft",
+        );
+        const results = await runAgentTestSuite(savedCases, {
+          resetPreview: onResetPreview,
+          runPrompt: (testCase) =>
+            onTryPrompt(testCase.prompt, { runId: check.id, caseId: testCase.id }),
+          onCaseStart: (testCase, index) =>
+            setBatchProgress({ index: index + 1, total: savedCases.length, title: testCase.title }),
+          onResult: (result) => {
+            if (variant === "baseline") {
+              setBaselineBatchResults((current) => ({ ...current, [result.id]: result }));
+            } else {
+              setBatchResults((current) => ({ ...current, [result.id]: result }));
+            }
+          },
+        });
+        setBatchProgress(null);
+        if (
+          results.some(
+            (result) =>
+              result.status === "error" ||
+              result.status === "not_run" ||
+              !result.evidence?.signedEvidence,
+          )
+        ) {
+          throw new Error(
+            "Every saved test must finish with verified preview evidence before publishing.",
+          );
+        }
+        await recordPublishCheck.mutateAsync({
+          checkId: check.id,
+          variant,
+          results: results.map(({ id, status, evidence }) => ({
+            id,
+            status,
+            ...(evidence?.signedEvidence ? { signedEvidence: evidence.signedEvidence } : {}),
+          })),
+        });
+        return results;
+      };
+      if (check.baselineRequired) await runVariant("baseline");
+      const draftResults = await runVariant("draft");
+      const passed = draftResults.filter((result) => result.status === "passed").length;
+      const allPassed = passed === savedCases.length;
+      onPublishCheckComplete(allPassed ? check.id : null);
+      setPublishCheckStage(null);
+      setPublishCheckMessage(
+        allPassed
+          ? `${check.baselineRequired ? "Published baseline and draft compared" : "First publish: no published baseline exists; draft compared"} · ${passed}/${savedCases.length} draft tests passed. Receipt is tied to these tests, knowledge revisions, and configuration.`
+          : `Comparison complete · ${passed}/${savedCases.length} draft tests passed. Publishing stays blocked until every draft test passes.`,
+      );
+    } catch (error) {
+      setBatchProgress(null);
+      setPublishCheckStage(null);
+      setTryError(error instanceof Error ? error.message : "Couldn't verify the full saved suite.");
+    }
+  };
+
   const submitCase = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     try {
@@ -330,6 +472,7 @@ export function WidgetTestPanel({
         expectedOutcome,
         expectedSourceIds: expectedOutcome === "grounded_answer" ? expectedSourceIds : [],
       });
+      onPublishCheckComplete(null);
       setShowForm(false);
       setTryError(null);
     } catch (error) {
@@ -446,25 +589,43 @@ export function WidgetTestPanel({
       ) : null}
 
       <section aria-labelledby="saved-tests-heading" className="space-y-3 py-4">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 id="saved-tests-heading" className="text-sm font-semibold">
               Saved tests
             </h3>
+            {canManage ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Publishing requires a fresh full-suite comparison. Answers stay transient; preview
+                actions are disabled.
+              </p>
+            ) : null}
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {canManage && (casesQuery.data?.cases.length ?? 0) > 0 ? (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-8 rounded-lg"
-                onClick={() => void runAllCases()}
-                disabled={isBusy}
-              >
-                <Play className="size-3.5" aria-hidden="true" />
-                {recordRun.isPending ? "Saving…" : "Run all"}
-              </Button>
+              <>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-8 rounded-lg"
+                  onClick={() => void runAllCases()}
+                  disabled={isBusy}
+                >
+                  <Play className="size-3.5" aria-hidden="true" />
+                  {recordRun.isPending ? "Saving…" : "Run all"}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-8 rounded-lg"
+                  onClick={() => void compareSuiteForPublish()}
+                  disabled={isBusy}
+                >
+                  <CheckCircle2 className="size-3.5" aria-hidden="true" />
+                  {isPublishCheckBusy ? "Comparing…" : "Compare to publish"}
+                </Button>
+              </>
             ) : null}
             {canManage ? (
               <Button
@@ -480,6 +641,14 @@ export function WidgetTestPanel({
             ) : null}
           </div>
         </div>
+        {publishCheckMessage ? (
+          <output
+            aria-live="polite"
+            className="block rounded-lg bg-muted/50 px-3 py-2 text-xs leading-relaxed text-muted-foreground"
+          >
+            {publishCheckMessage}
+          </output>
+        ) : null}
         {casesQuery.isLoading ? (
           <output aria-busy="true" aria-label="Loading saved tests" className="space-y-2">
             <div aria-hidden="true" className="space-y-2">
@@ -529,7 +698,8 @@ export function WidgetTestPanel({
         ) : null}
         {batchProgress ? (
           <p className="text-xs text-muted-foreground" aria-live="polite">
-            Running {batchProgress.index} of {batchProgress.total}: {batchProgress.title}
+            {publishCheckStage ? `${publishCheckStage} · ` : ""}Running {batchProgress.index} of{" "}
+            {batchProgress.total}: {batchProgress.title}
           </p>
         ) : null}
         {batchResults && Object.keys(batchResults).length > 0 && !batchProgress ? (
@@ -581,6 +751,15 @@ export function WidgetTestPanel({
                     <p className="mt-2 line-clamp-2 break-words text-sm text-muted-foreground">
                       {testCase.prompt}
                     </p>
+                    {publishCheckMessage ? (
+                      <p className="mt-2 text-xs font-medium text-muted-foreground">
+                        Published:{" "}
+                        {publishBaselineAvailable
+                          ? publishResultLabel(baselineBatchResults[testCase.id]?.status)
+                          : "No prior publication"}
+                        {" · "}Draft: {publishResultLabel(batchResults[testCase.id]?.status)}
+                      </p>
+                    ) : null}
                     {suiteResult?.status === "not_run" ? (
                       <p className="mt-2 text-xs text-muted-foreground">Not run</p>
                     ) : suiteResult?.status === "error" && !evaluated ? (
@@ -638,6 +817,7 @@ export function WidgetTestPanel({
                             onClick={() =>
                               void deleteCase
                                 .mutateAsync(testCase.id)
+                                .then(() => onPublishCheckComplete(null))
                                 .catch((error: unknown) =>
                                   setTryError(
                                     error instanceof Error

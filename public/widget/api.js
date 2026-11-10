@@ -285,6 +285,7 @@ export async function callWidgetChatAPI(
   leadInfo = null,
   interactionId,
   canRetry = true,
+  previewBinding = null,
 ) {
   const metadata = getBrowserMetadata();
   const response = await fetch(buildPublicApiUrl(widgetKeyPath("/chat")), {
@@ -301,6 +302,9 @@ export async function callWidgetChatAPI(
       history: historyToSend,
       leadInfo,
       preview: state.preview,
+      ...(state.preview && previewBinding
+        ? { previewRunId: previewBinding.runId, previewCaseId: previewBinding.caseId }
+        : {}),
       metadata,
     }),
   });

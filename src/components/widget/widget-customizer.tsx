@@ -57,7 +57,10 @@ const NAV_ITEMS: {
 const WIDGET_CARD_CLASS = "bg-transparent";
 
 const WIDGET_SETTINGS_CARD_CLASS = `${WIDGET_CARD_CLASS} overflow-hidden`;
-async function waitForPreviewWidget(prompt: string): Promise<WidgetPreviewEvidence | null> {
+async function waitForPreviewWidget(
+  prompt: string,
+  binding?: { runId: string; caseId: string },
+): Promise<WidgetPreviewEvidence | null> {
   for (let attempt = 0; attempt < 50; attempt += 1) {
     const sendPreviewMessage = window.Widget?.sendPreviewMessage;
     if (sendPreviewMessage) {
@@ -81,14 +84,20 @@ async function waitForPreviewWidget(prompt: string): Promise<WidgetPreviewEviden
         };
         const onEvidence = (event: Event) => {
           const detail = (event as CustomEvent<unknown>).detail;
-          if (!isPreviewEvidence(detail) || detail.prompt !== prompt) return;
+          if (
+            !isPreviewEvidence(detail) ||
+            detail.prompt !== prompt ||
+            (binding && (detail.runId !== binding.runId || detail.caseId !== binding.caseId))
+          ) {
+            return;
+          }
           receivedEvidence = detail;
           finishWhenReady();
         };
 
         window.addEventListener("cogni:widget-preview-evidence", onEvidence);
         timeoutId = window.setTimeout(() => finish(null), WIDGET_PREVIEW_RESPONSE_TIMEOUT_MS);
-        void sendPreviewMessage(prompt).then(
+        void sendPreviewMessage(prompt, binding?.runId, binding?.caseId).then(
           (sent) => {
             sendFinished = true;
             sendSucceeded = sent;
@@ -242,6 +251,7 @@ export function WidgetCustomizer({
   const mobileTestResultRef = useRef<HTMLElement | null>(null);
   const [copied, setCopied] = useState(false);
   const [publicationError, setPublicationError] = useState<string | null>(null);
+  const [publishCheckId, setPublishCheckId] = useState<string | null>(null);
   const [domainInput, setDomainInput] = useState("");
   const [configOverrides, setConfigOverrides] = useState<Partial<WidgetCustomizerConfig>>({});
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -292,30 +302,36 @@ export function WidgetCustomizer({
             ? `Draft saved · published v${publication.current.version}`
             : `Published · v${publication.current.version}`
           : "Draft saved · not published";
+  const requiresPublishCheck =
+    !testCasesQuery.isSuccess || (testCasesQuery.data?.cases.length ?? 0) > 0;
   const canPublishChanges =
     canManage &&
+    (!requiresPublishCheck || Boolean(publishCheckId)) &&
     Boolean(publication?.hasUnpublishedChanges) &&
     !isSavingDraft &&
     !publishWidgetConfigMutation.isPending;
 
-  const tryPreviewPrompt = useCallback((prompt: string) => {
-    setPreviewEvidence(null);
-    setPreviewTestFailed(false);
-    setLastPreviewPrompt(prompt);
-    setSendingTestPrompt(prompt);
-    setShowMobilePreview(true);
-    return waitForPreviewWidget(prompt)
-      .then((evidence) => {
-        setPreviewTestFailed(evidence === null);
-        if (window.matchMedia("(max-width: 1023px)").matches) {
-          window.requestAnimationFrame(() =>
-            mobileTestResultRef.current?.focus({ preventScroll: true }),
-          );
-        }
-        return evidence;
-      })
-      .finally(() => setSendingTestPrompt(null));
-  }, []);
+  const tryPreviewPrompt = useCallback(
+    (prompt: string, binding?: { runId: string; caseId: string }) => {
+      setPreviewEvidence(null);
+      setPreviewTestFailed(false);
+      setLastPreviewPrompt(prompt);
+      setSendingTestPrompt(prompt);
+      setShowMobilePreview(true);
+      return waitForPreviewWidget(prompt, binding)
+        .then((evidence) => {
+          setPreviewTestFailed(evidence === null);
+          if (window.matchMedia("(max-width: 1023px)").matches) {
+            window.requestAnimationFrame(() =>
+              mobileTestResultRef.current?.focus({ preventScroll: true }),
+            );
+          }
+          return evidence;
+        })
+        .finally(() => setSendingTestPrompt(null));
+    },
+    [],
+  );
 
   const resetPreview = useCallback(async () => {
     setPreviewEvidence(null);
@@ -343,6 +359,7 @@ export function WidgetCustomizer({
     <Key extends keyof WidgetCustomizerConfig>(key: Key, value: WidgetCustomizerConfig[Key]) => {
       if (!canManage) return;
       const next = { ...configOverridesRef.current, [key]: value };
+      setPublishCheckId(null);
       configOverridesRef.current = next;
       setConfigOverrides(next);
     },
@@ -353,6 +370,7 @@ export function WidgetCustomizer({
     (updates: Partial<WidgetCustomizerConfig>) => {
       if (!canManage) return;
       const next = { ...configOverridesRef.current, ...updates };
+      setPublishCheckId(null);
       configOverridesRef.current = next;
       setConfigOverrides(next);
     },
@@ -652,7 +670,9 @@ export function WidgetCustomizer({
       await publishWidgetConfigMutation.mutateAsync({
         workspaceId: activeWorkspaceId,
         ...(restoreVersion ? { restoreVersion } : {}),
+        ...(!restoreVersion && publishCheckId ? { publishCheckId } : {}),
       });
+      if (!restoreVersion) setPublishCheckId(null);
     } catch (error: unknown) {
       setPublicationError(
         error instanceof Error ? error.message : "Couldn't publish these agent changes.",
@@ -669,26 +689,30 @@ export function WidgetCustomizer({
     sessionsQuery.data?.pagination?.total && sessionsQuery.data.pagination.total > 0,
   );
 
-  const launchChecklist = getAgentLaunchChecklist({
-    readySourcesCount,
-    processingSourcesCount,
-    testCasesCount,
-    hasTestRun,
-    isEnabled: config.isEnabled,
-    hasPublishedVersion: Boolean(publication?.current),
-    hasUnpublishedChanges: Boolean(publication?.hasUnpublishedChanges),
-    authorizedDomainCount: config.allowedDomains.length,
-    hasObservedSession,
-    isSavingConfiguration: isSavingDraft,
-  });
+  const launchChecklist =
+    widgetConfigQuery.data?.readiness?.checklist ??
+    getAgentLaunchChecklist({
+      readySourcesCount,
+      processingSourcesCount,
+      testCasesCount,
+      hasTestRun,
+      isEnabled: config.isEnabled,
+      hasPublishedVersion: Boolean(publication?.current),
+      hasUnpublishedChanges: Boolean(publication?.hasUnpublishedChanges),
+      authorizedDomainCount: config.allowedDomains.length,
+      hasObservedSession,
+      isSavingConfiguration: isSavingDraft,
+    });
 
-  const launchReadiness = getAgentPublicationReadiness({
-    isEnabled: config.isEnabled,
-    hasPublishedVersion: Boolean(publication?.current),
-    hasUnpublishedChanges: Boolean(publication?.hasUnpublishedChanges),
-    authorizedDomainCount: config.allowedDomains.length,
-    isSavingConfiguration: isSavingDraft,
-  });
+  const launchReadiness =
+    widgetConfigQuery.data?.readiness?.publicationReadiness ??
+    getAgentPublicationReadiness({
+      isEnabled: config.isEnabled,
+      hasPublishedVersion: Boolean(publication?.current),
+      hasUnpublishedChanges: Boolean(publication?.hasUnpublishedChanges),
+      authorizedDomainCount: config.allowedDomains.length,
+      isSavingConfiguration: isSavingDraft,
+    });
 
   const appearanceConfig: AppearanceConfig = {
     logoUrl: config.logoUrl ?? "",
@@ -928,6 +952,7 @@ export function WidgetCustomizer({
                   canManage={canManage}
                   onTryPrompt={tryPreviewPrompt}
                   onResetPreview={resetPreview}
+                  onPublishCheckComplete={setPublishCheckId}
                 />
               </TabsContent>
 

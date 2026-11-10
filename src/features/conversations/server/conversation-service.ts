@@ -8,6 +8,10 @@ import {
 } from "@/lib/db/schema";
 import type { widget as widgetTable } from "@/lib/db/schema";
 import { and, eq, ne, sql } from "drizzle-orm";
+import {
+  enqueueClosedConversationQa,
+  startConversationQaVersionAfterReopen,
+} from "@/features/conversation-qa/server/queue";
 
 const visitorSessionDurationMs = 1000 * 60 * 60 * 24 * 90;
 
@@ -549,6 +553,17 @@ export async function setConversationStatus({
   status: "CLOSED" | "OPEN";
 }) {
   return runDbWriteOperation(db, async (transaction) => {
+    const [current] = await transaction
+      .select({
+        status: conversation.status,
+        messages: conversation.messages,
+      })
+      .from(conversation)
+      .where(and(eq(conversation.id, conversationId), eq(conversation.workspaceId, workspaceId)))
+      .for("update")
+      .limit(1);
+    if (!current) return null;
+
     const status =
       targetStatus === "CLOSED"
         ? "CLOSED"
@@ -567,7 +582,19 @@ export async function setConversationStatus({
         assignedMemberId: conversation.assignedMemberId,
       });
 
-    if (updated) await recordConversationEvent(transaction, workspaceId, conversationId, "state");
+    if (updated) {
+      await recordConversationEvent(transaction, workspaceId, conversationId, "state");
+      if (targetStatus === "CLOSED" && current.status !== "CLOSED") {
+        await enqueueClosedConversationQa({
+          db: transaction,
+          workspaceId,
+          conversationId,
+          messages: current.messages,
+        });
+      } else if (targetStatus === "OPEN" && current.status === "CLOSED") {
+        await startConversationQaVersionAfterReopen(transaction, workspaceId, conversationId);
+      }
+    }
     return updated ?? null;
   });
 }
@@ -597,12 +624,39 @@ export async function updateConversationState({
       eq(conversation.workspaceId, workspaceId),
     ];
     if (onlyOpen) conditions.push(ne(conversation.status, "CLOSED"));
+    const [current] = await transaction
+      .select({
+        status: conversation.status,
+        messages: conversation.messages,
+      })
+      .from(conversation)
+      .where(and(eq(conversation.id, conversationId), eq(conversation.workspaceId, workspaceId)))
+      .for("update")
+      .limit(1);
+    if (!current || (onlyOpen && current.status === "CLOSED")) return null;
+
     const [updated] = await transaction
       .update(conversation)
       .set(changes)
       .where(and(...conditions))
-      .returning({ id: conversation.id });
-    if (updated) await recordConversationEvent(transaction, workspaceId, conversationId, "state");
+      .returning({ id: conversation.id, status: conversation.status });
+    if (updated) {
+      await recordConversationEvent(transaction, workspaceId, conversationId, "state");
+      if (changes.status === "CLOSED" && current.status !== "CLOSED") {
+        await enqueueClosedConversationQa({
+          db: transaction,
+          workspaceId,
+          conversationId,
+          messages: current.messages,
+        });
+      } else if (
+        current.status === "CLOSED" &&
+        changes.status !== undefined &&
+        changes.status !== "CLOSED"
+      ) {
+        await startConversationQaVersionAfterReopen(transaction, workspaceId, conversationId);
+      }
+    }
     return updated ?? null;
   });
 }

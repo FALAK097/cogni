@@ -50,19 +50,25 @@ export async function POST(request: Request) {
     bytes,
   });
 
-  const [document] = await db
-    .insert(documentTable)
-    .values({
-      id: randomUUID(),
-      workspaceId: workspace.id,
-      title,
-      sourceType,
-      storageKey: saved.storageKey,
-      mimeType,
-      status: "PROCESSING",
-      updatedAt: new Date().toISOString(),
-    })
-    .returning();
+  const { runDbWriteOperation } = await import("@/lib/db/client");
+  const { lockWorkspaceSourceBasisInTransaction } =
+    await import("@/features/knowledge/server/source-revisions");
+  const [document] = await runDbWriteOperation(db, async (transaction) => {
+    await lockWorkspaceSourceBasisInTransaction(transaction, workspace.id);
+    return transaction
+      .insert(documentTable)
+      .values({
+        id: randomUUID(),
+        workspaceId: workspace.id,
+        title,
+        sourceType,
+        storageKey: saved.storageKey,
+        mimeType,
+        status: "PROCESSING",
+        updatedAt: new Date().toISOString(),
+      })
+      .returning();
+  });
 
   const job = await enqueueDocumentProcessing({
     db,

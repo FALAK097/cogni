@@ -180,6 +180,9 @@ export async function GET() {
   const widget = await ensureWorkspaceWidget(db, workspace.id);
   const settings = toWidgetSettings(widget);
   const publication = await getWidgetPublicationStatus(db, widget);
+  const { getWorkspaceActivationReadiness } =
+    await import("@/features/widget/server/agent-readiness-service");
+  const readiness = await getWorkspaceActivationReadiness(db, workspace.id);
 
   return NextResponse.json({
     ...settings,
@@ -188,6 +191,7 @@ export async function GET() {
     allowedDomains: settings.authorizedDomains,
     borderRadius: settings.borderRadiusStyle,
     publication,
+    readiness,
   });
 }
 
