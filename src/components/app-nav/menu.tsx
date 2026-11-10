@@ -5,7 +5,6 @@ import Link from "next/link";
 import { Ellipsis } from "@/components/icons";
 
 import { CollapseMenuButton } from "@/components/app-nav/collapse-menu-button";
-import { buttonVariants } from "@/components/ui/button-variants";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { closeMobileSidebar } from "@/hooks/use-sidebar";
 import { buildMenuList } from "@/lib/menu-list";
@@ -77,30 +76,32 @@ export function Menu({ isOpen }: MenuProps) {
                     aria-label={label}
                     aria-current={isCurrentActive ? "page" : false}
                     className={cn(
-                      buttonVariants({ variant: "ghost" }),
-                      "w-full h-11 lg:h-11 mb-2 rounded-xl hover:bg-transparent relative overflow-hidden group cursor-pointer flex items-center transition-colors duration-150",
-                      isOpen === false ? "justify-center px-0" : "justify-start px-4",
-                      isCurrentActive ? "text-foreground" : "text-muted-foreground",
+                      "w-full min-h-11 lg:min-h-10 mb-1 rounded-lg relative overflow-hidden group cursor-pointer flex items-center transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                      isOpen === false ? "justify-center px-0" : "justify-start px-3 gap-3",
+                      isCurrentActive
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium shadow-xs"
+                        : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                     )}
                     onClick={() => closeMobileSidebar()}
                   >
+                    {isCurrentActive && (
+                      <span
+                        className="absolute left-0 top-2 bottom-2 w-0.5 rounded-r bg-primary"
+                        aria-hidden="true"
+                      />
+                    )}
                     <span
                       className={cn(
-                        isOpen === false ? "" : "mr-3",
-                        "flex-shrink-0 flex items-center justify-center",
+                        "flex-shrink-0 flex items-center justify-center transition-colors duration-150",
+                        isCurrentActive
+                          ? "text-primary"
+                          : "text-muted-foreground group-hover:text-sidebar-foreground",
                       )}
                     >
-                      <Icon size={18} className={isCurrentActive ? "text-primary" : ""} />
+                      <Icon size={18} />
                     </span>
                     {isOpen !== false && (
-                      <p
-                        className={cn(
-                          "flex-1 min-w-0 truncate text-left",
-                          isCurrentActive && "font-medium text-primary",
-                        )}
-                      >
-                        {label}
-                      </p>
+                      <p className="flex-1 min-w-0 truncate text-left text-sm">{label}</p>
                     )}
                     {isOpen && submenus && submenus.length > 0 && (
                       <span className="ml-auto px-1.5 py-0.5 text-xs rounded-full bg-primary/10 text-primary">

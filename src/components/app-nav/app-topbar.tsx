@@ -43,6 +43,7 @@ const LABELS: Record<string, string> = {
   insights: APP_PAGES.insights.label,
   agent: APP_PAGES.agent.label,
   settings: APP_PAGES.settings.label,
+  help: "Help & Docs",
   connections: "Connections",
   workspace: "Workspace",
 };

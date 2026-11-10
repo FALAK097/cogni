@@ -7,8 +7,9 @@ import { useEffect } from "react";
 import { Menu } from "@/components/app-nav/menu";
 import { WorkspaceSwitcher } from "@/components/app-nav/workspace-switcher";
 import { ThemeLogo } from "@/components/theme-logo";
-import { Settings } from "@/components/icons";
+import { HelpCircle, Settings } from "@/components/icons";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   closeMobileSidebar,
   useIsMobileSidebar,
@@ -44,22 +45,89 @@ function SidebarContent({ expanded }: { expanded: boolean }) {
       <div className="w-full min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <Menu isOpen={expanded} />
       </div>
-      <div className={cn("flex-none border-t border-sidebar-border", expanded ? "p-3" : "p-2")}>
-        <Link
-          href={APP_ROUTES.settings}
-          onClick={closeMobileSidebar}
-          aria-label={APP_PAGES.settings.label}
-          aria-current={pathname.startsWith(APP_ROUTES.settings) ? "page" : false}
-          title={APP_PAGES.settings.label}
-          className={cn(
-            "flex min-h-11 lg:min-h-10 items-center gap-4 rounded-md px-4 text-sm transition-colors duration-150 hover:bg-sidebar-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-            !expanded && "justify-center px-0",
-            pathname.startsWith(APP_ROUTES.settings) && "bg-sidebar-accent font-medium",
-          )}
-        >
-          <Settings className="size-[18px] shrink-0" />
-          {expanded && <span>{APP_PAGES.settings.label}</span>}
-        </Link>
+      <div
+        className={cn(
+          "flex-none border-t border-sidebar-border flex flex-col gap-1",
+          expanded ? "p-3" : "p-2",
+        )}
+      >
+        {expanded ? (
+          <>
+            <Link
+              href="/help"
+              onClick={closeMobileSidebar}
+              aria-label="Help & Docs"
+              aria-current={pathname.startsWith("/help") ? "page" : false}
+              title="Help & Docs"
+              className={cn(
+                "flex min-h-11 lg:min-h-10 items-center gap-3 rounded-lg px-3 text-sm text-sidebar-foreground transition-colors duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                pathname.startsWith("/help") &&
+                  "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
+              )}
+            >
+              <HelpCircle className="size-[18px] shrink-0 text-muted-foreground" />
+              <span>Help & Docs</span>
+            </Link>
+            <Link
+              href={APP_ROUTES.settings}
+              onClick={closeMobileSidebar}
+              aria-label={APP_PAGES.settings.label}
+              aria-current={pathname.startsWith(APP_ROUTES.settings) ? "page" : false}
+              title={APP_PAGES.settings.label}
+              className={cn(
+                "flex min-h-11 lg:min-h-10 items-center gap-3 rounded-lg px-3 text-sm text-sidebar-foreground transition-colors duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                pathname.startsWith(APP_ROUTES.settings) &&
+                  "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
+              )}
+            >
+              <Settings className="size-[18px] shrink-0 text-muted-foreground" />
+              <span>{APP_PAGES.settings.label}</span>
+            </Link>
+          </>
+        ) : (
+          <TooltipProvider delay={100}>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Link
+                    href="/help"
+                    onClick={closeMobileSidebar}
+                    aria-label="Help & Docs"
+                    aria-current={pathname.startsWith("/help") ? "page" : false}
+                    className={cn(
+                      "flex min-h-11 lg:min-h-10 w-full items-center justify-center rounded-lg text-sidebar-foreground transition-colors duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                      pathname.startsWith("/help") &&
+                        "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
+                    )}
+                  >
+                    <HelpCircle className="size-[18px] shrink-0 text-muted-foreground" />
+                  </Link>
+                }
+              />
+              <TooltipContent side="right">Help & Docs</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Link
+                    href={APP_ROUTES.settings}
+                    onClick={closeMobileSidebar}
+                    aria-label={APP_PAGES.settings.label}
+                    aria-current={pathname.startsWith(APP_ROUTES.settings) ? "page" : false}
+                    className={cn(
+                      "flex min-h-11 lg:min-h-10 w-full items-center justify-center rounded-lg text-sidebar-foreground transition-colors duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                      pathname.startsWith(APP_ROUTES.settings) &&
+                        "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
+                    )}
+                  >
+                    <Settings className="size-[18px] shrink-0 text-muted-foreground" />
+                  </Link>
+                }
+              />
+              <TooltipContent side="right">{APP_PAGES.settings.label}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
       </div>
     </div>
   );
