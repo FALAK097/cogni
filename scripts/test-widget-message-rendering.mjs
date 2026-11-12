@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { readFileSync } from "node:fs";
 import { build } from "esbuild";
 
 const compiled = await build({
@@ -97,6 +98,31 @@ const feedbackCompiled = await build({
 });
 const { createFeedbackButtons, createFeedbackReasonMarkup } = await import(
   `data:text/javascript;base64,${Buffer.from(feedbackCompiled.outputFiles[0].text).toString("base64")}`
+);
+const leadCaptureCompiled = await build({
+  entryPoints: ["public/widget/lead-capture.js"],
+  bundle: true,
+  write: false,
+  format: "esm",
+  platform: "node",
+  plugins: [
+    {
+      name: "identity-remend",
+      setup(builder) {
+        builder.onResolve({ filter: /^remend$/ }, () => ({
+          path: "remend",
+          namespace: "test",
+        }));
+        builder.onLoad({ filter: /.*/, namespace: "test" }, () => ({
+          contents: "export default (text) => text;",
+          loader: "js",
+        }));
+      },
+    },
+  ],
+});
+const { renderLeadNameMarkup, renderLeadEmailMarkup, renderLeadPhoneMarkup } = await import(
+  `data:text/javascript;base64,${Buffer.from(leadCaptureCompiled.outputFiles[0].text).toString("base64")}`
 );
 
 test("message formatter keeps unsafe markdown destinations inert", () => {
@@ -224,4 +250,70 @@ test("teammate history uses a distinct, safely escaped support identity", () => 
   assert.ok(header.includes('class="oc-team-label">Support</span>'));
   assert.doesNotMatch(header, /<img\b/i);
   assert.ok(renderTeamMessageHeader(" ").includes(">Support team</span>"));
+});
+
+test("lead capture steps expose accessible labels, button names, and error associations", () => {
+  const config = { agentName: "SupportBot", logoUrl: null };
+
+  const nameMarkup = renderLeadNameMarkup(config);
+  assert.ok(
+    nameMarkup.includes(
+      '<label for="oc-lead-name-input" class="oc-screen-reader-only">Your name</label>',
+    ),
+  );
+  assert.ok(nameMarkup.includes('aria-label="Your name"'));
+  assert.ok(nameMarkup.includes('aria-describedby="oc-lead-name-error"'));
+  assert.ok(nameMarkup.includes('autocomplete="name"'));
+  assert.ok(nameMarkup.includes('id="oc-lead-name-btn"'));
+  assert.ok(nameMarkup.includes('aria-label="Submit name"'));
+  assert.ok(nameMarkup.includes('id="oc-lead-name-error" role="alert" aria-live="polite"'));
+
+  const emailMarkup = renderLeadEmailMarkup(config, "Alex");
+  assert.ok(
+    emailMarkup.includes(
+      '<label for="oc-lead-email-input" class="oc-screen-reader-only">Email address</label>',
+    ),
+  );
+  assert.ok(emailMarkup.includes('aria-label="Email address"'));
+  assert.ok(emailMarkup.includes('aria-describedby="oc-lead-email-error"'));
+  assert.ok(emailMarkup.includes('autocomplete="email"'));
+  assert.ok(emailMarkup.includes('id="oc-lead-email-btn"'));
+  assert.ok(emailMarkup.includes('aria-label="Submit email"'));
+  assert.ok(emailMarkup.includes('id="oc-lead-email-error" role="alert" aria-live="polite"'));
+
+  const phoneMarkup = renderLeadPhoneMarkup(config);
+  assert.ok(
+    phoneMarkup.includes(
+      '<label for="oc-lead-phone-input" class="oc-screen-reader-only">Phone number (optional)</label>',
+    ),
+  );
+  assert.ok(phoneMarkup.includes('aria-label="Phone number (optional)"'));
+  assert.ok(phoneMarkup.includes('aria-describedby="oc-lead-phone-error"'));
+  assert.ok(phoneMarkup.includes('autocomplete="tel"'));
+  assert.ok(phoneMarkup.includes('id="oc-lead-phone-btn"'));
+  assert.ok(phoneMarkup.includes('aria-label="Submit phone number"'));
+  assert.ok(phoneMarkup.includes('id="oc-lead-phone-error" role="alert" aria-live="polite"'));
+  assert.ok(phoneMarkup.includes('id="oc-lead-phone-skip"'));
+});
+
+test("widget stylesheet uses semantic muted-text tokens and avoids inverted low-contrast pairs", () => {
+  const stylesContent = readFileSync("public/widget/styles.js", "utf8");
+
+  // Inverted contrast pair: #71717a in dark mode (4.12:1 on #09090b) and #a1a1aa in light mode (2.56:1 on white)
+  assert.doesNotMatch(
+    stylesContent,
+    /config\.theme === "dark" \? "#71717a" : "#a1a1aa"/,
+    "Stylesheet should not declare low-contrast inverted pair #71717a / #a1a1aa for normal text",
+  );
+
+  // Semantic muted token definition and custom property
+  assert.match(
+    stylesContent,
+    /const panelMuted = config\.theme === "dark" \? "#a1a1aa" : "#71717a";/,
+  );
+  assert.match(stylesContent, /--oc-text-muted:\s*\$\{panelMuted\};/);
+
+  // Lead error styling with accessible contrast
+  assert.match(stylesContent, /\.oc-lead-error\s*\{/);
+  assert.match(stylesContent, /\.oc-lead-input-container\.has-error\s*\{/);
 });
