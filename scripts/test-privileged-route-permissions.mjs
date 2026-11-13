@@ -40,6 +40,7 @@ const state = {
 globalThis.__privilegedRoutePermissionTest = state;
 
 const stubs = {
+  "server-only": `export {};`,
   "next/server": `export const NextResponse = { json: (value, init = {}) => new Response(JSON.stringify(value), { ...init, headers: { "content-type": "application/json", ...init.headers } }) };`,
   "@/lib/auth/dashboard-context": `export const requireDashboardContext = () => globalThis.__privilegedRoutePermissionTest.requireDashboardContext();`,
   "@/lib/auth/permissions": `export const canManageWorkspace = (role) => role === "OWNER";`,
@@ -54,11 +55,11 @@ const stubs = {
   "@/lib/storage/index": `export const isAllowedKnowledgeUpload = () => true; export const saveObject = () => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; };`,
   "@/lib/storage": `export const deleteObject = () => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; };`,
   "@/features/integrations/server/composio-connections": `export const COMPOSIO_PROVIDER_SLUGS = {}; export const COMPOSIO_TOOLKITS = {}; export const createComposioClient = () => { globalThis.__privilegedRoutePermissionTest.sideEffects += 1; }; export const getComposioProviderBySlug = () => null; export const getOrCreateAuthConfig = () => {};`,
-  "@/lib/db/schema": `export const integration = { workspaceId: "workspaceId", provider: "provider" }; export const approvalRequest = { id: "id", workspaceId: "workspaceId" }; export const workflowRun = { id: "id", workspaceId: "workspaceId", name: "name", idempotencyKey: "idempotencyKey", status: "status" }; export const document = { id: "id", workspaceId: "workspaceId" }; export const widget = { id: "id" };`,
+  "@/lib/db/schema": `const column = (name) => ({ name: String(name) }); const table = () => new Proxy({}, { get: (_target, prop) => (typeof prop === "symbol" ? undefined : column(prop)) }); export const integration = { workspaceId: "workspaceId", provider: "provider" }; export const approvalRequest = { id: "id", workspaceId: "workspaceId" }; export const workflowRun = { id: "id", workspaceId: "workspaceId", name: "name", idempotencyKey: "idempotencyKey", status: "status" }; export const document = { id: "id", workspaceId: "workspaceId" }; export const widget = { id: "id" }; export const workspace = table(); export const conversation = table(); export const conversationEvent = table(); export const conversationQaEvaluation = table(); export const conversationQaState = table(); export const contact = table(); export const domainEvent = table(); export const visitorSession = table();`,
   "@/features/widget/domain": `export const normalizeHostname = () => null; export const normalizeLauncherSize = () => "md"; export const normalizePosition = () => "right"; export const normalizeFontFamily = () => "system"; export const normalizeFontSize = () => "md"; export const normalizeLogoUrl = () => null; export const stringifyJsonArray = () => "[]";`,
   "@/features/widget/server/widget-service": `export const ensureWorkspaceWidget = () => ({}); export const getWidgetPublicationStatus = () => ({}); export const toWidgetSettings = () => ({});`,
   "@/lib/env/server": `export const env = {};`,
-  "drizzle-orm": `export const and = (...args) => args; export const eq = (...args) => args; export const like = (...args) => args; export const inArray = (...args) => args;`,
+  "drizzle-orm": `export const and = (...args) => args; export const eq = (...args) => args; export const like = (...args) => args; export const inArray = (...args) => args; export const asc = (value) => value; export const desc = (value) => value; export const gt = (...args) => args; export const gte = (...args) => args; export const lt = (...args) => args; export const lte = (...args) => args; export const ne = (...args) => args; export const or = (...args) => args; export const isNotNull = (value) => value; export const isNull = (value) => value; export const sql = (...args) => args;`,
   "@/features/workflows/progression": `export const getWorkflowProgression = () => ({ kind: "complete" });`,
 };
 
@@ -74,10 +75,12 @@ async function loadRoute(entryPoint) {
       {
         name: "privileged-route-permission-test",
         setup(buildContext) {
-          buildContext.onResolve({ filter: /^(next\/server|drizzle-orm|@\/.*)$/ }, (args) =>
-            args.path in stubs
-              ? { path: args.path, namespace: "privileged-route-permission-test" }
-              : undefined,
+          buildContext.onResolve(
+            { filter: /^(next\/server|server-only|drizzle-orm|@\/.*)$/ },
+            (args) =>
+              args.path in stubs
+                ? { path: args.path, namespace: "privileged-route-permission-test" }
+                : undefined,
           );
           buildContext.onLoad(
             { filter: /.*/, namespace: "privileged-route-permission-test" },
