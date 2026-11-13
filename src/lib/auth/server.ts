@@ -65,13 +65,9 @@ function createAuth() {
       },
     },
     socialProviders,
-    trustedOrigins: [
-      env.BETTER_AUTH_URL,
-      "http://localhost:3000",
-      "http://127.0.0.1:3000",
-      "http://localhost:3001",
-      "http://127.0.0.1:3001",
-    ].filter(Boolean),
+    trustedOrigins: [env.BETTER_AUTH_URL, "http://localhost:3000", "http://127.0.0.1:3000"].filter(
+      Boolean,
+    ),
     advanced: {
       useSecureCookies: process.env.NODE_ENV === "production",
       cookiePrefix: "ba",
