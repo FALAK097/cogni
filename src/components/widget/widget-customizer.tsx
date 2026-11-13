@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 
 import { Bot, Code, Eye, MessageCircle, Sparkles } from "@/components/icons";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -850,7 +851,10 @@ export function WidgetCustomizer({
       ) : null}
       {publicationError ? (
         <p role="alert" className="shrink-0 text-sm text-destructive">
-          {publicationError} The published version is unchanged.
+          {publicationError} The published version is unchanged.{" "}
+          <Link href="/help#preview-publish" className="underline underline-offset-2">
+            Publish help
+          </Link>
         </p>
       ) : null}
       {!canManage ? (

@@ -134,9 +134,12 @@ export function IntegrationDetail({ slug, canManage }: { slug: string; canManage
                 : "Just now"}
             </p>
             {detail.lastError ? (
-              <p className="rounded-lg bg-destructive/10 p-3 text-destructive">
-                {detail.lastError}
-              </p>
+              <div className="space-y-2 rounded-lg bg-destructive/10 p-3 text-destructive">
+                <p>{detail.lastError}</p>
+                <Link href="/help#channels" className="underline underline-offset-2">
+                  Channel setup and delivery guide
+                </Link>
+              </div>
             ) : null}
             {detail.inboundWebhookUrl ? (
               <div className="space-y-1 pt-2">
@@ -157,7 +160,12 @@ export function IntegrationDetail({ slug, canManage }: { slug: string; canManage
           </CardHeader>
           <CardContent className="space-y-2">
             {detail.capabilities.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No agent actions are enabled yet.</p>
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">No agent actions are enabled yet.</p>
+                <Link href="/help#channels" className="text-sm underline underline-offset-2">
+                  Review channel capabilities
+                </Link>
+              </div>
             ) : (
               detail.capabilities.map((capability) => (
                 <div

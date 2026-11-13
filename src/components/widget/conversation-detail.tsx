@@ -1109,6 +1109,12 @@ export function ConversationDetail({
                           Visitor requested a human or matched escalation criteria. AI replies are
                           paused.
                         </p>
+                        <Link
+                          href="/help#takeover"
+                          className="inline-block text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                        >
+                          Takeover guide
+                        </Link>
                       </div>
                     </div>
                     {!isAssignedToMe ? (
