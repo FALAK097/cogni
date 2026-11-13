@@ -62,12 +62,33 @@ export function toWidgetPublishedConfig(widget: WidgetRecord): WidgetPublishedCo
 }
 
 export function toWidgetBookingConfig(widget: WidgetRecord) {
+  let parsedWorkingHours: Record<string, unknown> = {};
+  try {
+    parsedWorkingHours = JSON.parse(widget.bookingWorkingHours) as Record<string, unknown>;
+  } catch {
+    parsedWorkingHours = { start: "09:00", end: "17:00", weekdays: [1, 2, 3, 4, 5] };
+  }
   return bookingSettingsInputSchema.parse({
     enabled: widget.bookingEnabled,
     timezone: widget.bookingTimezone,
     durationMinutes: widget.bookingDurationMinutes,
     minimumNoticeMinutes: widget.bookingMinimumNoticeMinutes,
-    workingHours: JSON.parse(widget.bookingWorkingHours) as unknown,
+    bufferMinutes:
+      typeof parsedWorkingHours.bufferMinutes === "number" ? parsedWorkingHours.bufferMinutes : 15,
+    allowedDays: Array.isArray(parsedWorkingHours.allowedDays)
+      ? parsedWorkingHours.allowedDays
+      : Array.isArray(parsedWorkingHours.weekdays)
+        ? parsedWorkingHours.weekdays
+        : undefined,
+    handoffFallback:
+      typeof parsedWorkingHours.handoffFallback === "string"
+        ? parsedWorkingHours.handoffFallback
+        : undefined,
+    notificationChannel:
+      typeof parsedWorkingHours.notificationChannel === "string"
+        ? parsedWorkingHours.notificationChannel
+        : undefined,
+    workingHours: parsedWorkingHours,
   });
 }
 

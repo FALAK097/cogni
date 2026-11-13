@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import {
   bookingSettingsInputSchema,
@@ -13,8 +13,13 @@ const defaultSettings = bookingSettingsInputSchema.parse({
   enabled: false,
   timezone: "UTC",
   durationMinutes: 30,
+  bufferMinutes: 15,
   minimumNoticeMinutes: 60,
+  allowedDays: [1, 2, 3, 4, 5],
   workingHours: { start: "09:00", end: "17:00", weekdays: [1, 2, 3, 4, 5] },
+  handoffFallback:
+    "No slots currently available. A team member will follow up with you directly in this chat.",
+  notificationChannel: "INBOX",
 });
 
 export async function GET() {
@@ -22,15 +27,43 @@ export async function GET() {
   const saved = await db.query.widget.findFirst({
     where: (fields, { eq }) => eq(fields.workspaceId, workspace.id),
   });
+
+  let parsedWorkingHours: Record<string, unknown> = {};
+  if (saved) {
+    try {
+      parsedWorkingHours = JSON.parse(saved.bookingWorkingHours) as Record<string, unknown>;
+    } catch {
+      parsedWorkingHours = {};
+    }
+  }
+
   const settings = saved
     ? bookingSettingsInputSchema.parse({
         enabled: saved.bookingEnabled,
         timezone: saved.bookingTimezone,
         durationMinutes: saved.bookingDurationMinutes,
         minimumNoticeMinutes: saved.bookingMinimumNoticeMinutes,
-        workingHours: JSON.parse(saved.bookingWorkingHours) as unknown,
+        bufferMinutes:
+          typeof parsedWorkingHours.bufferMinutes === "number"
+            ? parsedWorkingHours.bufferMinutes
+            : 15,
+        allowedDays: Array.isArray(parsedWorkingHours.allowedDays)
+          ? parsedWorkingHours.allowedDays
+          : Array.isArray(parsedWorkingHours.weekdays)
+            ? parsedWorkingHours.weekdays
+            : [1, 2, 3, 4, 5],
+        handoffFallback:
+          typeof parsedWorkingHours.handoffFallback === "string"
+            ? parsedWorkingHours.handoffFallback
+            : undefined,
+        notificationChannel:
+          typeof parsedWorkingHours.notificationChannel === "string"
+            ? parsedWorkingHours.notificationChannel
+            : "INBOX",
+        workingHours: parsedWorkingHours,
       })
     : defaultSettings;
+
   return NextResponse.json({
     settings,
     slots: settings.enabled ? createAvailableSlots(settings) : [],
@@ -56,6 +89,17 @@ export async function PATCH(request: Request) {
   if (!existing) {
     return NextResponse.json({ error: "Widget not found." }, { status: 404 });
   }
+
+  const allowedDays = parsed.data.allowedDays ?? parsed.data.workingHours.weekdays;
+  const enrichedWorkingHours = {
+    ...parsed.data.workingHours,
+    weekdays: allowedDays,
+    bufferMinutes: parsed.data.bufferMinutes,
+    allowedDays,
+    handoffFallback: parsed.data.handoffFallback,
+    notificationChannel: parsed.data.notificationChannel,
+  };
+
   await db
     .update(widget)
     .set({
@@ -63,9 +107,10 @@ export async function PATCH(request: Request) {
       bookingTimezone: parsed.data.timezone,
       bookingDurationMinutes: parsed.data.durationMinutes,
       bookingMinimumNoticeMinutes: parsed.data.minimumNoticeMinutes,
-      bookingWorkingHours: JSON.stringify(parsed.data.workingHours),
+      bookingWorkingHours: JSON.stringify(enrichedWorkingHours),
       updatedAt: new Date().toISOString(),
     })
-    .where(eq(widget.id, existing.id));
+    .where(and(eq(widget.id, existing.id), eq(widget.workspaceId, workspace.id)));
+
   return NextResponse.json({ settings: parsed.data, slots: createAvailableSlots(parsed.data) });
 }
