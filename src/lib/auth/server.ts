@@ -9,6 +9,24 @@ import { getDb } from "@/lib/db/client";
 import { env } from "@/lib/env/server";
 import * as schema from "@/lib/db/schema";
 
+export function isEmailPasswordAuthEnabled(): boolean {
+  const isProduction =
+    process.env.NODE_ENV === "production" ||
+    env.ENV === "production" ||
+    process.env.ENV === "production";
+
+  if (isProduction) {
+    return false;
+  }
+
+  const rawOptIn = env.LOCAL_DEV_EMAIL_PASSWORD_AUTH ?? process.env.LOCAL_DEV_EMAIL_PASSWORD_AUTH;
+  if (rawOptIn !== undefined) {
+    return rawOptIn === "true";
+  }
+
+  return true;
+}
+
 function createAuth() {
   const db = getDb();
 
@@ -29,7 +47,7 @@ function createAuth() {
       schema: schema,
     }),
     emailAndPassword: {
-      enabled: true,
+      enabled: isEmailPasswordAuthEnabled(),
       requireEmailVerification: false,
       async sendResetPassword({ user }) {
         if (process.env.NODE_ENV !== "production") {
