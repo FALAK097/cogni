@@ -119,6 +119,8 @@ export function injectStyles() {
 		#widget-container {
 			--oc-font-family: ${resolveFontFamily(config.fontFamily || "Inter")};
 			--oc-font-size: ${baseFontSize};
+			--oc-text-color: ${panelText};
+			--oc-text-muted: ${panelMuted};
 			font-family: var(--oc-font-family);
 			font-size: var(--oc-font-size);
 			${containerPositioning}
@@ -516,7 +518,7 @@ export function injectStyles() {
 		.oc-bot-name {
 			font-size: 12px;
 			font-weight: 500;
-			color: ${config.theme === "dark" ? "#71717a" : "#71717a"};
+			color: ${panelMuted};
 		}
 
 		.oc-team-avatar {
@@ -536,7 +538,7 @@ export function injectStyles() {
 
 		.oc-team-label {
 			font-size: 10px;
-			color: ${config.theme === "dark" ? "#71717a" : "#a1a1aa"};
+			color: ${panelMuted};
 		}
 
 		.oc-team-header .oc-bot-name {
@@ -549,7 +551,7 @@ export function injectStyles() {
 
 		.oc-timestamp {
 			font-size: 10px;
-			color: ${config.theme === "dark" ? "#71717a" : "#a1a1aa"};
+			color: ${panelMuted};
 			padding: 0 4px;
 		}
 
@@ -576,7 +578,7 @@ export function injectStyles() {
 			display: flex;
 			align-items: center;
 			justify-content: center;
-			color: ${config.theme === "dark" ? "#71717a" : "#a1a1aa"};
+			color: ${panelMuted};
 			transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
 			min-width: 36px;
 			min-height: 36px;
@@ -584,7 +586,7 @@ export function injectStyles() {
 
 		.oc-feedback-btn:hover {
 			background: ${config.theme === "dark" ? "#27272a" : "#f4f4f5"};
-			color: ${config.theme === "dark" ? "#a1a1aa" : "#71717a"};
+			color: ${panelText};
 		}
 
 		.oc-feedback-btn:focus-visible,
@@ -629,7 +631,7 @@ export function injectStyles() {
 
 		.oc-feedback-thanks {
 			font-size: 11px;
-			color: ${config.theme === "dark" ? "#71717a" : "#a1a1aa"};
+			color: ${panelMuted};
 			margin-left: 8px;
 			opacity: 0;
 			transition: opacity 0.2s ease;
@@ -687,7 +689,7 @@ export function injectStyles() {
 
 		.oc-feedback-input-label span {
 			font-weight: 400;
-			color: ${config.theme === "dark" ? "#a1a1aa" : "#71717a"};
+			color: ${panelMuted};
 		}
 
 		.oc-feedback-modal-options {
@@ -704,7 +706,7 @@ export function injectStyles() {
 			border: 1px solid ${config.theme === "dark" ? "#3f3f46" : "#e4e4e7"};
 			border-radius: 16px;
 			background: transparent;
-			color: ${config.theme === "dark" ? "#a1a1aa" : "#71717a"};
+			color: ${panelMuted};
 			cursor: pointer;
 			transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
 		}
@@ -753,7 +755,7 @@ export function injectStyles() {
 		.oc-feedback-modal-btn.cancel {
 			background: transparent;
 			border: 1px solid ${config.theme === "dark" ? "#3f3f46" : "#e4e4e7"};
-			color: ${config.theme === "dark" ? "#a1a1aa" : "#71717a"};
+			color: ${panelMuted};
 		}
 
 		.oc-feedback-modal-btn.submit {
@@ -884,7 +886,7 @@ export function injectStyles() {
 
 		.oc-document-desc {
 			font-size: 12px;
-			color: ${config.theme === "dark" ? "#a1a1aa" : "#71717a"};
+			color: ${panelMuted};
 			margin: 0;
 			white-space: nowrap;
 			overflow: hidden;
@@ -937,7 +939,7 @@ export function injectStyles() {
 
 		.oc-privacy {
 			font-size: 11px;
-			color: ${config.theme === "dark" ? "#71717a" : "#a1a1aa"};
+			color: ${panelMuted};
 			text-align: center;
 			margin-bottom: 8px;
 		}
@@ -973,13 +975,13 @@ export function injectStyles() {
 		}
 
 		.oc-input::placeholder {
-			color: ${config.theme === "dark" ? "#71717a" : "#a1a1aa"};
+			color: ${panelMuted};
 		}
 
 		.oc-upload-btn {
 			background: none;
 			border: none;
-			color: ${config.theme === "dark" ? "#a1a1aa" : "#71717a"};
+			color: ${panelMuted};
 			cursor: pointer;
 			padding: 0;
 			display: flex;
@@ -1026,7 +1028,7 @@ export function injectStyles() {
 		.oc-branding {
 			text-align: center;
 			font-size: 10px;
-			color: ${config.theme === "dark" ? "#71717a" : "#a1a1aa"};
+			color: ${panelMuted};
 			margin-top: 12px;
 		}
 
@@ -1036,7 +1038,7 @@ export function injectStyles() {
 		}
 
 		.oc-branding a:hover {
-			color: ${config.theme === "dark" ? "#a1a1aa" : "#71717a"};
+			color: ${panelText};
 		}
 
 		.oc-typing-bubble {
@@ -1051,7 +1053,7 @@ export function injectStyles() {
 			width: 6px;
 			height: 6px;
 			border-radius: 50%;
-			background: ${config.theme === "dark" ? "#71717a" : "#a1a1aa"};
+			background: ${panelMuted};
 			animation: oc-bounce 1.4s infinite ease-in-out both;
 		}
 
@@ -1119,7 +1121,7 @@ export function injectStyles() {
 			display: flex;
 			align-items: center;
 			justify-content: center;
-			color: ${config.theme === "dark" ? "#a1a1aa" : "#71717a"};
+			color: ${panelMuted};
 			z-index: 10;
 			transition: background 0.15s ease;
 		}
@@ -1514,11 +1516,11 @@ export function injectStyles() {
 		}
 
 		.oc-lead-input::placeholder {
-			color: ${config.theme === "dark" ? "#71717a" : "#a1a1aa"};
+			color: ${panelMuted};
 		}
 
 		.oc-lead-prefix {
-			color: ${config.theme === "dark" ? "#a1a1aa" : "#71717a"};
+			color: ${panelMuted};
 			font-size: 14px;
 			font-weight: 500;
 			white-space: nowrap;
@@ -1543,6 +1545,12 @@ export function injectStyles() {
 			opacity: 0.8;
 		}
 
+		.oc-lead-submit-btn:focus-visible,
+		.oc-lead-skip-btn:focus-visible {
+			outline: 2px solid ${config.primaryColor};
+			outline-offset: 2px;
+		}
+
 		.oc-lead-submit-btn:disabled {
 			opacity: 0.4;
 			cursor: not-allowed;
@@ -1553,10 +1561,26 @@ export function injectStyles() {
 			height: 16px;
 		}
 
+		.oc-lead-error {
+			font-size: 12px;
+			color: ${config.theme === "dark" ? "#fca5a5" : "#b91c1c"};
+			margin-top: 4px;
+			padding: 0 4px;
+			display: none;
+		}
+
+		.oc-lead-error:not(:empty) {
+			display: block;
+		}
+
+		.oc-lead-input-container.has-error {
+			border-color: ${config.theme === "dark" ? "#ef4444" : "#dc2626"};
+		}
+
 		.oc-lead-skip-btn {
 			background: transparent;
 			border: 1px solid ${config.theme === "dark" ? "#3f3f46" : "#d4d4d8"};
-			color: ${config.theme === "dark" ? "#a1a1aa" : "#71717a"};
+			color: ${panelMuted};
 			padding: 6px 14px;
 			border-radius: 16px;
 			font-size: 12px;
@@ -1567,7 +1591,7 @@ export function injectStyles() {
 
 		.oc-lead-skip-btn:hover {
 			background: ${config.theme === "dark" ? "#27272a" : "#f4f4f5"};
-			color: ${config.theme === "dark" ? "#fafafa" : "#18181b"};
+			color: ${panelText};
 		}
 
 		.oc-window.is-panel-view .oc-header.is-hidden,
@@ -1673,7 +1697,7 @@ export function injectStyles() {
 			align-items: center;
 			justify-content: space-between;
 			font-size: 12px;
-			color: ${config.theme === "dark" ? "#a1a1aa" : "#71717a"};
+			color: ${panelMuted};
 		}
 
 		.oc-panel-list-badge {
@@ -1686,7 +1710,7 @@ export function injectStyles() {
 		.oc-panel-empty {
 			padding: 24px 12px;
 			text-align: center;
-			color: ${config.theme === "dark" ? "#a1a1aa" : "#71717a"};
+			color: ${panelMuted};
 			font-size: 14px;
 		}
 

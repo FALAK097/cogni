@@ -1,11 +1,23 @@
 import { AuthForm } from "@/components/auth/auth-form";
+import { isEmailPasswordAuthEnabled } from "@/lib/auth/server";
+import { safeReturnPath } from "@/lib/auth/return-path";
 
 export const metadata = {
   title: "Sign Up",
   description: "Create your cogni workspace.",
 };
 
-export default function SignUpPage() {
+export default async function SignUpPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = searchParams ? await searchParams : undefined;
+  const callbackURL = safeReturnPath(
+    typeof params?.callbackURL === "string" ? params.callbackURL : undefined,
+  );
+  const allowEmailPassword = isEmailPasswordAuthEnabled();
+
   return (
     <div className="flex flex-col gap-8">
       <div className="space-y-2">
@@ -13,7 +25,7 @@ export default function SignUpPage() {
         <p className="text-[15px] text-gray-500">Get started with your cogni workspace.</p>
       </div>
 
-      <AuthForm mode="sign-up" />
+      <AuthForm mode="sign-up" callbackURL={callbackURL} allowEmailPassword={allowEmailPassword} />
     </div>
   );
 }
