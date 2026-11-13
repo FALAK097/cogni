@@ -75,42 +75,177 @@ export function startConversationalLeadCapture(triggerType, triggerValue) {
 }
 
 /**
+ * Render markup for lead capture step 1 (name)
+ */
+export function renderLeadNameMarkup(config) {
+  const agentName = config?.agentName || "Assistant";
+  const logoUrl = config?.logoUrl || null;
+  return `
+		<div class="oc-bot-header">
+			<div class="oc-bot-avatar">
+				${renderBotAvatarMarkup(logoUrl)}
+			</div>
+			<span class="oc-bot-name">${escapeHtml(agentName)}</span>
+		</div>
+		<div class="oc-bubble" id="oc-lead-name-prompt">I'd love to help you further! May I have your name?</div>
+		<div class="oc-lead-input-container" id="oc-name-input-container">
+			<label for="oc-lead-name-input" class="oc-screen-reader-only">Your name</label>
+			<input
+				type="text"
+				class="oc-lead-input"
+				id="oc-lead-name-input"
+				name="name"
+				placeholder="Your name"
+				aria-label="Your name"
+				aria-describedby="oc-lead-name-error"
+				autocomplete="name"
+			/>
+			<button
+				type="button"
+				class="oc-lead-submit-btn"
+				id="oc-lead-name-btn"
+				aria-label="Submit name"
+				disabled
+			>${ICONS.send}</button>
+		</div>
+		<div class="oc-lead-error" id="oc-lead-name-error" role="alert" aria-live="polite"></div>
+	`;
+}
+
+/**
+ * Render markup for lead capture step 2 (email)
+ */
+export function renderLeadEmailMarkup(config, userName) {
+  const agentName = config?.agentName || "Assistant";
+  const logoUrl = config?.logoUrl || null;
+  const name = userName || "";
+  return `
+		<div class="oc-bot-header">
+			<div class="oc-bot-avatar">
+				${renderBotAvatarMarkup(logoUrl)}
+			</div>
+			<span class="oc-bot-name">${escapeHtml(agentName)}</span>
+		</div>
+		<div class="oc-bubble" id="oc-lead-email-prompt">Nice to meet you, ${escapeHtml(name)}! What's your email address?</div>
+		<div class="oc-lead-input-container" id="oc-email-input-container">
+			<label for="oc-lead-email-input" class="oc-screen-reader-only">Email address</label>
+			<input
+				type="email"
+				class="oc-lead-input"
+				id="oc-lead-email-input"
+				name="email"
+				placeholder="your@email.com"
+				aria-label="Email address"
+				aria-describedby="oc-lead-email-error"
+				autocomplete="email"
+			/>
+			<button
+				type="button"
+				class="oc-lead-submit-btn"
+				id="oc-lead-email-btn"
+				aria-label="Submit email"
+				disabled
+			>${ICONS.send}</button>
+		</div>
+		<div class="oc-lead-error" id="oc-lead-email-error" role="alert" aria-live="polite"></div>
+	`;
+}
+
+/**
+ * Render markup for lead capture step 3 (phone)
+ */
+export function renderLeadPhoneMarkup(config) {
+  const agentName = config?.agentName || "Assistant";
+  const logoUrl = config?.logoUrl || null;
+  return `
+		<div class="oc-bot-header">
+			<div class="oc-bot-avatar">
+				${renderBotAvatarMarkup(logoUrl)}
+			</div>
+			<span class="oc-bot-name">${escapeHtml(agentName)}</span>
+		</div>
+		<div class="oc-bubble" id="oc-lead-phone-prompt">Great! And what's your phone number? (optional)</div>
+		<div class="oc-lead-input-container" id="oc-phone-input-container">
+			<span class="oc-lead-prefix" aria-hidden="true">+91</span>
+			<label for="oc-lead-phone-input" class="oc-screen-reader-only">Phone number (optional)</label>
+			<input
+				type="tel"
+				class="oc-lead-input"
+				id="oc-lead-phone-input"
+				name="phone"
+				placeholder="9876543210"
+				aria-label="Phone number (optional)"
+				aria-describedby="oc-lead-phone-error"
+				autocomplete="tel"
+				maxlength="10"
+			/>
+			<button
+				type="button"
+				class="oc-lead-submit-btn"
+				id="oc-lead-phone-btn"
+				aria-label="Submit phone number"
+				disabled
+			>${ICONS.send}</button>
+		</div>
+		<div class="oc-lead-error" id="oc-lead-phone-error" role="alert" aria-live="polite"></div>
+		<button type="button" class="oc-lead-skip-btn" id="oc-lead-phone-skip">Skip this step</button>
+	`;
+}
+
+/**
  * Ask for user's name
  */
 function askForName() {
   const questionDiv = document.createElement("div");
   questionDiv.className = "oc-message bot oc-lead-question";
   questionDiv.id = "oc-lead-step-1";
-  questionDiv.innerHTML = `
-		<div class="oc-bot-header">
-			<div class="oc-bot-avatar">
-				${renderBotAvatarMarkup(state.config.logoUrl)}
-			</div>
-			<span class="oc-bot-name">${escapeHtml(state.config.agentName)}</span>
-		</div>
-		<div class="oc-bubble">I'd love to help you further! May I have your name?</div>
-		<div class="oc-lead-input-container" id="oc-name-input-container">
-			<input type="text" class="oc-lead-input" id="oc-lead-name-input" placeholder="Your name" />
-			<button class="oc-lead-submit-btn" id="oc-lead-name-btn" disabled>${ICONS.send}</button>
-		</div>
-	`;
+  questionDiv.innerHTML = renderLeadNameMarkup(state.config);
   state.messagesContainer.appendChild(questionDiv);
   scrollToBottom();
 
   const inputEl = document.getElementById("oc-lead-name-input");
   const btnEl = document.getElementById("oc-lead-name-btn");
+  const errorEl = document.getElementById("oc-lead-name-error");
+  const container = document.getElementById("oc-name-input-container");
+
+  function validate() {
+    const name = inputEl.value.trim();
+    if (!name) {
+      if (errorEl) errorEl.textContent = "Please enter your name.";
+      if (container) container.classList.add("has-error");
+      inputEl.setAttribute("aria-invalid", "true");
+      return false;
+    }
+    if (errorEl) errorEl.textContent = "";
+    if (container) container.classList.remove("has-error");
+    inputEl.setAttribute("aria-invalid", "false");
+    return true;
+  }
 
   inputEl.addEventListener("input", () => {
-    btnEl.disabled = !inputEl.value.trim();
-  });
-
-  inputEl.addEventListener("keypress", (e) => {
-    if (e.key === "Enter" && inputEl.value.trim()) {
-      handleNameSubmit();
+    const hasValue = !!inputEl.value.trim();
+    btnEl.disabled = !hasValue;
+    if (hasValue && errorEl && errorEl.textContent) {
+      errorEl.textContent = "";
+      if (container) container.classList.remove("has-error");
+      inputEl.setAttribute("aria-invalid", "false");
     }
   });
 
-  btnEl.addEventListener("click", handleNameSubmit);
+  inputEl.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (validate()) {
+        handleNameSubmit();
+      }
+    }
+  });
+
+  btnEl.addEventListener("click", () => {
+    if (validate()) {
+      handleNameSubmit();
+    }
+  });
   setTimeout(() => inputEl.focus(), 100);
 }
 
@@ -119,6 +254,7 @@ function askForName() {
  */
 function handleNameSubmit() {
   const inputEl = document.getElementById("oc-lead-name-input");
+  if (!inputEl) return;
   const name = inputEl.value.trim();
   if (!name) return;
 
@@ -129,9 +265,11 @@ function handleNameSubmit() {
     addUserMessage(name, null, true);
   });
 
-  // Remove the input container
+  // Remove the input container and error
   const container = document.getElementById("oc-name-input-container");
   if (container) container.remove();
+  const errorEl = document.getElementById("oc-lead-name-error");
+  if (errorEl) errorEl.remove();
 
   // Move to email step
   state.leadCaptureStep = 2;
@@ -145,36 +283,59 @@ function askForEmail() {
   const questionDiv = document.createElement("div");
   questionDiv.className = "oc-message bot oc-lead-question";
   questionDiv.id = "oc-lead-step-2";
-  questionDiv.innerHTML = `
-		<div class="oc-bot-header">
-			<div class="oc-bot-avatar">
-				${renderBotAvatarMarkup(state.config.logoUrl)}
-			</div>
-			<span class="oc-bot-name">${escapeHtml(state.config.agentName)}</span>
-		</div>
-		<div class="oc-bubble">Nice to meet you, ${escapeHtml(state.pendingLeadInfo.name)}! What's your email address?</div>
-		<div class="oc-lead-input-container" id="oc-email-input-container">
-			<input type="email" class="oc-lead-input" id="oc-lead-email-input" placeholder="your@email.com" />
-			<button class="oc-lead-submit-btn" id="oc-lead-email-btn" disabled>${ICONS.send}</button>
-		</div>
-	`;
+  questionDiv.innerHTML = renderLeadEmailMarkup(state.config, state.pendingLeadInfo.name);
   state.messagesContainer.appendChild(questionDiv);
   scrollToBottom();
 
   const inputEl = document.getElementById("oc-lead-email-input");
   const btnEl = document.getElementById("oc-lead-email-btn");
+  const errorEl = document.getElementById("oc-lead-email-error");
+  const container = document.getElementById("oc-email-input-container");
+
+  function validate() {
+    const email = inputEl.value.trim();
+    if (!email) {
+      if (errorEl) errorEl.textContent = "Please enter your email address.";
+      if (container) container.classList.add("has-error");
+      inputEl.setAttribute("aria-invalid", "true");
+      return false;
+    }
+    if (!validateEmail(email)) {
+      if (errorEl) errorEl.textContent = "Please enter a valid email address.";
+      if (container) container.classList.add("has-error");
+      inputEl.setAttribute("aria-invalid", "true");
+      return false;
+    }
+    if (errorEl) errorEl.textContent = "";
+    if (container) container.classList.remove("has-error");
+    inputEl.setAttribute("aria-invalid", "false");
+    return true;
+  }
 
   inputEl.addEventListener("input", () => {
-    btnEl.disabled = !validateEmail(inputEl.value.trim());
-  });
-
-  inputEl.addEventListener("keypress", (e) => {
-    if (e.key === "Enter" && validateEmail(inputEl.value.trim())) {
-      handleEmailSubmit();
+    const isValid = validateEmail(inputEl.value.trim());
+    btnEl.disabled = !isValid;
+    if (isValid && errorEl && errorEl.textContent) {
+      errorEl.textContent = "";
+      if (container) container.classList.remove("has-error");
+      inputEl.setAttribute("aria-invalid", "false");
     }
   });
 
-  btnEl.addEventListener("click", handleEmailSubmit);
+  inputEl.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (validate()) {
+        handleEmailSubmit();
+      }
+    }
+  });
+
+  btnEl.addEventListener("click", () => {
+    if (validate()) {
+      handleEmailSubmit();
+    }
+  });
   setTimeout(() => inputEl.focus(), 100);
 }
 
@@ -183,8 +344,9 @@ function askForEmail() {
  */
 function handleEmailSubmit() {
   const inputEl = document.getElementById("oc-lead-email-input");
+  if (!inputEl) return;
   const email = inputEl.value.trim();
-  if (!email) return;
+  if (!email || !validateEmail(email)) return;
 
   state.pendingLeadInfo.email = email;
 
@@ -193,9 +355,11 @@ function handleEmailSubmit() {
     addUserMessage(email, null, true);
   });
 
-  // Remove the input container
+  // Remove the input container and error
   const container = document.getElementById("oc-email-input-container");
   if (container) container.remove();
+  const errorEl = document.getElementById("oc-lead-email-error");
+  if (errorEl) errorEl.remove();
 
   // Move to phone step
   state.leadCaptureStep = 3;
@@ -209,41 +373,62 @@ function askForPhone() {
   const questionDiv = document.createElement("div");
   questionDiv.className = "oc-message bot oc-lead-question";
   questionDiv.id = "oc-lead-step-3";
-  questionDiv.innerHTML = `
-		<div class="oc-bot-header">
-			<div class="oc-bot-avatar">
-				${renderBotAvatarMarkup(state.config.logoUrl)}
-			</div>
-			<span class="oc-bot-name">${escapeHtml(state.config.agentName)}</span>
-		</div>
-		<div class="oc-bubble">Great! And what's your phone number? (optional)</div>
-		<div class="oc-lead-input-container" id="oc-phone-input-container">
-			<span class="oc-lead-prefix">+91</span>
-			<input type="tel" class="oc-lead-input" id="oc-lead-phone-input" placeholder="9876543210" maxlength="10" />
-			<button class="oc-lead-submit-btn" id="oc-lead-phone-btn" disabled>${ICONS.send}</button>
-		</div>
-		<button class="oc-lead-skip-btn" id="oc-lead-phone-skip">Skip this step</button>
-	`;
+  questionDiv.innerHTML = renderLeadPhoneMarkup(state.config);
   state.messagesContainer.appendChild(questionDiv);
   scrollToBottom();
 
   const inputEl = document.getElementById("oc-lead-phone-input");
   const btnEl = document.getElementById("oc-lead-phone-btn");
   const skipBtn = document.getElementById("oc-lead-phone-skip");
+  const errorEl = document.getElementById("oc-lead-phone-error");
+  const container = document.getElementById("oc-phone-input-container");
+
+  function validate() {
+    const phone = inputEl.value.trim();
+    if (!phone) {
+      if (errorEl) errorEl.textContent = "Please enter your phone number or click skip.";
+      if (container) container.classList.add("has-error");
+      inputEl.setAttribute("aria-invalid", "true");
+      return false;
+    }
+    if (!validatePhone(phone)) {
+      if (errorEl) errorEl.textContent = "Please enter a valid 10-digit mobile number.";
+      if (container) container.classList.add("has-error");
+      inputEl.setAttribute("aria-invalid", "true");
+      return false;
+    }
+    if (errorEl) errorEl.textContent = "";
+    if (container) container.classList.remove("has-error");
+    inputEl.setAttribute("aria-invalid", "false");
+    return true;
+  }
 
   inputEl.addEventListener("input", (e) => {
     // Only allow digits
     e.target.value = e.target.value.replace(/\D/g, "").slice(0, 10);
-    btnEl.disabled = !validatePhone(inputEl.value.trim());
-  });
-
-  inputEl.addEventListener("keypress", (e) => {
-    if (e.key === "Enter" && validatePhone(inputEl.value.trim())) {
-      handlePhoneSubmit();
+    const isValid = validatePhone(inputEl.value.trim());
+    btnEl.disabled = !isValid;
+    if (isValid && errorEl && errorEl.textContent) {
+      errorEl.textContent = "";
+      if (container) container.classList.remove("has-error");
+      inputEl.setAttribute("aria-invalid", "false");
     }
   });
 
-  btnEl.addEventListener("click", handlePhoneSubmit);
+  inputEl.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (validate()) {
+        handlePhoneSubmit();
+      }
+    }
+  });
+
+  btnEl.addEventListener("click", () => {
+    if (validate()) {
+      handlePhoneSubmit();
+    }
+  });
   skipBtn.addEventListener("click", handlePhoneSkip);
   setTimeout(() => inputEl.focus(), 100);
 }
@@ -257,9 +442,11 @@ function handlePhoneSkip() {
     addUserMessage("Skipped", null, true);
   });
 
-  // Remove the input container and skip button
+  // Remove the input container, error, and skip button
   const container = document.getElementById("oc-phone-input-container");
   if (container) container.remove();
+  const errorEl = document.getElementById("oc-lead-phone-error");
+  if (errorEl) errorEl.remove();
   const skipBtn = document.getElementById("oc-lead-phone-skip");
   if (skipBtn) skipBtn.remove();
 
@@ -274,8 +461,9 @@ function handlePhoneSkip() {
  */
 function handlePhoneSubmit() {
   const inputEl = document.getElementById("oc-lead-phone-input");
+  if (!inputEl) return;
   const phone = inputEl.value.trim();
-  if (!phone) return;
+  if (!phone || !validatePhone(phone)) return;
 
   state.pendingLeadInfo.phone = "+91" + phone;
 
@@ -284,9 +472,13 @@ function handlePhoneSubmit() {
     addUserMessage("+91 " + phone, null, true);
   });
 
-  // Remove the input container
+  // Remove the input container, error, and skip button
   const container = document.getElementById("oc-phone-input-container");
   if (container) container.remove();
+  const errorEl = document.getElementById("oc-lead-phone-error");
+  if (errorEl) errorEl.remove();
+  const skipBtn = document.getElementById("oc-lead-phone-skip");
+  if (skipBtn) skipBtn.remove();
 
   // Submit the lead
   state.leadCaptureStep = 4;

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AuthForm } from "@/components/auth/auth-form";
+import { isEmailPasswordAuthEnabled } from "@/lib/auth/server";
 import { safeReturnPath } from "@/lib/auth/return-path";
 
 export const metadata = {
@@ -16,6 +17,7 @@ export default async function SignInPage({
   const callbackURL = safeReturnPath(
     typeof params.callbackURL === "string" ? params.callbackURL : undefined,
   );
+  const allowEmailPassword = isEmailPasswordAuthEnabled();
 
   return (
     <div className="flex flex-col gap-8">
@@ -26,7 +28,7 @@ export default async function SignInPage({
         </p>
       </div>
 
-      <AuthForm mode="sign-in" callbackURL={callbackURL} />
+      <AuthForm mode="sign-in" callbackURL={callbackURL} allowEmailPassword={allowEmailPassword} />
       <p className="text-center text-xs text-muted-foreground">
         Trouble signing in?{" "}
         <Link
