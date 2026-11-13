@@ -334,3 +334,20 @@ export async function callWidgetChatAPI(
 
   return response;
 }
+
+export async function fetchBookingAvailabilityAPI() {
+  try {
+    return await requestJson(widgetKeyPath("/booking"));
+  } catch (error) {
+    console.error("widget: Failed to fetch booking availability", error);
+    return null;
+  }
+}
+
+export async function confirmBookingAPI(bookingData) {
+  return requestJson(widgetKeyPath("/booking"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(bookingData),
+  });
+}
