@@ -220,7 +220,7 @@ export function injectStyles() {
 		}
 
 		.oc-header {
-			background: linear-gradient(to right, ${config.headerGradientFrom}, ${config.headerGradientTo});
+			background: ${config.headerGradientFrom || config.primaryColor};
 			padding: 16px 20px;
 			display: flex;
 			align-items: center;
@@ -320,11 +320,27 @@ export function injectStyles() {
 		.oc-body {
 			flex: 1;
 			overflow-y: auto;
-			padding: 20px;
+			padding: 16px;
 			display: flex;
 			flex-direction: column;
-			gap: 16px;
+			gap: 12px;
 			background: ${config.theme === "dark" ? "#18181b" : "#ffffff"};
+			scrollbar-width: thin;
+			scrollbar-color: ${panelBorder} transparent;
+		}
+
+		.oc-body::-webkit-scrollbar {
+			width: 5px;
+			height: 5px;
+		}
+
+		.oc-body::-webkit-scrollbar-track {
+			background: transparent;
+		}
+
+		.oc-body::-webkit-scrollbar-thumb {
+			background-color: ${panelBorder};
+			border-radius: 9999px;
 		}
 
 		.oc-message {
@@ -332,7 +348,7 @@ export function injectStyles() {
 			flex-direction: column;
 			gap: 4px;
 			min-width: 0;
-			max-width: min(85%, 100%);
+			max-width: min(88%, 100%);
 		}
 
 		.oc-message.user {
@@ -362,12 +378,12 @@ export function injectStyles() {
 		.oc-bubble {
 			min-width: 0;
 			max-width: 100%;
-			padding: 12px 16px;
+			padding: 10px 14px;
 			border-radius: 12px;
 			font-family: inherit;
 			font-size: 1em;
-			line-height: 1.625;
-			box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+			line-height: 1.55;
+			box-shadow: none;
 			overflow-wrap: anywhere;
 			word-break: normal;
 		}
@@ -383,30 +399,37 @@ export function injectStyles() {
 		.oc-message.user .oc-bubble {
 			background-color: ${config.userBubbleColor};
 			color: ${config.userBubbleTextColor};
-			border-bottom-right-radius: 2px;
+			border-bottom-right-radius: 3px;
 		}
 
 		.oc-message.bot .oc-bubble {
 			background-color: ${config.botBubbleColor};
 			color: ${config.botBubbleTextColor};
-			border-bottom-left-radius: 2px;
+			border-bottom-left-radius: 3px;
+			border: 1px solid ${panelBorder};
 		}
 
 		.oc-message.team .oc-bubble {
 			background-color: ${config.botBubbleColor};
 			color: ${config.botBubbleTextColor};
-			border-bottom-left-radius: 2px;
+			border-bottom-left-radius: 3px;
+			border: 1px solid ${panelBorder};
 		}
 
 		.oc-bubble.oc-streaming::after {
-			content: "...";
+			content: "";
+			display: inline-block;
+			width: 6px;
+			height: 13px;
+			margin-left: 3px;
+			vertical-align: -1px;
+			background-color: currentColor;
+			opacity: 0.6;
 			animation: blink 1s infinite;
-			margin-left: 2px;
-			opacity: 0.4;
 		}
 
 		@keyframes blink {
-			0%, 50% { opacity: 1; }
+			0%, 50% { opacity: 0.6; }
 			51%, 100% { opacity: 0; }
 		}
 
@@ -795,50 +818,56 @@ export function injectStyles() {
 		.oc-pill-brochure {
 			display: inline-flex;
 			align-items: center;
-			gap: 8px;
-			padding: 10px 16px;
-			background: linear-gradient(135deg, ${config.primaryColor}, ${config.primaryColor}dd);
+			gap: 6px;
+			padding: 8px 14px;
+			background: ${config.primaryColor};
 			border: none;
+			border-radius: 9999px;
 			color: white;
 			font-weight: 500;
-			box-shadow: 0 2px 8px ${config.primaryColor}40;
+			font-size: 13px;
+			box-shadow: none;
+			cursor: pointer;
+			transition: opacity 150ms ease;
 		}
 
 		.oc-pill-brochure:hover {
-			background: linear-gradient(135deg, ${config.primaryColor}ee, ${config.primaryColor}cc);
-			transform: translateY(-1px);
-			box-shadow: 0 4px 12px ${config.primaryColor}50;
+			background: ${config.primaryColor};
+			opacity: 0.9;
+			transform: none;
+			box-shadow: none;
 		}
 
 		.oc-pill-brochure svg {
-			width: 16px;
-			height: 16px;
+			width: 14px;
+			height: 14px;
 		}
 
 		/* Document cards for brochure display */
 		.oc-documents {
 			display: flex;
 			flex-direction: column;
-			gap: 10px;
-			margin-top: 12px;
+			gap: 8px;
+			margin-top: 10px;
 		}
 
 		.oc-document-card {
 			display: flex;
 			align-items: center;
-			gap: 14px;
-			padding: 14px 16px;
-			border-radius: 12px;
-			border: 1px solid ${config.theme === "dark" ? "#3f3f46" : "#e4e4e7"};
-			background: ${config.theme === "dark" ? "linear-gradient(135deg, #1f1f23, #18181b)" : "linear-gradient(135deg, #ffffff, #fafafa)"};
-			box-shadow: ${config.theme === "dark" ? "0 2px 8px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.06)"};
-			transition: border-color 150ms ease, box-shadow 150ms ease;
+			gap: 10px;
+			padding: 10px 12px;
+			border-radius: 8px;
+			border: 1px solid ${panelBorder};
+			background: ${panelSubtleBg};
+			box-shadow: none;
+			transition: border-color 150ms ease, background-color 150ms ease;
 		}
 
 		@media (hover: hover) and (pointer: fine) {
 			.oc-document-card:hover {
-				border-color: ${config.primaryColor}50;
-				box-shadow: ${config.theme === "dark" ? `0 4px 16px rgba(0,0,0,0.4), 0 0 0 1px ${config.primaryColor}30` : `0 4px 16px rgba(0,0,0,0.1), 0 0 0 1px ${config.primaryColor}20`};
+				border-color: ${panelBorder};
+				background: ${panelHoverBg};
+				box-shadow: none;
 			}
 		}
 
@@ -846,26 +875,17 @@ export function injectStyles() {
 			display: flex;
 			align-items: center;
 			justify-content: center;
-			width: 44px;
-			height: 44px;
-			border-radius: 10px;
-			background: linear-gradient(135deg, ${config.primaryColor}20, ${config.primaryColor}10);
+			width: 28px;
+			height: 28px;
+			border-radius: 6px;
+			background: ${config.theme === "dark" ? "#27272a" : "#e4e4e7"};
 			color: ${config.primaryColor};
 			flex-shrink: 0;
-			position: relative;
-		}
-
-		.oc-document-icon::after {
-			content: '';
-			position: absolute;
-			inset: 0;
-			border-radius: 10px;
-			border: 1px solid ${config.primaryColor}25;
 		}
 
 		.oc-document-icon svg {
-			width: 22px;
-			height: 22px;
+			width: 16px;
+			height: 16px;
 		}
 
 		.oc-document-info {
@@ -874,14 +894,13 @@ export function injectStyles() {
 		}
 
 		.oc-document-name {
-			font-size: 14px;
-			font-weight: 600;
-			color: ${config.theme === "dark" ? "#fafafa" : "#18181b"};
-			margin: 0 0 4px 0;
+			font-size: 13px;
+			font-weight: 500;
+			color: ${panelText};
+			margin: 0;
 			white-space: nowrap;
 			overflow: hidden;
 			text-overflow: ellipsis;
-			letter-spacing: -0.01em;
 		}
 
 		.oc-document-desc {
@@ -897,21 +916,23 @@ export function injectStyles() {
 			display: flex;
 			align-items: center;
 			justify-content: center;
-			width: 44px;
-			height: 44px;
-			border-radius: 10px;
-			border: none;
-			background: linear-gradient(135deg, ${config.primaryColor}, ${config.primaryColor}dd);
-			color: white;
+			width: 28px;
+			height: 28px;
+			border-radius: 6px;
+			border: 1px solid ${panelBorder};
+			background: ${panelBg};
+			color: ${panelMuted};
 			cursor: pointer;
-			transition: background 150ms ease, box-shadow 150ms ease;
+			transition: color 150ms ease, border-color 150ms ease, background-color 150ms ease;
 			flex-shrink: 0;
-			box-shadow: 0 2px 6px ${config.primaryColor}30;
+			box-shadow: none;
 		}
 
 		.oc-document-download:hover {
-			background: linear-gradient(135deg, ${config.primaryColor}ee, ${config.primaryColor}cc);
-			box-shadow: 0 4px 12px ${config.primaryColor}40;
+			color: ${panelText};
+			border-color: ${config.primaryColor};
+			background: ${panelHoverBg};
+			box-shadow: none;
 		}
 
 		.oc-document-download:focus-visible {
@@ -920,8 +941,8 @@ export function injectStyles() {
 		}
 
 		.oc-document-download svg {
-			width: 18px;
-			height: 18px;
+			width: 14px;
+			height: 14px;
 		}
 
 		@media (prefers-reduced-motion: reduce) {
@@ -1219,7 +1240,7 @@ export function injectStyles() {
 		}
 
 		.oc-panel-header {
-			background: linear-gradient(to right, ${config.headerGradientFrom}, ${config.headerGradientTo});
+			background: ${config.headerGradientFrom || config.primaryColor};
 			color: #ffffff;
 			display: flex;
 			align-items: center;
@@ -1286,6 +1307,22 @@ export function injectStyles() {
 			overflow-y: auto;
 			min-height: 0;
 			background: ${panelBg};
+			scrollbar-width: thin;
+			scrollbar-color: ${panelBorder} transparent;
+		}
+
+		.oc-panel-body::-webkit-scrollbar {
+			width: 5px;
+			height: 5px;
+		}
+
+		.oc-panel-body::-webkit-scrollbar-track {
+			background: transparent;
+		}
+
+		.oc-panel-body::-webkit-scrollbar-thumb {
+			background-color: ${panelBorder};
+			border-radius: 9999px;
 		}
 
 		.oc-panel-loading {
@@ -1345,21 +1382,21 @@ export function injectStyles() {
 			align-items: center;
 			justify-content: center;
 			gap: 8px;
-			padding: 14px 20px;
-			background: linear-gradient(135deg, ${config.primaryColor}, ${config.primaryColor}dd);
+			padding: 12px 16px;
+			background: ${config.primaryColor};
 			color: ${config.userBubbleTextColor || "#ffffff"};
 			border: none;
-			border-radius: 999px;
-			font-size: 15px;
+			border-radius: 8px;
+			font-size: 14px;
 			font-weight: 500;
 			cursor: pointer;
-			transition: opacity 0.15s, box-shadow 0.15s;
-			box-shadow: 0 2px 8px ${config.primaryColor}40;
+			transition: opacity 0.15s;
+			box-shadow: none;
 		}
 
 		.oc-panel-primary-btn:hover {
-			opacity: 0.95;
-			box-shadow: 0 4px 12px ${config.primaryColor}50;
+			opacity: 0.9;
+			box-shadow: none;
 		}
 
 		.oc-panel-primary-btn svg {
@@ -1712,6 +1749,59 @@ export function injectStyles() {
 			text-align: center;
 			color: ${panelMuted};
 			font-size: 14px;
+		}
+
+		/* Mobile viewport responsive adjustments (320px - 480px) */
+		@media (max-width: 480px) {
+			#widget-container:not(.oc-preview-container) .oc-window {
+				width: calc(100vw - 20px);
+				max-width: calc(100vw - 20px);
+				right: 10px;
+				left: 10px;
+				margin: 0 auto;
+				bottom: ${config.launcherSize === "lg" ? "72px" : config.launcherSize === "sm" ? "52px" : "62px"};
+				max-height: calc(100vh - 90px);
+			}
+
+			.oc-body {
+				padding: 12px 10px;
+				gap: 10px;
+			}
+
+			.oc-bubble {
+				padding: 9px 12px;
+				font-size: 13.5px;
+			}
+
+			.oc-message {
+				max-width: 90%;
+			}
+
+			.oc-input-container {
+				padding: 8px 10px;
+			}
+		}
+
+		@media (max-width: 360px) {
+			#widget-container:not(.oc-preview-container) .oc-window {
+				width: calc(100vw - 12px);
+				max-width: calc(100vw - 12px);
+				right: 6px;
+				left: 6px;
+			}
+
+			.oc-body {
+				padding: 10px 8px;
+			}
+
+			.oc-bubble {
+				padding: 8px 10px;
+				font-size: 13px;
+			}
+
+			.oc-message {
+				max-width: 94%;
+			}
 		}
 
 	`;
