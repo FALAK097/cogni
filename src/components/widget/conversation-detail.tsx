@@ -771,10 +771,10 @@ export function ConversationDetail({
               it. Check the channel before sending this message again; resending can create a
               duplicate. Learn about uncertain delivery in the{" "}
               <Link
-                href="/help#human-takeover"
+                href="/help#channels"
                 className="underline underline-offset-2 hover:text-foreground"
               >
-                human takeover guide
+                channel delivery guide
               </Link>
               .
             </AlertDialogDescription>
@@ -1109,6 +1109,14 @@ export function ConversationDetail({
                           Visitor requested a human or matched escalation criteria. AI replies are
                           paused.
                         </p>
+                        <Link
+                          href="/help#takeover"
+                          className="inline-block text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Takeover guide
+                        </Link>
                       </div>
                     </div>
                     {!isAssignedToMe ? (
