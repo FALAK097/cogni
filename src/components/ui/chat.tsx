@@ -185,7 +185,7 @@ export function ChatMessageHeader({
 /* -------------------------------------------------------------------------- */
 
 export const chatBubbleVariants = cva(
-  "relative min-w-0 rounded-2xl px-4 py-3 text-sm leading-relaxed transition-colors [overflow-wrap:anywhere] break-words",
+  "relative min-w-0 max-w-full rounded-2xl px-4 py-3 text-sm leading-relaxed transition-colors [overflow-wrap:anywhere] break-words",
   {
     variants: {
       variant: {
@@ -242,10 +242,13 @@ export function ChatAttachmentChip({
   const formattedDate = createdAt
     ? format(typeof createdAt === "string" ? new Date(createdAt) : createdAt, "MMM d, p")
     : null;
+  const opensInNewTab = props.target === "_blank";
+  const shouldDownload = download !== undefined && download !== false;
+  const actionLabel = shouldDownload ? "Download" : opensInNewTab ? "Open" : "View";
 
   const content = (
     <>
-      <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+      <span className="flex size-5 shrink-0 items-center justify-center text-muted-foreground">
         {isImage ? (
           <ImageIcon className="size-3.5" aria-hidden="true" />
         ) : (
@@ -265,10 +268,17 @@ export function ChatAttachmentChip({
         ) : null}
       </span>
       {href ? (
-        <Download
-          className="size-3.5 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground"
-          aria-hidden="true"
-        />
+        opensInNewTab ? (
+          <ExternalLink
+            className="size-3.5 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground"
+            aria-hidden="true"
+          />
+        ) : (
+          <Download
+            className="size-3.5 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground"
+            aria-hidden="true"
+          />
+        )
       ) : null}
     </>
   );
@@ -278,11 +288,11 @@ export function ChatAttachmentChip({
       <a
         data-slot="chat-attachment-chip"
         href={href}
-        download={download ?? fileName}
-        aria-label={`Download ${fileName}${formattedSize ? `, ${formattedSize}` : ""}`}
+        download={download}
+        aria-label={`${actionLabel} ${fileName}${formattedSize ? `, ${formattedSize}` : ""}${opensInNewTab ? " in a new tab" : ""}`}
         title={fileName}
         className={cn(
-          "group flex min-h-10 items-center gap-2.5 rounded-lg border border-border/60 bg-background/70 px-2.5 py-1.5 text-left transition-colors hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+          "group flex min-h-10 min-w-0 max-w-full items-center gap-2.5 rounded-lg border border-border/60 bg-background/70 px-2.5 py-1.5 text-left transition-colors hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
           className,
         )}
         {...props}
@@ -297,7 +307,7 @@ export function ChatAttachmentChip({
       data-slot="chat-attachment-chip"
       title={fileName}
       className={cn(
-        "flex min-h-10 items-center gap-2.5 rounded-lg border border-border/60 bg-background/70 px-2.5 py-1.5 text-left",
+        "flex min-h-10 min-w-0 max-w-full items-center gap-2.5 rounded-lg border border-border/60 bg-background/70 px-2.5 py-1.5 text-left",
         className,
       )}
     >
@@ -328,7 +338,7 @@ export function ChatCitationChip({
     <details
       data-slot="chat-citation-chip"
       className={cn(
-        "group rounded-md border border-border/60 bg-background/75 transition-colors open:bg-background",
+        "group min-w-0 max-w-full rounded-md border border-border/60 bg-background/75 transition-colors open:bg-background",
         className,
       )}
     >
