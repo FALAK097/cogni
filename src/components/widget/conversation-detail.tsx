@@ -771,10 +771,10 @@ export function ConversationDetail({
               it. Check the channel before sending this message again; resending can create a
               duplicate. Learn about uncertain delivery in the{" "}
               <Link
-                href="/help#human-takeover"
+                href="/help#channels"
                 className="underline underline-offset-2 hover:text-foreground"
               >
-                human takeover guide
+                channel delivery guide
               </Link>
               .
             </AlertDialogDescription>

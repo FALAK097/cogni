@@ -559,7 +559,7 @@ function KnowledgeEmptyState({
               Add Source
             </Button>
             <Link
-              href="/help#knowledge-sources"
+              href="/help#sources"
               className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
             >
               Learn about supported formats and ingestion
