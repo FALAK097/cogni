@@ -33,19 +33,20 @@ function GoogleLogo() {
 type AuthFormProps = {
   mode: "sign-in" | "sign-up";
   callbackURL?: string;
+  allowEmailPassword?: boolean;
 };
 
-export function AuthForm({ mode, callbackURL = "/insights" }: AuthFormProps) {
+export function AuthForm({
+  mode,
+  callbackURL = "/insights",
+  allowEmailPassword = false,
+}: AuthFormProps) {
   const [activeMode, setActiveMode] = useState<"sign-in" | "sign-up">(mode);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string>();
-
-  const isLocalDevAuth =
-    process.env.NODE_ENV !== "production" ||
-    process.env.NEXT_PUBLIC_LOCAL_DEV_EMAIL_PASSWORD_AUTH === "true";
 
   async function continueWithGoogle() {
     setError(undefined);
@@ -69,6 +70,10 @@ export function AuthForm({ mode, callbackURL = "/insights" }: AuthFormProps) {
 
   async function handleEmailAuth(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!allowEmailPassword) {
+      setError("Email and password authentication is not available.");
+      return;
+    }
     setError(undefined);
     setIsPending(true);
 
@@ -125,117 +130,119 @@ export function AuthForm({ mode, callbackURL = "/insights" }: AuthFormProps) {
             : "Sign in with Google"}
       </Button>
 
-      <div className="relative flex items-center justify-center">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-gray-200" />
-        </div>
-        <div className="relative bg-white px-3 text-xs uppercase tracking-wider text-gray-500">
-          Or continue with email
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-gray-200 bg-gray-50/50 p-4">
-        {isLocalDevAuth && (
-          <div className="mb-4 flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-600">
-              Email &amp; Password Auth
-            </span>
-            <div className="flex gap-1" aria-label="Authentication mode">
-              <Button
-                type="button"
-                size="sm"
-                variant={activeMode === "sign-in" ? "default" : "ghost"}
-                className="h-7 text-xs"
-                onClick={() => {
-                  setActiveMode("sign-in");
-                  setError(undefined);
-                }}
-              >
-                Sign In
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={activeMode === "sign-up" ? "default" : "ghost"}
-                className="h-7 text-xs"
-                onClick={() => {
-                  setActiveMode("sign-up");
-                  setError(undefined);
-                }}
-              >
-                Sign Up
-              </Button>
+      {allowEmailPassword && (
+        <>
+          <div className="relative flex items-center justify-center">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-200" />
+            </div>
+            <div className="relative bg-white px-3 text-xs uppercase tracking-wider text-gray-500">
+              Or continue with email
             </div>
           </div>
-        )}
 
-        <form onSubmit={handleEmailAuth} className="grid gap-3.5">
-          {activeMode === "sign-up" && (
-            <div className="grid gap-1.5">
-              <Label htmlFor="auth-name" className="text-xs font-medium text-gray-700">
-                Full Name
-              </Label>
-              <Input
-                id="auth-name"
-                name="name"
-                type="text"
-                autoComplete="name"
-                placeholder="Jane Doe"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+          <div className="rounded-xl border border-gray-200 bg-gray-50/50 p-4">
+            <div className="mb-4 flex items-center justify-between">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-600">
+                Email &amp; Password Auth
+              </span>
+              <div className="flex gap-1" aria-label="Authentication mode">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={activeMode === "sign-in" ? "default" : "ghost"}
+                  className="h-7 text-xs"
+                  onClick={() => {
+                    setActiveMode("sign-in");
+                    setError(undefined);
+                  }}
+                >
+                  Sign In
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={activeMode === "sign-up" ? "default" : "ghost"}
+                  className="h-7 text-xs"
+                  onClick={() => {
+                    setActiveMode("sign-up");
+                    setError(undefined);
+                  }}
+                >
+                  Sign Up
+                </Button>
+              </div>
+            </div>
+
+            <form onSubmit={handleEmailAuth} className="grid gap-3.5">
+              {activeMode === "sign-up" && (
+                <div className="grid gap-1.5">
+                  <Label htmlFor="auth-name" className="text-xs font-medium text-gray-700">
+                    Full Name
+                  </Label>
+                  <Input
+                    id="auth-name"
+                    name="name"
+                    type="text"
+                    autoComplete="name"
+                    placeholder="Jane Doe"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    disabled={isPending}
+                    className="rounded-xl border-gray-200 bg-white"
+                  />
+                </div>
+              )}
+
+              <div className="grid gap-1.5">
+                <Label htmlFor="auth-email" className="text-xs font-medium text-gray-700">
+                  Email address
+                </Label>
+                <Input
+                  id="auth-email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={isPending}
+                  className="rounded-xl border-gray-200 bg-white"
+                />
+              </div>
+
+              <div className="grid gap-1.5">
+                <Label htmlFor="auth-password" className="text-xs font-medium text-gray-700">
+                  Password
+                </Label>
+                <Input
+                  id="auth-password"
+                  name="password"
+                  type="password"
+                  autoComplete={activeMode === "sign-up" ? "new-password" : "current-password"}
+                  required
+                  minLength={8}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={isPending}
+                  className="rounded-xl border-gray-200 bg-white"
+                />
+              </div>
+
+              <Button
+                type="submit"
+                size="lg"
+                className="mt-1 h-11 w-full rounded-xl"
                 disabled={isPending}
-                className="rounded-xl border-gray-200 bg-white"
-              />
-            </div>
-          )}
-
-          <div className="grid gap-1.5">
-            <Label htmlFor="auth-email" className="text-xs font-medium text-gray-700">
-              Email address
-            </Label>
-            <Input
-              id="auth-email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={isPending}
-              className="rounded-xl border-gray-200 bg-white"
-            />
+              >
+                {isPending ? "Working…" : activeMode === "sign-up" ? "Create Account" : "Sign In"}
+              </Button>
+            </form>
           </div>
-
-          <div className="grid gap-1.5">
-            <Label htmlFor="auth-password" className="text-xs font-medium text-gray-700">
-              Password
-            </Label>
-            <Input
-              id="auth-password"
-              name="password"
-              type="password"
-              autoComplete={activeMode === "sign-up" ? "new-password" : "current-password"}
-              required
-              minLength={8}
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={isPending}
-              className="rounded-xl border-gray-200 bg-white"
-            />
-          </div>
-
-          <Button
-            type="submit"
-            size="lg"
-            className="mt-1 h-11 w-full rounded-xl"
-            disabled={isPending}
-          >
-            {isPending ? "Working…" : activeMode === "sign-up" ? "Create Account" : "Sign In"}
-          </Button>
-        </form>
-      </div>
+        </>
+      )}
 
       {error ? (
         <p
@@ -247,37 +254,39 @@ export function AuthForm({ mode, callbackURL = "/insights" }: AuthFormProps) {
       ) : null}
 
       <div className="flex flex-col items-center gap-2 text-center text-xs text-muted-foreground">
-        <div>
-          {activeMode === "sign-in" ? (
-            <p>
-              Don&apos;t have an account?{" "}
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveMode("sign-up");
-                  setError(undefined);
-                }}
-                className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
-              >
-                Sign up
-              </button>
-            </p>
-          ) : (
-            <p>
-              Already have an account?{" "}
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveMode("sign-in");
-                  setError(undefined);
-                }}
-                className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
-              >
-                Sign in
-              </button>
-            </p>
-          )}
-        </div>
+        {allowEmailPassword && (
+          <div>
+            {activeMode === "sign-in" ? (
+              <p>
+                Don&apos;t have an account?{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveMode("sign-up");
+                    setError(undefined);
+                  }}
+                  className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
+                >
+                  Sign up
+                </button>
+              </p>
+            ) : (
+              <p>
+                Already have an account?{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveMode("sign-in");
+                    setError(undefined);
+                  }}
+                  className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
+                >
+                  Sign in
+                </button>
+              </p>
+            )}
+          </div>
+        )}
 
         <p className="leading-relaxed">
           By continuing, you agree to our{" "}
