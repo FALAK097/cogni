@@ -82,9 +82,10 @@ export default function HelpPage() {
             </p>
             <p>
               Website and sitemap sources can be synced again to fetch current content. Use
-              <strong className="text-foreground"> Reindex</strong> for an uploaded or pasted text
-              source after replacing its content. Cogni does not automatically refresh a source on a
-              schedule. The source row shows its last sync time.
+              <strong className="text-foreground"> Reindex</strong> to process an uploaded or pasted
+              text source again. Cogni does not replace stored content in place. To change the
+              content, delete the source and add the new file or text. Cogni does not automatically
+              refresh a source on a schedule. The source row shows its last sync time.
             </p>
             <p>
               For a failed source, read the error, check that the website is reachable or the file

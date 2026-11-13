@@ -1112,6 +1112,8 @@ export function ConversationDetail({
                         <Link
                           href="/help#takeover"
                           className="inline-block text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                          target="_blank"
+                          rel="noopener noreferrer"
                         >
                           Takeover guide
                         </Link>

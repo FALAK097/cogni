@@ -20,9 +20,10 @@ In **Agent → Knowledge**, add a website URL, sitemap, uploaded PDF or DOCX, or
 is processed and then becomes indexed, or shows failed with an error. Only indexed sources can be
 retrieved for answers.
 
-Website and sitemap sources can be synced again to fetch current content. Use **Reindex** for an
-uploaded or pasted text source after replacing its content. Cogni does not automatically refresh a
-source on a schedule. The source row shows its last sync time.
+Website and sitemap sources can be synced again to fetch current content. Use **Reindex** to process
+an uploaded or pasted text source again. Cogni does not replace stored content in place. To change the
+content, delete the source and add the new file or text. Cogni does not automatically refresh a source
+on a schedule. The source row shows its last sync time.
 
 For a failed source, read the error, check that the website is reachable or the file is supported,
 then choose **Retry**. Retry is available for failed sources. If the source is still processing,
