@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo } from "react";
 
 import { IntegrationCategorySection } from "@/features/integrations/components/integration-category-section";
@@ -72,6 +73,12 @@ export function WidgetIntegrationsPage({ canManage }: { canManage: boolean }) {
         titleAs="p"
         description="Retry to confirm the active workspace before managing connections."
       >
+        <Link
+          href="/help#channels"
+          className="text-sm underline underline-offset-4"
+        >
+          Channel setup guide
+        </Link>
         <Button
           variant="outline"
           onClick={() => void authMeQuery.refetch()}
@@ -107,6 +114,12 @@ export function WidgetIntegrationsPage({ canManage }: { canManage: boolean }) {
         titleAs="p"
         description="Try again to see which tools are connected."
       >
+        <Link
+          href="/help#channels"
+          className="text-sm underline underline-offset-4"
+        >
+          Channel setup guide
+        </Link>
         <Button
           variant="outline"
           onClick={() => void integrationsQuery.refetch()}
@@ -125,7 +138,15 @@ export function WidgetIntegrationsPage({ canManage }: { canManage: boolean }) {
           role="alert"
           className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm text-muted-foreground"
         >
-          <p>Connections couldn’t refresh. Showing the last loaded connections.</p>
+          <p className="text-sm text-muted-foreground">
+            Connections couldn’t refresh. Showing the last loaded connections.{" "}
+            <Link
+              href="/help#channels"
+              className="underline underline-offset-2 hover:text-foreground"
+            >
+              Channel setup guide
+            </Link>
+          </p>
           <Button
             size="sm"
             variant="outline"
