@@ -676,10 +676,13 @@ export function ConversationsList({
           </output>
         ) : null}
         {isError && conversations.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
-            <p role="alert" className="text-sm text-muted-foreground">
-              Unable to load conversations. Check your connection and try again.
-            </p>
+          <EmptyState
+            mode="error"
+            title="Unable to load conversations"
+            titleAs="p"
+            description="Check your connection and try again."
+            className="h-full min-h-[240px] px-5 py-8"
+          >
             <Button
               variant="outline"
               className="min-h-11 sm:min-h-9"
@@ -688,7 +691,7 @@ export function ConversationsList({
             >
               Retry loading
             </Button>
-          </div>
+          </EmptyState>
         ) : (!hasHydrated || isConversationsPending) && conversations.length === 0 ? (
           <output aria-busy="true" aria-label="Loading conversations" className="block">
             <span className="sr-only">Loading conversations</span>
@@ -700,11 +703,11 @@ export function ConversationsList({
           </output>
         ) : conversations.length === 0 ? (
           <EmptyState
-            compact
+            mode="pane"
             icon={searchTerm ? Search : MessageSquare}
             title={emptyTitle}
             description={emptyDescription}
-            className="h-full min-h-[240px] rounded-none border-0 bg-transparent px-5 py-8"
+            className="h-full min-h-[240px] px-5 py-8"
           >
             {searchTerm || hasFacetFilters ? (
               <Button

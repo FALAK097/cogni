@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "reac
 import Link from "next/link";
 import { parseAsString, useQueryStates } from "nuqs";
 
-import { MessageSquare, Trash2 } from "@/components/icons";
+import { MessageSquare, Trash2, User } from "@/components/icons";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -490,11 +491,14 @@ export function WidgetConversations({ canManage }: WidgetConversationsProps) {
                 onComposerDraftChange={updateComposerDraft}
               />
             ) : (
-              <div className="flex h-full items-center justify-center p-6">
-                <p className="text-sm text-muted-foreground">
-                  Select a conversation to view the thread
-                </p>
-              </div>
+              <EmptyState
+                mode="pane"
+                icon={MessageSquare}
+                title="No conversation selected"
+                titleAs="p"
+                description="Select a conversation to view the thread."
+                className="h-full"
+              />
             )}
           </div>
 
@@ -511,10 +515,15 @@ export function WidgetConversations({ canManage }: WidgetConversationsProps) {
                 part="details"
               />
             ) : (
-              <div className="flex h-full items-center justify-center border-l border-border bg-card p-4">
-                <p className="text-center text-xs text-muted-foreground">
-                  Select a conversation to view contact details
-                </p>
+              <div className="flex h-full w-full items-center justify-center border-l border-border">
+                <EmptyState
+                  mode="inline"
+                  icon={User}
+                  title="No contact selected"
+                  titleAs="p"
+                  description="Select a conversation to view contact details."
+                  className="h-full"
+                />
               </div>
             )}
           </div>

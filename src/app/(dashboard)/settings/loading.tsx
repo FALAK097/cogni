@@ -19,7 +19,7 @@ export default function SettingsLoading() {
             Loading team settings
           </h2>
           <div className="space-y-5" aria-hidden="true">
-            <div className="overflow-hidden rounded-xl border bg-card">
+            <div className="overflow-hidden">
               <div className="border-b px-4 py-4 sm:px-5">
                 <Skeleton className="h-4 w-20" />
                 <Skeleton className="mt-2 h-3 w-56 max-w-full" />
@@ -37,7 +37,7 @@ export default function SettingsLoading() {
                 ))}
               </div>
             </div>
-            <div className="rounded-xl border bg-card p-4 sm:p-5">
+            <div className="py-5">
               <Skeleton className="h-4 w-36" />
               <Skeleton className="mt-2 h-3 w-64 max-w-full" />
               <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_9rem_auto]">

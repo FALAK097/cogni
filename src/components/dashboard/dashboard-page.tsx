@@ -106,7 +106,6 @@ import {
   ArrowLeft01Icon,
   ArrowRight01Icon,
   ArrowUp01Icon,
-  AlertCircleIcon,
   Calendar03Icon,
   Chart01Icon,
   Clock01Icon,
@@ -1366,24 +1365,12 @@ export function DashboardPage({
         ) : null}
 
         {hasInitialError ? (
-          <div
-            role="alert"
-            className="flex flex-col gap-4 rounded-xl border border-destructive/30 bg-destructive/5 p-5 sm:flex-row sm:items-center sm:justify-between"
+          <EmptyState
+            mode="error"
+            title="Unable to load Insights"
+            titleAs="h2"
+            description="The selected date range is unchanged. Check your connection and try again."
           >
-            <div className="flex items-start gap-3">
-              <HugeiconsIcon
-                icon={AlertCircleIcon}
-                strokeWidth={2}
-                className="mt-0.5 size-5 shrink-0 text-destructive"
-                aria-hidden="true"
-              />
-              <div>
-                <h2 className="text-sm font-semibold">Unable to load Insights</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  The selected date range is unchanged.
-                </p>
-              </div>
-            </div>
             <Button
               type="button"
               variant="outline"
@@ -1400,17 +1387,15 @@ export function DashboardPage({
               />
               {analyticsQuery.isFetching ? "Retrying…" : "Try again"}
             </Button>
-          </div>
+          </EmptyState>
         ) : null}
 
         {analyticsQuery.isError && analytics ? (
           <output
             aria-live="polite"
-            className="flex flex-col gap-3 rounded-xl border border-border/60 bg-muted/30 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+            className="flex flex-col gap-3 py-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between"
           >
-            <span className="text-sm text-muted-foreground">
-              Insights could not refresh. Showing the last loaded results.
-            </span>
+            <span>Insights could not refresh. Showing the last loaded results.</span>
             <Button
               type="button"
               variant="outline"
@@ -1432,9 +1417,9 @@ export function DashboardPage({
 
         {isEmptyPeriod && analytics ? (
           analytics.kpis.totalConversations.previousValue > 0 ? (
-            <section className="flex flex-col gap-4 rounded-xl border border-border/60 bg-card/60 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <section className="flex flex-col gap-4 py-5 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex min-w-0 items-start gap-3">
-                <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground">
+                <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center text-muted-foreground">
                   <HugeiconsIcon icon={Message01Icon} strokeWidth={2} className="size-[18px]" />
                 </span>
                 <div className="min-w-0">
@@ -2191,13 +2176,13 @@ export function DashboardPage({
                   <Skeleton className="h-52 w-full rounded-lg border border-border/50 bg-transparent" />
                 </output>
               ) : agentTestRunsQuery.isError && !agentTestRunsQuery.data ? (
-                <div
-                  role="alert"
-                  className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/70 bg-muted/30 px-3 py-3"
+                <EmptyState
+                  mode="error"
+                  title="Saved test history couldn’t be loaded"
+                  titleAs="p"
+                  description="Check your connection and try again."
+                  className="mt-5 min-h-[140px]"
                 >
-                  <p className="text-sm text-muted-foreground">
-                    Saved test history couldn’t be loaded.
-                  </p>
                   <Button
                     size="sm"
                     variant="outline"
@@ -2206,7 +2191,7 @@ export function DashboardPage({
                   >
                     {agentTestRunsQuery.isFetching ? "Retrying…" : "Try again"}
                   </Button>
-                </div>
+                </EmptyState>
               ) : insightsQuery.tests === "latest-suite" &&
                 (agentTestRunsQuery.data?.runs.length ?? 0) > 0 &&
                 testHistory.latestSuiteDigest === null ? (

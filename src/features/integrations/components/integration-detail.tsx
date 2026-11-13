@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -65,20 +66,16 @@ export function IntegrationDetail({ slug, canManage }: { slug: string; canManage
   if (query.isLoading) return <IntegrationDetailSkeleton />;
   if (!query.data) {
     return (
-      <div
-        role="alert"
-        className="flex flex-col items-start gap-4 rounded-2xl border border-border/70 bg-card p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6"
+      <EmptyState
+        mode="error"
+        title="Connection details unavailable"
+        titleAs="h1"
+        description="We couldn’t load this connection. Check your connection and try again."
       >
-        <div>
-          <h1 className="font-semibold">Connection details unavailable</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            We couldn’t load this connection. Check your connection and try again.
-          </p>
-        </div>
         <Button variant="outline" onClick={() => void query.refetch()} disabled={query.isFetching}>
           {query.isFetching ? "Trying again…" : "Try again"}
         </Button>
-      </div>
+      </EmptyState>
     );
   }
   const detail = query.data.integration;
@@ -86,7 +83,7 @@ export function IntegrationDetail({ slug, canManage }: { slug: string; canManage
   return (
     <div className="space-y-6">
       {query.isError ? (
-        <output className="flex flex-col items-start gap-3 rounded-xl border border-border/70 bg-muted/30 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <output className="flex flex-col items-start gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted-foreground">
             Couldn’t refresh this connection. Showing the last loaded details.
           </p>
@@ -297,9 +294,9 @@ export function IntegrationDetailSkeleton() {
         </div>
         <Skeleton className="h-6 w-24 rounded-full" />
       </div>
-      <div aria-hidden="true" className="grid gap-4 lg:grid-cols-2">
+      <div aria-hidden="true" className="grid gap-8 lg:grid-cols-2">
         {Array.from({ length: 2 }).map((_, index) => (
-          <div key={index} className="rounded-2xl border border-border/60 p-5">
+          <div key={index} className="py-5">
             <Skeleton className="h-5 w-36" />
             <div className="mt-5 space-y-3">
               <Skeleton className="h-4 w-3/4" />
@@ -309,7 +306,7 @@ export function IntegrationDetailSkeleton() {
           </div>
         ))}
       </div>
-      <div aria-hidden="true" className="rounded-2xl border border-border/60 p-5">
+      <div aria-hidden="true" className="py-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Skeleton className="h-5 w-24" />
           <Skeleton className="h-9 w-full rounded-lg sm:w-56" />
@@ -320,7 +317,7 @@ export function IntegrationDetailSkeleton() {
           ))}
         </div>
       </div>
-      <div aria-hidden="true" className="rounded-2xl border border-border/60 p-5">
+      <div aria-hidden="true" className="py-5">
         <Skeleton className="h-5 w-44" />
         <Skeleton className="mt-4 h-9 w-28 rounded-lg" />
       </div>
