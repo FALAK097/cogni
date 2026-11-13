@@ -27,7 +27,7 @@ export function DashboardSkeleton({ label = "Loading Insights" }: { label?: stri
         {Array.from({ length: 5 }).map((_, index) => (
           <div
             key={index}
-            className="flex min-h-[132px] flex-col gap-4 rounded-xl border border-border/50 p-4 sm:p-5 xl:p-6"
+            className="flex min-h-[132px] flex-col gap-4 rounded-xl p-4 sm:p-5 xl:p-6"
           >
             <Skeleton className="h-3.5 w-28 max-w-full" />
             <Skeleton className="h-8 w-20" />
@@ -39,7 +39,7 @@ export function DashboardSkeleton({ label = "Loading Insights" }: { label?: stri
         aria-hidden="true"
         className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 xl:grid-cols-4"
       >
-        <div className="flex min-h-[320px] flex-col rounded-xl border border-border/50 p-6 md:col-span-2 xl:col-span-2">
+        <div className="flex min-h-[320px] flex-col rounded-xl p-6 md:col-span-2 xl:col-span-2">
           <div className="mb-5 flex items-center justify-between gap-3">
             <Skeleton className="h-4 w-40 max-w-[55%]" />
             <Skeleton className="h-9 w-24 rounded-lg" />
@@ -65,10 +65,7 @@ export function DashboardSkeleton({ label = "Loading Insights" }: { label?: stri
           </div>
         </div>
         {Array.from({ length: 2 }).map((_, index) => (
-          <div
-            key={index}
-            className="flex min-h-[320px] flex-col items-center rounded-xl border border-border/50 p-6"
-          >
+          <div key={index} className="flex min-h-[320px] flex-col items-center rounded-xl p-6">
             <Skeleton className="mr-auto h-4 w-36 max-w-full" />
             <div className="relative my-5 flex size-[180px] items-center justify-center rounded-full border-[24px] border-muted">
               <Skeleton className="absolute inset-[18px] rounded-full" />
@@ -89,10 +86,7 @@ export function DashboardSkeleton({ label = "Loading Insights" }: { label?: stri
         className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-2 xl:grid-cols-4"
       >
         {Array.from({ length: 4 }).map((_, index) => (
-          <div
-            key={index}
-            className="flex min-h-[260px] flex-col rounded-xl border border-border/50 p-6 xl:col-span-2"
-          >
+          <div key={index} className="flex min-h-[260px] flex-col rounded-xl p-6 xl:col-span-2">
             <Skeleton className="h-4 w-36" />
             <div className="mt-5 flex-1 space-y-3">
               {Array.from({ length: index === 2 ? 4 : 5 }).map((__, rowIndex) => (

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle, Info } from "@/components/icons";
+import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/ui/use-toast";
 import { queryKeys } from "@/lib/query-keys";
 
@@ -69,31 +70,30 @@ export function PendingActionsCard({ canManage }: { canManage: boolean }) {
 
   if (query.isLoading) {
     return (
-      <output aria-busy="true" aria-label="Checking pending approvals" className="block">
-        <Card aria-hidden="true">
-          <CardHeader>
+      <output aria-busy="true" aria-label="Checking pending approvals" className="block py-5">
+        <div aria-hidden="true" className="space-y-4">
+          <div className="space-y-2">
             <Skeleton className="h-5 w-52 max-w-full" />
             <Skeleton className="h-4 w-72 max-w-full" />
-          </CardHeader>
-          <CardContent>
-            <Skeleton className="h-16 w-full rounded-xl" />
-          </CardContent>
-        </Card>
+          </div>
+          <Skeleton className="h-16 w-full rounded-xl" />
+        </div>
       </output>
     );
   }
 
   if (query.isError && !query.data) {
     return (
-      <div role="alert" className="rounded-xl border border-border bg-card p-5">
-        <p className="font-medium">Pending approvals could not be loaded</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Try again to check for agent actions that need your review.
-        </p>
-        <Button className="mt-4" variant="outline" onClick={() => void query.refetch()}>
+      <EmptyState
+        mode="error"
+        title="Pending approvals could not be loaded"
+        titleAs="p"
+        description="Try again to check for agent actions that need your review."
+      >
+        <Button variant="outline" onClick={() => void query.refetch()}>
           Try again
         </Button>
-      </div>
+      </EmptyState>
     );
   }
 
@@ -108,12 +108,12 @@ export function PendingActionsCard({ canManage }: { canManage: boolean }) {
         </p>
       </CardHeader>
       {query.isError ? (
-        <div role="alert" className="mx-6 rounded-lg border border-border bg-muted/30 p-3 text-sm">
-          <p className="font-medium">Approvals may be out of date</p>
-          <p className="mt-1 text-muted-foreground">
-            The latest review status could not be checked.
-          </p>
-          <Button className="mt-3" variant="outline" size="sm" onClick={() => void query.refetch()}>
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-3 px-6 py-3 text-sm text-muted-foreground"
+        >
+          <p>Approvals may be out of date. The latest review status could not be checked.</p>
+          <Button variant="outline" size="sm" onClick={() => void query.refetch()}>
             Try again
           </Button>
         </div>
