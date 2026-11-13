@@ -65,6 +65,10 @@ export type WidgetBookingConfig = {
   timezone: string;
   durationMinutes: number;
   minimumNoticeMinutes: number;
+  bufferMinutes?: number;
+  allowedDays?: number[];
+  handoffFallback?: string;
+  notificationChannel?: "INBOX" | "EMAIL" | "SLACK";
   workingHours: { start: string; end: string; weekdays: number[] };
 };
 

@@ -23,6 +23,7 @@ import {
 import type { Db } from "@/lib/db/client";
 import { contact, integrationAction } from "@/lib/db/schema";
 import { env } from "@/lib/env/server";
+import { getCalendarAdapter } from "./calendar-adapter";
 
 export class ActionOutcomeUnknownError extends Error {
   constructor() {
@@ -238,6 +239,62 @@ async function executeComposioTool({
   }
 }
 
+async function executeCalendarTool({
+  db,
+  workspaceId,
+  actionType,
+  input,
+}: {
+  db: Db;
+  workspaceId: string;
+  actionType: ToolActionType;
+  input: Record<string, unknown>;
+}) {
+  if (env.COMPOSIO_API_KEY) {
+    try {
+      return await executeComposioTool({
+        db,
+        workspaceId,
+        provider: "GOOGLE_CALENDAR",
+        actionType,
+        input,
+      });
+    } catch (error) {
+      if (error instanceof ActionOutcomeUnknownError) throw error;
+      // Fallback to typed mock calendar adapter if integration is not ready
+    }
+  }
+
+  const adapter = await getCalendarAdapter(workspaceId, db);
+  if (actionType === "calendar.find_availability") {
+    return await adapter.findAvailability({
+      startAt: input.startAt as string,
+      endAt: input.endAt as string,
+      timezone: input.timezone as string,
+      calendarIds: input.calendarIds as string[] | undefined,
+      durationMinutes: input.durationMinutes as number | undefined,
+      bufferMinutes: input.bufferMinutes as number | undefined,
+      allowedDays: input.allowedDays as number[] | undefined,
+      workingHours: input.workingHours as { start: string; end: string } | undefined,
+    });
+  }
+
+  if (actionType === "calendar.create") {
+    return await adapter.createEvent({
+      title: input.title as string,
+      startAt: input.startAt as string,
+      endAt: input.endAt as string,
+      attendeeEmail: input.attendeeEmail as string,
+      timezone: input.timezone as string,
+      description: input.description as string | undefined,
+      createMeetingRoom: input.createMeetingRoom as boolean | undefined,
+      conversationId: input.conversationId as string | undefined,
+    });
+  }
+
+  throw new Error(`Unsupported calendar action: ${actionType}`);
+}
+
 export async function executeApprovedTool({
   db,
   workspaceId,
@@ -321,13 +378,20 @@ export async function executeApprovedTool({
         ? await executeInternalTool({ db, workspaceId, actionType, input: parsed.input })
         : parsed.tool.provider === "RESEND"
           ? await executeResendTool({ db, workspaceId, input: parsed.input, idempotencyKey })
-          : await executeComposioTool({
-              db,
-              workspaceId,
-              provider: parsed.tool.provider,
-              actionType: parsed.tool.actionType,
-              input: parsed.input,
-            });
+          : parsed.tool.provider === "GOOGLE_CALENDAR"
+            ? await executeCalendarTool({
+                db,
+                workspaceId,
+                actionType: parsed.tool.actionType,
+                input: parsed.input,
+              })
+            : await executeComposioTool({
+                db,
+                workspaceId,
+                provider: parsed.tool.provider,
+                actionType: parsed.tool.actionType,
+                input: parsed.input,
+              });
     const [completed] = await db
       .update(integrationAction)
       .set({

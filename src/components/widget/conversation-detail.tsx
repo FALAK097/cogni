@@ -19,6 +19,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Bot,
+  Calendar,
   CheckCircle2,
   ChevronDown,
   Clock,
@@ -1151,6 +1152,130 @@ export function ConversationDetail({
                   </div>
                 </output>
               ) : null}
+
+              {session.workflows
+                ?.filter((w) => w.name === "appointment.booking")
+                .map((workflow) => {
+                  const startAt = workflowInputString(workflow.input, "startAt");
+                  const attendeeEmail = workflowInputString(workflow.input, "attendeeEmail");
+                  const title = workflowInputString(workflow.input, "title") || "Customer meeting";
+                  const timezone =
+                    workflowInputString(workflow.input, "timezone") ||
+                    session.workspaceTimezone ||
+                    "UTC";
+                  const isFailed =
+                    workflow.status === "FAILED" ||
+                    workflow.status === "CANCELLED" ||
+                    workflow.status === "DEAD";
+                  const isConfirmed = workflow.status === "COMPLETED";
+                  const isWaiting = workflow.status === "WAITING_APPROVAL";
+
+                  return (
+                    <div
+                      key={`appointment-timeline-${workflow.id}`}
+                      className="w-full rounded-lg border border-border bg-background p-3.5 text-xs sm:p-4"
+                    >
+                      <div className="flex items-start justify-between gap-2 border-b border-border pb-3">
+                        <div className="min-w-0 space-y-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <Calendar
+                              className="size-3.5 shrink-0 text-primary"
+                              aria-hidden="true"
+                            />
+                            <span className="truncate font-semibold text-foreground">{title}</span>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground">
+                            Appointment booking workflow
+                          </p>
+                        </div>
+                        <Badge
+                          variant={workflowStatusVariant(workflow.status)}
+                          className="shrink-0 text-[11px] font-medium"
+                        >
+                          {isConfirmed
+                            ? "Confirmed"
+                            : isWaiting
+                              ? "Pending Approval"
+                              : isFailed
+                                ? "Failed"
+                                : formatStatusLabel(workflow.status)}
+                        </Badge>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-2 pt-3 sm:grid-cols-2">
+                        <div>
+                          <span className="block text-[11px] text-muted-foreground">
+                            Date & Time
+                          </span>
+                          <span className="font-medium text-foreground">
+                            {startAt
+                              ? format(new Date(startAt), "EEE, MMM d, yyyy · h:mm a")
+                              : "Time not specified"}{" "}
+                            ({timezone})
+                          </span>
+                        </div>
+                        <div>
+                          <span className="block text-[11px] text-muted-foreground">
+                            Attendee Email
+                          </span>
+                          <span className="block truncate font-medium text-foreground">
+                            {attendeeEmail || "None specified"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 space-y-1.5 border-t border-border pt-2.5">
+                        <span className="block text-[11px] font-medium text-muted-foreground">
+                          Workflow Steps
+                        </span>
+                        <div className="space-y-1">
+                          {workflow.steps.map((step) => {
+                            const stepDone = step.status === "COMPLETED";
+                            const stepWait =
+                              step.status === "WAITING_APPROVAL" || step.status === "RUNNING";
+                            const stepFail =
+                              step.status === "FAILED" || step.status === "CANCELLED";
+                            return (
+                              <div
+                                key={step.id}
+                                className="flex items-center justify-between text-[11px]"
+                              >
+                                <div className="flex items-center gap-1.5 truncate">
+                                  <span
+                                    className={cn(
+                                      "size-1.5 shrink-0 rounded-full",
+                                      stepDone
+                                        ? "bg-emerald-500"
+                                        : stepWait
+                                          ? "bg-amber-500"
+                                          : stepFail
+                                            ? "bg-rose-500"
+                                            : "bg-muted-foreground",
+                                    )}
+                                  />
+                                  <span className="truncate text-foreground">{step.name}</span>
+                                </div>
+                                <span className="shrink-0 font-mono text-muted-foreground">
+                                  {formatStatusLabel(step.status)}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {isFailed || workflow.errorMessage ? (
+                        <div className="mt-3 rounded-md border border-rose-200 bg-rose-50/50 p-2.5 text-[11px] text-rose-900 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-200">
+                          <p className="font-medium">Booking could not be scheduled</p>
+                          <p className="mt-0.5 text-muted-foreground">
+                            {workflow.errorMessage ||
+                              "The selected time could not be booked. Handoff fallback: assign to an agent to follow up directly."}
+                          </p>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
 
               {groupedMessages.map((group) => (
                 <div key={group.date} className="space-y-4">

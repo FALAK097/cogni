@@ -1,9 +1,14 @@
-import { z } from "zod";
+import { format } from "date-fns";
+import { and, eq } from "drizzle-orm";
 
 import {
+  type AppointmentNotificationPayload,
+  type AppointmentWorkflowInput,
+  type BookingSettings,
+  appointmentWorkflowInputSchema,
   bookingSettingsInputSchema,
-  createAvailableSlots,
 } from "@/features/integrations/server/booking";
+import { getCalendarAdapter } from "@/features/integrations/server/calendar-adapter";
 import {
   assertPublicWidgetAccess,
   requireAuthorizedVisitorSession,
@@ -14,20 +19,20 @@ import {
   withWidgetCors,
 } from "@/features/widget/server/widget-utils";
 import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
-import { getDb, runDbWriteOperation } from "@/lib/db/client";
+import { type Db, getDb, runDbWriteOperation } from "@/lib/db/client";
 import { createApprovalRequest } from "@/features/integrations/server/approval-service";
 import { createWorkflowWithSteps, updateWorkflowStep } from "@/lib/workflows/runner";
 import { approvalRequest, workflowRun, workflowStep } from "@/lib/db/schema";
-import { and, eq } from "drizzle-orm";
+import { emitDomainEvent } from "@/lib/events/domain-events";
+import { notifyWorkspaceMembers } from "@/lib/notifications/create-notification";
+import { appendConversationMessage } from "@/features/conversations/server/conversation-service";
 
 type RouteContext = { params: Promise<{ publicKey: string }> };
 
-const confirmBookingSchema = z.object({
-  conversationId: z.string().min(1),
-  startAt: z.iso.datetime(),
-  endAt: z.iso.datetime(),
-  attendeeEmail: z.email(),
-  title: z.string().trim().min(1).max(200).default("Customer meeting"),
+const confirmBookingSchema = appointmentWorkflowInputSchema.omit({
+  handoffFallback: true,
+  notificationChannel: true,
+  timezone: true,
 });
 
 export function OPTIONS(request: Request) {
@@ -56,14 +61,38 @@ function corsResponse(request: Request, allowedDomains: string[], body: unknown,
   );
 }
 
+async function getAvailableSlots(db: Db, workspaceId: string, settings: BookingSettings) {
+  const adapter = await getCalendarAdapter(workspaceId, db);
+  const rangeStart = new Date(Date.now() + settings.minimumNoticeMinutes * 60_000);
+  const rangeEnd = new Date(rangeStart.getTime() + 14 * 24 * 60 * 60_000);
+  const availability = await adapter.findAvailability({
+    startAt: rangeStart.toISOString(),
+    endAt: rangeEnd.toISOString(),
+    timezone: settings.timezone,
+    durationMinutes: settings.durationMinutes,
+    bufferMinutes: settings.bufferMinutes,
+    allowedDays: settings.allowedDays ?? settings.workingHours.weekdays,
+    workingHours: settings.workingHours,
+  });
+  return availability.freeSlots;
+}
+
 export async function GET(request: Request, context: RouteContext) {
   const { publicKey } = await context.params;
   const result = await getBookingContext(request, publicKey);
   if ("error" in result) return result.error;
+  const slots = await getAvailableSlots(
+    result.db,
+    result.access.widget.workspaceId,
+    result.settings,
+  );
   return corsResponse(request, result.access.allowedDomains, {
+    enabled: result.settings.enabled,
     timezone: result.settings.timezone,
     durationMinutes: result.settings.durationMinutes,
-    slots: createAvailableSlots(result.settings),
+    bufferMinutes: result.settings.bufferMinutes,
+    handoffFallback: result.settings.handoffFallback,
+    slots,
   });
 }
 
@@ -92,20 +121,34 @@ export async function POST(request: Request, context: RouteContext) {
       404,
     );
   }
-  const validSlot = createAvailableSlots(result.settings).some(
+  const availableSlots = await getAvailableSlots(
+    result.db,
+    result.access.widget.workspaceId,
+    result.settings,
+  );
+  const validSlot = availableSlots.some(
     (slot) => slot.startAt === parsed.data.startAt && slot.endAt === parsed.data.endAt,
   );
   if (!validSlot) {
     return corsResponse(
       request,
       result.access.allowedDomains,
-      { error: "Slot is no longer available." },
+      {
+        error: "Slot is no longer available.",
+        fallbackMessage: result.settings.handoffFallback,
+      },
       409,
     );
   }
 
   const workspaceId = result.access.widget.workspaceId;
   const idempotencyKey = `booking:${workspaceId}:${parsed.data.startAt}`;
+  const workflowInput = {
+    ...parsed.data,
+    timezone: result.settings.timezone,
+    handoffFallback: result.settings.handoffFallback,
+    notificationChannel: result.settings.notificationChannel,
+  } satisfies AppointmentWorkflowInput;
   const calendarPayload = {
     conversationId: conversation.id,
     title: parsed.data.title,
@@ -118,14 +161,15 @@ export async function POST(request: Request, context: RouteContext) {
     conversationId: conversation.id,
     to: parsed.data.attendeeEmail,
     subject: `Confirmed: ${parsed.data.title}`,
-    text: `Your appointment is confirmed from ${parsed.data.startAt} to ${parsed.data.endAt}. Reply to this email if you need to make a change.`,
+    text: `Your appointment is confirmed for ${parsed.data.startAt} to ${parsed.data.endAt} (${result.settings.timezone}). Reply to this email if you need to make a change.`,
   };
   const existing = await result.db.query.workflowRun.findFirst({
     where: (fields, { and, eq }) =>
       and(eq(fields.workspaceId, workspaceId), eq(fields.idempotencyKey, idempotencyKey)),
   });
   if (existing) {
-    const sameRequest = JSON.stringify(JSON.parse(existing.input)) === JSON.stringify(parsed.data);
+    const sameRequest =
+      JSON.stringify(JSON.parse(existing.input)) === JSON.stringify(workflowInput);
     if (
       !sameRequest &&
       existing.conversationId === conversation.id &&
@@ -149,7 +193,7 @@ export async function POST(request: Request, context: RouteContext) {
         if (!pendingApproval) return false;
         await tx
           .update(workflowRun)
-          .set({ input: JSON.stringify(parsed.data) })
+          .set({ input: JSON.stringify(workflowInput) })
           .where(and(eq(workflowRun.id, existing.id), eq(workflowRun.workspaceId, workspaceId)));
         await tx
           .update(workflowStep)
@@ -182,6 +226,8 @@ export async function POST(request: Request, context: RouteContext) {
           workflowId: existing.id,
           status: "PENDING_TEAM_APPROVAL",
           message: "Your pending booking details were updated.",
+          appointment: calendarPayload,
+          fallbackMessage: result.settings.handoffFallback,
         });
       }
     }
@@ -193,6 +239,7 @@ export async function POST(request: Request, context: RouteContext) {
           ? "This booking request is already pending."
           : "Slot is already reserved.",
         workflowId: existing.id,
+        fallbackMessage: result.settings.handoffFallback,
       },
       409,
     );
@@ -204,7 +251,7 @@ export async function POST(request: Request, context: RouteContext) {
     conversationId: conversation.id,
     name: "appointment.booking",
     idempotencyKey,
-    input: parsed.data,
+    input: workflowInput,
     steps: [
       {
         name: "Approve and create calendar event",
@@ -228,7 +275,11 @@ export async function POST(request: Request, context: RouteContext) {
     return corsResponse(
       request,
       result.access.allowedDomains,
-      { error: "Slot is already reserved.", workflowId: workflow.run.id },
+      {
+        error: "Slot is already reserved.",
+        workflowId: workflow.run.id,
+        fallbackMessage: result.settings.handoffFallback,
+      },
       409,
     );
   }
@@ -252,7 +303,11 @@ export async function POST(request: Request, context: RouteContext) {
     return corsResponse(
       request,
       result.access.allowedDomains,
-      { error: "This booking request is already pending.", workflowId: workflow.run.id },
+      {
+        error: "This booking request is already pending.",
+        workflowId: workflow.run.id,
+        fallbackMessage: result.settings.handoffFallback,
+      },
       409,
     );
   }
@@ -268,9 +323,56 @@ export async function POST(request: Request, context: RouteContext) {
     .update(workflowRun)
     .set({ status: "WAITING_APPROVAL" })
     .where(and(eq(workflowRun.id, workflow.run.id), eq(workflowRun.workspaceId, workspaceId)));
+
+  const notificationPayload = {
+    workflowRunId: workflow.run.id,
+    conversationId: conversation.id,
+    title: parsed.data.title,
+    startAt: parsed.data.startAt,
+    endAt: parsed.data.endAt,
+    attendeeEmail: parsed.data.attendeeEmail,
+    timezone: result.settings.timezone,
+    status: "REQUESTED",
+    notificationChannel: result.settings.notificationChannel,
+  } satisfies AppointmentNotificationPayload;
+
+  await emitDomainEvent({
+    db: result.db,
+    workspaceId,
+    type: "appointment.booking_requested",
+    entityId: workflow.run.id,
+    payload: notificationPayload,
+  });
+
+  await notifyWorkspaceMembers({
+    db: result.db,
+    workspaceId,
+    type: "appointment.booking_requested",
+    title: "New appointment requested",
+    body: `${parsed.data.title} with ${parsed.data.attendeeEmail} for ${parsed.data.startAt}`,
+  });
+
+  const formattedTime = format(new Date(parsed.data.startAt), "EEE, MMM d, yyyy · h:mm a");
+  await appendConversationMessage({
+    db: result.db,
+    workspaceId,
+    conversationId: conversation.id,
+    message: {
+      id: crypto.randomUUID(),
+      body: `Appointment requested: ${parsed.data.title} on ${formattedTime} (${result.settings.timezone}). Our team has received your booking details and will confirm shortly.`,
+      authorType: "AI",
+      authorName: result.access.widget.displayName || "Assistant",
+      visibility: "PUBLIC",
+      createdAt: new Date().toISOString(),
+    },
+    updateLastMessageAt: true,
+  });
+
   return corsResponse(request, result.access.allowedDomains, {
     workflowId: workflow.run.id,
     status: "PENDING_TEAM_APPROVAL",
     message: "Your requested time is reserved pending team confirmation.",
+    appointment: calendarPayload,
+    fallbackMessage: result.settings.handoffFallback,
   });
 }

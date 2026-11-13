@@ -1690,6 +1690,252 @@ export function injectStyles() {
 			font-size: 14px;
 		}
 
+		/* Appointment Booking Workflow Styles - Flat & Minimal */
+		.oc-booking-container {
+			width: 100%;
+			max-width: 100%;
+		}
+
+		.oc-booking-bubble {
+			width: 100%;
+			max-width: 100%;
+			box-sizing: border-box;
+			border: 1px solid ${config.theme === "dark" ? "#27272a" : "#e4e4e7"};
+			background: ${config.theme === "dark" ? "#121214" : "#fbfbfc"};
+			border-radius: 8px;
+			padding: 12px;
+		}
+
+		.oc-booking-header {
+			display: flex;
+			flex-direction: column;
+			gap: 2px;
+			margin-bottom: 8px;
+		}
+
+		.oc-booking-title {
+			font-size: 13px;
+			font-weight: 600;
+			color: ${config.theme === "dark" ? "#f4f4f5" : "#18181b"};
+		}
+
+		.oc-booking-subtitle {
+			font-size: 11px;
+			color: ${config.theme === "dark" ? "#a1a1aa" : "#71717a"};
+		}
+
+		.oc-booking-chips {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 6px;
+			margin-top: 8px;
+			max-width: 100%;
+		}
+
+		.oc-slot-chip {
+			display: inline-flex;
+			align-items: center;
+			padding: 6px 10px;
+			font-size: 12px;
+			font-weight: 500;
+			border-radius: 6px;
+			border: 1px solid ${config.theme === "dark" ? "#3f3f46" : "#d4d4d8"};
+			background: ${config.theme === "dark" ? "#18181b" : "#ffffff"};
+			color: ${config.theme === "dark" ? "#e4e4e7" : "#27272a"};
+			cursor: pointer;
+			transition: all 0.15s ease;
+			text-align: left;
+			font-family: inherit;
+		}
+
+		.oc-slot-chip:hover {
+			border-color: ${config.primaryColor};
+			color: ${config.primaryColor};
+		}
+
+		.oc-slot-chip-active {
+			background: ${config.primaryColor};
+			color: #ffffff;
+			border-color: ${config.primaryColor};
+		}
+
+		.oc-booking-form {
+			display: flex;
+			flex-direction: column;
+			gap: 8px;
+			margin-top: 8px;
+		}
+
+		.oc-booking-field {
+			display: flex;
+			flex-direction: column;
+			gap: 3px;
+		}
+
+		.oc-booking-field label {
+			font-size: 11px;
+			font-weight: 500;
+			color: ${config.theme === "dark" ? "#a1a1aa" : "#71717a"};
+		}
+
+		.oc-booking-input {
+			height: 32px;
+			padding: 0 8px;
+			border-radius: 6px;
+			border: 1px solid ${config.theme === "dark" ? "#3f3f46" : "#d4d4d8"};
+			background: ${config.theme === "dark" ? "#18181b" : "#ffffff"};
+			color: ${config.theme === "dark" ? "#f4f4f5" : "#18181b"};
+			font-size: 12px;
+			font-family: inherit;
+			outline: none;
+			box-sizing: border-box;
+		}
+
+		.oc-booking-input:focus {
+			border-color: ${config.primaryColor};
+		}
+
+		.oc-booking-actions {
+			display: flex;
+			flex-wrap: wrap;
+			align-items: center;
+			gap: 6px;
+			margin-top: 4px;
+		}
+
+		.oc-booking-submit-btn {
+			height: 32px;
+			padding: 0 12px;
+			border-radius: 6px;
+			border: none;
+			background: ${config.primaryColor};
+			color: #ffffff;
+			font-size: 12px;
+			font-weight: 500;
+			font-family: inherit;
+			cursor: pointer;
+			transition: opacity 0.15s ease;
+		}
+
+		.oc-booking-submit-btn:disabled {
+			opacity: 0.6;
+			cursor: not-allowed;
+		}
+
+		.oc-booking-back-btn,
+		.oc-booking-retry-btn {
+			height: 32px;
+			padding: 0 10px;
+			border-radius: 6px;
+			border: 1px solid ${config.theme === "dark" ? "#3f3f46" : "#d4d4d8"};
+			background: transparent;
+			color: ${config.theme === "dark" ? "#a1a1aa" : "#71717a"};
+			font-size: 11px;
+			font-family: inherit;
+			cursor: pointer;
+		}
+
+		.oc-booking-error {
+			font-size: 11px;
+			color: #ef4444;
+			margin-top: 2px;
+		}
+
+		.oc-booking-card {
+			display: flex;
+			flex-direction: column;
+			gap: 6px;
+		}
+
+		.oc-booking-card-header {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 8px;
+		}
+
+		.oc-booking-badge {
+			font-size: 10px;
+			font-weight: 600;
+			padding: 2px 6px;
+			border-radius: 4px;
+			background: ${config.theme === "dark" ? "rgba(16, 185, 129, 0.2)" : "#d1fae5"};
+			color: #059669;
+			border: 1px solid rgba(16, 185, 129, 0.3);
+		}
+
+		.oc-booking-card-title {
+			font-size: 12px;
+			font-weight: 600;
+			color: ${config.theme === "dark" ? "#f4f4f5" : "#18181b"};
+		}
+
+		.oc-booking-card-body {
+			display: flex;
+			flex-direction: column;
+			gap: 3px;
+			padding: 6px 0;
+			border-top: 1px solid ${config.theme === "dark" ? "#27272a" : "#e4e4e7"};
+			border-bottom: 1px solid ${config.theme === "dark" ? "#27272a" : "#e4e4e7"};
+		}
+
+		.oc-booking-detail-row {
+			display: flex;
+			justify-content: space-between;
+			font-size: 11px;
+			gap: 8px;
+		}
+
+		.oc-booking-detail-label {
+			color: ${config.theme === "dark" ? "#a1a1aa" : "#71717a"};
+		}
+
+		.oc-booking-detail-val {
+			font-weight: 500;
+			color: ${config.theme === "dark" ? "#f4f4f5" : "#18181b"};
+			text-align: right;
+		}
+
+		.oc-booking-card-footer {
+			font-size: 11px;
+			color: ${config.theme === "dark" ? "#a1a1aa" : "#71717a"};
+			line-height: 1.4;
+		}
+
+		.oc-booking-fallback {
+			display: flex;
+			flex-direction: column;
+			gap: 6px;
+		}
+
+		.oc-booking-fallback-header {
+			display: flex;
+			align-items: center;
+			gap: 6px;
+		}
+
+		.oc-booking-fallback-badge {
+			font-size: 10px;
+			font-weight: 600;
+			padding: 1px 5px;
+			border-radius: 4px;
+			background: ${config.theme === "dark" ? "rgba(245, 158, 11, 0.2)" : "#fef3c7"};
+			color: #d97706;
+			border: 1px solid rgba(245, 158, 11, 0.3);
+		}
+
+		.oc-booking-fallback-title {
+			font-size: 12px;
+			font-weight: 600;
+			color: ${config.theme === "dark" ? "#f4f4f5" : "#18181b"};
+		}
+
+		.oc-booking-fallback-body {
+			font-size: 11px;
+			color: ${config.theme === "dark" ? "#d4d4d8" : "#3f3f46"};
+			line-height: 1.4;
+			margin: 0;
+		}
 	`;
   document.head.appendChild(style);
 }
