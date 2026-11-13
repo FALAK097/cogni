@@ -80,7 +80,7 @@ export function ChatMessageContent({
     <div
       data-slot="chat-message-content"
       className={cn(
-        "flex min-w-0 max-w-[88%] flex-col sm:max-w-[78%]",
+        "flex min-w-0 max-w-[min(88%,calc(100%-3rem))] flex-col sm:max-w-[min(78%,calc(100%-3rem))]",
         alignment === "outgoing" && "items-end",
         className,
       )}
@@ -191,7 +191,7 @@ export const chatBubbleVariants = cva(
       variant: {
         incoming: "bg-muted text-foreground",
         outgoing: "bg-muted text-foreground",
-        internal: "border border-border bg-muted/60 text-foreground",
+        internal: "bg-muted/60 text-foreground",
         team: "bg-muted text-foreground",
       },
     },
