@@ -249,7 +249,7 @@ export function TeamSettings({
           </section>
         </>
       ) : (
-        <p className="rounded-lg border border-border/70 bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+        <p className="py-3 text-sm text-muted-foreground">
           A workspace owner can invite teammates, update roles, and remove access.
         </p>
       )}

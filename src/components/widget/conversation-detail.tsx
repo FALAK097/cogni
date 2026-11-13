@@ -60,6 +60,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { CountryFlag } from "@/components/ui/country-flag";
 import { Input } from "@/components/ui/input";
 import {
@@ -644,7 +645,7 @@ export function ConversationDetail({
               <Skeleton className="ml-auto h-16 w-1/2 rounded-xl" />
             </div>
             <div className="shrink-0 border-t border-border/50 p-3 sm:p-4">
-              <div className="space-y-3 rounded-xl border border-border/60 bg-card p-3">
+              <div className="space-y-3 p-3">
                 <div className="flex items-center justify-between gap-3">
                   <Skeleton className="h-8 w-28 rounded-lg" />
                   <Skeleton className="h-3 w-32 max-w-[45%]" />
@@ -688,13 +689,13 @@ export function ConversationDetail({
             </Button>
           </header>
         ) : null}
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
-          <div role="alert" className="space-y-1">
-            <p className="text-sm font-medium text-foreground">
-              {part === "details" ? "Details are unavailable" : "This conversation couldn’t load"}
-            </p>
-            <p className="text-sm text-muted-foreground">Check your connection and try again.</p>
-          </div>
+        <EmptyState
+          mode="error"
+          title={part === "details" ? "Details are unavailable" : "This conversation couldn’t load"}
+          titleAs="p"
+          description="Check your connection and try again."
+          className="flex-1"
+        >
           <Button
             type="button"
             variant="outline"
@@ -708,7 +709,7 @@ export function ConversationDetail({
             ) : null}
             {isFetching ? "Retrying…" : "Try again"}
           </Button>
-        </div>
+        </EmptyState>
       </div>
     );
   }
