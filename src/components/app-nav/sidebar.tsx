@@ -7,7 +7,7 @@ import { useEffect } from "react";
 import { Menu } from "@/components/app-nav/menu";
 import { WorkspaceSwitcher } from "@/components/app-nav/workspace-switcher";
 import { ThemeLogo } from "@/components/theme-logo";
-import { HelpCircle, Settings } from "@/components/icons";
+import { BookOpen, Settings } from "@/components/icons";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -54,19 +54,19 @@ function SidebarContent({ expanded }: { expanded: boolean }) {
         {expanded ? (
           <>
             <Link
-              href="/help"
+              href="/docs"
               onClick={closeMobileSidebar}
-              aria-label="Help & Docs"
-              aria-current={pathname.startsWith("/help") ? "page" : false}
-              title="Help & Docs"
+              aria-label="Documentation"
+              aria-current={pathname.startsWith("/docs") ? "page" : false}
+              title="Documentation"
               className={cn(
                 "flex min-h-11 lg:min-h-10 items-center gap-3 rounded-lg px-3 text-sm text-sidebar-foreground transition-colors duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-                pathname.startsWith("/help") &&
+                pathname.startsWith("/docs") &&
                   "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
               )}
             >
-              <HelpCircle className="size-[18px] shrink-0 text-muted-foreground" />
-              <span>Help & Docs</span>
+              <BookOpen className="size-[18px] shrink-0 text-muted-foreground" />
+              <span>Documentation</span>
             </Link>
             <Link
               href={APP_ROUTES.settings}
@@ -90,21 +90,21 @@ function SidebarContent({ expanded }: { expanded: boolean }) {
               <TooltipTrigger
                 render={
                   <Link
-                    href="/help"
+                    href="/docs"
                     onClick={closeMobileSidebar}
-                    aria-label="Help & Docs"
-                    aria-current={pathname.startsWith("/help") ? "page" : false}
+                    aria-label="Documentation"
+                    aria-current={pathname.startsWith("/docs") ? "page" : false}
                     className={cn(
                       "flex min-h-11 lg:min-h-10 w-full items-center justify-center rounded-lg text-sidebar-foreground transition-colors duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-                      pathname.startsWith("/help") &&
+                      pathname.startsWith("/docs") &&
                         "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
                     )}
                   >
-                    <HelpCircle className="size-[18px] shrink-0 text-muted-foreground" />
+                    <BookOpen className="size-[18px] shrink-0 text-muted-foreground" />
                   </Link>
                 }
               />
-              <TooltipContent side="right">Help & Docs</TooltipContent>
+              <TooltipContent side="right">Documentation</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger

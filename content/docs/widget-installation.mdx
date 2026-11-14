@@ -1,0 +1,57 @@
+---
+title: Widget installation
+description: Publish the agent, authorize production hostnames, install the loader, and configure CSP.
+---
+
+Install the widget only after an owner has published an enabled agent.
+
+## Authorize each hostname
+
+In **Agent → Deploy**, add every hostname that may load the widget. Enter hostnames without a protocol, path, query, or port, for example:
+
+```text
+example.com
+www.example.com
+app.example.com
+```
+
+Each hostname is matched explicitly. Authorizing `example.com` does not automatically authorize `www.example.com` or another subdomain.
+
+For local verification, add the exact local hostname used by the browser.
+
+## Add the loader
+
+Copy the generated script from **Agent → Deploy** and place it once in the site markup, normally before the closing `</body>` tag:
+
+```html
+<script
+  src="https://YOUR_COGNI_ORIGIN/widget.bundle.js"
+  data-widget-key="YOUR_WIDGET_KEY"
+  async
+></script>
+```
+
+Use the generated origin and public widget key exactly. Do not expose workspace credentials or integration secrets in page markup.
+
+## Content Security Policy
+
+Sites with a Content Security Policy must allow the Cogni origin in the directives used by the loader:
+
+- `script-src` for `widget.bundle.js`;
+- `connect-src` for widget API requests;
+- `img-src` for remote images or data URLs rendered in messages, when applicable; and
+- `style-src` if the host policy blocks styles inserted by the widget.
+
+Keep the policy as narrow as the host application permits. Add only the deployed Cogni origin rather than a broad wildcard.
+
+## Verify the deployment
+
+Load the production page and confirm that:
+
+1. the loader request succeeds;
+2. the launcher appears at the configured position;
+3. opening the widget starts a conversation;
+4. a message receives the published agent response; and
+5. the conversation appears in Cogni's inbox.
+
+If the launcher is absent, check the browser console and network panel for the first blocked loader, CSP, or domain-authorization request. Correct that exact host or directive and reload.

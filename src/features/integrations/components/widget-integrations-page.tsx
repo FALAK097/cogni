@@ -74,7 +74,7 @@ export function WidgetIntegrationsPage({ canManage }: { canManage: boolean }) {
         description="Retry to confirm the active workspace before managing connections."
       >
         <Link
-          href="/help#channels"
+          href="/docs/integrations-channels#connect-a-provider"
           className="text-sm underline underline-offset-4"
         >
           Channel setup guide
@@ -115,7 +115,7 @@ export function WidgetIntegrationsPage({ canManage }: { canManage: boolean }) {
         description="Try again to see which tools are connected."
       >
         <Link
-          href="/help#channels"
+          href="/docs/integrations-channels#connect-a-provider"
           className="text-sm underline underline-offset-4"
         >
           Channel setup guide
@@ -141,7 +141,7 @@ export function WidgetIntegrationsPage({ canManage }: { canManage: boolean }) {
           <p className="text-sm text-muted-foreground">
             Connections couldn’t refresh. Showing the last loaded connections.{" "}
             <Link
-              href="/help#channels"
+              href="/docs/integrations-channels#connect-a-provider"
               className="underline underline-offset-2 hover:text-foreground"
             >
               Channel setup guide

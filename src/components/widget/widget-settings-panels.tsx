@@ -1114,7 +1114,7 @@ export function WidgetInstallationPanel({
                 <p className="mt-1 text-xs text-muted-foreground">
                   The widget enforces origin allowlisting.{" "}
                   <Link
-                    href="/help#install"
+                    href="/docs/widget-installation#authorize-each-hostname"
                     className="underline underline-offset-2 hover:text-foreground"
                   >
                     View authorized domains and CSP guide
@@ -1140,10 +1140,10 @@ export function WidgetInstallationPanel({
             <p className="mt-2 text-xs text-muted-foreground">
               Need help with embed placement or Content Security Policy (CSP)?{" "}
               <Link
-                href="/help#install"
+                href="/docs/widget-installation#content-security-policy"
                 className="underline underline-offset-2 hover:text-foreground"
               >
-                View widget installation &amp; CSP troubleshooting
+                View widget installation and CSP
               </Link>
               .
             </p>
@@ -1196,7 +1196,7 @@ export function WidgetVersionHistory({
         <p className="px-4 pb-2 text-xs text-muted-foreground">
           Learn about draft preview vs live publication and rollback in the{" "}
           <Link
-            href="/help#preview-publish"
+            href="/docs/agent#restore-a-version"
             className="underline underline-offset-2 hover:text-foreground"
           >
             publication guide

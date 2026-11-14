@@ -1,0 +1,26 @@
+---
+title: Booking
+description: Configure Google Calendar-backed availability and approved appointment creation.
+---
+
+Booking lets the agent present available times and prepare a Google Calendar event after the visitor confirms the required details.
+
+## Prerequisites
+
+An owner must connect Google Calendar for the active workspace. The connection must support availability lookup and event creation before booking is enabled for the agent.
+
+## Configure booking
+
+Open **Agent → Build**, enable booking, then configure the booking timezone, appointment duration, working hours, and other availability constraints shown by the product. Appointment duration must be between 15 and 240 minutes.
+
+Availability is calculated against the connected calendar and the configured schedule.
+
+## Visitor confirmation
+
+Before an event is created, the visitor must confirm the appointment title, selected time, timezone, and email address. Cogni prepares the action for approval rather than silently writing an event from incomplete details.
+
+## Publish booking changes
+
+Booking configuration follows the agent publication model. Test the draft flow, publish the agent, then verify availability and event creation against the intended calendar.
+
+If no times appear, confirm the Calendar connection, timezone, working hours, appointment duration, and existing calendar conflicts. If creation remains pending, review the action approval in the workspace rather than asking the visitor to submit it repeatedly.

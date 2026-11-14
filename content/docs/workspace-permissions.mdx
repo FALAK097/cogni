@@ -1,0 +1,30 @@
+---
+title: Workspace and permissions
+description: Understand Google sign-in, workspace membership, invitations, and owner-only changes.
+---
+
+## Sign in
+
+Production authentication uses Google only. The first sign-in provisions a workspace and makes that user its owner. Use the workspace switcher to confirm the active workspace before changing configuration or replying to conversations.
+
+All workspace data is isolated by membership. Changing the active workspace changes the agent, sources, conversations, integrations, and analytics shown in the dashboard.
+
+## Roles
+
+Cogni has two workspace roles:
+
+| Capability                                           | Owner | Member |
+| ---------------------------------------------------- | :---: | :----: |
+| View the workspace and analytics                     |  Yes  |  Yes   |
+| Preview and test the agent                           |  Yes  |  Yes   |
+| Work with inbox conversations                        |  Yes  |  Yes   |
+| Manage members and workspace settings                |  Yes  |   No   |
+| Change knowledge, agent, widget, booking, or domains |  Yes  |   No   |
+| Connect integrations and approve actions             |  Yes  |   No   |
+| Publish or restore an agent version                  |  Yes  |   No   |
+
+## Invite a teammate
+
+Owners can invite a teammate from workspace settings. Invitations are tied to the invited email address; the recipient must sign in with that Google account. Once accepted, the workspace appears in their switcher.
+
+Membership changes apply to the workspace only. They do not change another workspace that the same person belongs to.

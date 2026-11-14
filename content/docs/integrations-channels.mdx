@@ -1,0 +1,35 @@
+---
+title: Integrations and channels
+description: Connect implemented providers and control approval for external actions.
+---
+
+Owners manage integrations in workspace settings. A connection belongs to the active workspace and may require provider credentials, OAuth consent, bot installation, webhook configuration, or channel identifiers.
+
+## Implemented providers
+
+| Provider        | Current Cogni capability                                                    |
+| --------------- | --------------------------------------------------------------------------- |
+| Gmail           | Send approved email actions.                                                |
+| Google Calendar | Read availability and create approved booking events.                       |
+| Slack           | Send notifications and receive configured channel messages.                 |
+| Discord         | Send bot messages and receive configured channel replies.                   |
+| Google Chat     | Receive and route configured space messages.                                |
+| WhatsApp        | Receive and route configured business messages.                             |
+| Microsoft Teams | Receive and route configured Teams messages, including Adaptive Card input. |
+
+The integration detail screen is the source of truth for the fields and actions available for a provider in the current workspace.
+
+## Connect a provider
+
+1. Open workspace settings and select **Integrations**.
+2. Choose the provider and enter the requested connection settings.
+3. Complete any provider-side OAuth, bot, webhook, or channel setup.
+4. Save the connection and run the available action from its detail screen.
+
+Never place provider secrets in agent instructions, knowledge sources, or widget embed markup.
+
+## Approvals
+
+External actions can require explicit approval. Owners manage the connection and approval policy; a proposed action is not treated as completed until the provider confirms it.
+
+For channel integrations, verify both inbound routing to the Cogni inbox and the configured outbound action before using the channel operationally. If delivery is uncertain, inspect the provider response and conversation activity before retrying to avoid duplicate messages.

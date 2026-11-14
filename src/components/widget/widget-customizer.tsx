@@ -856,8 +856,8 @@ export function WidgetCustomizer({
       {publicationError ? (
         <p role="alert" className="shrink-0 text-sm text-destructive">
           {publicationError} The published version is unchanged.{" "}
-          <Link href="/help#preview-publish" className="underline underline-offset-2">
-            Publish help
+          <Link href="/docs/agent#publish" className="underline underline-offset-2">
+            Publication documentation
           </Link>
         </p>
       ) : null}

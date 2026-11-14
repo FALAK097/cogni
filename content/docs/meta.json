@@ -1,0 +1,20 @@
+{
+  "title": "Cogni documentation",
+  "pages": [
+    "---Overview---",
+    "index",
+    "getting-started",
+    "workspace-permissions",
+    "---Agent and widget---",
+    "agent",
+    "knowledge-sources",
+    "widget",
+    "widget-installation",
+    "widget-embed-reference",
+    "booking",
+    "---Operations---",
+    "inbox-conversations",
+    "integrations-channels",
+    "analytics"
+  ]
+}
