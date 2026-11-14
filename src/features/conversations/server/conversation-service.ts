@@ -71,6 +71,10 @@ export type MessageJson = {
   feedbackAt?: string | null;
   citations?: MessageCitation[];
   retrievalOutcome?: "SOURCES_FOUND" | "NO_MATCH";
+  metadata?: {
+    type?: string;
+    documents?: Array<{ fileName: string; description?: string; fileUrl: string }>;
+  };
 };
 
 export type MessageCitation = {
