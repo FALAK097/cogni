@@ -548,6 +548,7 @@ export function WidgetCustomizer({
 
     return {
       workspaceId: config.workspaceId,
+      booking: widgetConfigData?.booking,
       publicKey: config.publicKey,
       agentName: config.agentName,
       welcomeMessage: config.welcomeMessage,
@@ -584,7 +585,7 @@ export function WidgetCustomizer({
       brochureSuggestionText: config.brochureSuggestionText,
       allowedDomains: config.allowedDomains,
     };
-  }, [config]);
+  }, [config, widgetConfigData?.booking]);
 
   const settingsLoadState = getWidgetSettingsLoadState({
     hasData: Boolean(widgetConfigData),

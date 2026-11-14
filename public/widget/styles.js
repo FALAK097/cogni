@@ -1814,7 +1814,7 @@ export function injectStyles() {
 			width: 100%;
 			max-width: 100%;
 			box-sizing: border-box;
-			border: 1px solid ${config.theme === "dark" ? "#27272a" : "#e4e4e7"};
+			border: none;
 			background: ${config.theme === "dark" ? "#121214" : "#fbfbfc"};
 			border-radius: 8px;
 			padding: 12px;
@@ -1847,6 +1847,9 @@ export function injectStyles() {
 		}
 
 		.oc-slot-chip {
+			min-height: 44px;
+			max-width: 100%;
+			overflow-wrap: anywhere;
 			display: inline-flex;
 			align-items: center;
 			padding: 6px 10px;
@@ -1857,7 +1860,7 @@ export function injectStyles() {
 			background: ${config.theme === "dark" ? "#18181b" : "#ffffff"};
 			color: ${config.theme === "dark" ? "#e4e4e7" : "#27272a"};
 			cursor: pointer;
-			transition: all 0.15s ease;
+			transition: color 0.15s ease, border-color 0.15s ease;
 			text-align: left;
 			font-family: inherit;
 		}
@@ -1893,7 +1896,7 @@ export function injectStyles() {
 		}
 
 		.oc-booking-input {
-			height: 32px;
+			min-height: 44px;
 			padding: 0 8px;
 			border-radius: 6px;
 			border: 1px solid ${config.theme === "dark" ? "#3f3f46" : "#d4d4d8"};
@@ -1918,7 +1921,7 @@ export function injectStyles() {
 		}
 
 		.oc-booking-submit-btn {
-			height: 32px;
+			min-height: 44px;
 			padding: 0 12px;
 			border-radius: 6px;
 			border: none;
@@ -1938,7 +1941,7 @@ export function injectStyles() {
 
 		.oc-booking-back-btn,
 		.oc-booking-retry-btn {
-			height: 32px;
+			min-height: 44px;
 			padding: 0 10px;
 			border-radius: 6px;
 			border: 1px solid ${config.theme === "dark" ? "#3f3f46" : "#d4d4d8"};

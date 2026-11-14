@@ -1,5 +1,7 @@
-import { format } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import { and, eq } from "drizzle-orm";
+import { z } from "zod";
+import { verifyWidgetBootstrapToken } from "@/features/widget/server/widget-bootstrap";
 
 import {
   type AppointmentNotificationPayload,
@@ -11,6 +13,8 @@ import {
 import { getCalendarAdapter } from "@/features/integrations/server/calendar-adapter";
 import {
   assertPublicWidgetAccess,
+  assertPreviewWidgetAccess,
+  bearerToken,
   requireAuthorizedVisitorSession,
 } from "@/features/widget/server/widget-public";
 import {
@@ -25,15 +29,21 @@ import { createWorkflowWithSteps, updateWorkflowStep } from "@/lib/workflows/run
 import { approvalRequest, workflowRun, workflowStep } from "@/lib/db/schema";
 import { emitDomainEvent } from "@/lib/events/domain-events";
 import { notifyWorkspaceMembers } from "@/lib/notifications/create-notification";
-import { appendConversationMessage } from "@/features/conversations/server/conversation-service";
+import {
+  appendConversationMessage,
+  startVisitorConversation,
+} from "@/features/conversations/server/conversation-service";
 
 type RouteContext = { params: Promise<{ publicKey: string }> };
 
-const confirmBookingSchema = appointmentWorkflowInputSchema.omit({
-  handoffFallback: true,
-  notificationChannel: true,
-  timezone: true,
-});
+const confirmBookingSchema = appointmentWorkflowInputSchema
+  .omit({
+    handoffFallback: true,
+    notificationChannel: true,
+    timezone: true,
+    conversationId: true,
+  })
+  .extend({ sessionId: z.string().uuid(), interactionId: z.string().uuid() });
 
 export function OPTIONS(request: Request) {
   return widgetPreflightResponse(request);
@@ -41,15 +51,25 @@ export function OPTIONS(request: Request) {
 
 async function getBookingContext(request: Request, publicKey: string) {
   const db = getDb();
-  const access = await assertPublicWidgetAccess(db, publicKey, request);
+  const preview = new URL(request.url).searchParams.get("preview") === "true";
+  const access = preview
+    ? await assertPreviewWidgetAccess(db, publicKey, request)
+    : await assertPublicWidgetAccess(db, publicKey, request);
   if ("error" in access) return { error: access.error };
   const visitor = await requireAuthorizedVisitorSession(db, publicKey, request);
-  if ("error" in visitor) return { error: visitor.error };
+  const token = bearerToken(request);
+  const bootstrap = token ? verifyWidgetBootstrapToken(token) : null;
+  if (
+    "error" in visitor &&
+    (!bootstrap || bootstrap.widgetId !== access.widget.id || bootstrap.publicKey !== publicKey)
+  ) {
+    return { error: visitor.error };
+  }
   const settings = bookingSettingsInputSchema.parse(access.bookingSettings);
   if (!settings.enabled) {
     return { error: Response.json({ error: "Booking is unavailable." }, { status: 404 }) };
   }
-  return { db, access, visitor, settings };
+  return { db, access, visitor: "error" in visitor ? null : visitor, bootstrap, settings, preview };
 }
 
 function corsResponse(request: Request, allowedDomains: string[], body: unknown, status = 200) {
@@ -61,7 +81,12 @@ function corsResponse(request: Request, allowedDomains: string[], body: unknown,
   );
 }
 
-async function getAvailableSlots(db: Db, workspaceId: string, settings: BookingSettings) {
+async function getAvailableSlots(
+  db: Db,
+  workspaceId: string,
+  settings: BookingSettings,
+  includeReserved = false,
+) {
   const adapter = await getCalendarAdapter(workspaceId, db);
   const rangeStart = new Date(Date.now() + settings.minimumNoticeMinutes * 60_000);
   const rangeEnd = new Date(rangeStart.getTime() + 14 * 24 * 60 * 60_000);
@@ -74,7 +99,23 @@ async function getAvailableSlots(db: Db, workspaceId: string, settings: BookingS
     allowedDays: settings.allowedDays ?? settings.workingHours.weekdays,
     workingHours: settings.workingHours,
   });
-  return availability.freeSlots;
+  if (includeReserved || availability.freeSlots.length === 0) return availability.freeSlots;
+  const reservations = await db.query.workflowRun.findMany({
+    where: (fields, { and, eq, inArray }) =>
+      and(
+        eq(fields.workspaceId, workspaceId),
+        eq(fields.name, "appointment.booking"),
+        inArray(
+          fields.idempotencyKey,
+          availability.freeSlots.map((slot) => `booking:${workspaceId}:${slot.startAt}`),
+        ),
+      ),
+    columns: { idempotencyKey: true },
+  });
+  const reserved = new Set(reservations.map((run) => run.idempotencyKey));
+  return availability.freeSlots.filter(
+    (slot) => !reserved.has(`booking:${workspaceId}:${slot.startAt}`),
+  );
 }
 
 export async function GET(request: Request, context: RouteContext) {
@@ -104,27 +145,21 @@ export async function POST(request: Request, context: RouteContext) {
   if (!parsed.success) {
     return corsResponse(request, result.access.allowedDomains, { error: "Invalid booking." }, 400);
   }
-  const conversation = await result.db.query.conversation.findFirst({
-    where: (fields, { eq, and }) =>
-      and(
-        eq(fields.id, parsed.data.conversationId),
-        eq(fields.workspaceId, result.access.widget.workspaceId),
-        eq(fields.visitorSessionId, result.visitor.session.id),
-      ),
-    columns: { id: true },
-  });
-  if (!conversation) {
+  const authorizedBrowserSessionId =
+    result.visitor?.session.browserSessionId ?? result.bootstrap?.browserSessionId;
+  if (authorizedBrowserSessionId !== parsed.data.sessionId) {
     return corsResponse(
       request,
       result.access.allowedDomains,
-      { error: "Conversation not found." },
-      404,
+      { error: "Invalid widget session." },
+      401,
     );
   }
   const availableSlots = await getAvailableSlots(
     result.db,
     result.access.widget.workspaceId,
     result.settings,
+    true,
   );
   const validSlot = availableSlots.some(
     (slot) => slot.startAt === parsed.data.startAt && slot.endAt === parsed.data.endAt,
@@ -141,10 +176,73 @@ export async function POST(request: Request, context: RouteContext) {
     );
   }
 
+  if (result.preview) {
+    return corsResponse(request, result.access.allowedDomains, {
+      status: "PREVIEW",
+      message: "Preview only. No appointment request was created.",
+    });
+  }
+
+  const started = result.visitor
+    ? null
+    : result.bootstrap
+      ? await startVisitorConversation({
+          db: result.db,
+          widget: result.access.widget,
+          hostname: result.bootstrap.hostname,
+          browserSessionId: result.bootstrap.browserSessionId,
+          visitorId: result.bootstrap.visitorId,
+          identity: { name: null, email: parsed.data.attendeeEmail },
+          metadata: {
+            pageUrl: null,
+            referrer: null,
+            browser: null,
+            deviceType: null,
+            os: null,
+            country: null,
+            city: null,
+            timezone: result.settings.timezone,
+            language: null,
+            screenSize: null,
+          },
+          text: `Appointment request: ${parsed.data.title}`,
+          clientMessageId: parsed.data.interactionId,
+        })
+      : null;
+  const visitorSession = result.visitor?.session ?? started?.visitorSession;
+  if (!visitorSession) {
+    return corsResponse(
+      request,
+      result.access.allowedDomains,
+      { error: "Widget session is required." },
+      401,
+    );
+  }
+  const conversation = await result.db.query.conversation.findFirst({
+    where: (fields, { eq, and }) =>
+      and(
+        eq(fields.workspaceId, result.access.widget.workspaceId),
+        eq(fields.visitorSessionId, visitorSession.id),
+      ),
+    orderBy: (fields, { desc }) => [desc(fields.updatedAt)],
+    columns: { id: true },
+  });
+  if (!conversation) {
+    return corsResponse(
+      request,
+      result.access.allowedDomains,
+      { error: "Conversation not found." },
+      404,
+    );
+  }
   const workspaceId = result.access.widget.workspaceId;
   const idempotencyKey = `booking:${workspaceId}:${parsed.data.startAt}`;
   const workflowInput = {
-    ...parsed.data,
+    conversationId: conversation.id,
+    title: parsed.data.title,
+    startAt: parsed.data.startAt,
+    endAt: parsed.data.endAt,
+    attendeeEmail: parsed.data.attendeeEmail,
     timezone: result.settings.timezone,
     handoffFallback: result.settings.handoffFallback,
     notificationChannel: result.settings.notificationChannel,
@@ -352,7 +450,11 @@ export async function POST(request: Request, context: RouteContext) {
     body: `${parsed.data.title} with ${parsed.data.attendeeEmail} for ${parsed.data.startAt}`,
   });
 
-  const formattedTime = format(new Date(parsed.data.startAt), "EEE, MMM d, yyyy · h:mm a");
+  const formattedTime = formatInTimeZone(
+    parsed.data.startAt,
+    result.settings.timezone,
+    "EEE, MMM d, yyyy · h:mm a",
+  );
   await appendConversationMessage({
     db: result.db,
     workspaceId,
@@ -369,6 +471,8 @@ export async function POST(request: Request, context: RouteContext) {
   });
 
   return corsResponse(request, result.access.allowedDomains, {
+    sessionId: visitorSession.id,
+    sessionToken: visitorSession.token,
     workflowId: workflow.run.id,
     status: "PENDING_TEAM_APPROVAL",
     message: "Your requested time is reserved pending team confirmation.",

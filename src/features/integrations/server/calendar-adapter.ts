@@ -104,14 +104,14 @@ export class MockCalendarAdapter implements CalendarAdapter {
         minute + durationMinutes <= endMinute;
         minute += slotInterval
       ) {
-        // Skip lunch hour
-        if (minute >= 12 * 60 && minute < 13 * 60) continue;
+        // Reject every appointment that overlaps the busy window, including long meetings.
+        if (minute < 13 * 60 && minute + durationMinutes > 12 * 60) continue;
 
         const localStart = addMinutes(zonedDay, minute);
         const slotStart = fromZonedTime(localStart, timezone);
         const slotEnd = addMinutes(slotStart, durationMinutes);
 
-        if (isBefore(slotStart, rangeStart) || isAfter(slotStart, rangeEnd)) {
+        if (isBefore(slotStart, rangeStart) || isAfter(slotEnd, rangeEnd)) {
           continue;
         }
 

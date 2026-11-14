@@ -50,8 +50,10 @@ export async function ensureWorkspaceWidget(db: Db, workspaceId: string) {
   return created;
 }
 
-export function toWidgetSettings(widget: WidgetRecord): WidgetSettings {
-  return toWidgetWidgetConfig(widget);
+export function toWidgetSettings(widget: WidgetRecord): WidgetSettings & {
+  booking: ReturnType<typeof toWidgetBookingConfig>;
+} {
+  return { ...toWidgetWidgetConfig(widget), booking: toWidgetBookingConfig(widget) };
 }
 
 export function toWidgetPublishedConfig(widget: WidgetRecord): WidgetPublishedConfig {

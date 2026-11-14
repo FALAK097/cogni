@@ -336,18 +336,22 @@ export async function callWidgetChatAPI(
 }
 
 export async function fetchBookingAvailabilityAPI() {
-  try {
-    return await requestJson(widgetKeyPath("/booking"));
-  } catch (error) {
-    console.error("widget: Failed to fetch booking availability", error);
-    return null;
-  }
+  return requestJson(widgetKeyPath(state.preview ? "/booking?preview=true" : "/booking"));
 }
 
 export async function confirmBookingAPI(bookingData) {
-  return requestJson(widgetKeyPath("/booking"), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(bookingData),
-  });
+  const result = await requestJson(
+    widgetKeyPath(state.preview ? "/booking?preview=true" : "/booking"),
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(bookingData),
+    },
+  );
+  if (result.sessionId && result.sessionToken) {
+    state.sessionDbId = result.sessionId;
+    state.sessionToken = result.sessionToken;
+    storeSessionToken(result.sessionToken, state.publicKey || state.config.workspaceId);
+  }
+  return result;
 }
