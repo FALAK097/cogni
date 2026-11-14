@@ -43,7 +43,7 @@ export function EmptyState({
     <div
       role={containerRole}
       className={cn(
-        "flex flex-col items-center justify-center text-center",
+        "flex min-w-0 max-w-full flex-col items-center justify-center text-center",
         isLegacyMode && compact && "min-h-[220px] p-5",
         isLegacyMode && !compact && "min-h-[280px] p-6 sm:p-8",
         !isLegacyMode && resolvedMode === "page" && "min-h-[50svh] px-4 py-16 sm:py-24",
@@ -77,7 +77,7 @@ export function EmptyState({
       ) : null}
       <Title
         className={cn(
-          "font-semibold tracking-tight text-foreground",
+          "max-w-full [overflow-wrap:anywhere] font-semibold tracking-tight text-foreground",
           isLegacyMode && (compact ? "text-sm" : "text-[15px]"),
           !isLegacyMode && resolvedMode === "page" && "text-xl sm:text-2xl",
           !isLegacyMode && resolvedMode === "pane" && "text-base",

@@ -22,7 +22,7 @@ import {
 import { formatInTimeZone, toZonedTime } from "date-fns-tz";
 import Link from "next/link";
 import type { FormEvent, ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import { parseAsString, parseAsStringLiteral, useQueryStates } from "nuqs";
 
 import type { DashboardAnalytics, MetricComparison, TopQuestion } from "@/features/analytics/types";
@@ -1024,6 +1024,8 @@ function GranularitySelect({
 
 // --- page ---
 
+const subscribeToHydration = () => () => {};
+
 export function DashboardPage({
   canManage = false,
   workspaceTimezone,
@@ -1031,6 +1033,11 @@ export function DashboardPage({
   canManage?: boolean;
   workspaceTimezone: string;
 }) {
+  const hasHydrated = useSyncExternalStore(
+    subscribeToHydration,
+    () => true,
+    () => false,
+  );
   const [insightsQuery, setInsightsQuery] = useQueryStates(INSIGHTS_QUERY_PARSERS, {
     clearOnDefault: true,
     history: "push",
@@ -1312,7 +1319,7 @@ export function DashboardPage({
   return (
     <>
       <output aria-live="polite" aria-atomic="true" className="sr-only">
-        {insightsStatusMessage}
+        {hasHydrated ? insightsStatusMessage : ""}
       </output>
       <div
         aria-busy={analyticsQuery.isFetching}

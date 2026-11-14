@@ -179,6 +179,7 @@ export function IntegrationDetail({ slug, canManage }: { slug: string; canManage
             <p className="text-sm text-muted-foreground">The latest 100 audited actions.</p>
           </div>
           <Input
+            aria-label="Search action log"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Search status, action, or error"
@@ -187,7 +188,17 @@ export function IntegrationDetail({ slug, canManage }: { slug: string; canManage
         </CardHeader>
         <CardContent className="space-y-2">
           {actions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No matching actions.</p>
+            <EmptyState
+              mode="inline"
+              title={search.trim() ? "No matching actions" : "No actions yet"}
+              titleAs="p"
+            >
+              {search.trim() ? (
+                <Button variant="outline" size="sm" onClick={() => setSearch("")}>
+                  Clear search
+                </Button>
+              ) : null}
+            </EmptyState>
           ) : (
             actions.map((action) => (
               <div
@@ -286,7 +297,7 @@ export function IntegrationDetail({ slug, canManage }: { slug: string; canManage
 export function IntegrationDetailSkeleton() {
   return (
     <output aria-busy="true" aria-label="Loading connection details" className="block space-y-6">
-      <div aria-hidden="true" className="flex items-start justify-between gap-4">
+      <div aria-hidden="true" className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-3">
           <Skeleton className="h-4 w-28" />
           <Skeleton className="h-7 w-48 max-w-[65vw]" />
@@ -294,9 +305,9 @@ export function IntegrationDetailSkeleton() {
         </div>
         <Skeleton className="h-6 w-24 rounded-full" />
       </div>
-      <div aria-hidden="true" className="grid gap-8 lg:grid-cols-2">
+      <div aria-hidden="true" className="grid gap-4 lg:grid-cols-2">
         {Array.from({ length: 2 }).map((_, index) => (
-          <div key={index} className="py-5">
+          <div key={index} className="p-6">
             <Skeleton className="h-5 w-36" />
             <div className="mt-5 space-y-3">
               <Skeleton className="h-4 w-3/4" />
@@ -306,7 +317,7 @@ export function IntegrationDetailSkeleton() {
           </div>
         ))}
       </div>
-      <div aria-hidden="true" className="py-5">
+      <div aria-hidden="true" className="p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Skeleton className="h-5 w-24" />
           <Skeleton className="h-9 w-full rounded-lg sm:w-56" />
@@ -317,7 +328,7 @@ export function IntegrationDetailSkeleton() {
           ))}
         </div>
       </div>
-      <div aria-hidden="true" className="py-5">
+      <div aria-hidden="true" className="p-6">
         <Skeleton className="h-5 w-44" />
         <Skeleton className="mt-4 h-9 w-28 rounded-lg" />
       </div>
