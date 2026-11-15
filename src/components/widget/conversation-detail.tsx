@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { format, formatDistanceToNow, isToday, isYesterday } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
@@ -26,7 +26,6 @@ import {
   Download,
   ExternalLink,
   FileText,
-  Image,
   Info,
   Loader2,
   MoreVertical,
@@ -38,8 +37,6 @@ import {
   Send,
   RotateCcw,
   Sparkles,
-  ThumbsDown,
-  ThumbsUp,
   Trash2,
   UserCheck,
   UserPlus,
@@ -136,9 +133,20 @@ import {
   canCreateTestFromMessage,
   getReplyContextLabel,
   getTranscriptMessageAlignment,
-  getTranscriptMessageRowClassName,
 } from "@/features/conversations/mobile-inbox-presentation";
 import { getVisitorName } from "@/lib/constants";
+
+import {
+  ChatAttachmentChip,
+  ChatBubble,
+  ChatCitationChip,
+  ChatDateSeparator,
+  ChatFeedback,
+  ChatMessage,
+  ChatMessageAvatar,
+  ChatMessageContent,
+  ChatMessageHeader,
+} from "@/components/ui/chat";
 
 import {
   scrollPaneClassName,
@@ -198,12 +206,6 @@ function getInitials(name: string) {
   return name.slice(0, 2).toUpperCase();
 }
 
-function formatFileSize(size: number) {
-  if (size < 1024) return `${size} B`;
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 function splitMessageSources(content: string) {
   const lines = content.trimEnd().split("\n");
 
@@ -228,13 +230,6 @@ function splitMessageSources(content: string) {
   }
 
   return { content, sources: [] };
-}
-
-function formatDateSeparator(timestamp: string) {
-  const date = new Date(timestamp);
-  if (isToday(date)) return "Today";
-  if (isYesterday(date)) return "Yesterday";
-  return format(date, "MMMM d, yyyy");
 }
 
 function formatStatusLabel(status: string) {
@@ -1154,11 +1149,7 @@ export function ConversationDetail({
 
               {groupedMessages.map((group) => (
                 <div key={group.date} className="space-y-4">
-                  <div className="flex items-center justify-center px-1">
-                    <span className="shrink-0 text-xs font-medium text-muted-foreground">
-                      {formatDateSeparator(group.date)}
-                    </span>
-                  </div>
+                  <ChatDateSeparator date={group.date} />
 
                   {group.messages.map((message) => (
                     <MessageBubble
@@ -1198,7 +1189,7 @@ export function ConversationDetail({
 
         <div className="shrink-0 px-3 pb-3 sm:px-4">
           {copilotMutation.data && composerMode === "reply" ? (
-            <div className="mb-2 space-y-2 rounded-xl border border-primary/20 bg-primary/[0.03] p-3">
+            <div className="mb-2 space-y-2 rounded-xl border border-border bg-muted/40 p-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="flex items-center gap-1.5 text-xs font-semibold">
                   <Bot className="h-3.5 w-3.5" /> Copilot draft
@@ -1605,41 +1596,32 @@ function MessageBubble({
   const timestamp = new Date(message.timestamp);
 
   return (
-    <div className={getTranscriptMessageRowClassName(alignment)} data-message-alignment={alignment}>
+    <ChatMessage alignment={alignment}>
       {isUser ? (
-        <Avatar className="mt-0.5 h-8 w-8 shrink-0">
-          <AvatarImage src={generateAvatarUrl(session.visitorId)} alt={displayName} />
-          <AvatarFallback className="bg-primary/10 text-[10px] font-medium text-primary">
-            {getInitials(displayName)}
-          </AvatarFallback>
-        </Avatar>
+        <ChatMessageAvatar
+          src={generateAvatarUrl(session.visitorId)}
+          alt={displayName}
+          initials={getInitials(displayName)}
+        />
       ) : isTeam ? (
-        <Avatar className="mt-0.5 h-8 w-8 shrink-0">
-          <AvatarImage src={generateAvatarUrl(`team:${authorName}`)} alt="" />
-          <AvatarFallback className="bg-muted text-[10px] font-medium text-muted-foreground">
-            {getInitials(authorName)}
-          </AvatarFallback>
-        </Avatar>
+        <ChatMessageAvatar
+          src={generateAvatarUrl(`team:${authorName}`)}
+          alt=""
+          initials={getInitials(authorName)}
+        />
       ) : (
-        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center text-muted-foreground">
-          <Bot className="h-4 w-4" />
+        <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center text-muted-foreground select-none">
+          <Bot className="size-4" aria-hidden="true" />
         </div>
       )}
 
-      <div className="min-w-0 max-w-[85%] sm:max-w-[78%]">
-        <div className="mb-1 flex min-h-4 min-w-0 items-center gap-2 px-1 text-xs">
-          <span className="min-w-0 truncate font-medium text-foreground">{authorName}</span>
-          {isInternal ? (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 font-medium text-muted-foreground">
-              <FileText className="size-3" aria-hidden="true" />
-              Internal note
-            </span>
-          ) : null}
+      <ChatMessageContent alignment={alignment}>
+        <ChatMessageHeader author={authorName} timestamp={timestamp} isInternal={isInternal}>
           {canCreateTestFromMessage(message.role, canManage) ? (
             <button
               type="button"
               onClick={() => onCreateTest(message.content)}
-              className="ml-auto inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               aria-label="Create agent test from this question"
               title="Create agent test from this question"
             >
@@ -1647,69 +1629,28 @@ function MessageBubble({
               <span>Create test</span>
             </button>
           ) : null}
-          <time
-            dateTime={message.timestamp}
-            title={format(timestamp, "PPpp")}
-            className={cn("shrink-0 text-muted-foreground tabular-nums", "ml-auto")}
-          >
-            {format(timestamp, "p")}
-          </time>
-        </div>
-        <div
-          className={cn(
-            "rounded-2xl px-4 py-3 text-sm leading-relaxed",
-            isInternal
-              ? "border border-border bg-muted/60 text-foreground"
-              : isUser
-                ? "bg-muted text-foreground"
-                : isTeam
-                  ? "bg-cream text-foreground"
-                  : "bg-muted text-foreground",
-          )}
+        </ChatMessageHeader>
+
+        <ChatBubble
+          variant={isInternal ? "internal" : isUser ? "incoming" : isTeam ? "team" : "outgoing"}
         >
-          <Streamdown className="break-words font-sans text-sm leading-relaxed">
+          <Streamdown className="break-words font-sans text-sm leading-relaxed [overflow-wrap:anywhere]">
             {parsedMessage.content}
           </Streamdown>
 
           {message.citations && message.citations.length > 0 ? (
             <div className="mt-3 space-y-1.5 border-t border-border/50 pt-2.5" aria-label="Sources">
               <span className="mb-1 inline-flex items-center gap-1 text-xs font-medium text-muted-foreground">
-                <FileText className="h-3 w-3" aria-hidden="true" />
+                <FileText className="size-3" aria-hidden="true" />
                 Sources used
               </span>
               {message.citations.map((citation) => (
-                <details
+                <ChatCitationChip
                   key={citation.documentId}
-                  className="group rounded-md bg-background/75 ring-1 ring-border/60 open:bg-background"
-                >
-                  <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md px-2.5 py-2 text-xs font-medium text-foreground outline-none transition-colors hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-                    <FileText
-                      className="size-3.5 shrink-0 text-muted-foreground"
-                      aria-hidden="true"
-                    />
-                    <span className="min-w-0 flex-1 truncate">{citation.title}</span>
-                    <span className="shrink-0 text-[11px] font-normal text-muted-foreground group-open:hidden">
-                      Preview
-                    </span>
-                    <ChevronDown
-                      className="size-3.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none"
-                      aria-hidden="true"
-                    />
-                  </summary>
-                  <p className="whitespace-pre-wrap border-t border-border/50 px-2.5 py-2 text-xs leading-relaxed break-words text-muted-foreground [overflow-wrap:anywhere]">
-                    {citation.excerpt}
-                  </p>
-                  <div className="flex items-center justify-between border-t border-border/40 bg-muted/20 px-2.5 py-1.5 text-[11px] text-muted-foreground">
-                    <span>Source document</span>
-                    <Link
-                      href="/agent#build"
-                      className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
-                    >
-                      <span>Inspect in Knowledge</span>
-                      <ExternalLink className="size-3" aria-hidden="true" />
-                    </Link>
-                  </div>
-                </details>
+                  title={citation.title}
+                  excerpt={citation.excerpt}
+                  href="/agent#build"
+                />
               ))}
             </div>
           ) : parsedMessage.sources.length > 0 ? (
@@ -1718,14 +1659,14 @@ function MessageBubble({
               aria-label="Sources"
             >
               <span className="mr-0.5 inline-flex items-center gap-1 text-xs font-medium text-muted-foreground">
-                <FileText className="h-3 w-3" aria-hidden="true" />
+                <FileText className="size-3" aria-hidden="true" />
                 Sources
               </span>
               {parsedMessage.sources.map((source) => (
                 <Link
                   key={source}
                   href="/agent#build"
-                  className="inline-flex max-w-full items-center gap-1 rounded-md bg-background/80 px-2 py-1 text-xs leading-none text-foreground ring-1 ring-border/60 hover:ring-primary/40"
+                  className="inline-flex max-w-full items-center gap-1 rounded-md bg-background/80 px-2 py-1 text-xs leading-none text-foreground ring-1 ring-border/60 hover:ring-primary/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 >
                   <span className="truncate">{source}</span>
                   <ExternalLink className="size-2.5 text-muted-foreground" aria-hidden="true" />
@@ -1738,72 +1679,25 @@ function MessageBubble({
             <div className="mt-3 space-y-2">
               {documents.map((doc, index) => {
                 const href = getSafeDocumentHref(doc.fileUrl);
-                const cardContent = (
-                  <>
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                      <FileText className="size-4" aria-hidden="true" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-xs font-medium">{doc.fileName}</span>
-                      {doc.description ? (
-                        <span className="block truncate text-xs text-muted-foreground">
-                          {doc.description}
-                        </span>
-                      ) : null}
-                    </span>
-                    {href ? (
-                      <ExternalLink
-                        className="size-3.5 shrink-0 text-muted-foreground"
-                        aria-hidden="true"
-                      />
-                    ) : null}
-                  </>
-                );
-
-                return href ? (
-                  <a
+                return (
+                  <ChatAttachmentChip
                     key={`${doc.fileName}-${index}`}
-                    href={href}
+                    fileName={doc.fileName}
+                    href={href ?? undefined}
                     target="_blank"
                     rel="noopener noreferrer"
-                    aria-label={`Open ${doc.fileName} in a new tab`}
-                    className="flex min-h-11 items-center gap-3 rounded-lg border border-border/50 bg-background/80 p-2.5 transition-colors hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-                  >
-                    {cardContent}
-                  </a>
-                ) : (
-                  <div
-                    key={`${doc.fileName}-${index}`}
-                    className="flex min-h-11 items-center gap-3 rounded-lg border border-border/50 bg-background/80 p-2.5"
-                  >
-                    {cardContent}
-                  </div>
+                  />
                 );
               })}
             </div>
           ) : null}
+
           {message.role === "assistant" && message.feedback ? (
-            <div className="mt-2 flex items-center gap-1">
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium",
-                  message.feedback === "positive"
-                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                    : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-                )}
-              >
-                {message.feedback === "positive" ? (
-                  <ThumbsUp className="h-3 w-3" />
-                ) : (
-                  <ThumbsDown className="h-3 w-3" />
-                )}
-                {message.feedback === "positive" ? "Helpful" : "Not helpful"}
-              </span>
-            </div>
+            <ChatFeedback feedback={message.feedback} readOnly />
           ) : null}
-        </div>
-      </div>
-    </div>
+        </ChatBubble>
+      </ChatMessageContent>
+    </ChatMessage>
   );
 }
 
@@ -2648,32 +2542,15 @@ function SessionDetailsContent({
           </CardHeader>
           <CardContent className={cn("space-y-1 pb-3", detailCardContentClassName())}>
             {session.attachments?.map((attachment) => (
-              <a
+              <ChatAttachmentChip
                 key={attachment.id}
+                fileName={attachment.fileName}
+                fileSize={attachment.size}
+                mimeType={attachment.mimeType}
+                createdAt={attachment.createdAt}
                 href={attachment.url}
                 download={attachment.fileName}
-                className="group flex min-h-11 items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-                aria-label={`Download ${attachment.fileName}, ${formatFileSize(attachment.size)}`}
-                title={attachment.fileName}
-              >
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                  {attachment.mimeType.startsWith("image/") ? (
-                    <Image className="size-4" aria-hidden="true" />
-                  ) : (
-                    <FileText className="size-4" aria-hidden="true" />
-                  )}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-xs font-medium text-foreground group-hover:text-primary">
-                    {attachment.fileName}
-                  </span>
-                  <span className="block text-xs text-muted-foreground">
-                    {formatFileSize(attachment.size)} ·{" "}
-                    {format(new Date(attachment.createdAt), "MMM d, p")}
-                  </span>
-                </span>
-                <Download className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-              </a>
+              />
             ))}
           </CardContent>
         </Card>

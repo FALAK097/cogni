@@ -194,6 +194,25 @@
   }
 }
 
+.chat-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.chat-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.chat-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: 9999px;
+}
+
 @media (prefers-reduced-motion: no-preference) {
   html,
   body {
@@ -396,14 +415,22 @@
 }
 
 .widget-preview-host #widget-container .oc-body {
-  scrollbar-width: none !important;
-  -ms-overflow-style: none !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: var(--border) transparent !important;
 }
 
 .widget-preview-host #widget-container .oc-body::-webkit-scrollbar {
-  display: none !important;
-  width: 0 !important;
-  height: 0 !important;
+  width: 5px !important;
+  height: 5px !important;
+}
+
+.widget-preview-host #widget-container .oc-body::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+.widget-preview-host #widget-container .oc-body::-webkit-scrollbar-thumb {
+  background-color: var(--border) !important;
+  border-radius: 9999px !important;
 }
 
 .widget-preview-host.widget-preview-mode-full-chat #widget-container {
