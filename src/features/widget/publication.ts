@@ -19,15 +19,19 @@ export const widgetPublishedConfigSchema = z
         timezone: z.string().trim().min(1).max(80),
         durationMinutes: z.number().int().min(15).max(240),
         minimumNoticeMinutes: z.number().int().min(0).max(10_080),
+        bufferMinutes: z.number().int().min(0).max(120).optional(),
+        allowedDays: z.array(z.number().int().min(0).max(6)).min(1).optional(),
+        handoffFallback: z.string().trim().max(500).optional(),
+        notificationChannel: z.enum(["INBOX", "EMAIL", "SLACK"]).optional(),
         workingHours: z
           .object({
             start: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
             end: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
             weekdays: z.array(z.number().int().min(0).max(6)).min(1),
           })
-          .strict(),
+          .passthrough(),
       })
-      .strict(),
+      .passthrough(),
     displayName: z.string().trim().min(1).max(60),
     welcomeMessage: z.string().trim().min(1).max(240),
     inputPlaceholder: z.string().trim().min(1).max(80),
@@ -111,12 +115,21 @@ export function mergeWidgetPublication(
 }
 
 export function toWidgetDraftStorageValues(config: WidgetPublishedConfig) {
+  const bookingWorkingHours = {
+    ...config.booking.workingHours,
+    weekdays: config.booking.allowedDays ?? config.booking.workingHours.weekdays,
+    bufferMinutes: config.booking.bufferMinutes,
+    allowedDays: config.booking.allowedDays,
+    handoffFallback: config.booking.handoffFallback,
+    notificationChannel: config.booking.notificationChannel,
+  };
+
   return {
     bookingEnabled: config.booking.enabled,
     bookingTimezone: config.booking.timezone,
     bookingDurationMinutes: config.booking.durationMinutes,
     bookingMinimumNoticeMinutes: config.booking.minimumNoticeMinutes,
-    bookingWorkingHours: JSON.stringify(config.booking.workingHours),
+    bookingWorkingHours: JSON.stringify(bookingWorkingHours),
     displayName: config.displayName,
     welcomeMessage: config.welcomeMessage,
     inputPlaceholder: config.inputPlaceholder,

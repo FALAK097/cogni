@@ -22,6 +22,7 @@ import {
 } from "./documents.js";
 import { createFeedbackButtons, attachFeedbackListeners } from "./feedback.js";
 import { detectLeadCapture } from "./lead-capture.js";
+import { isBookingTrigger, startBookingWorkflow } from "./booking.js";
 import { PREVIEW_EVIDENCE_EVENT } from "./preview-evidence.js";
 import { state, resetChatState } from "./state.js";
 import {
@@ -832,6 +833,22 @@ export function addSuggestedQuestions() {
     suggestionsEl.appendChild(brochurePill);
   }
 
+  // Add booking suggestion pill if enabled
+  const bookingConfig = state.config?.booking || state.config?.bookingSettings;
+  if (bookingConfig?.enabled || state.config?.bookingEnabled) {
+    const bookingPill = document.createElement("button");
+    bookingPill.className = "oc-pill oc-pill-booking";
+    bookingPill.innerHTML = `<span>📅 Book an appointment</span>`;
+    bookingPill.onclick = () => {
+      addUserMessage("I'd like to book an appointment", null, false);
+      state.hasInteracted = true;
+      const existingSuggestions = state.messagesContainer.querySelector(".oc-suggestions");
+      if (existingSuggestions) existingSuggestions.remove();
+      startBookingWorkflow();
+    };
+    suggestionsEl.appendChild(bookingPill);
+  }
+
   state.messagesContainer.appendChild(suggestionsEl);
   scrollToBottom();
 }
@@ -912,6 +929,15 @@ export async function sendMessage(previewBinding = null) {
       state.isSending = false;
       return;
     }
+  }
+
+  // Check for appointment booking trigger
+  const bookingConfig = state.config?.booking || state.config?.bookingSettings;
+  if ((bookingConfig?.enabled || state.config?.bookingEnabled) && isBookingTrigger(text)) {
+    if (sendBtn) sendBtn.disabled = false;
+    state.isSending = false;
+    await startBookingWorkflow();
+    return;
   }
 
   showTypingIndicator();

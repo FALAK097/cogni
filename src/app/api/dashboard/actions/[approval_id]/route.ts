@@ -3,11 +3,17 @@ import { z } from "zod";
 
 import { decideApprovalRequest } from "@/features/integrations/server/approval-service";
 import { executeApprovedTool } from "@/features/integrations/server/tool-executor";
+import {
+  type AppointmentNotificationPayload,
+  appointmentWorkflowInputSchema,
+} from "@/features/integrations/server/booking";
+import { appendConversationMessage } from "@/features/conversations/server/conversation-service";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { canManageWorkspace } from "@/lib/auth/permissions";
 import { completeWorkflowRun, updateWorkflowStep } from "@/lib/workflows/runner";
 import { approvalRequest, workflowRun } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
+import { emitDomainEvent } from "@/lib/events/domain-events";
 
 type RouteContext = { params: Promise<{ approval_id: string }> };
 
@@ -15,6 +21,19 @@ const decisionSchema = z.object({
   token: z.string().min(1),
   decision: z.enum(["APPROVED", "REJECTED"]),
 });
+
+function formatAppointmentTime(startAt: string, timezone: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+  }).format(new Date(startAt));
+}
 
 export async function PATCH(request: Request, context: RouteContext) {
   const { db, session, workspace, membership } = await requireDashboardContext();
@@ -44,6 +63,11 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
     if (parsed.data.decision === "REJECTED") {
       if (approval.workflowRunId && approval.workflowStepId) {
+        const bookingRun = await db.query.workflowRun.findFirst({
+          where: (fields, { and, eq }) =>
+            and(eq(fields.id, approval.workflowRunId!), eq(fields.workspaceId, workspace.id)),
+          columns: { id: true, name: true, input: true, conversationId: true },
+        });
         await updateWorkflowStep({
           db,
           workspaceId: workspace.id,
@@ -61,6 +85,46 @@ export async function PATCH(request: Request, context: RouteContext) {
               eq(workflowRun.workspaceId, workspace.id),
             ),
           );
+
+        if (bookingRun?.name === "appointment.booking" && bookingRun.conversationId) {
+          const booking = appointmentWorkflowInputSchema.safeParse(
+            JSON.parse(bookingRun.input) as unknown,
+          );
+          if (booking.success) {
+            await appendConversationMessage({
+              db,
+              workspaceId: workspace.id,
+              conversationId: bookingRun.conversationId,
+              message: {
+                id: crypto.randomUUID(),
+                body: booking.data.handoffFallback,
+                authorType: "AI",
+                authorName: "Assistant",
+                visibility: "PUBLIC",
+                createdAt: new Date().toISOString(),
+              },
+              updateLastMessageAt: true,
+            });
+            const notificationPayload = {
+              workflowRunId: bookingRun.id,
+              conversationId: bookingRun.conversationId,
+              title: booking.data.title,
+              startAt: booking.data.startAt,
+              endAt: booking.data.endAt,
+              attendeeEmail: booking.data.attendeeEmail,
+              timezone: booking.data.timezone,
+              status: "CANCELLED",
+              notificationChannel: booking.data.notificationChannel,
+            } satisfies AppointmentNotificationPayload;
+            await emitDomainEvent({
+              db,
+              workspaceId: workspace.id,
+              type: "appointment.booking_cancelled",
+              entityId: bookingRun.id,
+              payload: notificationPayload,
+            });
+          }
+        }
       }
       return NextResponse.json({ approval, action: null });
     }
@@ -162,12 +226,51 @@ export async function PATCH(request: Request, context: RouteContext) {
             ),
           );
       } else {
-        await completeWorkflowRun({
+        const completedRun = await completeWorkflowRun({
           db,
           workspaceId: workspace.id,
           runId: approval.workflowRunId,
           output: { actionId: action.id },
         });
+        if (completedRun.name === "appointment.booking" && completedRun.conversationId) {
+          const booking = appointmentWorkflowInputSchema.safeParse(
+            JSON.parse(completedRun.input) as unknown,
+          );
+          if (booking.success) {
+            await appendConversationMessage({
+              db,
+              workspaceId: workspace.id,
+              conversationId: completedRun.conversationId,
+              message: {
+                id: crypto.randomUUID(),
+                body: `Appointment confirmed: ${booking.data.title} on ${formatAppointmentTime(booking.data.startAt, booking.data.timezone)}. A confirmation email has been sent to ${booking.data.attendeeEmail}.`,
+                authorType: "AI",
+                authorName: "Assistant",
+                visibility: "PUBLIC",
+                createdAt: new Date().toISOString(),
+              },
+              updateLastMessageAt: true,
+            });
+            const notificationPayload = {
+              workflowRunId: completedRun.id,
+              conversationId: completedRun.conversationId,
+              title: booking.data.title,
+              startAt: booking.data.startAt,
+              endAt: booking.data.endAt,
+              attendeeEmail: booking.data.attendeeEmail,
+              timezone: booking.data.timezone,
+              status: "CONFIRMED",
+              notificationChannel: booking.data.notificationChannel,
+            } satisfies AppointmentNotificationPayload;
+            await emitDomainEvent({
+              db,
+              workspaceId: workspace.id,
+              type: "appointment.booked",
+              entityId: completedRun.id,
+              payload: notificationPayload,
+            });
+          }
+        }
       }
     }
     return NextResponse.json({ approval, action });
