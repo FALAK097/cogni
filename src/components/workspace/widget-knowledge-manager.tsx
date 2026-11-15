@@ -307,7 +307,14 @@ export function WidgetKnowledgeManager({ canManage }: { canManage: boolean }) {
               </p>
               <p className="text-xs text-muted-foreground">
                 Unindexed sources cannot be retrieved for visitor answers. Review error details
-                below and retry ingestion.
+                below and retry ingestion.{" "}
+                <Link
+                  href="/help#sources"
+                  className="underline underline-offset-2 hover:text-foreground"
+                >
+                  Source setup guide
+                </Link>
+                .
               </p>
             </div>
           </div>
@@ -320,7 +327,15 @@ export function WidgetKnowledgeManager({ canManage }: { canManage: boolean }) {
           role="alert"
           className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm text-muted-foreground"
         >
-          <span>Couldn’t refresh knowledge sources. Showing the last loaded version.</span>
+          <span>
+            Couldn’t refresh knowledge sources. Showing the last loaded version.{" "}
+            <Link
+              href="/help#sources"
+              className="underline underline-offset-2 hover:text-foreground"
+            >
+              Source help
+            </Link>
+          </span>
           <Button
             size="sm"
             variant="outline"
@@ -544,7 +559,7 @@ function KnowledgeEmptyState({
               Add Source
             </Button>
             <Link
-              href="/help#knowledge-sources"
+              href="/help#sources"
               className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
             >
               Learn about supported formats and ingestion

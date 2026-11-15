@@ -31,10 +31,7 @@ export default async function SignInPage({
       <AuthForm mode="sign-in" callbackURL={callbackURL} allowEmailPassword={allowEmailPassword} />
       <p className="text-center text-xs text-muted-foreground">
         Trouble signing in?{" "}
-        <Link
-          href="/help#google-auth"
-          className="underline underline-offset-2 hover:text-foreground"
-        >
+        <Link href="/help#workspace" className="underline underline-offset-2 hover:text-foreground">
           View Google auth setup guide
         </Link>
       </p>
