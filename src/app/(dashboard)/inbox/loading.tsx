@@ -70,17 +70,17 @@ function ContactDetailsSkeleton() {
         <Skeleton className="mt-2 h-3 w-40 max-w-full" />
       </div>
       <Skeleton className="h-4 w-24" />
-      <div className="space-y-3 rounded-xl border border-border/60 p-3">
+      <div className="space-y-3 py-2">
         <Skeleton className="h-3 w-20" />
         <Skeleton className="h-8 w-full rounded-md" />
         <Skeleton className="h-3 w-28" />
       </div>
-      <div className="space-y-3 rounded-xl border border-border/60 p-3">
+      <div className="space-y-3 py-2">
         <Skeleton className="h-3 w-16" />
         <Skeleton className="h-3 w-full" />
         <Skeleton className="h-3 w-4/5" />
       </div>
-      <div className="space-y-3 rounded-xl border border-border/60 p-3">
+      <div className="space-y-3 py-2">
         <Skeleton className="h-3 w-28" />
         <Skeleton className="h-8 w-full rounded-lg" />
         <Skeleton className="h-8 w-full rounded-lg" />

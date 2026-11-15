@@ -10,6 +10,7 @@ import { useAuthMe, useConnectIntegration, useIntegrations } from "@/hooks/query
 import { INTEGRATION_CATEGORIES } from "@/features/integrations/categories";
 import { getAllIntegrations, getIntegrationsByCategory } from "@/features/integrations/registry";
 import { Info } from "@/components/icons";
+import { EmptyState } from "@/components/ui/empty-state";
 import { IntegrationsPageSkeleton } from "@/features/integrations/components/integrations-page-skeleton";
 
 export function WidgetIntegrationsPage({ canManage }: { canManage: boolean }) {
@@ -65,53 +66,55 @@ export function WidgetIntegrationsPage({ canManage }: { canManage: boolean }) {
 
   if (authMeQuery.isError && !authMeQuery.data) {
     return (
-      <div role="alert" className="rounded-xl border border-border bg-card p-6">
-        <p className="font-medium">Workspace details could not be loaded</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Retry to confirm the active workspace before managing connections.
-        </p>
+      <EmptyState
+        mode="error"
+        title="Workspace details could not be loaded"
+        titleAs="p"
+        description="Retry to confirm the active workspace before managing connections."
+      >
         <Button
-          className="mt-4"
           variant="outline"
           onClick={() => void authMeQuery.refetch()}
           disabled={authMeQuery.isFetching}
         >
           {authMeQuery.isFetching ? "Retrying…" : "Try again"}
         </Button>
-      </div>
+      </EmptyState>
     );
   }
 
   if (!activeWorkspaceId) {
     return (
-      <div role="alert" className="rounded-xl border border-border bg-card p-6">
-        <p className="font-medium">No active workspace is selected</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Reload Settings after selecting a workspace to manage its connections.
-        </p>
-        <Button className="mt-4" variant="outline" onClick={() => window.location.reload()}>
+      <EmptyState
+        mode="pane"
+        title="No active workspace is selected"
+        titleAs="p"
+        description="Reload Settings after selecting a workspace to manage its connections."
+        role="alert"
+      >
+        <Button variant="outline" onClick={() => window.location.reload()}>
           Reload Settings
         </Button>
-      </div>
+      </EmptyState>
     );
   }
 
   if (integrationsQuery.isError && !integrationsQuery.data) {
     return (
-      <div role="alert" className="rounded-xl border border-border bg-card p-6">
-        <p className="font-medium">Connections could not be loaded</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Try again to see which tools are connected.
-        </p>
+      <EmptyState
+        mode="error"
+        title="Connections could not be loaded"
+        titleAs="p"
+        description="Try again to see which tools are connected."
+      >
         <Button
-          className="mt-4"
           variant="outline"
           onClick={() => void integrationsQuery.refetch()}
           disabled={integrationsQuery.isFetching}
         >
           {integrationsQuery.isFetching ? "Retrying…" : "Try again"}
         </Button>
-      </div>
+      </EmptyState>
     );
   }
 
@@ -120,11 +123,9 @@ export function WidgetIntegrationsPage({ canManage }: { canManage: boolean }) {
       {integrationsQuery.isError ? (
         <div
           role="alert"
-          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/70 bg-muted/30 px-3 py-3"
+          className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm text-muted-foreground"
         >
-          <p className="text-sm text-muted-foreground">
-            Connections couldn’t refresh. Showing the last loaded connections.
-          </p>
+          <p>Connections couldn’t refresh. Showing the last loaded connections.</p>
           <Button
             size="sm"
             variant="outline"
@@ -137,7 +138,7 @@ export function WidgetIntegrationsPage({ canManage }: { canManage: boolean }) {
       ) : null}
       <PendingActionsCard canManage={canManage} />
       {!canManage ? (
-        <output className="flex items-start gap-2 rounded-lg border border-border/70 bg-muted/30 px-3 py-2.5 text-sm text-muted-foreground">
+        <output className="flex items-start gap-2 py-3 text-sm text-muted-foreground">
           <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <p>
             You can view connections and approvals. A workspace owner manages connections and makes
@@ -164,9 +165,12 @@ export function WidgetIntegrationsPage({ canManage }: { canManage: boolean }) {
       })}
 
       {getAllIntegrations().length === 0 ? (
-        <p className="rounded-xl border border-dashed border-border/70 px-5 py-8 text-center text-sm text-muted-foreground">
-          No connections are available yet.
-        </p>
+        <EmptyState
+          mode="pane"
+          title="No connections are available yet"
+          titleAs="p"
+          description="Connected services will appear here."
+        />
       ) : null}
     </div>
   );
