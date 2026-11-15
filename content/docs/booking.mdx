@@ -1,19 +1,19 @@
 ---
 title: Booking
-description: Configure Google Calendar-backed availability and approved appointment creation.
+description: Configure appointment availability, approval, and provider verification.
 ---
 
-Booking lets the agent present available times and prepare a Google Calendar event after the visitor confirms the required details.
+Booking lets the agent present times from the workspace schedule and prepare an appointment request after the visitor confirms the required details.
 
 ## Prerequisites
 
-An owner must connect Google Calendar for the active workspace. The connection must support availability lookup and event creation before booking is enabled for the agent.
+An owner can configure and test the booking flow before publishing it. Before using booking operationally, connect and verify the calendar and email providers used by the approval workflow.
 
 ## Configure booking
 
 Open **Agent → Build**, enable booking, then configure the booking timezone, appointment duration, working hours, and other availability constraints shown by the product. Appointment duration must be between 15 and 240 minutes.
 
-Availability is calculated against the connected calendar and the configured schedule.
+Availability respects the configured timezone, duration, buffer, allowed days, and working hours. Conflict checks and event delivery depend on the connected provider path, so verify them with the intended workspace connection before launch.
 
 ## Visitor confirmation
 
@@ -21,6 +21,6 @@ Before an event is created, the visitor must confirm the appointment title, sele
 
 ## Publish booking changes
 
-Booking configuration follows the agent publication model. Test the draft flow, publish the agent, then verify availability and event creation against the intended calendar.
+Booking configuration follows the agent publication model. Test the draft flow, publish the agent, then verify availability, approval, calendar creation, and email delivery with the intended workspace connections.
 
 If no times appear, confirm the Calendar connection, timezone, working hours, appointment duration, and existing calendar conflicts. If creation remains pending, review the action approval in the workspace rather than asking the visitor to submit it repeatedly.
