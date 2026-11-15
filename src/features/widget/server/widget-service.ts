@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
 import type { Db } from "@/lib/db/client";
 import { user as userTable, widget as widgetTable, widgetPublication } from "@/lib/db/schema";
-import { bookingSettingsInputSchema } from "@/features/integrations/server/booking";
+import { bookingSettingsReadSchema } from "@/features/integrations/server/booking";
 import {
   createWidgetPublicationSnapshot,
   mergeWidgetPublication,
@@ -50,8 +50,10 @@ export async function ensureWorkspaceWidget(db: Db, workspaceId: string) {
   return created;
 }
 
-export function toWidgetSettings(widget: WidgetRecord): WidgetSettings {
-  return toWidgetWidgetConfig(widget);
+export function toWidgetSettings(widget: WidgetRecord): WidgetSettings & {
+  booking: ReturnType<typeof toWidgetBookingConfig>;
+} {
+  return { ...toWidgetWidgetConfig(widget), booking: toWidgetBookingConfig(widget) };
 }
 
 export function toWidgetPublishedConfig(widget: WidgetRecord): WidgetPublishedConfig {
@@ -68,7 +70,7 @@ export function toWidgetBookingConfig(widget: WidgetRecord) {
   } catch {
     parsedWorkingHours = { start: "09:00", end: "17:00", weekdays: [1, 2, 3, 4, 5] };
   }
-  return bookingSettingsInputSchema.parse({
+  return bookingSettingsReadSchema.parse({
     enabled: widget.bookingEnabled,
     timezone: widget.bookingTimezone,
     durationMinutes: widget.bookingDurationMinutes,
@@ -84,10 +86,7 @@ export function toWidgetBookingConfig(widget: WidgetRecord) {
       typeof parsedWorkingHours.handoffFallback === "string"
         ? parsedWorkingHours.handoffFallback
         : undefined,
-    notificationChannel:
-      typeof parsedWorkingHours.notificationChannel === "string"
-        ? parsedWorkingHours.notificationChannel
-        : undefined,
+    notificationChannel: "INBOX",
     workingHours: parsedWorkingHours,
   });
 }

@@ -5,7 +5,13 @@
 
 import { fetchBookingAvailabilityAPI, confirmBookingAPI } from "./api.js";
 import { state } from "./state.js";
-import { escapeHtml, renderBotAvatarMarkup, scrollToBottom, validateEmail } from "./utils.js";
+import {
+  escapeHtml,
+  renderBotAvatarMarkup,
+  scrollToBottom,
+  validateEmail,
+  generateUUID,
+} from "./utils.js";
 
 let bookingInProgress = false;
 
@@ -49,6 +55,8 @@ export async function startBookingWorkflow(optionalContainer = null) {
   }
 
   const bubbleEl = bookingCardEl.querySelector(".oc-booking-bubble") || bookingCardEl;
+  bubbleEl.innerHTML =
+    '<div class="oc-booking-loading" role="status">Finding available appointment times…</div>';
 
   try {
     const data = await fetchBookingAvailabilityAPI();
@@ -57,8 +65,8 @@ export async function startBookingWorkflow(optionalContainer = null) {
     if (!data || !data.slots || data.slots.length === 0) {
       const fallbackMsg =
         data?.handoffFallback ||
-        "No appointment times are currently available. Our team has been notified and will follow up with you directly in this chat.";
-      renderFailureFallback(bubbleEl, fallbackMsg, data?.slots);
+        "No appointment times are currently available. Please send us a message to arrange a time.";
+      renderFailureFallback(bubbleEl, fallbackMsg);
       return;
     }
 
@@ -67,7 +75,7 @@ export async function startBookingWorkflow(optionalContainer = null) {
     bookingInProgress = false;
     renderFailureFallback(
       bubbleEl,
-      "Unable to load available slots right now. Our team has been notified and will follow up with you.",
+      "Unable to load available slots right now. Try again or send us a message to arrange a time.",
     );
   }
 }
@@ -92,7 +100,7 @@ function renderSlotSelection(bubbleEl, slots, timezone, fallbackMessage) {
             data-end="${escapeHtml(slot.endAt)}"
             data-label="${escapeHtml(slot.label)}"
           >
-            ${escapeHtml(slot.label)}
+            ${escapeHtml(slot.label.replace(` (${timezone})`, ""))}
           </button>
         `,
           )
@@ -101,7 +109,8 @@ function renderSlotSelection(bubbleEl, slots, timezone, fallbackMessage) {
     </div>
   `;
 
-  scrollToBottom();
+  const messagesRect = state.messagesContainer.getBoundingClientRect();
+  state.messagesContainer.scrollTop += bubbleEl.getBoundingClientRect().top - messagesRect.top - 12;
 
   const chipButtons = bubbleEl.querySelectorAll(".oc-slot-chip");
   chipButtons.forEach((btn) => {
@@ -147,11 +156,12 @@ function renderBookingConfirmation(bubbleEl, slot, timezone, allSlots, fallbackM
             type="text"
             id="oc-booking-title"
             class="oc-booking-input"
+            maxlength="200"
             value="Customer meeting"
             placeholder="e.g. Product demo or support"
           />
         </div>
-        <div class="oc-booking-error" id="oc-booking-form-error" style="display:none;"></div>
+        <div class="oc-booking-error" id="oc-booking-form-error" role="alert" style="display:none;"></div>
         <div class="oc-booking-actions">
           <button type="button" class="oc-booking-back-btn" id="oc-booking-back">
             Choose another time
@@ -190,6 +200,8 @@ function renderBookingConfirmation(bubbleEl, slot, timezone, allSlots, fallbackM
       return;
     }
 
+    if (submitBtn?.disabled) return;
+    if (backBtn) backBtn.disabled = true;
     if (errorEl) errorEl.style.display = "none";
     if (submitBtn) {
       submitBtn.disabled = true;
@@ -198,7 +210,8 @@ function renderBookingConfirmation(bubbleEl, slot, timezone, allSlots, fallbackM
 
     try {
       const response = await confirmBookingAPI({
-        conversationId: state.sessionDbId || "",
+        sessionId: state.sessionId,
+        interactionId: generateUUID(),
         startAt: slot.startAt,
         endAt: slot.endAt,
         attendeeEmail: email,
@@ -222,17 +235,18 @@ function renderBookingConfirmation(bubbleEl, slot, timezone, allSlots, fallbackM
       }
     } catch (err) {
       const errorMsg = err?.message || "This slot could not be booked or is already reserved.";
-      renderFailureFallback(bubbleEl, fallbackMessage || errorMsg, allSlots);
+      renderFailureFallback(bubbleEl, fallbackMessage || errorMsg);
     }
   });
 }
 
 export function renderBookedDetailsCard(bubbleEl, appointment) {
   const isPending = appointment.status === "PENDING_TEAM_APPROVAL";
+  const isPreview = appointment.status === "PREVIEW";
   bubbleEl.innerHTML = `
     <div class="oc-booking-card">
       <div class="oc-booking-card-header">
-        <span class="oc-booking-badge">✓ Appointment Reserved</span>
+        <span class="oc-booking-badge">${isPreview ? "Booking preview" : "✓ Appointment Reserved"}</span>
         <span class="oc-booking-card-title">${escapeHtml(appointment.title)}</span>
       </div>
       <div class="oc-booking-card-body">
@@ -246,11 +260,11 @@ export function renderBookedDetailsCard(bubbleEl, appointment) {
         </div>
         <div class="oc-booking-detail-row">
           <span class="oc-booking-detail-label">Status:</span>
-          <span class="oc-booking-detail-val">${escapeHtml(isPending ? "Pending team confirmation" : "Confirmed")}</span>
+          <span class="oc-booking-detail-val">${escapeHtml(isPreview ? "Preview only" : isPending ? "Pending team confirmation" : "Confirmed")}</span>
         </div>
       </div>
       <div class="oc-booking-card-footer">
-        ${escapeHtml(isPending ? "Our team has received your request. We’ll send the email confirmation after approval." : "Your appointment is confirmed and the details have been sent by email.")}
+        ${escapeHtml(isPreview ? "Preview only. No appointment request was created." : isPending ? "Our team has received your request. We’ll send the email confirmation after approval." : "Your appointment is confirmed and the details have been sent by email.")}
       </div>
     </div>
   `;
@@ -258,7 +272,7 @@ export function renderBookedDetailsCard(bubbleEl, appointment) {
   scrollToBottom();
 }
 
-export function renderFailureFallback(bubbleEl, fallbackMessage, retrySlots = null) {
+export function renderFailureFallback(bubbleEl, fallbackMessage) {
   bubbleEl.innerHTML = `
     <div class="oc-booking-fallback">
       <div class="oc-booking-fallback-header">
@@ -268,17 +282,11 @@ export function renderFailureFallback(bubbleEl, fallbackMessage, retrySlots = nu
       <p class="oc-booking-fallback-body">
         ${escapeHtml(fallbackMessage)}
       </p>
-      ${
-        retrySlots && retrySlots.length > 0
-          ? `
         <div class="oc-booking-actions">
           <button type="button" class="oc-booking-retry-btn" id="oc-booking-retry">
-            Pick another available slot
+            Try available times again
           </button>
         </div>
-      `
-          : ""
-      }
     </div>
   `;
 

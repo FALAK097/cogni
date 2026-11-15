@@ -309,7 +309,7 @@ export function WidgetKnowledgeManager({ canManage }: { canManage: boolean }) {
                 Unindexed sources cannot be retrieved for visitor answers. Review error details
                 below and retry ingestion.{" "}
                 <Link
-                  href="/help#sources"
+                  href="/docs/knowledge-sources"
                   className="underline underline-offset-2 hover:text-foreground"
                 >
                   Source setup guide
@@ -330,7 +330,7 @@ export function WidgetKnowledgeManager({ canManage }: { canManage: boolean }) {
           <span>
             Couldn’t refresh knowledge sources. Showing the last loaded version.{" "}
             <Link
-              href="/help#sources"
+              href="/docs/knowledge-sources"
               className="underline underline-offset-2 hover:text-foreground"
             >
               Source help
@@ -559,7 +559,7 @@ function KnowledgeEmptyState({
               Add Source
             </Button>
             <Link
-              href="/help#sources"
+              href="/docs/knowledge-sources"
               className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
             >
               Learn about supported formats and ingestion

@@ -8,7 +8,7 @@ export default function SettingsLoading() {
       <output
         aria-busy="true"
         aria-label="Loading workspace settings"
-        className="container mx-auto block space-y-8 pb-10"
+        className="mx-auto block w-full max-w-[1200px] space-y-10 pb-10"
       >
         <header aria-hidden="true" className="space-y-2">
           <Skeleton className="h-6 w-24" />

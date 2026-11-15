@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useLayoutEffect } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
-import { ThemeProvider } from "next-themes";
+import { ThemeProvider, useTheme } from "next-themes";
 import { Agentation } from "agentation";
 
 import { Toaster } from "@/components/ui/toaster";
@@ -22,6 +22,7 @@ const DASHBOARD_ROUTE_PREFIXES = [
   "/conversations",
   "/knowledge-base",
   "/integrations",
+  "/docs",
 ] as const;
 
 function isDashboardPath(pathname: string): boolean {
@@ -32,13 +33,21 @@ function isDashboardPath(pathname: string): boolean {
 
 function DocumentThemeGuard() {
   const pathname = usePathname();
+  const { resolvedTheme } = useTheme();
 
   useLayoutEffect(() => {
-    if (!isDashboardPath(pathname)) {
-      document.documentElement.classList.remove("dark", "light");
-      document.documentElement.style.colorScheme = "light";
+    const root = document.documentElement;
+    if (isDashboardPath(pathname)) {
+      if (!resolvedTheme) return;
+      const isDark = resolvedTheme === "dark";
+      root.classList.toggle("dark", isDark);
+      root.classList.toggle("light", !isDark);
+      root.style.colorScheme = isDark ? "dark" : "light";
+      return;
     }
-  }, [pathname]);
+    root.classList.remove("dark", "light");
+    root.style.colorScheme = "light";
+  }, [pathname, resolvedTheme]);
 
   return null;
 }

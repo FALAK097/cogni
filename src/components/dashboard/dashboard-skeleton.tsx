@@ -5,7 +5,7 @@ export function DashboardSkeleton({ label = "Loading Insights" }: { label?: stri
     <output
       aria-busy="true"
       aria-label={label}
-      className="mx-auto flex w-full max-w-[1400px] flex-col gap-6 pb-8"
+      className="mx-auto flex w-full max-w-[1280px] flex-col gap-6 pb-8"
     >
       <div
         aria-hidden="true"

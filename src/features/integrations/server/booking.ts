@@ -10,7 +10,7 @@ const workingHoursSchema = z.object({
   weekdays: z.array(z.number().int().min(0).max(6)).min(1).default([1, 2, 3, 4, 5]),
 });
 
-export const bookingSettingsInputSchema = z.object({
+export const bookingSettingsReadSchema = z.object({
   enabled: z.boolean(),
   timezone: z
     .string()
@@ -37,10 +37,36 @@ export const bookingSettingsInputSchema = z.object({
     .default(
       "No slots currently available. A team member will follow up with you directly in this chat.",
     ),
-  notificationChannel: z.enum(["INBOX", "EMAIL", "SLACK"]).default("INBOX"),
+  notificationChannel: z.literal("INBOX").default("INBOX"),
 });
 
-export type BookingSettings = z.infer<typeof bookingSettingsInputSchema>;
+/**
+ * Stored settings may predate the interval constraint, so reads stay permissive:
+ * the dashboard must still load the current values so an operator can correct them.
+ */
+export const bookingSettingsInputSchema = bookingSettingsReadSchema.superRefine(
+  (settings, context) => {
+    const start = minutesFromTime(settings.workingHours.start);
+    const end = minutesFromTime(settings.workingHours.end);
+    if (start >= end) {
+      context.addIssue({
+        code: "custom",
+        path: ["workingHours", "end"],
+        message: "Day end time must be after the start time.",
+      });
+      return;
+    }
+    if (end - start < settings.durationMinutes) {
+      context.addIssue({
+        code: "custom",
+        path: ["workingHours", "end"],
+        message: "Working hours must fit at least one meeting.",
+      });
+    }
+  },
+);
+
+export type BookingSettings = z.infer<typeof bookingSettingsReadSchema>;
 
 export type AppointmentNotificationPayload = {
   workflowRunId: string;
@@ -62,6 +88,7 @@ export const appointmentWorkflowInputSchema = z.object({
   title: z.string().trim().min(1).max(200).default("Customer meeting"),
   timezone: z.string().trim().min(1).max(80),
   handoffFallback: z.string().trim().max(500),
+  // Legacy runs may store EMAIL or SLACK; keep them parseable so handoff still fires.
   notificationChannel: z.enum(["INBOX", "EMAIL", "SLACK"]),
 });
 
@@ -72,10 +99,7 @@ function minutesFromTime(value: string) {
   return (hours || 0) * 60 + (minutes || 0);
 }
 
-export function createAvailableSlots(
-  settings: z.infer<typeof bookingSettingsInputSchema>,
-  now = new Date(),
-) {
+export function createAvailableSlots(settings: BookingSettings, now = new Date()) {
   const earliest = addMinutes(now, settings.minimumNoticeMinutes ?? 60);
   const slots: { startAt: string; endAt: string; label: string }[] = [];
   const startMinutes = minutesFromTime(settings.workingHours.start);

@@ -11,7 +11,7 @@ const COPYRIGHT_YEAR = new Date().getUTCFullYear();
 const NAV_LINKS = [
   { label: "Features", href: "/#features" },
   { label: "Integrations", href: "/#integrations" },
-  { label: "Help", href: "/help" },
+  { label: "Documentation", href: "/docs" },
   { label: "Privacy", href: "/privacy-policy" },
   { label: "Terms", href: "/terms" },
 ] as const;

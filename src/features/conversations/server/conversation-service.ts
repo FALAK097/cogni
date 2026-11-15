@@ -71,6 +71,10 @@ export type MessageJson = {
   feedbackAt?: string | null;
   citations?: MessageCitation[];
   retrievalOutcome?: "SOURCES_FOUND" | "NO_MATCH";
+  metadata?: {
+    type?: string;
+    documents?: Array<{ fileName: string; description?: string; fileUrl: string }>;
+  };
 };
 
 export type MessageCitation = {
@@ -470,6 +474,53 @@ export async function setAiMessageFeedback({
         eq(conversation.visitorSessionId, visitorSessionId),
         ne(conversation.status, "CLOSED"),
         matchingAiMessage,
+      ),
+    )
+    .returning({ id: conversation.id });
+
+  return updated.length > 0;
+}
+
+export async function setAiMessageMetadata({
+  db,
+  workspaceId,
+  conversationId,
+  visitorSessionId,
+  messageId,
+  metadata,
+}: {
+  db: Db;
+  workspaceId: string;
+  conversationId: string;
+  visitorSessionId: string;
+  messageId: string;
+  metadata: NonNullable<MessageJson["metadata"]>;
+}) {
+  const messages = sql`COALESCE(NULLIF(${conversation.messages}, '')::jsonb, '[]'::jsonb)`;
+  const updatedMessages = sql`(
+    SELECT COALESCE(
+      jsonb_agg(
+        CASE
+          WHEN entry.item ->> 'id' = ${messageId}
+            AND entry.item ->> 'authorType' = 'AI'
+          THEN jsonb_set(entry.item, '{metadata}', ${JSON.stringify(metadata)}::jsonb, true)
+          ELSE entry.item
+        END
+        ORDER BY entry.ordinality
+      ),
+      '[]'::jsonb
+    )::text
+    FROM jsonb_array_elements(${messages}) WITH ORDINALITY AS entry(item, ordinality)
+  )`;
+
+  const updated = await db
+    .update(conversation)
+    .set({ messages: updatedMessages })
+    .where(
+      and(
+        eq(conversation.id, conversationId),
+        eq(conversation.workspaceId, workspaceId),
+        eq(conversation.visitorSessionId, visitorSessionId),
       ),
     )
     .returning({ id: conversation.id });

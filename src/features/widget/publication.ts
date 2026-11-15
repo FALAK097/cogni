@@ -22,7 +22,7 @@ export const widgetPublishedConfigSchema = z
         bufferMinutes: z.number().int().min(0).max(120).optional(),
         allowedDays: z.array(z.number().int().min(0).max(6)).min(1).optional(),
         handoffFallback: z.string().trim().max(500).optional(),
-        notificationChannel: z.enum(["INBOX", "EMAIL", "SLACK"]).optional(),
+        notificationChannel: z.literal("INBOX").optional(),
         workingHours: z
           .object({
             start: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
@@ -99,8 +99,32 @@ export function createWidgetPublicationSnapshot(
   });
 }
 
+/**
+ * Snapshots published before channels were unified can store EMAIL or SLACK.
+ * Normalize them on read so older versions stay restorable; new writes stay strict.
+ */
+function normalizeLegacySnapshotChannels(value: unknown): unknown {
+  if (typeof value !== "object" || value === null) return value;
+  const snapshot = value as Record<string, unknown>;
+  const config = snapshot.config;
+  if (typeof config !== "object" || config === null) return value;
+  const configRecord = config as Record<string, unknown>;
+  const booking = configRecord.booking;
+  if (typeof booking !== "object" || booking === null) return value;
+  const bookingRecord = booking as Record<string, unknown>;
+  const channel = bookingRecord.notificationChannel;
+  if (channel !== "EMAIL" && channel !== "SLACK") return value;
+  return {
+    ...snapshot,
+    config: {
+      ...configRecord,
+      booking: { ...bookingRecord, notificationChannel: "INBOX" },
+    },
+  };
+}
+
 export function parseWidgetPublicationSnapshot(value: unknown): WidgetPublicationSnapshot | null {
-  const parsed = widgetPublicationSnapshotSchema.safeParse(value);
+  const parsed = widgetPublicationSnapshotSchema.safeParse(normalizeLegacySnapshotChannels(value));
   return parsed.success ? parsed.data : null;
 }
 

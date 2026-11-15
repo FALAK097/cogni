@@ -11,6 +11,7 @@ import {
 import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
 import { getDb } from "@/lib/db/client";
 import type { MessageJson } from "@/features/conversations/server/conversation-service";
+import { setAiMessageMetadata } from "@/features/conversations/server/conversation-service";
 import { z } from "zod";
 
 const messageSchema = z.object({
@@ -19,6 +20,20 @@ const messageSchema = z.object({
   content: z.string().trim().min(1),
   preview: z.boolean().default(false),
   metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+const documentMetadataSchema = z.object({
+  type: z.literal("documents"),
+  documents: z
+    .array(
+      z.object({
+        fileName: z.string().trim().min(1).max(300),
+        description: z.string().trim().max(500).optional(),
+        fileUrl: z.string().trim().max(2_000),
+      }),
+    )
+    .min(1)
+    .max(10),
 });
 
 export function OPTIONS(request: Request) {
@@ -66,6 +81,18 @@ export async function POST(
 
   if (!matchedMessage) {
     return Response.json({ error: "Message not found." }, { status: 404 });
+  }
+
+  const documentMetadata = body.metadata ? documentMetadataSchema.safeParse(body.metadata) : null;
+  if (documentMetadata?.success && matchedMessage.metadata?.type !== "documents") {
+    await setAiMessageMetadata({
+      db,
+      workspaceId: access.widget.workspaceId,
+      conversationId: conversation.id,
+      visitorSessionId: authorized.session.id,
+      messageId: matchedMessage.id,
+      metadata: documentMetadata.data,
+    });
   }
 
   const origin = getRequestOrigin(request);

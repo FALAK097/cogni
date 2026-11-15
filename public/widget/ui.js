@@ -802,7 +802,9 @@ export function addBotMessage(
  */
 export function addSuggestedQuestions() {
   const suggestions = state.config.suggestions || [];
-  if (suggestions.length === 0 && !state.brochureEnabled) return;
+  const bookingConfig = state.config?.booking || state.config?.bookingSettings;
+  const bookingEnabled = bookingConfig?.enabled || state.config?.bookingEnabled;
+  if (suggestions.length === 0 && !state.brochureEnabled && !bookingEnabled) return;
 
   const suggestionsEl = document.createElement("div");
   suggestionsEl.className = "oc-suggestions";
@@ -834,8 +836,7 @@ export function addSuggestedQuestions() {
   }
 
   // Add booking suggestion pill if enabled
-  const bookingConfig = state.config?.booking || state.config?.bookingSettings;
-  if (bookingConfig?.enabled || state.config?.bookingEnabled) {
+  if (bookingEnabled) {
     const bookingPill = document.createElement("button");
     bookingPill.className = "oc-pill oc-pill-booking";
     bookingPill.innerHTML = `<span>📅 Book an appointment</span>`;
