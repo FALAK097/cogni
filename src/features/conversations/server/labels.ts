@@ -60,12 +60,13 @@ export async function changeConversationLabel({
       return { kind: "limit" };
     }
 
-    const nextLabels =
+    const nextLabels = (
       action === "add"
         ? hasLabel
           ? currentLabels
           : [...currentLabels, label]
-        : currentLabels.filter((existingLabel) => existingLabel !== label);
+        : currentLabels.filter((existingLabel) => existingLabel !== label)
+    ).sort();
 
     if (
       nextLabels.length !== currentLabels.length ||

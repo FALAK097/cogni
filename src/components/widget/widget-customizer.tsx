@@ -28,6 +28,7 @@ import {
 
 import { toSavePayload, type WidgetCustomizerConfig } from "./widget-settings-payload";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { isPreviewEvidence, WidgetPreviewPanel } from "./widget-preview-panel";
@@ -593,19 +594,21 @@ export function WidgetCustomizer({
 
   if (settingsLoadState === "error") {
     return (
-      <div className="m-3 rounded-xl border border-border bg-card p-6" role="alert">
-        <h2 className="text-base font-semibold">Couldn't load agent settings</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Try again to load your workspace's configuration.
-        </p>
+      <EmptyState
+        mode="error"
+        title="Couldn't load agent settings"
+        titleAs="h2"
+        description="Try again to load your workspace's configuration."
+        className="p-6"
+      >
         <Button
-          className="mt-4"
+          className="min-h-11 sm:min-h-9"
           disabled={widgetConfigQuery.isFetching}
           onClick={() => void widgetConfigQuery.refetch()}
         >
           {widgetConfigQuery.isFetching ? "Retrying…" : "Try again"}
         </Button>
-      </div>
+      </EmptyState>
     );
   }
 
