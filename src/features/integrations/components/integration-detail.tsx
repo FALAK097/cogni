@@ -133,7 +133,7 @@ export function IntegrationDetail({ slug, canManage }: { slug: string; canManage
             {detail.lastError ? (
               <div className="space-y-2 rounded-lg bg-destructive/10 p-3 text-destructive">
                 <p>{detail.lastError}</p>
-                <Link href="/help#channels" className="underline underline-offset-2">
+                <Link href="/docs/integrations-channels" className="underline underline-offset-2">
                   Channel setup and delivery guide
                 </Link>
               </div>
@@ -159,7 +159,10 @@ export function IntegrationDetail({ slug, canManage }: { slug: string; canManage
             {detail.capabilities.length === 0 ? (
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">No agent actions are enabled yet.</p>
-                <Link href="/help#channels" className="text-sm underline underline-offset-2">
+                <Link
+                  href="/docs/integrations-channels"
+                  className="text-sm underline underline-offset-2"
+                >
                   Review channel capabilities
                 </Link>
               </div>

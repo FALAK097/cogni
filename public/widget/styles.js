@@ -1751,6 +1751,59 @@ export function injectStyles() {
 			font-size: 14px;
 		}
 
+		/* Mobile viewport responsive adjustments (320px - 480px) */
+		@media (max-width: 480px) {
+			#widget-container:not(.oc-preview-container) .oc-window {
+				width: calc(100vw - 20px);
+				max-width: calc(100vw - 20px);
+				right: 10px;
+				left: 10px;
+				margin: 0 auto;
+				bottom: ${config.launcherSize === "lg" ? "72px" : config.launcherSize === "sm" ? "52px" : "62px"};
+				max-height: calc(100vh - 90px);
+			}
+
+			.oc-body {
+				padding: 12px 10px;
+				gap: 10px;
+			}
+
+			.oc-bubble {
+				padding: 9px 12px;
+				font-size: 13.5px;
+			}
+
+			.oc-message {
+				max-width: 90%;
+			}
+
+			.oc-input-container {
+				padding: 8px 10px;
+			}
+		}
+
+		@media (max-width: 360px) {
+			#widget-container:not(.oc-preview-container) .oc-window {
+				width: calc(100vw - 12px);
+				max-width: calc(100vw - 12px);
+				right: 6px;
+				left: 6px;
+			}
+
+			.oc-body {
+				padding: 10px 8px;
+			}
+
+			.oc-bubble {
+				padding: 8px 10px;
+				font-size: 13px;
+			}
+
+			.oc-message {
+				max-width: 94%;
+			}
+		}
+
 		/* Appointment Booking Workflow Styles - Flat & Minimal */
 		.oc-booking-container {
 			width: 100%;
@@ -1761,7 +1814,7 @@ export function injectStyles() {
 			width: 100%;
 			max-width: 100%;
 			box-sizing: border-box;
-			border: 1px solid ${config.theme === "dark" ? "#27272a" : "#e4e4e7"};
+			border: none;
 			background: ${config.theme === "dark" ? "#121214" : "#fbfbfc"};
 			border-radius: 8px;
 			padding: 12px;
@@ -1794,6 +1847,9 @@ export function injectStyles() {
 		}
 
 		.oc-slot-chip {
+			min-height: 44px;
+			max-width: 100%;
+			overflow-wrap: anywhere;
 			display: inline-flex;
 			align-items: center;
 			padding: 6px 10px;
@@ -1804,7 +1860,7 @@ export function injectStyles() {
 			background: ${config.theme === "dark" ? "#18181b" : "#ffffff"};
 			color: ${config.theme === "dark" ? "#e4e4e7" : "#27272a"};
 			cursor: pointer;
-			transition: all 0.15s ease;
+			transition: color 0.15s ease, border-color 0.15s ease;
 			text-align: left;
 			font-family: inherit;
 		}
@@ -1840,7 +1896,7 @@ export function injectStyles() {
 		}
 
 		.oc-booking-input {
-			height: 32px;
+			min-height: 44px;
 			padding: 0 8px;
 			border-radius: 6px;
 			border: 1px solid ${config.theme === "dark" ? "#3f3f46" : "#d4d4d8"};
@@ -1865,7 +1921,7 @@ export function injectStyles() {
 		}
 
 		.oc-booking-submit-btn {
-			height: 32px;
+			min-height: 44px;
 			padding: 0 12px;
 			border-radius: 6px;
 			border: none;
@@ -1885,7 +1941,7 @@ export function injectStyles() {
 
 		.oc-booking-back-btn,
 		.oc-booking-retry-btn {
-			height: 32px;
+			min-height: 44px;
 			padding: 0 10px;
 			border-radius: 6px;
 			border: 1px solid ${config.theme === "dark" ? "#3f3f46" : "#d4d4d8"};
@@ -1997,59 +2053,6 @@ export function injectStyles() {
 			line-height: 1.4;
 			margin: 0;
 		}
-		/* Mobile viewport responsive adjustments (320px - 480px) */
-		@media (max-width: 480px) {
-			#widget-container:not(.oc-preview-container) .oc-window {
-				width: calc(100vw - 20px);
-				max-width: calc(100vw - 20px);
-				right: 10px;
-				left: 10px;
-				margin: 0 auto;
-				bottom: ${config.launcherSize === "lg" ? "72px" : config.launcherSize === "sm" ? "52px" : "62px"};
-				max-height: calc(100vh - 90px);
-			}
-
-			.oc-body {
-				padding: 12px 10px;
-				gap: 10px;
-			}
-
-			.oc-bubble {
-				padding: 9px 12px;
-				font-size: 13.5px;
-			}
-
-			.oc-message {
-				max-width: 90%;
-			}
-
-			.oc-input-container {
-				padding: 8px 10px;
-			}
-		}
-
-		@media (max-width: 360px) {
-			#widget-container:not(.oc-preview-container) .oc-window {
-				width: calc(100vw - 12px);
-				max-width: calc(100vw - 12px);
-				right: 6px;
-				left: 6px;
-			}
-
-			.oc-body {
-				padding: 10px 8px;
-			}
-
-			.oc-bubble {
-				padding: 8px 10px;
-				font-size: 13px;
-			}
-
-			.oc-message {
-				max-width: 94%;
-			}
-		}
-
 	`;
   document.head.appendChild(style);
 }

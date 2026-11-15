@@ -48,6 +48,7 @@ function mapMessageToClient(message: MessageJson, agentName: string) {
     feedbackAt: message.feedbackAt ?? null,
     citations: message.citations ?? [],
     isInternal: message.visibility === "INTERNAL",
+    metadata: message.metadata,
   };
 }
 

@@ -10,6 +10,7 @@ import { useActiveWorkspaceId } from "@/hooks/use-auth";
 import type { InboxChannel } from "@/features/conversations/inbox-pagination";
 import type {
   WidgetWidgetConfig,
+  WidgetBookingConfig,
   WidgetBorderRadiusStyle,
   WidgetPublicationStatus,
 } from "@/features/widget/domain";
@@ -29,6 +30,7 @@ import {
 import { parseInboxConversationEventsResponse } from "@/features/conversations/inbox-events";
 
 export type DashboardWidgetConfig = Omit<WidgetWidgetConfig, "borderRadius"> & {
+  booking?: WidgetBookingConfig;
   agentName: string;
   allowedDomains: string[];
   borderRadius: WidgetBorderRadiusStyle;

@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { createMDX } from "fumadocs-mdx/next";
 
 import "./src/lib/env/server";
 
@@ -18,6 +19,9 @@ const nextConfig: NextConfig = {
     optimizePackageImports: ["@hugeicons/core-free-icons"],
   },
   reactCompiler: true,
+  async redirects() {
+    return [{ source: "/help", destination: "/docs", permanent: false }];
+  },
   async headers() {
     return [
       {
@@ -31,4 +35,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default createMDX()(nextConfig);

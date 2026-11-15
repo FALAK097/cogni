@@ -687,6 +687,7 @@ export function WidgetTestPanel({
         ) : null}
         {casesQuery.data?.cases.length === 0 ? (
           <EmptyState
+            mode="inline"
             title="No saved tests yet"
             className="min-h-[120px] rounded-lg bg-muted/20 p-4 sm:p-4"
             description={

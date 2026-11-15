@@ -22,7 +22,7 @@ export const widgetPublishedConfigSchema = z
         bufferMinutes: z.number().int().min(0).max(120).optional(),
         allowedDays: z.array(z.number().int().min(0).max(6)).min(1).optional(),
         handoffFallback: z.string().trim().max(500).optional(),
-        notificationChannel: z.enum(["INBOX", "EMAIL", "SLACK"]).optional(),
+        notificationChannel: z.literal("INBOX").optional(),
         workingHours: z
           .object({
             start: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),

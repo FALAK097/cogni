@@ -223,7 +223,7 @@ async function executeComposioTool({
   }
   const composio = new Composio({ apiKey: env.COMPOSIO_API_KEY });
   try {
-    return await composio.tools.execute(
+    const result = await composio.tools.execute(
       tool.composioToolSlug,
       {
         userId: workspaceId,
@@ -234,7 +234,12 @@ async function executeComposioTool({
       },
       { signal: AbortSignal.timeout(20_000) },
     );
-  } catch {
+    if (!result.successful) {
+      throw new ActionNotSentError(result.error ?? `${provider} action failed.`);
+    }
+    return result;
+  } catch (error) {
+    if (error instanceof ActionNotSentError) throw error;
     throw new ActionOutcomeUnknownError();
   }
 }
@@ -250,19 +255,16 @@ async function executeCalendarTool({
   actionType: ToolActionType;
   input: Record<string, unknown>;
 }) {
-  if (env.COMPOSIO_API_KEY) {
-    try {
-      return await executeComposioTool({
-        db,
-        workspaceId,
-        provider: "GOOGLE_CALENDAR",
-        actionType,
-        input,
-      });
-    } catch (error) {
-      if (error instanceof ActionOutcomeUnknownError) throw error;
-      // Fallback to typed mock calendar adapter if integration is not ready
-    }
+  try {
+    return await executeComposioTool({
+      db,
+      workspaceId,
+      provider: "GOOGLE_CALENDAR",
+      actionType,
+      input,
+    });
+  } catch (error) {
+    if (error instanceof ActionOutcomeUnknownError || env.ENV !== "development") throw error;
   }
 
   const adapter = await getCalendarAdapter(workspaceId, db);

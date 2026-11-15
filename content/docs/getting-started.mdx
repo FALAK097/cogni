@@ -1,0 +1,30 @@
+---
+title: Getting started
+description: Configure and deploy a grounded Cogni agent from a new workspace.
+---
+
+## 1. Open the workspace
+
+Sign in with Google and confirm the active workspace in the workspace switcher. The first user in a new workspace is its owner. Owners can change configuration and publish; members can participate in conversations and preview the agent.
+
+See [Workspace and permissions](/docs/workspace-permissions) for the complete role model.
+
+## 2. Configure the agent
+
+Open **Agent → Build** and set the model, agent name, instructions, behavior, and human-handoff keywords. Keep instructions specific to the organization and avoid placing factual product content in the prompt when it belongs in a knowledge source.
+
+## 3. Add knowledge
+
+Open **Knowledge** and add a website, sitemap, PDF, DOCX, or pasted text. Wait until each source is **Ready** before using it as evidence in a test.
+
+## 4. Test a draft
+
+Open **Agent → Test** and run representative customer questions. Check the answer, cited source, and handoff evidence. Test a question the knowledge does not answer to confirm the agent stays within its available context.
+
+Reusable test cases and run history make it possible to compare a draft with the published version.
+
+## 5. Publish and install
+
+Open **Agent → Deploy**, complete the launch checks, and publish. Add every production hostname to **Authorized domains**, then copy the generated loader into the site.
+
+The live widget uses the latest published version, not an unpublished draft. Continue with [Widget installation](/docs/widget-installation) for domains and CSP.

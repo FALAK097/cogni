@@ -10,35 +10,55 @@ const workingHoursSchema = z.object({
   weekdays: z.array(z.number().int().min(0).max(6)).min(1).default([1, 2, 3, 4, 5]),
 });
 
-export const bookingSettingsInputSchema = z.object({
-  enabled: z.boolean(),
-  timezone: z
-    .string()
-    .trim()
-    .min(1)
-    .max(80)
-    .refine((value) => {
-      try {
-        new Intl.DateTimeFormat("en-US", { timeZone: value }).format();
-        return true;
-      } catch {
-        return false;
-      }
-    }, "Enter a valid IANA timezone."),
-  durationMinutes: z.number().int().min(15).max(240),
-  bufferMinutes: z.number().int().min(0).max(120).default(15),
-  minimumNoticeMinutes: z.number().int().min(0).max(10_080).default(60),
-  allowedDays: z.array(z.number().int().min(0).max(6)).min(1).optional(),
-  workingHours: workingHoursSchema,
-  handoffFallback: z
-    .string()
-    .trim()
-    .max(500)
-    .default(
-      "No slots currently available. A team member will follow up with you directly in this chat.",
-    ),
-  notificationChannel: z.enum(["INBOX", "EMAIL", "SLACK"]).default("INBOX"),
-});
+export const bookingSettingsInputSchema = z
+  .object({
+    enabled: z.boolean(),
+    timezone: z
+      .string()
+      .trim()
+      .min(1)
+      .max(80)
+      .refine((value) => {
+        try {
+          new Intl.DateTimeFormat("en-US", { timeZone: value }).format();
+          return true;
+        } catch {
+          return false;
+        }
+      }, "Enter a valid IANA timezone."),
+    durationMinutes: z.number().int().min(15).max(240),
+    bufferMinutes: z.number().int().min(0).max(120).default(15),
+    minimumNoticeMinutes: z.number().int().min(0).max(10_080).default(60),
+    allowedDays: z.array(z.number().int().min(0).max(6)).min(1).optional(),
+    workingHours: workingHoursSchema,
+    handoffFallback: z
+      .string()
+      .trim()
+      .max(500)
+      .default(
+        "No slots currently available. A team member will follow up with you directly in this chat.",
+      ),
+    notificationChannel: z.literal("INBOX").default("INBOX"),
+  })
+  .superRefine((settings, context) => {
+    const start = minutesFromTime(settings.workingHours.start);
+    const end = minutesFromTime(settings.workingHours.end);
+    if (start >= end) {
+      context.addIssue({
+        code: "custom",
+        path: ["workingHours", "end"],
+        message: "Day end time must be after the start time.",
+      });
+      return;
+    }
+    if (end - start < settings.durationMinutes) {
+      context.addIssue({
+        code: "custom",
+        path: ["workingHours", "end"],
+        message: "Working hours must fit at least one meeting.",
+      });
+    }
+  });
 
 export type BookingSettings = z.infer<typeof bookingSettingsInputSchema>;
 
@@ -51,7 +71,7 @@ export type AppointmentNotificationPayload = {
   attendeeEmail: string;
   timezone: string;
   status: "REQUESTED" | "CONFIRMED" | "FAILED" | "CANCELLED";
-  notificationChannel: "INBOX" | "EMAIL" | "SLACK";
+  notificationChannel: "INBOX";
 };
 
 export const appointmentWorkflowInputSchema = z.object({
@@ -62,7 +82,7 @@ export const appointmentWorkflowInputSchema = z.object({
   title: z.string().trim().min(1).max(200).default("Customer meeting"),
   timezone: z.string().trim().min(1).max(80),
   handoffFallback: z.string().trim().max(500),
-  notificationChannel: z.enum(["INBOX", "EMAIL", "SLACK"]),
+  notificationChannel: z.literal("INBOX"),
 });
 
 export type AppointmentWorkflowInput = z.infer<typeof appointmentWorkflowInputSchema>;

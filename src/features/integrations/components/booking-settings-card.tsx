@@ -22,7 +22,7 @@ export type BookingSettings = {
   allowedDays?: number[];
   workingHours: { start: string; end: string; weekdays: number[] };
   handoffFallback: string;
-  notificationChannel: "INBOX" | "EMAIL" | "SLACK";
+  notificationChannel: "INBOX";
 };
 
 const DAY_NAMES = [
@@ -294,27 +294,6 @@ function BookingForm({
                 onChange={(event) => field.handleChange(event.target.value)}
                 className="h-9 text-xs"
               />
-            </Field>
-          )}
-        </form.Field>
-
-        <form.Field name="notificationChannel">
-          {(field) => (
-            <Field
-              label="Notification channel"
-              htmlFor="booking-notification-channel"
-              hint="Where the team receives alerts"
-            >
-              <select
-                id="booking-notification-channel"
-                value={field.state.value}
-                onChange={(e) => field.handleChange(e.target.value as "INBOX" | "EMAIL" | "SLACK")}
-                className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-xs shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-              >
-                <option value="INBOX">Inbox (Dashboard)</option>
-                <option value="EMAIL">Email</option>
-                <option value="SLACK">Slack</option>
-              </select>
             </Field>
           )}
         </form.Field>

@@ -1,0 +1,38 @@
+---
+title: Knowledge sources and indexing
+description: Add supported content and understand how Cogni indexes, refreshes, and publishes knowledge.
+---
+
+Knowledge sources provide the factual context used by the agent. Only workspace owners can add, refresh, replace, or delete them.
+
+## Supported sources
+
+| Source      | Behavior                                                  |
+| ----------- | --------------------------------------------------------- |
+| Website URL | Fetches and indexes one public HTTP or HTTPS page.        |
+| Sitemap     | Discovers and indexes public pages listed by the sitemap. |
+| PDF         | Extracts and indexes uploaded PDF text.                   |
+| DOCX        | Extracts and indexes uploaded Word document text.         |
+| Pasted text | Indexes text entered directly in Cogni.                   |
+
+Private network addresses, local URLs, credential-bearing URLs, and non-HTTP protocols are rejected. A source must be reachable by the Cogni server when it is fetched.
+
+## Indexing states
+
+- **Processing** means content is being fetched, extracted, and indexed.
+- **Ready** means the source can be retrieved by the agent.
+- **Failed** means the latest indexing attempt did not produce a usable revision.
+
+Test grounded answers only after the required sources are Ready.
+
+## Refresh and replacement
+
+Website and sitemap sources can be synchronized to fetch their current public content. Uploaded documents and pasted text are reindexed from the content stored in Cogni. To replace their content, delete the existing source and add the updated file or text.
+
+Indexing is explicit; the current implementation does not schedule automatic website refreshes.
+
+## Drafts and publications
+
+Knowledge changes affect the draft used in **Agent → Test**. The public widget uses the knowledge snapshot in the latest successful publication, so publish again after validating a material source change.
+
+If an indexing attempt fails, confirm the exact URL or file is public, supported, and readable, then retry that source. A previous successful revision remains distinct from the failed attempt.

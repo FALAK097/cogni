@@ -22,6 +22,7 @@ const DASHBOARD_ROUTE_PREFIXES = [
   "/conversations",
   "/knowledge-base",
   "/integrations",
+  "/docs",
 ] as const;
 
 function isDashboardPath(pathname: string): boolean {
