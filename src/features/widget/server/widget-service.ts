@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
 import type { Db } from "@/lib/db/client";
 import { user as userTable, widget as widgetTable, widgetPublication } from "@/lib/db/schema";
-import { bookingSettingsInputSchema } from "@/features/integrations/server/booking";
+import { bookingSettingsReadSchema } from "@/features/integrations/server/booking";
 import {
   createWidgetPublicationSnapshot,
   mergeWidgetPublication,
@@ -70,7 +70,7 @@ export function toWidgetBookingConfig(widget: WidgetRecord) {
   } catch {
     parsedWorkingHours = { start: "09:00", end: "17:00", weekdays: [1, 2, 3, 4, 5] };
   }
-  return bookingSettingsInputSchema.parse({
+  return bookingSettingsReadSchema.parse({
     enabled: widget.bookingEnabled,
     timezone: widget.bookingTimezone,
     durationMinutes: widget.bookingDurationMinutes,

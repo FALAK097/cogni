@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 
 import {
   bookingSettingsInputSchema,
+  bookingSettingsReadSchema,
   createAvailableSlots,
 } from "@/features/integrations/server/booking";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
@@ -39,7 +40,7 @@ export async function GET() {
   }
 
   const settings = saved
-    ? bookingSettingsInputSchema.parse({
+    ? bookingSettingsReadSchema.parse({
         enabled: saved.bookingEnabled,
         timezone: saved.bookingTimezone,
         durationMinutes: saved.bookingDurationMinutes,

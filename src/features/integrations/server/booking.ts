@@ -10,37 +10,42 @@ const workingHoursSchema = z.object({
   weekdays: z.array(z.number().int().min(0).max(6)).min(1).default([1, 2, 3, 4, 5]),
 });
 
-export const bookingSettingsInputSchema = z
-  .object({
-    enabled: z.boolean(),
-    timezone: z
-      .string()
-      .trim()
-      .min(1)
-      .max(80)
-      .refine((value) => {
-        try {
-          new Intl.DateTimeFormat("en-US", { timeZone: value }).format();
-          return true;
-        } catch {
-          return false;
-        }
-      }, "Enter a valid IANA timezone."),
-    durationMinutes: z.number().int().min(15).max(240),
-    bufferMinutes: z.number().int().min(0).max(120).default(15),
-    minimumNoticeMinutes: z.number().int().min(0).max(10_080).default(60),
-    allowedDays: z.array(z.number().int().min(0).max(6)).min(1).optional(),
-    workingHours: workingHoursSchema,
-    handoffFallback: z
-      .string()
-      .trim()
-      .max(500)
-      .default(
-        "No slots currently available. A team member will follow up with you directly in this chat.",
-      ),
-    notificationChannel: z.literal("INBOX").default("INBOX"),
-  })
-  .superRefine((settings, context) => {
+export const bookingSettingsReadSchema = z.object({
+  enabled: z.boolean(),
+  timezone: z
+    .string()
+    .trim()
+    .min(1)
+    .max(80)
+    .refine((value) => {
+      try {
+        new Intl.DateTimeFormat("en-US", { timeZone: value }).format();
+        return true;
+      } catch {
+        return false;
+      }
+    }, "Enter a valid IANA timezone."),
+  durationMinutes: z.number().int().min(15).max(240),
+  bufferMinutes: z.number().int().min(0).max(120).default(15),
+  minimumNoticeMinutes: z.number().int().min(0).max(10_080).default(60),
+  allowedDays: z.array(z.number().int().min(0).max(6)).min(1).optional(),
+  workingHours: workingHoursSchema,
+  handoffFallback: z
+    .string()
+    .trim()
+    .max(500)
+    .default(
+      "No slots currently available. A team member will follow up with you directly in this chat.",
+    ),
+  notificationChannel: z.literal("INBOX").default("INBOX"),
+});
+
+/**
+ * Stored settings may predate the interval constraint, so reads stay permissive:
+ * the dashboard must still load the current values so an operator can correct them.
+ */
+export const bookingSettingsInputSchema = bookingSettingsReadSchema.superRefine(
+  (settings, context) => {
     const start = minutesFromTime(settings.workingHours.start);
     const end = minutesFromTime(settings.workingHours.end);
     if (start >= end) {
@@ -58,9 +63,10 @@ export const bookingSettingsInputSchema = z
         message: "Working hours must fit at least one meeting.",
       });
     }
-  });
+  },
+);
 
-export type BookingSettings = z.infer<typeof bookingSettingsInputSchema>;
+export type BookingSettings = z.infer<typeof bookingSettingsReadSchema>;
 
 export type AppointmentNotificationPayload = {
   workflowRunId: string;
@@ -71,7 +77,7 @@ export type AppointmentNotificationPayload = {
   attendeeEmail: string;
   timezone: string;
   status: "REQUESTED" | "CONFIRMED" | "FAILED" | "CANCELLED";
-  notificationChannel: "INBOX";
+  notificationChannel: "INBOX" | "EMAIL" | "SLACK";
 };
 
 export const appointmentWorkflowInputSchema = z.object({
@@ -82,7 +88,8 @@ export const appointmentWorkflowInputSchema = z.object({
   title: z.string().trim().min(1).max(200).default("Customer meeting"),
   timezone: z.string().trim().min(1).max(80),
   handoffFallback: z.string().trim().max(500),
-  notificationChannel: z.literal("INBOX"),
+  // Legacy runs may store EMAIL or SLACK; keep them parseable so handoff still fires.
+  notificationChannel: z.enum(["INBOX", "EMAIL", "SLACK"]),
 });
 
 export type AppointmentWorkflowInput = z.infer<typeof appointmentWorkflowInputSchema>;
@@ -92,10 +99,7 @@ function minutesFromTime(value: string) {
   return (hours || 0) * 60 + (minutes || 0);
 }
 
-export function createAvailableSlots(
-  settings: z.infer<typeof bookingSettingsInputSchema>,
-  now = new Date(),
-) {
+export function createAvailableSlots(settings: BookingSettings, now = new Date()) {
   const earliest = addMinutes(now, settings.minimumNoticeMinutes ?? 60);
   const slots: { startAt: string; endAt: string; label: string }[] = [];
   const startMinutes = minutesFromTime(settings.workingHours.start);

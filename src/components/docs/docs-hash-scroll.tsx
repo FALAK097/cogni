@@ -10,7 +10,13 @@ export function DocsHashScroll() {
     let cancelled = false;
 
     function scrollToHash() {
-      const id = decodeURIComponent(window.location.hash.slice(1));
+      const rawId = window.location.hash.slice(1);
+      let id = rawId;
+      try {
+        id = decodeURIComponent(rawId);
+      } catch {
+        // Malformed fragment such as `#%`: fall back to the raw value instead of throwing.
+      }
       if (!id || cancelled) return;
 
       window.requestAnimationFrame(() => {

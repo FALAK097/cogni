@@ -8,7 +8,7 @@ import {
   type AppointmentWorkflowInput,
   type BookingSettings,
   appointmentWorkflowInputSchema,
-  bookingSettingsInputSchema,
+  bookingSettingsReadSchema,
 } from "@/features/integrations/server/booking";
 import { getCalendarAdapter } from "@/features/integrations/server/calendar-adapter";
 import {
@@ -68,7 +68,7 @@ async function getBookingContext(request: Request, publicKey: string) {
   ) {
     return { error: visitor.error };
   }
-  const settings = bookingSettingsInputSchema.parse(access.bookingSettings);
+  const settings = bookingSettingsReadSchema.parse(access.bookingSettings);
   if (!settings.enabled) {
     return { error: Response.json({ error: "Booking is unavailable." }, { status: 404 }) };
   }
@@ -130,13 +130,16 @@ async function getAvailableSlots(
   const now = Date.now();
   const reserved = new Set(
     reservations
-      .filter(
-        (run) =>
-          run.status !== "WAITING_APPROVAL" ||
-          run.approvalStatus === null ||
-          (run.approvalStatus === "PENDING" &&
-            (run.approvalExpiresAt === null || new Date(run.approvalExpiresAt).getTime() > now)),
-      )
+      .filter((run) => {
+        if (run.status !== "WAITING_APPROVAL") return true;
+        // An approved booking is being executed; keep the slot claimed until the
+        // run reaches a terminal status so a retry cannot double-book it.
+        if (run.approvalStatus === "APPROVED" || run.approvalStatus === null) return true;
+        return (
+          run.approvalStatus === "PENDING" &&
+          (run.approvalExpiresAt === null || new Date(run.approvalExpiresAt).getTime() > now)
+        );
+      })
       .map((run) => run.idempotencyKey),
   );
   return availability.freeSlots.filter(
@@ -300,6 +303,9 @@ export async function POST(request: Request, context: RouteContext) {
     });
     if (
       pendingApproval &&
+      // Approved runs are executing against the provider; releasing the claim here
+      // would let a duplicate request pick the same slot while that call continues.
+      pendingApproval.status !== "APPROVED" &&
       (pendingApproval.status !== "PENDING" ||
         new Date(pendingApproval.expiresAt).getTime() <= Date.now())
     ) {

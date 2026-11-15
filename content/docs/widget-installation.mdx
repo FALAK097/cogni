@@ -40,9 +40,9 @@ Sites with a Content Security Policy must allow the Cogni origin in the directiv
 - `script-src` for `widget.bundle.js`;
 - `connect-src` for widget API requests;
 - `img-src` for remote images or data URLs rendered in messages, when applicable; and
-- `style-src` if the host policy blocks styles inserted by the widget.
+- `style-src` with `'unsafe-inline'` when the host policy blocks the widget's styles. The loader inserts an inline `<style id="widget-styles">` element, which an origin allowance in `style-src` does not permit.
 
-Keep the policy as narrow as the host application permits. Add only the deployed Cogni origin rather than a broad wildcard.
+Add only the deployed Cogni origin to `script-src`, `connect-src`, and `img-src`. Keep the policy as narrow as the host application permits.
 
 ## Verify the deployment
 

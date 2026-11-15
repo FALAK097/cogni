@@ -235,6 +235,9 @@ async function executeComposioTool({
       { signal: AbortSignal.timeout(20_000) },
     );
     if (!result.successful) {
+      // A failure envelope for a create does not guarantee the upstream event was
+      // not committed, so the outcome is unknown and must not be retried blindly.
+      if (actionType === "calendar.create") throw new ActionOutcomeUnknownError();
       throw new ActionNotSentError(result.error ?? `${provider} action failed.`);
     }
     return result;

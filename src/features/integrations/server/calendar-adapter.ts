@@ -100,7 +100,9 @@ function findStringByKey(value: unknown, keys: Set<string>): string | null {
   return null;
 }
 
-function normalizeProviderSlots(data: ProviderRecord, timezone: string) {
+type ProviderInterval = { start: Date; end: Date };
+
+function normalizeProviderIntervals(data: ProviderRecord): ProviderInterval[] {
   const rawSlots = findArrayByKey(
     data,
     new Set(["free_slots", "freeSlots", "available_slots", "availableSlots", "slots"]),
@@ -108,7 +110,7 @@ function normalizeProviderSlots(data: ProviderRecord, timezone: string) {
   if (rawSlots === null) {
     throw new Error("Google Calendar returned no usable availability data.");
   }
-  return rawSlots.flatMap((value): CalendarAvailabilitySlot[] => {
+  return rawSlots.flatMap((value): ProviderInterval[] => {
     const slot = asRecord(value);
     if (!slot) return [];
     const startAt = readString(slot, ["start", "startAt", "start_time", "start_datetime"]);
@@ -123,15 +125,61 @@ function normalizeProviderSlots(data: ProviderRecord, timezone: string) {
     ) {
       return [];
     }
-    const localStart = toZonedTime(start, timezone);
-    return [
-      {
-        startAt: start.toISOString(),
-        endAt: end.toISOString(),
-        label: `${format(localStart, "EEE, MMM d · h:mm a")} (${timezone})`,
-      },
-    ];
+    return [{ start, end }];
   });
+}
+
+function minutesFromTime(value: string) {
+  const [hours = 0, minutes = 0] = value.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+/**
+ * The provider returns free gaps, not appointments. Intersect each day's working
+ * window with those gaps and emit stable slots sized by the configured duration.
+ */
+function buildAppointmentSlots(
+  intervals: ProviderInterval[],
+  query: CalendarAvailabilityQuery,
+): CalendarAvailabilitySlot[] {
+  if (intervals.length === 0) return [];
+  const timezone = query.timezone;
+  const durationMinutes = Math.max(15, query.durationMinutes ?? 30);
+  const bufferMinutes = Math.max(0, query.bufferMinutes ?? 15);
+  const stepMinutes = Math.max(15, durationMinutes + bufferMinutes);
+  const allowedDays = query.allowedDays ?? [1, 2, 3, 4, 5];
+  const workingStart = minutesFromTime(query.workingHours?.start ?? "09:00");
+  const workingEnd = minutesFromTime(query.workingHours?.end ?? "17:00");
+  if (workingStart >= workingEnd) return [];
+
+  const rangeStart = parseISO(query.startAt);
+  const rangeEnd = parseISO(query.endAt);
+  const slots: CalendarAvailabilitySlot[] = [];
+
+  for (let dayOffset = 0; dayOffset < 14 && slots.length < 24; dayOffset += 1) {
+    const currentDay = addDays(rangeStart, dayOffset);
+    if (isAfter(currentDay, rangeEnd)) break;
+    const zonedDay = startOfDay(toZonedTime(currentDay, timezone));
+    if (!allowedDays.includes(zonedDay.getDay())) continue;
+
+    for (let minute = workingStart; minute + durationMinutes <= workingEnd; minute += stepMinutes) {
+      const localStart = addMinutes(zonedDay, minute);
+      const slotStart = fromZonedTime(localStart, timezone);
+      const slotEnd = addMinutes(slotStart, durationMinutes);
+      if (isBefore(slotStart, rangeStart) || isAfter(slotEnd, rangeEnd)) continue;
+      const available = intervals.some(
+        (interval) => !isBefore(slotStart, interval.start) && !isAfter(slotEnd, interval.end),
+      );
+      if (!available) continue;
+      slots.push({
+        startAt: slotStart.toISOString(),
+        endAt: slotEnd.toISOString(),
+        label: `${format(localStart, "EEE, MMM d · h:mm a")} (${timezone})`,
+      });
+      if (slots.length >= 24) break;
+    }
+  }
+  return slots;
 }
 
 class ComposioCalendarAdapter implements CalendarAdapter {
@@ -167,7 +215,10 @@ class ComposioCalendarAdapter implements CalendarAdapter {
 
   async findAvailability(query: CalendarAvailabilityQuery): Promise<CalendarAvailabilityResult> {
     const data = await this.execute("calendar.find_availability", { ...query });
-    return { busy: [], freeSlots: normalizeProviderSlots(data, query.timezone) };
+    return {
+      busy: [],
+      freeSlots: buildAppointmentSlots(normalizeProviderIntervals(data), query),
+    };
   }
 
   async createEvent(input: CalendarEventCreateInput): Promise<CalendarEventResult> {
