@@ -1,5 +1,5 @@
 import { formatInTimeZone } from "date-fns-tz";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { verifyWidgetBootstrapToken } from "@/features/widget/server/widget-bootstrap";
 
@@ -24,7 +24,10 @@ import {
 } from "@/features/widget/server/widget-utils";
 import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
 import { type Db, getDb, runDbWriteOperation } from "@/lib/db/client";
-import { createApprovalRequest } from "@/features/integrations/server/approval-service";
+import {
+  createApprovalRequest,
+  expireApprovalRequest,
+} from "@/features/integrations/server/approval-service";
 import { createWorkflowWithSteps, updateWorkflowStep } from "@/lib/workflows/runner";
 import { approvalRequest, workflowRun, workflowStep } from "@/lib/db/schema";
 import { emitDomainEvent } from "@/lib/events/domain-events";
@@ -100,19 +103,42 @@ async function getAvailableSlots(
     workingHours: settings.workingHours,
   });
   if (includeReserved || availability.freeSlots.length === 0) return availability.freeSlots;
-  const reservations = await db.query.workflowRun.findMany({
-    where: (fields, { and, eq, inArray }) =>
+  const slotKeys = availability.freeSlots.map((slot) => `booking:${workspaceId}:${slot.startAt}`);
+  const reservations = await db
+    .select({
+      idempotencyKey: workflowRun.idempotencyKey,
+      status: workflowRun.status,
+      approvalStatus: approvalRequest.status,
+      approvalExpiresAt: approvalRequest.expiresAt,
+    })
+    .from(workflowRun)
+    .leftJoin(
+      approvalRequest,
       and(
-        eq(fields.workspaceId, workspaceId),
-        eq(fields.name, "appointment.booking"),
-        inArray(
-          fields.idempotencyKey,
-          availability.freeSlots.map((slot) => `booking:${workspaceId}:${slot.startAt}`),
-        ),
+        eq(approvalRequest.workflowRunId, workflowRun.id),
+        eq(approvalRequest.workspaceId, workspaceId),
       ),
-    columns: { idempotencyKey: true },
-  });
-  const reserved = new Set(reservations.map((run) => run.idempotencyKey));
+    )
+    .where(
+      and(
+        eq(workflowRun.workspaceId, workspaceId),
+        eq(workflowRun.name, "appointment.booking"),
+        inArray(workflowRun.idempotencyKey, slotKeys),
+        inArray(workflowRun.status, ["PENDING", "RUNNING", "WAITING_APPROVAL", "COMPLETED"]),
+      ),
+    );
+  const now = Date.now();
+  const reserved = new Set(
+    reservations
+      .filter(
+        (run) =>
+          run.status !== "WAITING_APPROVAL" ||
+          run.approvalStatus === null ||
+          (run.approvalStatus === "PENDING" &&
+            (run.approvalExpiresAt === null || new Date(run.approvalExpiresAt).getTime() > now)),
+      )
+      .map((run) => run.idempotencyKey),
+  );
   return availability.freeSlots.filter(
     (slot) => !reserved.has(`booking:${workspaceId}:${slot.startAt}`),
   );
@@ -261,10 +287,64 @@ export async function POST(request: Request, context: RouteContext) {
     subject: `Confirmed: ${parsed.data.title}`,
     text: `Your appointment is confirmed for ${parsed.data.startAt} to ${parsed.data.endAt} (${result.settings.timezone}). Reply to this email if you need to make a change.`,
   };
-  const existing = await result.db.query.workflowRun.findFirst({
-    where: (fields, { and, eq }) =>
-      and(eq(fields.workspaceId, workspaceId), eq(fields.idempotencyKey, idempotencyKey)),
-  });
+  let existing =
+    (await result.db.query.workflowRun.findFirst({
+      where: (fields, { and, eq }) =>
+        and(eq(fields.workspaceId, workspaceId), eq(fields.idempotencyKey, idempotencyKey)),
+    })) ?? null;
+  if (existing?.status === "WAITING_APPROVAL") {
+    const existingId = existing.id;
+    const pendingApproval = await result.db.query.approvalRequest.findFirst({
+      where: (fields, { and, eq }) =>
+        and(eq(fields.workspaceId, workspaceId), eq(fields.workflowRunId, existingId)),
+    });
+    if (
+      pendingApproval &&
+      (pendingApproval.status !== "PENDING" ||
+        new Date(pendingApproval.expiresAt).getTime() <= Date.now())
+    ) {
+      if (pendingApproval.status === "PENDING") {
+        await expireApprovalRequest({
+          db: result.db,
+          workspaceId,
+          approval: pendingApproval,
+        });
+      } else {
+        await runDbWriteOperation(result.db, async (tx) => {
+          await tx
+            .update(workflowStep)
+            .set({
+              status: "CANCELLED",
+              errorMessage: `Approval request ${pendingApproval.status.toLowerCase()}.`,
+              finishedAt: new Date().toISOString(),
+            })
+            .where(
+              and(
+                eq(workflowStep.workflowRunId, existingId),
+                eq(workflowStep.workspaceId, workspaceId),
+                eq(workflowStep.status, "WAITING_APPROVAL"),
+              ),
+            );
+          await tx
+            .update(workflowRun)
+            .set({
+              status: "CANCELLED",
+              idempotencyKey: null,
+              errorMessage: `Approval request ${pendingApproval.status.toLowerCase()}.`,
+              finishedAt: new Date().toISOString(),
+            })
+            .where(
+              and(
+                eq(workflowRun.id, existingId),
+                eq(workflowRun.workspaceId, workspaceId),
+                eq(workflowRun.status, "WAITING_APPROVAL"),
+              ),
+            );
+        });
+      }
+      existing = null;
+    }
+  }
   if (existing) {
     const sameRequest =
       JSON.stringify(JSON.parse(existing.input)) === JSON.stringify(workflowInput);

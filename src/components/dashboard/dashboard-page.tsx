@@ -2204,7 +2204,7 @@ export function DashboardPage({
                 testHistory.latestSuiteDigest === null ? (
                 <div className="mt-5">
                   <EmptyState
-                    compact
+                    mode="inline"
                     title="These runs have no suite version"
                     description="Earlier runs were saved before suite versioning. View all runs, or run your saved checks again to record a version."
                   >
@@ -2220,7 +2220,7 @@ export function DashboardPage({
               ) : (agentTestRuns?.length ?? 0) === 0 ? (
                 <div className="mt-5">
                   <EmptyState
-                    compact
+                    mode="inline"
                     title={
                       agentTestRunsQuery.data?.hasAnyRuns
                         ? "No saved test runs in this period"

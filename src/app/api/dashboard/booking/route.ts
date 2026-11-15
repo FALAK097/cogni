@@ -8,6 +8,7 @@ import {
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { canManageWorkspace } from "@/lib/auth/permissions";
 import { widget } from "@/lib/db/schema";
+import { env } from "@/lib/env/server";
 
 const defaultSettings = bookingSettingsInputSchema.parse({
   enabled: false,
@@ -56,10 +57,7 @@ export async function GET() {
           typeof parsedWorkingHours.handoffFallback === "string"
             ? parsedWorkingHours.handoffFallback
             : undefined,
-        notificationChannel:
-          typeof parsedWorkingHours.notificationChannel === "string"
-            ? parsedWorkingHours.notificationChannel
-            : "INBOX",
+        notificationChannel: "INBOX",
         workingHours: parsedWorkingHours,
       })
     : defaultSettings;
@@ -88,6 +86,23 @@ export async function PATCH(request: Request) {
   });
   if (!existing) {
     return NextResponse.json({ error: "Widget not found." }, { status: 404 });
+  }
+  if (parsed.data.enabled && env.ENV === "production") {
+    const calendar = await db.query.integration.findFirst({
+      where: (fields, { and, eq }) =>
+        and(
+          eq(fields.workspaceId, workspace.id),
+          eq(fields.provider, "GOOGLE_CALENDAR"),
+          eq(fields.status, "CONNECTED"),
+        ),
+      columns: { connectedAccountId: true },
+    });
+    if (!env.COMPOSIO_API_KEY || !calendar?.connectedAccountId) {
+      return NextResponse.json(
+        { error: "Connect Google Calendar before enabling appointment booking." },
+        { status: 409 },
+      );
+    }
   }
 
   const allowedDays = parsed.data.allowedDays ?? parsed.data.workingHours.weekdays;

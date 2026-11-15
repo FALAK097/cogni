@@ -333,7 +333,7 @@ export function WidgetKnowledgeManager({ canManage }: { canManage: boolean }) {
               href="/docs/knowledge-sources"
               className="underline underline-offset-2 hover:text-foreground"
             >
-              Source help
+              Source documentation
             </Link>
           </span>
           <Button
@@ -548,6 +548,7 @@ function KnowledgeEmptyState({
   return (
     <div className="p-6">
       <EmptyState
+        mode="pane"
         icon={BookOpen}
         title="No knowledge sources yet"
         description="Add a website URL, upload documents, or paste text to teach your AI assistant how to answer questions."

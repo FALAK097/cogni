@@ -86,10 +86,7 @@ export function toWidgetBookingConfig(widget: WidgetRecord) {
       typeof parsedWorkingHours.handoffFallback === "string"
         ? parsedWorkingHours.handoffFallback
         : undefined,
-    notificationChannel:
-      typeof parsedWorkingHours.notificationChannel === "string"
-        ? parsedWorkingHours.notificationChannel
-        : undefined,
+    notificationChannel: "INBOX",
     workingHours: parsedWorkingHours,
   });
 }

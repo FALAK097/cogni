@@ -89,7 +89,11 @@ export async function PATCH(request: Request, context: RouteContext) {
         });
         await db
           .update(workflowRun)
-          .set({ status: "CANCELLED", finishedAt: new Date().toISOString() })
+          .set({
+            status: "CANCELLED",
+            finishedAt: new Date().toISOString(),
+            ...(bookingRun?.name === "appointment.booking" ? { idempotencyKey: null } : {}),
+          })
           .where(
             and(
               eq(workflowRun.id, approval.workflowRunId!),
