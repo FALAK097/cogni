@@ -61,6 +61,17 @@ export async function PATCH(request: Request, context: RouteContext) {
     if (approval.status !== parsed.data.decision) {
       throw new Error(`This action was already ${approval.status.toLowerCase()}.`);
     }
+    const workflowRunId = approval.workflowRunId;
+    if (workflowRunId) {
+      const existingRun = await db.query.workflowRun.findFirst({
+        where: (fields, { and, eq }) =>
+          and(eq(fields.id, workflowRunId), eq(fields.workspaceId, workspace.id)),
+        columns: { status: true },
+      });
+      if (existingRun?.status === "COMPLETED" || existingRun?.status === "CANCELLED") {
+        return NextResponse.json({ approval, action: null });
+      }
+    }
     if (parsed.data.decision === "REJECTED") {
       if (approval.workflowRunId && approval.workflowStepId) {
         const bookingRun = await db.query.workflowRun.findFirst({
@@ -78,7 +89,11 @@ export async function PATCH(request: Request, context: RouteContext) {
         });
         await db
           .update(workflowRun)
-          .set({ status: "CANCELLED", finishedAt: new Date().toISOString() })
+          .set({
+            status: "CANCELLED",
+            finishedAt: new Date().toISOString(),
+            ...(bookingRun?.name === "appointment.booking" ? { idempotencyKey: null } : {}),
+          })
           .where(
             and(
               eq(workflowRun.id, approval.workflowRunId!),

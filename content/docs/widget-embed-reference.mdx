@@ -1,0 +1,37 @@
+---
+title: Widget embed reference
+description: Reference for the supported Cogni widget loader and its HTML attributes.
+---
+
+The widget loader is Cogni's customer-facing web integration. Add one asynchronous script element to the host page.
+
+```html
+<script
+  src="https://YOUR_COGNI_ORIGIN/widget.bundle.js"
+  data-widget-key="YOUR_WIDGET_KEY"
+  async
+></script>
+```
+
+## Attributes
+
+| Attribute           |  Required   | Description                                                                                  |
+| ------------------- | :---------: | -------------------------------------------------------------------------------------------- |
+| `src`               |     Yes     | Absolute URL of the deployed Cogni `widget.bundle.js`.                                       |
+| `data-widget-key`   |     Yes     | Public key copied from **Agent → Deploy**. It identifies the published widget configuration. |
+| `async`             | Recommended | Loads the bundle without blocking HTML parsing.                                              |
+| `data-api-base-url` |     No      | Overrides the API origin. Omit it when the API and bundle use the same origin.               |
+
+The key is a public widget identifier, not an administrative credential. Workspace and provider secrets must never be placed in the embed.
+
+## Runtime behavior
+
+The bundle reads its attributes, validates the current hostname against the widget's authorized domains, and creates the launcher and conversation UI. It owns the requests needed to load configuration and exchange messages.
+
+Those bundle-owned `/api/widget/...` requests are not a separate manual integration contract. The supported integration surface is the loader and the attributes documented above.
+
+## Placement
+
+Include the loader once per page. In a client-routed application, install it in the shared document or root layout so route changes do not create duplicate widget instances.
+
+See [Widget installation](/docs/widget-installation) for authorized domains, CSP, and deployment verification.

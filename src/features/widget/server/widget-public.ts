@@ -46,7 +46,7 @@ export async function assertPublicWidgetAccess(
     widget,
     settings,
     bookingSettings,
-    config: toWidgetPublicConfig(settings),
+    config: { ...toWidgetPublicConfig(settings), booking: bookingSettings },
     origin,
     allowedDomains,
   };

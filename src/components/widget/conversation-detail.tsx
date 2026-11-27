@@ -768,7 +768,7 @@ export function ConversationDetail({
               it. Check the channel before sending this message again; resending can create a
               duplicate. Learn about uncertain delivery in the{" "}
               <Link
-                href="/help#channels"
+                href="/docs/integrations-channels"
                 className="underline underline-offset-2 hover:text-foreground"
               >
                 channel delivery guide
@@ -1107,7 +1107,7 @@ export function ConversationDetail({
                           paused.
                         </p>
                         <Link
-                          href="/help#takeover"
+                          href="/docs/inbox-conversations"
                           className="inline-block text-muted-foreground underline underline-offset-2 hover:text-foreground"
                           target="_blank"
                           rel="noopener noreferrer"
