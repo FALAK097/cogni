@@ -10,7 +10,8 @@ const agentRunRuntimeContextSchema = z.object({
   workspaceId: z.string().min(1),
   widgetId: z.string().min(1),
   conversationId: z.string().min(1),
-  contactId: z.string().min(1),
+  // Preview conversations have no visitor contact yet.
+  contactId: z.string().min(1).nullable(),
   visitorSessionId: z.string().min(1).nullable(),
   channel: z.literal("WIDGET"),
   plan: z.literal("free"),
@@ -48,7 +49,7 @@ export function buildWidgetAgentRuntimeContext(input: {
   workspaceId: string;
   widgetId: string;
   conversationId: string;
-  contactId: string;
+  contactId: string | null;
   visitorSessionId: string | null;
   locale: string | null;
 }): AgentRunRuntimeContext {
