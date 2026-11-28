@@ -2,7 +2,7 @@ import "server-only";
 
 import { and, eq } from "drizzle-orm";
 
-import type { Db } from "@/lib/db/client";
+import { runDbWriteOperation, type Db } from "@/lib/db/client";
 import { contact } from "@/lib/db/schema";
 
 export function parseContactTags(value: string) {
@@ -47,37 +47,49 @@ export async function changeContactTag({
     );
   }
 
-  return db.transaction(async (transaction): Promise<ContactTagUpdateResult> => {
-    const [contactRow] = await transaction
-      .select({ tags: contact.tags })
-      .from(contact)
-      .where(and(eq(contact.id, contactId), eq(contact.workspaceId, workspaceId)))
-      .for("update");
+  return runDbWriteOperation(db, async (transaction): Promise<ContactTagUpdateResult> => {
+    const maxAttempts = 5;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      const [contactRow] = await transaction
+        .select({ tags: contact.tags })
+        .from(contact)
+        .where(and(eq(contact.id, contactId), eq(contact.workspaceId, workspaceId)))
+        .limit(1);
 
-    if (!contactRow) return { kind: "not-found" };
-    const currentTags = parseContactTags(contactRow.tags);
-    const hasTag = currentTags.includes(tag);
-    if (action === "add" && !hasTag && currentTags.length >= 50) {
-      return { kind: "limit" };
+      if (!contactRow) return { kind: "not-found" };
+      const currentTags = parseContactTags(contactRow.tags);
+      const hasTag = currentTags.includes(tag);
+      if (action === "add" && !hasTag && currentTags.length >= 50) {
+        return { kind: "limit" };
+      }
+
+      const nextTags =
+        action === "add"
+          ? hasTag
+            ? currentTags
+            : [...currentTags, tag]
+          : currentTags.filter((existingTag) => existingTag !== tag);
+
+      if (
+        nextTags.length !== currentTags.length ||
+        nextTags.some((entry, index) => entry !== currentTags[index])
+      ) {
+        const updated = await transaction
+          .update(contact)
+          .set({ tags: JSON.stringify(nextTags), updatedAt: new Date().toISOString() })
+          .where(
+            and(
+              eq(contact.id, contactId),
+              eq(contact.workspaceId, workspaceId),
+              eq(contact.tags, contactRow.tags),
+            ),
+          )
+          .returning({ id: contact.id });
+        if (updated.length === 0) continue;
+      }
+
+      return { kind: "updated", tags: nextTags };
     }
-
-    const nextTags =
-      action === "add"
-        ? hasTag
-          ? currentTags
-          : [...currentTags, tag]
-        : currentTags.filter((existingTag) => existingTag !== tag);
-
-    if (
-      nextTags.length !== currentTags.length ||
-      nextTags.some((entry, index) => entry !== currentTags[index])
-    ) {
-      await transaction
-        .update(contact)
-        .set({ tags: JSON.stringify(nextTags), updatedAt: new Date().toISOString() })
-        .where(and(eq(contact.id, contactId), eq(contact.workspaceId, workspaceId)));
-    }
-
-    return { kind: "updated", tags: nextTags };
+    throw new Error("Contact tags were updated concurrently. Try again.");
   });
 }

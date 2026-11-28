@@ -65,7 +65,11 @@ export async function POST(
 
   const conversation = await db.query.conversation.findFirst({
     where: (fields, { eq, and }) =>
-      and(eq(fields.visitorSessionId, authorized.session.id), eq(fields.channel, "WIDGET")),
+      and(
+        eq(fields.visitorSessionId, authorized.session.id),
+        eq(fields.workspaceId, access.widget.workspaceId),
+        eq(fields.channel, "WIDGET"),
+      ),
     orderBy: (fields, { desc }) => [desc(fields.updatedAt)],
   });
 

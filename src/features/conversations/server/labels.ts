@@ -47,38 +47,50 @@ export async function changeConversationLabel({
   const label = parsedLabel.data.toLowerCase();
 
   return runDbWriteOperation(db, async (transaction): Promise<ConversationLabelUpdateResult> => {
-    const [conversationRow] = await transaction
-      .select({ labels: conversation.labels })
-      .from(conversation)
-      .where(and(eq(conversation.id, conversationId), eq(conversation.workspaceId, workspaceId)))
-      .for("update");
+    const maxAttempts = 5;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      const [conversationRow] = await transaction
+        .select({ labels: conversation.labels })
+        .from(conversation)
+        .where(and(eq(conversation.id, conversationId), eq(conversation.workspaceId, workspaceId)))
+        .limit(1);
 
-    if (!conversationRow) return { kind: "not-found" };
-    const currentLabels = parseConversationLabels(conversationRow.labels);
-    const hasLabel = currentLabels.includes(label);
-    if (action === "add" && !hasLabel && currentLabels.length >= 50) {
-      return { kind: "limit" };
+      if (!conversationRow) return { kind: "not-found" };
+      const currentLabels = parseConversationLabels(conversationRow.labels);
+      const hasLabel = currentLabels.includes(label);
+      if (action === "add" && !hasLabel && currentLabels.length >= 50) {
+        return { kind: "limit" };
+      }
+
+      const nextLabels = (
+        action === "add"
+          ? hasLabel
+            ? currentLabels
+            : [...currentLabels, label]
+          : currentLabels.filter((existingLabel) => existingLabel !== label)
+      ).sort();
+
+      if (
+        nextLabels.length !== currentLabels.length ||
+        nextLabels.some((entry, index) => entry !== currentLabels[index])
+      ) {
+        const updated = await transaction
+          .update(conversation)
+          .set({ labels: JSON.stringify(nextLabels), updatedAt: new Date().toISOString() })
+          .where(
+            and(
+              eq(conversation.id, conversationId),
+              eq(conversation.workspaceId, workspaceId),
+              eq(conversation.labels, conversationRow.labels),
+            ),
+          )
+          .returning({ id: conversation.id });
+        if (updated.length === 0) continue;
+        await recordConversationEvent(transaction, workspaceId, conversationId, "state");
+      }
+
+      return { kind: "updated", labels: nextLabels };
     }
-
-    const nextLabels = (
-      action === "add"
-        ? hasLabel
-          ? currentLabels
-          : [...currentLabels, label]
-        : currentLabels.filter((existingLabel) => existingLabel !== label)
-    ).sort();
-
-    if (
-      nextLabels.length !== currentLabels.length ||
-      nextLabels.some((entry, index) => entry !== currentLabels[index])
-    ) {
-      await transaction
-        .update(conversation)
-        .set({ labels: JSON.stringify(nextLabels), updatedAt: new Date().toISOString() })
-        .where(and(eq(conversation.id, conversationId), eq(conversation.workspaceId, workspaceId)));
-      await recordConversationEvent(transaction, workspaceId, conversationId, "state");
-    }
-
-    return { kind: "updated", labels: nextLabels };
+    throw new Error("Conversation labels were updated concurrently. Try again.");
   });
 }

@@ -46,6 +46,7 @@ import {
   failAgentRun,
 } from "@/lib/ai/telemetry";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
+import { getRequestGeo } from "@/lib/cloudflare/request-geo";
 import { getDb } from "@/lib/db/client";
 import { agentTestPublishCheck } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
@@ -406,6 +407,8 @@ export async function POST(
     return Response.json({ error: "Widget session is already active." }, { status: 401 });
   }
 
+  const requestGeo = getRequestGeo(request.headers);
+
   const started = isPreview
     ? null
     : authorizedSession
@@ -433,9 +436,9 @@ export async function POST(
             visitorId: bootstrapClaims?.visitorId ?? body.visitorId ?? randomUUID(),
             metadata: {
               ...body.metadata,
-              country: body.metadata.country ?? request.headers.get("x-vercel-ip-country"),
-              city: body.metadata.city ?? request.headers.get("x-vercel-ip-city"),
-              timezone: body.metadata.timezone ?? request.headers.get("x-vercel-ip-timezone"),
+              country: body.metadata.country ?? requestGeo.country,
+              city: body.metadata.city ?? requestGeo.city,
+              timezone: body.metadata.timezone ?? requestGeo.timezone,
             },
             identity: {
               name: body.leadInfo?.name ?? null,
@@ -525,6 +528,7 @@ export async function POST(
           if (!isPreview) {
             await recordAiMessage({
               db,
+              workspaceId: widget.workspace.id,
               conversationId,
               text,
               replyToMessageId: visitorMessageId,
@@ -640,6 +644,7 @@ export async function POST(
           if (run) {
             await completeAgentRun({
               db,
+              workspaceId: widget.workspace.id,
               agentRunId: run.id,
               startedAtMs: run.startedAtMs,
               usage: { inputTokens, outputTokens, totalTokens },
@@ -652,6 +657,7 @@ export async function POST(
         if (!isPreview) {
           await recordAiMessage({
             db,
+            workspaceId: widget.workspace.id,
             conversationId,
             text,
             replyToMessageId: visitorMessageId,
@@ -663,6 +669,7 @@ export async function POST(
         if (run) {
           await completeAgentRun({
             db,
+            workspaceId: widget.workspace.id,
             agentRunId: run.id,
             startedAtMs: run.startedAtMs,
             usage: { inputTokens, outputTokens, totalTokens },
@@ -685,6 +692,7 @@ export async function POST(
         if (run) {
           void failAgentRun({
             db,
+            workspaceId: widget.workspace.id,
             agentRunId: run.id,
             startedAtMs: run.startedAtMs,
             error,
@@ -749,6 +757,7 @@ export async function POST(
     if (run) {
       void failAgentRun({
         db,
+        workspaceId: widget.workspace.id,
         agentRunId: run.id,
         startedAtMs: run.startedAtMs,
         error: error instanceof Error ? error : new Error(String(error)),

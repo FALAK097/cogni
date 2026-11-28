@@ -6,16 +6,12 @@ import { createOpenAI } from "@ai-sdk/openai";
 import type { WidgetModelProvider } from "@/features/widget/domain";
 import { env } from "@/lib/env/server";
 
-let openAIProvider: ReturnType<typeof createOpenAI> | undefined;
-let googleProvider: ReturnType<typeof createGoogle> | undefined;
-
 function getOpenAIProvider() {
   if (!env.OPENAI_API_KEY) {
     throw new Error("OPENAI_API_KEY is not configured.");
   }
 
-  openAIProvider ??= createOpenAI({ apiKey: env.OPENAI_API_KEY });
-  return openAIProvider;
+  return createOpenAI({ apiKey: env.OPENAI_API_KEY });
 }
 
 function getGoogleProvider() {
@@ -23,8 +19,7 @@ function getGoogleProvider() {
     throw new Error("GEMINI_API_KEY is not configured.");
   }
 
-  googleProvider ??= createGoogle({ apiKey: env.GEMINI_API_KEY });
-  return googleProvider;
+  return createGoogle({ apiKey: env.GEMINI_API_KEY });
 }
 
 export function getWidgetModel(provider: WidgetModelProvider, modelName: string) {

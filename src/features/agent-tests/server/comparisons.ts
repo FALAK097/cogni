@@ -3,7 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
 
-import { getDb, type Db } from "@/lib/db/client";
+import { chunkArray, getDb, type Db } from "@/lib/db/client";
 import { env } from "@/lib/env/server";
 import {
   agentTestComparison,
@@ -104,22 +104,30 @@ export async function replayAgentTestComparison(
   );
   const [baselineDocuments, baselineRevisions] = await Promise.all([
     baselineDocumentIds.length
-      ? db.query.document.findMany({
-          where: and(
-            eq(documentTable.workspaceId, input.workspaceId),
-            inArray(documentTable.id, baselineDocumentIds),
+      ? Promise.all(
+          chunkArray(baselineDocumentIds, 80).map((idBatch) =>
+            db.query.document.findMany({
+              where: and(
+                eq(documentTable.workspaceId, input.workspaceId),
+                inArray(documentTable.id, idBatch),
+              ),
+              columns: { id: true },
+            }),
           ),
-          columns: { id: true },
-        })
+        ).then((batches) => batches.flat())
       : Promise.resolve([]),
     baselineRevisionIds.length
-      ? db.query.documentRevision.findMany({
-          where: and(
-            eq(documentRevision.workspaceId, input.workspaceId),
-            inArray(documentRevision.id, baselineRevisionIds),
+      ? Promise.all(
+          chunkArray(baselineRevisionIds, 80).map((idBatch) =>
+            db.query.documentRevision.findMany({
+              where: and(
+                eq(documentRevision.workspaceId, input.workspaceId),
+                inArray(documentRevision.id, idBatch),
+              ),
+              columns: { id: true, documentId: true, revisionNumber: true },
+            }),
           ),
-          columns: { id: true, documentId: true, revisionNumber: true },
-        })
+        ).then((batches) => batches.flat())
       : Promise.resolve([]),
   ]);
   const baselineDocumentsById = new Set(baselineDocuments.map((source) => source.id));
@@ -237,13 +245,19 @@ export async function replayAgentTestComparison(
     );
     const revisionIds = [...new Set(revisions.map((source) => source.revisionId))];
     const storedRevisions = revisionIds.length
-      ? await db.query.documentRevision.findMany({
-          where: and(
-            eq(documentRevision.workspaceId, input.workspaceId),
-            inArray(documentRevision.id, revisionIds),
-          ),
-          columns: { id: true, documentId: true, revisionNumber: true },
-        })
+      ? (
+          await Promise.all(
+            chunkArray(revisionIds, 80).map((idBatch) =>
+              db.query.documentRevision.findMany({
+                where: and(
+                  eq(documentRevision.workspaceId, input.workspaceId),
+                  inArray(documentRevision.id, idBatch),
+                ),
+                columns: { id: true, documentId: true, revisionNumber: true },
+              }),
+            ),
+          )
+        ).flat()
       : [];
     const storedById = new Map(storedRevisions.map((revision) => [revision.id, revision]));
     if (

@@ -17,6 +17,14 @@
     "enabled": true,
   },
   "routes": [{ "pattern": "cogni.falakgala.dev", "custom_domain": true }],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "cogni-db",
+      "database_id": "752d0d66-9897-4fb9-a8b2-fe40ca1a8071",
+      "migrations_dir": "drizzle",
+    },
+  ],
   "r2_buckets": [
     {
       "binding": "UPLOADS",
@@ -80,8 +88,19 @@
       },
     ],
   },
+  "triggers": {
+    "crons": ["0 3 * * *"],
+  },
   "env": {
     "development": {
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "cogni-db-dev",
+          "database_id": "00000000-0000-0000-0000-000000000000",
+          "migrations_dir": "drizzle",
+        },
+      ],
       "r2_buckets": [
         {
           "binding": "UPLOADS",
@@ -92,10 +111,43 @@
           "bucket_name": "widget-development-next-cache",
         },
       ],
+      "services": [
+        {
+          "binding": "WORKER_SELF_REFERENCE",
+          "service": "cogni-development",
+        },
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "NEXT_CACHE_DO_QUEUE",
+            "class_name": "DOQueueHandler",
+          },
+          {
+            "name": "NEXT_TAG_CACHE_DO_SHARDED",
+            "class_name": "DOShardedTagCache",
+          },
+        ],
+      },
+      "queues": {
+        "producers": [
+          {
+            "binding": "INGESTION_QUEUE",
+            "queue": "cogni-ingestion-dev",
+          },
+        ],
+      },
       "vars": {
         "ENV": "development",
+        "NODE_ENV": "production",
+        "NEXTJS_ENV": "production",
+        "UPLOAD_STORAGE": "r2",
+        "BETTER_AUTH_URL": "http://127.0.0.1:8787",
+        "APP_ROOT_DOMAIN": "cogni.falakgala.dev",
         "R2_BUCKET_NAME": "widget-development",
         "SEARCH_INDEX": "cogni-search-development",
+        "WIDGET_MODEL_PROVIDER": "GOOGLE",
+        "WIDGET_MODEL_NAME": "gemini-2.5-flash",
       },
     },
   },

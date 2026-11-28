@@ -24,11 +24,12 @@ import {
 } from "@/features/widget/server/widget-utils";
 import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
 import { type Db, getDb, runDbWriteOperation } from "@/lib/db/client";
+import { chunkArray } from "@/lib/db/utils";
 import {
   createApprovalRequest,
   expireApprovalRequest,
 } from "@/features/integrations/server/approval-service";
-import { createWorkflowWithSteps, updateWorkflowStep } from "@/lib/workflows/runner";
+import { createWorkflowWithSteps } from "@/lib/workflows/runner";
 import { approvalRequest, workflowRun, workflowStep } from "@/lib/db/schema";
 import { emitDomainEvent } from "@/lib/events/domain-events";
 import { notifyWorkspaceMembers } from "@/lib/notifications/create-notification";
@@ -104,29 +105,35 @@ async function getAvailableSlots(
   });
   if (includeReserved || availability.freeSlots.length === 0) return availability.freeSlots;
   const slotKeys = availability.freeSlots.map((slot) => `booking:${workspaceId}:${slot.startAt}`);
-  const reservations = await db
-    .select({
-      idempotencyKey: workflowRun.idempotencyKey,
-      status: workflowRun.status,
-      approvalStatus: approvalRequest.status,
-      approvalExpiresAt: approvalRequest.expiresAt,
-    })
-    .from(workflowRun)
-    .leftJoin(
-      approvalRequest,
-      and(
-        eq(approvalRequest.workflowRunId, workflowRun.id),
-        eq(approvalRequest.workspaceId, workspaceId),
+  const reservations = (
+    await Promise.all(
+      chunkArray(slotKeys, 80).map((keyBatch) =>
+        db
+          .select({
+            idempotencyKey: workflowRun.idempotencyKey,
+            status: workflowRun.status,
+            approvalStatus: approvalRequest.status,
+            approvalExpiresAt: approvalRequest.expiresAt,
+          })
+          .from(workflowRun)
+          .leftJoin(
+            approvalRequest,
+            and(
+              eq(approvalRequest.workflowRunId, workflowRun.id),
+              eq(approvalRequest.workspaceId, workspaceId),
+            ),
+          )
+          .where(
+            and(
+              eq(workflowRun.workspaceId, workspaceId),
+              eq(workflowRun.name, "appointment.booking"),
+              inArray(workflowRun.idempotencyKey, keyBatch),
+              inArray(workflowRun.status, ["PENDING", "RUNNING", "WAITING_APPROVAL", "COMPLETED"]),
+            ),
+          ),
       ),
     )
-    .where(
-      and(
-        eq(workflowRun.workspaceId, workspaceId),
-        eq(workflowRun.name, "appointment.booking"),
-        inArray(workflowRun.idempotencyKey, slotKeys),
-        inArray(workflowRun.status, ["PENDING", "RUNNING", "WAITING_APPROVAL", "COMPLETED"]),
-      ),
-    );
+  ).flat();
   const now = Date.now();
   const reserved = new Set(
     reservations
@@ -317,35 +324,37 @@ export async function POST(request: Request, context: RouteContext) {
         });
       } else {
         await runDbWriteOperation(result.db, async (tx) => {
-          await tx
-            .update(workflowStep)
-            .set({
-              status: "CANCELLED",
-              errorMessage: `Approval request ${pendingApproval.status.toLowerCase()}.`,
-              finishedAt: new Date().toISOString(),
-            })
-            .where(
-              and(
-                eq(workflowStep.workflowRunId, existingId),
-                eq(workflowStep.workspaceId, workspaceId),
-                eq(workflowStep.status, "WAITING_APPROVAL"),
+          await tx.batch([
+            tx
+              .update(workflowStep)
+              .set({
+                status: "CANCELLED",
+                errorMessage: `Approval request ${pendingApproval.status.toLowerCase()}.`,
+                finishedAt: new Date().toISOString(),
+              })
+              .where(
+                and(
+                  eq(workflowStep.workflowRunId, existingId),
+                  eq(workflowStep.workspaceId, workspaceId),
+                  eq(workflowStep.status, "WAITING_APPROVAL"),
+                ),
               ),
-            );
-          await tx
-            .update(workflowRun)
-            .set({
-              status: "CANCELLED",
-              idempotencyKey: null,
-              errorMessage: `Approval request ${pendingApproval.status.toLowerCase()}.`,
-              finishedAt: new Date().toISOString(),
-            })
-            .where(
-              and(
-                eq(workflowRun.id, existingId),
-                eq(workflowRun.workspaceId, workspaceId),
-                eq(workflowRun.status, "WAITING_APPROVAL"),
+            tx
+              .update(workflowRun)
+              .set({
+                status: "CANCELLED",
+                idempotencyKey: null,
+                errorMessage: `Approval request ${pendingApproval.status.toLowerCase()}.`,
+                finishedAt: new Date().toISOString(),
+              })
+              .where(
+                and(
+                  eq(workflowRun.id, existingId),
+                  eq(workflowRun.workspaceId, workspaceId),
+                  eq(workflowRun.status, "WAITING_APPROVAL"),
+                ),
               ),
-            );
+          ]);
         });
       }
       existing = null;
@@ -359,6 +368,7 @@ export async function POST(request: Request, context: RouteContext) {
       existing.conversationId === conversation.id &&
       existing.status === "WAITING_APPROVAL"
     ) {
+      const existingRunId = existing.id;
       const corrected = await runDbWriteOperation(result.db, async (tx) => {
         const [pendingApproval] = await tx
           .update(approvalRequest)
@@ -368,41 +378,45 @@ export async function POST(request: Request, context: RouteContext) {
           })
           .where(
             and(
-              eq(approvalRequest.workflowRunId, existing.id),
+              eq(approvalRequest.workflowRunId, existingRunId),
               eq(approvalRequest.workspaceId, workspaceId),
               eq(approvalRequest.status, "PENDING"),
             ),
           )
           .returning({ id: approvalRequest.id });
         if (!pendingApproval) return false;
-        await tx
-          .update(workflowRun)
-          .set({ input: JSON.stringify(workflowInput) })
-          .where(and(eq(workflowRun.id, existing.id), eq(workflowRun.workspaceId, workspaceId)));
-        await tx
-          .update(workflowStep)
-          .set({
-            input: JSON.stringify({ actionType: "calendar.create", payload: calendarPayload }),
-          })
-          .where(
-            and(
-              eq(workflowStep.workflowRunId, existing.id),
-              eq(workflowStep.workspaceId, workspaceId),
-              eq(workflowStep.position, 0),
+        await tx.batch([
+          tx
+            .update(workflowRun)
+            .set({ input: JSON.stringify(workflowInput) })
+            .where(
+              and(eq(workflowRun.id, existingRunId), eq(workflowRun.workspaceId, workspaceId)),
             ),
-          );
-        await tx
-          .update(workflowStep)
-          .set({
-            input: JSON.stringify({ actionType: "email.send", payload: confirmationPayload }),
-          })
-          .where(
-            and(
-              eq(workflowStep.workflowRunId, existing.id),
-              eq(workflowStep.workspaceId, workspaceId),
-              eq(workflowStep.position, 1),
+          tx
+            .update(workflowStep)
+            .set({
+              input: JSON.stringify({ actionType: "calendar.create", payload: calendarPayload }),
+            })
+            .where(
+              and(
+                eq(workflowStep.workflowRunId, existingRunId),
+                eq(workflowStep.workspaceId, workspaceId),
+                eq(workflowStep.position, 0),
+              ),
             ),
-          );
+          tx
+            .update(workflowStep)
+            .set({
+              input: JSON.stringify({ actionType: "email.send", payload: confirmationPayload }),
+            })
+            .where(
+              and(
+                eq(workflowStep.workflowRunId, existingRunId),
+                eq(workflowStep.workspaceId, workspaceId),
+                eq(workflowStep.position, 1),
+              ),
+            ),
+        ]);
         return true;
       });
       if (corrected) {
@@ -473,40 +487,64 @@ export async function POST(request: Request, context: RouteContext) {
     actionType: string;
     payload: unknown;
   };
-  const approval = await createApprovalRequest({
-    db: result.db,
-    workspaceId,
-    conversationId: conversation.id,
-    workflowRunId: workflow.run.id,
-    workflowStepId: actionStep.id,
-    actionType: actionInput.actionType,
-    input: actionInput.payload,
-    summary: `Create calendar event and email confirmation to ${parsed.data.attendeeEmail}`,
-  });
-  if (!approval.created) {
-    return corsResponse(
-      request,
-      result.access.allowedDomains,
-      {
-        error: "This booking request is already pending.",
-        workflowId: workflow.run.id,
-        fallbackMessage: result.settings.handoffFallback,
-      },
-      409,
-    );
+  let approval: Awaited<ReturnType<typeof createApprovalRequest>>;
+  try {
+    approval = await createApprovalRequest({
+      db: result.db,
+      workspaceId,
+      conversationId: conversation.id,
+      workflowRunId: workflow.run.id,
+      workflowStepId: actionStep.id,
+      actionType: actionInput.actionType,
+      input: actionInput.payload,
+      summary: `Create calendar event and email confirmation to ${parsed.data.attendeeEmail}`,
+    });
+    if (!approval.created) {
+      return corsResponse(
+        request,
+        result.access.allowedDomains,
+        {
+          error: "This booking request is already pending.",
+          workflowId: workflow.run.id,
+          fallbackMessage: result.settings.handoffFallback,
+        },
+        409,
+      );
+    }
+    await result.db.batch([
+      result.db
+        .update(workflowStep)
+        .set({
+          status: "WAITING_APPROVAL",
+          output: JSON.stringify({ approvalId: approval.approval.id }),
+          errorMessage: null,
+          finishedAt: null,
+        })
+        .where(
+          and(
+            eq(workflowStep.id, actionStep.id),
+            eq(workflowStep.workflowRunId, workflow.run.id),
+            eq(workflowStep.workspaceId, workspaceId),
+          ),
+        ),
+      result.db
+        .update(workflowRun)
+        .set({ status: "WAITING_APPROVAL" })
+        .where(and(eq(workflowRun.id, workflow.run.id), eq(workflowRun.workspaceId, workspaceId))),
+    ]);
+  } catch (error) {
+    await result.db
+      .update(workflowRun)
+      .set({
+        status: "CANCELLED",
+        idempotencyKey: null,
+        errorMessage: error instanceof Error ? error.message : "Booking approval failed.",
+        finishedAt: new Date().toISOString(),
+      })
+      .where(and(eq(workflowRun.id, workflow.run.id), eq(workflowRun.workspaceId, workspaceId)))
+      .catch(() => {});
+    throw error;
   }
-  await updateWorkflowStep({
-    db: result.db,
-    workspaceId,
-    runId: workflow.run.id,
-    stepId: actionStep.id,
-    status: "WAITING_APPROVAL",
-    output: { approvalId: approval.approval.id },
-  });
-  await result.db
-    .update(workflowRun)
-    .set({ status: "WAITING_APPROVAL" })
-    .where(and(eq(workflowRun.id, workflow.run.id), eq(workflowRun.workspaceId, workspaceId)));
 
   const notificationPayload = {
     workflowRunId: workflow.run.id,

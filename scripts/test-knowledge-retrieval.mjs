@@ -1,19 +1,14 @@
 import assert from "node:assert/strict";
-import "dotenv/config";
-import { mkdir } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { after, before, test } from "node:test";
 import { randomUUID } from "node:crypto";
 import { build } from "esbuild";
-import postgres from "postgres";
+import { createTempSqliteEnvironment } from "./sqlite-test-utils.mjs";
 
 process.env.SKIP_ENV_VALIDATION ??= "true";
-
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl || !["localhost", "127.0.0.1", "::1"].includes(new URL(databaseUrl).hostname)) {
-  throw new Error("Knowledge retrieval integration tests require a local DATABASE_URL.");
-}
+const { databaseUrl, raw, cleanup } = createTempSqliteEnvironment("cogni-knowledge-");
 
 const outputDirectory = join(process.cwd(), "node_modules", ".cache", "cogni-knowledge-test");
 const outputFile = join(outputDirectory, "retrieval.mjs");
@@ -23,10 +18,7 @@ await build({
   stdin: {
     contents: `
       export { retrieveKnowledgeContextWith } from "@/features/knowledge/server/retrieval";
-      import { drizzle } from "drizzle-orm/postgres-js";
-      import * as schema from "@/lib/db/schema";
-      import * as relations from "@/lib/db/relations";
-      export const createTestDb = (client) => drizzle(client, { schema: { ...schema, ...relations } });
+      export { createDbForUrl } from "@/lib/db/client";
     `,
     resolveDir: process.cwd(),
     sourcefile: "knowledge-test-entry.ts",
@@ -54,12 +46,10 @@ await build({
   ],
 });
 
-const { retrieveKnowledgeContextWith, createTestDb } = await import(
+const { retrieveKnowledgeContextWith, createDbForUrl } = await import(
   `${pathToFileURL(outputFile).href}?build=${randomUUID()}`
 );
-const raw = postgres(databaseUrl, { max: 2 });
-const appClient = postgres(databaseUrl, { max: 1 });
-const db = createTestDb(appClient);
+const db = createDbForUrl(databaseUrl);
 const workspaceId = randomUUID();
 const foreignWorkspaceId = randomUUID();
 const readyDocumentId = randomUUID();
@@ -76,8 +66,9 @@ before(async () => {
 
 after(async () => {
   await raw`DELETE FROM "workspace" WHERE "id" IN (${workspaceId}, ${foreignWorkspaceId})`;
-  await appClient.end({ timeout: 5 });
-  await raw.end({ timeout: 5 });
+  db.$client.close?.();
+  await cleanup();
+  await rm(outputDirectory, { recursive: true, force: true });
 });
 
 test("irrelevant queries return no evidence instead of the newest workspace chunk", async () => {

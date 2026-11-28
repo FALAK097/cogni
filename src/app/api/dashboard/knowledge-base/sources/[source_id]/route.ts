@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { eq, and, inArray, like } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
-import { document as documentTable, workflowRun } from "@/lib/db/schema";
+import { document as documentTable } from "@/lib/db/schema";
 import { enqueueDocumentProcessing } from "@/lib/jobs/ingestion";
 import { deleteObject } from "@/lib/storage";
 import { z } from "zod";
@@ -69,8 +69,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       const [lockedSource] = await transaction
         .select({ id: documentTable.id, status: documentTable.status })
         .from(documentTable)
-        .where(and(eq(documentTable.id, sourceId), eq(documentTable.workspaceId, workspace.id)))
-        .for("update");
+        .where(and(eq(documentTable.id, sourceId), eq(documentTable.workspaceId, workspace.id)));
       if (lockedSource?.status !== expectedStatus) return false;
 
       const updated = await transaction
@@ -136,34 +135,11 @@ export async function DELETE(_request: Request, context: RouteContext) {
   if (!source) {
     return NextResponse.json({ error: "Source not found." }, { status: 404 });
   }
-  if (source.storageKey) await deleteObject(source.storageKey);
-
-  const { runDbWriteOperation } = await import("@/lib/db/client");
-  const { drainSearchItemCleanup, markDocumentRevisionsDeleted } =
+  const { deleteKnowledgeSourceRecord, drainSearchItemCleanup } =
     await import("@/features/knowledge/server/source-revisions");
 
-  await runDbWriteOperation(db, async (transaction) => {
-    await markDocumentRevisionsDeleted(transaction, workspace.id, sourceId);
-    await transaction
-      .update(workflowRun)
-      .set({
-        status: "CANCELLED",
-        errorMessage: "Knowledge source was deleted.",
-        finishedAt: new Date().toISOString(),
-      })
-      .where(
-        and(
-          eq(workflowRun.workspaceId, workspace.id),
-          eq(workflowRun.name, "document.process"),
-          like(workflowRun.idempotencyKey, `%${sourceId}%`),
-          inArray(workflowRun.status, ["QUEUED", "FAILED"]),
-        ),
-      );
-
-    await transaction
-      .delete(documentTable)
-      .where(and(eq(documentTable.id, sourceId), eq(documentTable.workspaceId, workspace.id)));
-  });
+  await deleteKnowledgeSourceRecord(db, workspace.id, sourceId);
+  if (source.storageKey) await deleteObject(source.storageKey);
   await drainSearchItemCleanup(db, 20, workspace.id);
 
   return NextResponse.json({ ok: true });

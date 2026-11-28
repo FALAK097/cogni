@@ -10,6 +10,7 @@ import {
 import { appendConversationMessage } from "@/features/conversations/server/conversation-service";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { canManageWorkspace } from "@/lib/auth/permissions";
+import { runDbWriteOperation } from "@/lib/db/client";
 import { completeWorkflowRun, updateWorkflowStep } from "@/lib/workflows/runner";
 import { approvalRequest, workflowRun } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
@@ -74,32 +75,33 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
     if (parsed.data.decision === "REJECTED") {
       if (approval.workflowRunId && approval.workflowStepId) {
+        const workflowRunId = approval.workflowRunId;
+        const workflowStepId = approval.workflowStepId;
         const bookingRun = await db.query.workflowRun.findFirst({
           where: (fields, { and, eq }) =>
-            and(eq(fields.id, approval.workflowRunId!), eq(fields.workspaceId, workspace.id)),
+            and(eq(fields.id, workflowRunId), eq(fields.workspaceId, workspace.id)),
           columns: { id: true, name: true, input: true, conversationId: true },
         });
-        await updateWorkflowStep({
-          db,
-          workspaceId: workspace.id,
-          runId: approval.workflowRunId,
-          stepId: approval.workflowStepId,
-          status: "CANCELLED",
-          errorMessage: "Action rejected by teammate.",
-        });
-        await db
-          .update(workflowRun)
-          .set({
+        await runDbWriteOperation(db, async (tx) => {
+          await updateWorkflowStep({
+            db: tx,
+            workspaceId: workspace.id,
+            runId: workflowRunId,
+            stepId: workflowStepId,
             status: "CANCELLED",
-            finishedAt: new Date().toISOString(),
-            ...(bookingRun?.name === "appointment.booking" ? { idempotencyKey: null } : {}),
-          })
-          .where(
-            and(
-              eq(workflowRun.id, approval.workflowRunId!),
-              eq(workflowRun.workspaceId, workspace.id),
-            ),
-          );
+            errorMessage: "Action rejected by teammate.",
+          });
+          await tx
+            .update(workflowRun)
+            .set({
+              status: "CANCELLED",
+              finishedAt: new Date().toISOString(),
+              ...(bookingRun?.name === "appointment.booking" ? { idempotencyKey: null } : {}),
+            })
+            .where(
+              and(eq(workflowRun.id, workflowRunId), eq(workflowRun.workspaceId, workspace.id)),
+            );
+        });
 
         if (bookingRun?.name === "appointment.booking" && bookingRun.conversationId) {
           const booking = appointmentWorkflowInputSchema.safeParse(
@@ -199,7 +201,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         } catch (error) {
           const message =
             error instanceof Error ? error.message : "Booking confirmation email failed.";
-          await db.transaction(async (tx) => {
+          await runDbWriteOperation(db, async (tx) => {
             await tx
               .update(approvalRequest)
               .set({ status: "PENDING", decidedAt: null, decidedByUserId: null })

@@ -18,6 +18,7 @@ import {
   withWidgetCors,
 } from "@/features/widget/server/widget-utils";
 import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
+import { getRequestGeo } from "@/lib/cloudflare/request-geo";
 import { getDb } from "@/lib/db/client";
 import { attachment as attachmentTable } from "@/lib/db/schema";
 import { checkRateLimits, getTrustedClientIp } from "@/lib/rate-limit/shared";
@@ -137,7 +138,11 @@ export async function POST(
     if (existingSession) {
       const conversation = await db.query.conversation.findFirst({
         where: (fields, { eq, and }) =>
-          and(eq(fields.visitorSessionId, existingSession.id), eq(fields.channel, "WIDGET")),
+          and(
+            eq(fields.visitorSessionId, existingSession.id),
+            eq(fields.workspaceId, access.widget.workspaceId),
+            eq(fields.channel, "WIDGET"),
+          ),
       });
       if (conversation) {
         const messagesList = JSON.parse(conversation.messages || "[]") as MessageJson[];
@@ -176,7 +181,11 @@ export async function POST(
   if (authorizedSession) {
     const conversation = await db.query.conversation.findFirst({
       where: (fields, { eq, and }) =>
-        and(eq(fields.visitorSessionId, authorizedSession.id), eq(fields.channel, "WIDGET")),
+        and(
+          eq(fields.visitorSessionId, authorizedSession.id),
+          eq(fields.workspaceId, access.widget.workspaceId),
+          eq(fields.channel, "WIDGET"),
+        ),
     });
     if (conversation) {
       const messagesList = JSON.parse(conversation.messages || "[]") as MessageJson[];
@@ -221,6 +230,8 @@ export async function POST(
   });
 
   try {
+    const requestGeo = getRequestGeo(request.headers);
+
     const started = authorizedSession
       ? {
           visitorSession: authorizedSession,
@@ -240,9 +251,9 @@ export async function POST(
             bootstrapClaims?.visitorId ?? (typeof visitorId === "string" ? visitorId : null),
           metadata: {
             ...metadata.data,
-            country: metadata.data.country ?? request.headers.get("x-vercel-ip-country"),
-            city: metadata.data.city ?? request.headers.get("x-vercel-ip-city"),
-            timezone: metadata.data.timezone ?? request.headers.get("x-vercel-ip-timezone"),
+            country: metadata.data.country ?? requestGeo.country,
+            city: metadata.data.city ?? requestGeo.city,
+            timezone: metadata.data.timezone ?? requestGeo.timezone,
           },
           identity: { name: null, email: null },
           text: `Uploaded ${file.name}`,

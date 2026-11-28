@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import type { WidgetModelProvider } from "@/features/widget/domain";
@@ -101,6 +101,7 @@ export async function createWidgetAgentRun({
 
 export async function completeAgentRun({
   db,
+  workspaceId,
   agentRunId,
   startedAtMs,
   usage,
@@ -108,6 +109,7 @@ export async function completeAgentRun({
   sources,
 }: {
   db: Db;
+  workspaceId: string;
   agentRunId: string;
   startedAtMs: number;
   usage: AgentRunUsage;
@@ -131,16 +133,18 @@ export async function completeAgentRun({
       sourceRefs: JSON.stringify(parsedSources),
       finishedAt: finishedAt.toISOString(),
     })
-    .where(eq(agentRun.id, agentRunId));
+    .where(and(eq(agentRun.id, agentRunId), eq(agentRun.workspaceId, workspaceId)));
 }
 
 export async function failAgentRun({
   db,
+  workspaceId,
   agentRunId,
   startedAtMs,
   error,
 }: {
   db: Db;
+  workspaceId: string;
   agentRunId: string;
   startedAtMs: number;
   error: unknown;
@@ -155,7 +159,7 @@ export async function failAgentRun({
       errorMessage: error instanceof Error ? error.message : "Unknown model error",
       finishedAt: finishedAt.toISOString(),
     })
-    .where(eq(agentRun.id, agentRunId));
+    .where(and(eq(agentRun.id, agentRunId), eq(agentRun.workspaceId, workspaceId)));
 }
 
 function isTimeoutError(error: unknown) {

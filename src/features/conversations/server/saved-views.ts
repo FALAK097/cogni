@@ -3,7 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { and, asc, eq } from "drizzle-orm";
 
-import { getDb, type Db } from "@/lib/db/client";
+import { getDb, isUniqueConstraintError, type Db } from "@/lib/db/client";
 import { inboxSavedView, workspaceMember } from "@/lib/db/schema";
 import { conversationLabelSchema } from "@/features/conversations/inbox-pagination";
 
@@ -27,12 +27,6 @@ export class InboxSavedViewAssigneeError extends Error {
     super("That teammate is not in this workspace.");
     this.name = "InboxSavedViewAssigneeError";
   }
-}
-
-function hasErrorCode(error: unknown, code: string, depth = 0): boolean {
-  if (depth > 3 || typeof error !== "object" || error === null) return false;
-  if ("code" in error && error.code === code) return true;
-  return "cause" in error && hasErrorCode(error.cause, code, depth + 1);
 }
 
 export async function listInboxSavedViews(workspaceId: string, db: Db = getDb()) {
@@ -97,7 +91,7 @@ export async function createInboxSavedView(
 
     return view;
   } catch (error) {
-    if (hasErrorCode(error, "23505")) {
+    if (isUniqueConstraintError(error)) {
       throw new InboxSavedViewNameConflictError();
     }
     throw error;

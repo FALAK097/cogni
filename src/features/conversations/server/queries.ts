@@ -1,9 +1,10 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, gt, isNull, like, lt, lte, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 
 import { getDb } from "@/lib/db/client";
+import { escapeLikePattern } from "@/lib/db/utils";
 import {
   contact as contactTable,
   conversation as conversationTable,
@@ -25,11 +26,13 @@ import {
 import { encodeInboxCursor, type InboxChannel, type InboxCursor } from "../inbox-pagination";
 import { parseConversationLabels } from "@/features/conversations/server/labels";
 
+const currentIsoSql = sql`strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`;
+
 function getInboxConversationBaseCond(c: typeof conversationTable) {
   return sql`EXISTS (
     SELECT 1
-    FROM jsonb_array_elements(COALESCE(NULLIF(${c.messages}, '')::jsonb, '[]'::jsonb)) AS message(item)
-    WHERE message.item ->> 'authorType' = 'VISITOR'
+    FROM json_each(CASE WHEN json_valid(${c.messages}) AND json_type(${c.messages}) = 'array' THEN ${c.messages} ELSE '[]' END) AS message
+    WHERE json_extract(message.value, '$.authorType') = 'VISITOR'
   )`;
 }
 
@@ -39,7 +42,7 @@ function conversationFilterCond(
   membershipId: string | undefined,
 ) {
   const base = getInboxConversationBaseCond(c);
-  const notSnoozed = or(isNull(c.snoozedUntil), lte(c.snoozedUntil, sql`CURRENT_TIMESTAMP`));
+  const notSnoozed = or(isNull(c.snoozedUntil), lte(c.snoozedUntil, currentIsoSql));
 
   switch (filter) {
     case "unread":
@@ -55,7 +58,7 @@ function conversationFilterCond(
     case "closed":
       return and(base, notSnoozed, eq(c.status, "CLOSED"));
     case "snoozed":
-      return and(base, gt(c.snoozedUntil, sql`CURRENT_TIMESTAMP`), ne(c.status, "CLOSED"));
+      return and(base, gt(c.snoozedUntil, currentIsoSql), ne(c.status, "CLOSED"));
     case "tickets":
       return and(base, hasTicketSql(c));
     default:
@@ -83,22 +86,26 @@ function conversationWhereCond(
   if (label) {
     conds.push(
       sql`exists (
-        select 1 from jsonb_array_elements_text(${c.labels}::jsonb) as label(value)
-        where lower(label.value) = ${label.toLowerCase()}
+        select 1 from json_each(CASE WHEN json_valid(${c.labels}) AND json_type(${c.labels}) = 'array' THEN ${c.labels} ELSE '[]' END) as label
+        where label.type = 'text' and lower(label.value) = ${label.toLowerCase()}
       )`,
     );
   }
 
   if (normalizedQuery) {
-    const pattern = `%${normalizedQuery}%`;
+    const pattern = `%${escapeLikePattern(normalizedQuery)}%`;
     conds.push(
       or(
-        like(c.subject, pattern),
-        like(c.messages, pattern),
+        sql`${c.subject} like ${pattern} escape '\\'`,
+        sql`${c.messages} like ${pattern} escape '\\'`,
         sql`exists (
           select 1 from contact
           where contact.id = ${c.contactId}
-            and (contact.name like ${pattern} or contact.email like ${pattern})
+            and contact."workspaceId" = ${c.workspaceId}
+            and (
+              contact.name like ${pattern} escape '\\'
+              or contact.email like ${pattern} escape '\\'
+            )
         )`,
       )!,
     );
@@ -195,9 +202,9 @@ function countUnreadMessages(messages: MessageJson[]): number {
 
 function hasUnreadVisitorMessagesSql(c: typeof conversationTable) {
   return sql`exists (
-    select 1 from jsonb_array_elements(${c.messages}::jsonb) as message
-    where message->>'authorType' = 'VISITOR'
-      and message->>'readAt' is null
+    select 1 from json_each(CASE WHEN json_valid(${c.messages}) AND json_type(${c.messages}) = 'array' THEN ${c.messages} ELSE '[]' END) as message
+    where json_extract(message.value, '$.authorType') = 'VISITOR'
+      and json_extract(message.value, '$.readAt') is null
   )`;
 }
 
@@ -289,7 +296,7 @@ export async function getInboxPage(
   const unread = hasUnreadVisitorMessagesSql(conversationTable);
   const notSnoozed = or(
     isNull(conversationTable.snoozedUntil),
-    lte(conversationTable.snoozedUntil, sql`CURRENT_TIMESTAMP`),
+    lte(conversationTable.snoozedUntil, currentIsoSql),
   );
   const baseWhere = and(
     eq(conversationTable.workspaceId, workspaceId),
@@ -332,7 +339,7 @@ export async function getInboxPage(
         )`.mapWith(Number),
         snoozed: sql<number>`count(*) filter (
           where ${getInboxConversationBaseCond(conversationTable)}
-            and ${conversationTable.snoozedUntil} > CURRENT_TIMESTAMP
+            and ${conversationTable.snoozedUntil} > ${currentIsoSql}
             and ${conversationTable.status} <> 'CLOSED'
         )`.mapWith(Number),
         tickets: sql<number>`count(*) filter (

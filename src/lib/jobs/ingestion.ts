@@ -74,13 +74,61 @@ export async function enqueueDocumentProcessing({
   return { mode: "queued" as const, created: Boolean(created), workflowRunId: created?.id ?? null };
 }
 
+type IngestionQueueBinding = {
+  send: (body: {
+    workflowRunId: string;
+    workspaceId: string;
+    callbackUrl: string;
+  }) => Promise<void>;
+};
+
+function resolveIngestionQueueBinding(): IngestionQueueBinding | undefined {
+  const cfContext = (
+    globalThis as unknown as Record<
+      symbol,
+      { env?: { INGESTION_QUEUE?: IngestionQueueBinding } } | undefined
+    >
+  )[Symbol.for("__cloudflare-context__")];
+  return cfContext?.env?.INGESTION_QUEUE;
+}
+
+function isWorkersRuntime(): boolean {
+  return (
+    typeof globalThis.navigator?.userAgent === "string" &&
+    globalThis.navigator.userAgent === "Cloudflare-Workers"
+  );
+}
+
 async function publishCloudflareIngestionJob(workflowRunId: string, workspaceId: string) {
-  if (!env.CLOUDFLARE_INGESTION_QUEUE_URL || !env.INGESTION_SHARED_SECRET) return false;
+  if (!env.INGESTION_SHARED_SECRET) return false;
   const callbackUrl = new URL(
     "/api/internal/ingestion",
     env.BETTER_AUTH_URL || "https://cogni.falakgala.dev",
   );
   if (callbackUrl.protocol !== "https:") return false;
+
+  const payload = {
+    workflowRunId,
+    workspaceId,
+    callbackUrl: callbackUrl.toString(),
+  };
+
+  const queueBinding = resolveIngestionQueueBinding();
+  if (queueBinding) {
+    try {
+      await queueBinding.send(payload);
+      return true;
+    } catch (error) {
+      logError("knowledge.ingestion.publish_failed", {
+        workflowRunId,
+        workspaceId,
+        error: error instanceof Error ? error.message : "Unknown queue binding failure.",
+      });
+      return false;
+    }
+  }
+
+  if (!env.CLOUDFLARE_INGESTION_QUEUE_URL) return false;
 
   try {
     const response = await fetch(env.CLOUDFLARE_INGESTION_QUEUE_URL, {
@@ -89,11 +137,7 @@ async function publishCloudflareIngestionJob(workflowRunId: string, workspaceId:
         Authorization: `Bearer ${env.INGESTION_SHARED_SECRET}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        workflowRunId,
-        workspaceId,
-        callbackUrl: callbackUrl.toString(),
-      }),
+      body: JSON.stringify(payload),
       signal: AbortSignal.timeout(10_000),
     });
     if (!response.ok) throw new Error(`Cloudflare queue returned ${response.status}.`);
@@ -237,31 +281,37 @@ export async function processIngestionWorkflowRun({
   }
 
   let leaseOwned = true;
+  let lastRenewedMs = nowDate().getTime();
+  const renewLease = async () => {
+    const renewedAt = nowDate();
+    const rows = await db
+      .update(workflowRun)
+      .set({
+        leaseExpiresAt: new Date(renewedAt.getTime() + leaseDurationMs).toISOString(),
+      })
+      .where(
+        and(
+          eq(workflowRun.id, workflowRunId),
+          eq(workflowRun.workspaceId, workspaceId),
+          eq(workflowRun.status, "RUNNING"),
+          eq(workflowRun.leaseToken, leaseToken),
+        ),
+      )
+      .returning({ id: workflowRun.id });
+    if (rows.length === 0) {
+      leaseOwned = false;
+      return false;
+    }
+    lastRenewedMs = renewedAt.getTime();
+    return true;
+  };
   const heartbeat =
-    leaseTiming?.enabled === false
+    leaseTiming?.enabled === false || isWorkersRuntime()
       ? undefined
       : setInterval(() => {
-          const renewedAt = nowDate();
-          void db
-            .update(workflowRun)
-            .set({
-              leaseExpiresAt: new Date(renewedAt.getTime() + leaseDurationMs).toISOString(),
-            })
-            .where(
-              and(
-                eq(workflowRun.id, workflowRunId),
-                eq(workflowRun.workspaceId, workspaceId),
-                eq(workflowRun.status, "RUNNING"),
-                eq(workflowRun.leaseToken, leaseToken),
-              ),
-            )
-            .returning({ id: workflowRun.id })
-            .then((rows) => {
-              if (rows.length === 0) leaseOwned = false;
-            })
-            .catch(() => {
-              leaseOwned = false;
-            });
+          void renewLease().catch(() => {
+            leaseOwned = false;
+          });
         }, heartbeatMs);
   heartbeat?.unref?.();
 
@@ -269,18 +319,23 @@ export async function processIngestionWorkflowRun({
     await processIngestionJob(db, JSON.parse(claimed.input) as unknown, leaseToken, async () => {
       if (!leaseOwned) throw new Error("Ingestion lease was lost; refusing further processing.");
       try {
-        const current = await db.query.workflowRun.findFirst({
-          where: (fields, { and, eq, gt }) =>
-            and(
-              eq(fields.id, workflowRunId),
-              eq(fields.workspaceId, workspaceId),
-              eq(fields.status, "RUNNING"),
-              eq(fields.leaseToken, leaseToken),
-              gt(fields.leaseExpiresAt, nowDate().toISOString()),
-            ),
-          columns: { id: true },
-        });
-        if (current) return;
+        if (nowDate().getTime() - lastRenewedMs >= heartbeatMs) {
+          const renewed = await renewLease();
+          if (renewed) return;
+        } else {
+          const current = await db.query.workflowRun.findFirst({
+            where: (fields, { and, eq, gt }) =>
+              and(
+                eq(fields.id, workflowRunId),
+                eq(fields.workspaceId, workspaceId),
+                eq(fields.status, "RUNNING"),
+                eq(fields.leaseToken, leaseToken),
+                gt(fields.leaseExpiresAt, nowDate().toISOString()),
+              ),
+            columns: { id: true },
+          });
+          if (current) return;
+        }
       } catch (error) {
         leaseOwned = false;
         throw error;

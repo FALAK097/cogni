@@ -5,16 +5,11 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { after, before, test } from "node:test";
-import "dotenv/config";
 import { build } from "esbuild";
-import postgres from "postgres";
+import { createTempSqliteEnvironment } from "./sqlite-test-utils.mjs";
 
 process.env.SKIP_ENV_VALIDATION ??= "true";
-
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl || !["localhost", "127.0.0.1", "::1"].includes(new URL(databaseUrl).hostname)) {
-  throw new Error("Inbox pagination integration tests require a local DATABASE_URL.");
-}
+const { raw, cleanup } = createTempSqliteEnvironment("cogni-inbox-pagination-db-");
 
 const outputDirectory = await mkdtemp(join(tmpdir(), "cogni-inbox-test-"));
 const outputFile = join(outputDirectory, "queries.mjs");
@@ -65,7 +60,6 @@ const {
   mapConversationToListItem,
   parseConversationLabels,
 } = await import(`${pathToFileURL(outputFile).href}?build=${randomUUID()}`);
-const raw = postgres(databaseUrl, { max: 1 });
 const workspaceId = randomUUID();
 const otherWorkspaceId = randomUUID();
 const userId = randomUUID();
@@ -84,7 +78,7 @@ before(async () => {
   `;
   await raw`
     INSERT INTO "user" ("id", "name", "email", "updatedAt")
-    VALUES (${userId}, 'Inbox test member', ${`${userId}@example.test`}, ${now})
+    VALUES (${userId}, 'Inbox test member', ${`${userId}@example.test`}, ${Date.now()})
   `;
   await raw`
     INSERT INTO "workspace_member" ("id", "userId", "workspaceId", "updatedAt")
@@ -149,8 +143,8 @@ before(async () => {
 after(async () => {
   await raw`DELETE FROM "workspace" WHERE "id" IN (${workspaceId}, ${otherWorkspaceId})`;
   await raw`DELETE FROM "user" WHERE "id" = ${userId}`;
-  await getDb().$client.end({ timeout: 5 });
-  await raw.end({ timeout: 5 });
+  getDb().$client.close?.();
+  await cleanup();
   await rm(outputDirectory, { recursive: true, force: true });
 });
 
@@ -300,13 +294,14 @@ test("unread view only includes conversations with an unread visitor message", a
 test("total inbox count stays nonzero when every visitor message is read", async () => {
   await raw`
     UPDATE "conversation"
-    SET "messages" = (
-      SELECT COALESCE(
-        jsonb_agg(item.value || jsonb_build_object('readAt', ${now}::text)),
-        '[]'::jsonb
-      )::text
-      FROM jsonb_array_elements("conversation"."messages"::jsonb) AS item(value)
-    )
+    SET "messages" = COALESCE((
+      SELECT json_group_array(json_set(entry.value, '$.readAt', ${now}))
+      FROM (
+        SELECT key, value
+        FROM json_each("conversation"."messages")
+        ORDER BY CAST(key AS INTEGER) ASC
+      ) AS entry
+    ), '[]')
     WHERE "workspaceId" = ${workspaceId}
   `;
 

@@ -1,19 +1,16 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { mkdir } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { test } from "node:test";
+import { after, test } from "node:test";
 import { build } from "esbuild";
-import postgres from "postgres";
 import { z } from "zod";
-import "dotenv/config";
+import { createTempSqliteEnvironment } from "./sqlite-test-utils.mjs";
 
 process.env.SKIP_ENV_VALIDATION ??= "true";
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl || !["localhost", "127.0.0.1", "::1"].includes(new URL(databaseUrl).hostname)) {
-  throw new Error("Agent test history integration tests require a local DATABASE_URL.");
-}
+const { raw, cleanup } = createTempSqliteEnvironment("cogni-agent-test-history-");
+
 const outputFile = join(process.cwd(), "node_modules/.cache/cogni-agent-test-history/runs.mjs");
 await mkdir(resolve(outputFile, ".."), { recursive: true });
 await build({
@@ -61,8 +58,13 @@ const {
   AgentTestSuiteChangedError,
 } = await import(pathToFileURL(outputFile).href);
 
-test("Postgres history isolates tenants, deduplicates concurrent saves, validates suites and date bounds", async () => {
-  const raw = postgres(databaseUrl, { max: 1, prepare: false });
+after(async () => {
+  getDb().$client.close?.();
+  await cleanup();
+  await rm(resolve(outputFile, ".."), { recursive: true, force: true });
+});
+
+test("SQLite history isolates tenants, deduplicates concurrent saves, validates suites and date bounds", async () => {
   const workspaceId = randomUUID();
   const foreignId = randomUUID();
   const userId = randomUUID();
@@ -72,7 +74,7 @@ test("Postgres history isolates tenants, deduplicates concurrent saves, validate
   const now = new Date().toISOString();
   try {
     await raw`INSERT INTO workspace (id, name, slug, "updatedAt") VALUES (${workspaceId}, 'History test', ${workspaceId}, ${now}), (${foreignId}, 'Foreign history', ${foreignId}, ${now})`;
-    await raw`INSERT INTO "user" (id, name, email, "updatedAt") VALUES (${userId}, 'History owner', ${`${userId}@example.test`}, ${now})`;
+    await raw`INSERT INTO "user" (id, name, email, "updatedAt") VALUES (${userId}, 'History owner', ${`${userId}@example.test`}, ${Date.now()})`;
     await raw`INSERT INTO workspace_member (id, role, "updatedAt", "userId", "workspaceId") VALUES (${memberId}, 'OWNER', ${now}, ${userId}, ${workspaceId})`;
     await raw`INSERT INTO agent_test_case (id, title, prompt, "expectedOutcome", "updatedAt", "workspaceId") VALUES (${caseId}, 'Check', 'Private prompt', 'grounded_answer', ${now}, ${workspaceId})`;
     const cases = await listAgentTestCases(workspaceId);
@@ -115,7 +117,7 @@ test("Postgres history isolates tenants, deduplicates concurrent saves, validate
       (await listAgentTestRuns(workspaceId, new Date("2026-09-30"), new Date("2026-10-01"))).length,
       0,
     );
-    await raw`UPDATE agent_test_case SET "updatedAt" = "updatedAt" + interval '1 second' WHERE id = ${caseId} AND "workspaceId" = ${workspaceId}`;
+    await raw`UPDATE agent_test_case SET "updatedAt" = strftime('%Y-%m-%dT%H:%M:%fZ', "updatedAt", '+1 second') WHERE id = ${caseId} AND "workspaceId" = ${workspaceId}`;
     await assert.rejects(
       recordAgentTestRun(workspaceId, memberId, { ...input, runId: randomUUID() }),
       AgentTestSuiteChangedError,
@@ -196,7 +198,5 @@ test("Postgres history isolates tenants, deduplicates concurrent saves, validate
   } finally {
     await raw`DELETE FROM workspace WHERE id IN (${workspaceId}, ${foreignId})`;
     await raw`DELETE FROM "user" WHERE id = ${userId}`;
-    await getDb().$client.end({ timeout: 5 });
-    await raw.end({ timeout: 5 });
   }
 });

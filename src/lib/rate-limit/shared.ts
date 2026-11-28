@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createHmac } from "node:crypto";
-import { eq, sql } from "drizzle-orm";
+import { asc, eq, inArray, lt, sql } from "drizzle-orm";
 
 import { getDb } from "@/lib/db/client";
 import { rateLimitBucket } from "@/lib/db/schema";
@@ -92,6 +92,9 @@ export async function checkRateLimits(budgets: RateLimitBudget[]): Promise<RateL
 }
 
 export function getTrustedClientIp(headers: Headers) {
+  const cfIp = headers.get("cf-connecting-ip")?.trim();
+  if (cfIp) return cfIp;
+
   const realIp = headers.get("x-real-ip")?.trim();
   if (realIp) return realIp;
 
@@ -103,18 +106,15 @@ export function getTrustedClientIp(headers: Headers) {
 export async function pruneExpiredRateLimitBuckets(olderThanHours = 24) {
   const db = getDb();
   const cutoff = new Date(Date.now() - olderThanHours * 60 * 60 * 1000).toISOString();
-  const deleted = await db.execute(sql`
-    WITH expired AS (
-      SELECT ${rateLimitBucket.keyHash}
-      FROM ${rateLimitBucket}
-      WHERE ${rateLimitBucket.resetAt} < ${cutoff}
-      ORDER BY ${rateLimitBucket.resetAt}
-      LIMIT 5000
-    )
-    DELETE FROM ${rateLimitBucket}
-    USING expired
-    WHERE ${rateLimitBucket.keyHash} = expired."keyHash"
-    RETURNING ${rateLimitBucket.keyHash}
-  `);
+  const expiredQuery = db
+    .select({ keyHash: rateLimitBucket.keyHash })
+    .from(rateLimitBucket)
+    .where(lt(rateLimitBucket.resetAt, cutoff))
+    .orderBy(asc(rateLimitBucket.resetAt))
+    .limit(5000);
+  const deleted = await db
+    .delete(rateLimitBucket)
+    .where(inArray(rateLimitBucket.keyHash, expiredQuery))
+    .returning({ keyHash: rateLimitBucket.keyHash });
   return deleted.length;
 }

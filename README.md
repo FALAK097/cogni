@@ -7,7 +7,7 @@ Cogni is an AI-first customer support platform with an embedded chat widget, sha
 - Next.js 16 App Router, React 19, TypeScript
 - Tailwind CSS v4, shadcn/ui with Base UI, Hugeicons
 - Better Auth with Google OAuth
-- Drizzle ORM using PostgreSQL locally and Neon Postgres in production
+- Drizzle ORM using local SQLite (`node:sqlite`) for development/tests and Cloudflare D1 in production
 - TanStack Query, next-themes, Vercel AI SDK
 
 ## Quick Start
@@ -18,10 +18,11 @@ Cogni is an AI-first customer support platform with an embedded chat widget, sha
    pnpm install
    ```
 
-2. Configure environment variables by copying `.env.example` to `.env.local`:
+2. Configure environment variables by copying `.env.example` to `.env.local` and initialize the local SQLite database:
 
    ```bash
    cp .env.example .env.local
+   pnpm db:migrate
    ```
 
 3. Run the development server:
@@ -42,14 +43,13 @@ Copy `.env.example` to `.env.local` and fill in the values:
 
 ```env
 ENV="development"
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/widget"
-DATABASE_URL_UNPOOLED=""
+DATABASE_URL="file:./.data/cogni.db"
 BETTER_AUTH_SECRET="at-least-32-random-characters"
 BETTER_AUTH_URL="http://localhost:3000"
 GOOGLE_CLIENT_ID=""
 GOOGLE_CLIENT_SECRET=""
 
-# Cloudflare APIs used from the Vercel Node.js runtime.
+# Cloudflare APIs
 CLOUDFLARE_ACCOUNT_ID=""
 CLOUDFLARE_API_TOKEN=""
 CLOUDFLARE_AI_SEARCH_TOKEN=""
@@ -66,23 +66,24 @@ GEMINI_API_KEY=""
 ## Commands
 
 ```bash
-pnpm dev             # Start development server
+pnpm dev               # Start development server
 pnpm test:widget-stream # Check widget stream framing and failure recovery
-pnpm build           # Build the production bundle
-pnpm start           # Run the built application
-pnpm check           # Run formatting + types + linting checks
-pnpm lint            # Run Oxlint checks
-pnpm fmt             # Format code using Oxfmt
-pnpm typecheck       # Verify TypeScript types
-pnpm db:generate     # Generate Drizzle SQL migrations
-pnpm db:migrate        # Apply Drizzle migrations to local PostgreSQL
-pnpm db:migrate:remote # Apply Drizzle migrations to Neon
-pnpm db:studio       # Open Drizzle Studio
+pnpm build             # Build the production bundle
+pnpm start             # Run the built application
+pnpm check             # Run formatting + types + linting checks
+pnpm lint              # Run Oxlint checks
+pnpm fmt               # Format code using Oxfmt
+pnpm typecheck         # Verify TypeScript types
+pnpm db:generate       # Generate Drizzle SQL migrations
+pnpm db:migrate        # Apply Drizzle migrations to local SQLite
+pnpm db:migrate:local  # Apply Drizzle migrations to local Wrangler D1 state
+pnpm db:migrate:remote # Apply Drizzle migrations to remote Cloudflare D1
+pnpm db:studio         # Open Drizzle Studio
 ```
 
 ## Cloudflare Workers Deployment
 
-The application runs on Cloudflare Workers using OpenNext (`@opennextjs/cloudflare`) and targets `https://cogni.falakgala.dev`.
+The application runs on Cloudflare Workers using OpenNext (`@opennextjs/cloudflare`), Cloudflare D1 (`cogni-db` bound as `DB`), and targets `https://cogni.falakgala.dev`.
 
 ### Automated Deployment via Cloudflare Workers Builds (Git Integration)
 
@@ -94,15 +95,15 @@ The `cogni` Worker is natively integrated with GitHub using Cloudflare Workers B
 
 ### Worker Secrets & Environment Variables
 
-Non-secret variables and bindings are configured in [`wrangler.jsonc`](wrangler.jsonc). Secret credentials must be set in Cloudflare via `wrangler secret put` or via Cloudflare Dashboard (**Workers & Pages** > `cogni` > **Settings** > **Variables and Secrets**):
+Non-secret variables and bindings (including the `DB` D1 database and `0 3 * * *` cron trigger) are configured in [`wrangler.jsonc`](wrangler.jsonc). Secret credentials must be set in Cloudflare via `wrangler secret put` or via Cloudflare Dashboard (**Workers & Pages** > `cogni` > **Settings** > **Variables and Secrets**):
 
 ```bash
-pnpm exec wrangler secret put DATABASE_URL
 pnpm exec wrangler secret put BETTER_AUTH_SECRET
 pnpm exec wrangler secret put GOOGLE_CLIENT_ID
 pnpm exec wrangler secret put GOOGLE_CLIENT_SECRET
 pnpm exec wrangler secret put CLOUDFLARE_API_TOKEN
 pnpm exec wrangler secret put INGESTION_SHARED_SECRET
+pnpm exec wrangler secret put CRON_SECRET
 pnpm exec wrangler secret put OPENAI_API_KEY
 pnpm exec wrangler secret put GEMINI_API_KEY
 pnpm exec wrangler secret put R2_ACCESS_KEY_ID
@@ -119,10 +120,9 @@ https://cogni.falakgala.dev/api/auth/callback/google
 
 ### Database Migrations
 
-Use the unpooled connection string for running migrations prior to deployment:
+Apply SQLite migrations to local Wrangler D1 state or remote production Cloudflare D1:
 
 ```bash
-DATABASE_URL_UNPOOLED="postgresql://..." pnpm db:migrate:remote
+pnpm db:migrate:local   # local Wrangler D1 state
+pnpm db:migrate:remote  # remote Cloudflare D1 (cogni-db)
 ```
-
-The application uses the pooled connection with `@neondatabase/serverless` / pooled PostgreSQL with `max: 1` and `prepare: false` inside Cloudflare Workers.

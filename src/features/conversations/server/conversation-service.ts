@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { runDbWriteOperation, type Db } from "@/lib/db/client";
+import { isInteractiveTransactionSupported, runDbWriteOperation, type Db } from "@/lib/db/client";
 import {
   conversation,
   conversationEvent,
@@ -7,7 +7,7 @@ import {
   contact,
 } from "@/lib/db/schema";
 import type { widget as widgetTable } from "@/lib/db/schema";
-import { and, eq, ne, sql } from "drizzle-orm";
+import { and, eq, lt, ne, sql } from "drizzle-orm";
 import {
   enqueueClosedConversationQa,
   startConversationQaVersionAfterReopen,
@@ -83,31 +83,51 @@ export type MessageCitation = {
   excerpt: string;
 };
 
+function sqliteMessagesArraySql(column: typeof conversation.messages) {
+  return sql`CASE WHEN json_valid(${column}) AND json_type(${column}) = 'array' THEN ${column} ELSE '[]' END`;
+}
+
+async function removeConversationMessageById(
+  db: Db,
+  workspaceId: string,
+  conversationId: string,
+  messageId: string,
+) {
+  const messages = sqliteMessagesArraySql(conversation.messages);
+  const filteredMessages = sql`COALESCE((
+    SELECT json_group_array(json(entry.value))
+    FROM (
+      SELECT key, value
+      FROM json_each(${messages})
+      WHERE json_extract(value, '$.id') <> ${messageId}
+      ORDER BY CAST(key AS INTEGER) ASC
+    ) AS entry
+  ), '[]')`;
+  await db
+    .update(conversation)
+    .set({ messages: filteredMessages })
+    .where(and(eq(conversation.id, conversationId), eq(conversation.workspaceId, workspaceId)));
+}
+
 export async function recordConversationEvent(
   db: Db,
   workspaceId: string,
   conversationId: string,
   type: "message" | "state" | "read",
 ) {
-  // Identity values are allocated before commit. Serializing per workspace keeps
-  // the cursor order consistent with commit order, so clients cannot skip events.
-  await db.execute(
-    sql`SELECT pg_advisory_xact_lock(hashtext('cogni_inbox_events'), hashtext(${workspaceId}))`,
-  );
   const [event] = await db
     .insert(conversationEvent)
     .values({ workspaceId, conversationId, type })
     .returning({ cursor: conversationEvent.cursor });
 
-  if (event && event.cursor % BigInt(1000) === BigInt(0)) {
-    await db
-      .delete(conversationEvent)
-      .where(sql`${conversationEvent.createdAt} < CURRENT_TIMESTAMP - INTERVAL '14 days'`);
+  if (event && BigInt(event.cursor) % BigInt(1000) === BigInt(0)) {
+    const retentionCutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+    await db.delete(conversationEvent).where(lt(conversationEvent.createdAt, retentionCutoff));
   }
 }
 
 /**
- * Serialize an AI channel delivery with human takeover. The row lock is held
+ * Serialize an AI channel delivery with human takeover. The write lock is held
  * only for the external send and transcript write, never while generating.
  */
 export async function deliverAiReplyIfActive({
@@ -124,14 +144,6 @@ export async function deliverAiReplyIfActive({
   deliver: () => Promise<void>;
 }) {
   return runDbWriteOperation(db, async (transaction) => {
-    const locked = await transaction.execute(sql`
-      SELECT "id"
-      FROM "conversation"
-      WHERE "id" = ${conversationId} AND "workspaceId" = ${workspaceId}
-      FOR UPDATE
-    `);
-    if (locked.length === 0) return false;
-
     const [current] = await transaction
       .select({ aiPaused: conversation.aiPaused, status: conversation.status })
       .from(conversation)
@@ -153,15 +165,26 @@ export async function deliverAiReplyIfActive({
       requireAiActive: true,
     });
     if (!appended || !appended.inserted) return false;
-    await deliver();
+    try {
+      await deliver();
+    } catch (error) {
+      if (!isInteractiveTransactionSupported(transaction)) {
+        await removeConversationMessageById(
+          transaction,
+          workspaceId,
+          conversationId,
+          message.id,
+        ).catch(() => {});
+      }
+      throw error;
+    }
     return true;
   });
 }
 
 /**
- * Append against the current JSON array in one PostgreSQL UPDATE. The row lock
- * acquired by UPDATE serializes concurrent writers, so no message is lost when
- * a visitor, teammate, agent, or channel webhook writes at the same time.
+ * Append against the current JSON array in one atomic SQLite UPDATE so no
+ * message is lost when a visitor, teammate, agent, or channel webhook writes.
  */
 export async function appendConversationMessage({
   db,
@@ -179,21 +202,21 @@ export async function appendConversationMessage({
   requireAiActive?: boolean;
 }) {
   return runDbWriteOperation(db, async (transaction) => {
-    const messages = sql`COALESCE(NULLIF(${conversation.messages}, '')::jsonb, '[]'::jsonb)`;
+    const messages = sqliteMessagesArraySql(conversation.messages);
     const duplicate = message.clientId
       ? sql`EXISTS (
         SELECT 1
-        FROM jsonb_array_elements(${messages}) AS existing(item)
-        WHERE existing.item ->> 'clientId' = ${message.clientId}
+        FROM json_each(${messages}) AS existing
+        WHERE json_extract(existing.value, '$.clientId') = ${message.clientId}
       )`
       : message.replyToMessageId
         ? sql`EXISTS (
           SELECT 1
-          FROM jsonb_array_elements(${messages}) AS existing(item)
-          WHERE existing.item ->> 'replyToMessageId' = ${message.replyToMessageId}
+          FROM json_each(${messages}) AS existing
+          WHERE json_extract(existing.value, '$.replyToMessageId') = ${message.replyToMessageId}
         )`
         : null;
-    const appendedMessages = sql`(${messages} || ${JSON.stringify([message])}::jsonb)::text`;
+    const appendedMessages = sql`json_insert(${messages}, '$[#]', json(${JSON.stringify(message)}))`;
 
     const conditions = [
       eq(conversation.id, conversationId),
@@ -251,16 +274,6 @@ async function appendVisitorMessage(
 ) {
   const now = new Date();
   const nowIso = now.toISOString();
-
-  // Serialize first-message creation per visitor session. Without locking the
-  // parent row, simultaneous requests can both observe no active conversation.
-  await db.execute(sql`
-    SELECT id
-    FROM ${visitorSessionTable}
-    WHERE ${visitorSessionTable.id} = ${visitorSession.id}
-      AND ${visitorSessionTable.widgetId} = ${visitorSession.widget.id}
-    FOR UPDATE
-  `);
 
   const existingConversation = await db.query.conversation.findFirst({
     where: (convo, { eq, and, ne }) =>
@@ -435,34 +448,33 @@ export async function setAiMessageFeedback({
   reason: string | null;
   feedbackAt: string;
 }) {
-  const messages = sql`COALESCE(NULLIF(${conversation.messages}, '')::jsonb, '[]'::jsonb)`;
+  const messages = sqliteMessagesArraySql(conversation.messages);
   const matchingAiMessage = sql`EXISTS (
     SELECT 1
-    FROM jsonb_array_elements(${messages}) AS candidate(item)
-    WHERE candidate.item ->> 'id' = ${messageId}
-      AND candidate.item ->> 'authorType' = 'AI'
+    FROM json_each(${messages}) AS candidate
+    WHERE json_extract(candidate.value, '$.id') = ${messageId}
+      AND json_extract(candidate.value, '$.authorType') = 'AI'
   )`;
-  const updatedMessages = sql`(
-    SELECT COALESCE(
-      jsonb_agg(
-        CASE
-          WHEN entry.item ->> 'id' = ${messageId}
-            AND entry.item ->> 'authorType' = 'AI'
-          THEN jsonb_set(
-            jsonb_set(
-              jsonb_set(entry.item, '{feedback}', to_jsonb(${feedback}::text), true),
-              '{feedbackReason}', COALESCE(to_jsonb(${reason}::text), 'null'::jsonb), true
-            ),
-            '{feedbackAt}', to_jsonb(${feedbackAt}::text), true
-          )
-          ELSE entry.item
-        END
-        ORDER BY entry.ordinality
-      ),
-      '[]'::jsonb
-    )::text
-    FROM jsonb_array_elements(${messages}) WITH ORDINALITY AS entry(item, ordinality)
-  )`;
+  const updatedMessages = sql`COALESCE((
+    SELECT json_group_array(
+      CASE
+        WHEN json_extract(entry.value, '$.id') = ${messageId}
+          AND json_extract(entry.value, '$.authorType') = 'AI'
+        THEN json_set(
+          entry.value,
+          '$.feedback', ${feedback},
+          '$.feedbackReason', json(${JSON.stringify(reason)}),
+          '$.feedbackAt', ${feedbackAt}
+        )
+        ELSE json(entry.value)
+      END
+    )
+    FROM (
+      SELECT key, value
+      FROM json_each(${messages})
+      ORDER BY CAST(key AS INTEGER) ASC
+    ) AS entry
+  ), '[]')`;
 
   const updated = await db
     .update(conversation)
@@ -496,22 +508,22 @@ export async function setAiMessageMetadata({
   messageId: string;
   metadata: NonNullable<MessageJson["metadata"]>;
 }) {
-  const messages = sql`COALESCE(NULLIF(${conversation.messages}, '')::jsonb, '[]'::jsonb)`;
-  const updatedMessages = sql`(
-    SELECT COALESCE(
-      jsonb_agg(
-        CASE
-          WHEN entry.item ->> 'id' = ${messageId}
-            AND entry.item ->> 'authorType' = 'AI'
-          THEN jsonb_set(entry.item, '{metadata}', ${JSON.stringify(metadata)}::jsonb, true)
-          ELSE entry.item
-        END
-        ORDER BY entry.ordinality
-      ),
-      '[]'::jsonb
-    )::text
-    FROM jsonb_array_elements(${messages}) WITH ORDINALITY AS entry(item, ordinality)
-  )`;
+  const messages = sqliteMessagesArraySql(conversation.messages);
+  const updatedMessages = sql`COALESCE((
+    SELECT json_group_array(
+      CASE
+        WHEN json_extract(entry.value, '$.id') = ${messageId}
+          AND json_extract(entry.value, '$.authorType') = 'AI'
+        THEN json_set(entry.value, '$.metadata', json(${JSON.stringify(metadata)}))
+        ELSE json(entry.value)
+      END
+    )
+    FROM (
+      SELECT key, value
+      FROM json_each(${messages})
+      ORDER BY CAST(key AS INTEGER) ASC
+    ) AS entry
+  ), '[]')`;
 
   const updated = await db
     .update(conversation)
@@ -542,36 +554,36 @@ export async function markVisitorMessagesAsRead({
   readAt: string;
 }) {
   return runDbWriteOperation(db, async (transaction) => {
-    const messages = sql`COALESCE(NULLIF(${conversation.messages}, '')::jsonb, '[]'::jsonb)`;
-    const throughMessageOrdinality = sql`(
-    SELECT max(entry.ordinality)
-    FROM jsonb_array_elements(${messages}) WITH ORDINALITY AS entry(item, ordinality)
-    WHERE entry.item ->> 'id' = ${throughMessageId}
-      AND entry.item ->> 'authorType' = 'VISITOR'
-  )`;
+    const messages = sqliteMessagesArraySql(conversation.messages);
+    const throughMessageIndex = sql`(
+      SELECT MAX(CAST(entry.key AS INTEGER))
+      FROM json_each(${messages}) AS entry
+      WHERE json_extract(entry.value, '$.id') = ${throughMessageId}
+        AND json_extract(entry.value, '$.authorType') = 'VISITOR'
+    )`;
     const hasUnreadVisitorMessage = sql`EXISTS (
-    SELECT 1
-    FROM jsonb_array_elements(${messages}) WITH ORDINALITY AS candidate(item, ordinality)
-    WHERE candidate.item ->> 'authorType' = 'VISITOR'
-      AND candidate.item ->> 'readAt' IS NULL
-      AND candidate.ordinality <= ${throughMessageOrdinality}
-  )`;
-    const updatedMessages = sql`(
-    SELECT COALESCE(
-      jsonb_agg(
+      SELECT 1
+      FROM json_each(${messages}) AS candidate
+      WHERE json_extract(candidate.value, '$.authorType') = 'VISITOR'
+        AND json_extract(candidate.value, '$.readAt') IS NULL
+        AND CAST(candidate.key AS INTEGER) <= ${throughMessageIndex}
+    )`;
+    const updatedMessages = sql`COALESCE((
+      SELECT json_group_array(
         CASE
-          WHEN entry.item ->> 'authorType' = 'VISITOR'
-            AND entry.item ->> 'readAt' IS NULL
-            AND entry.ordinality <= ${throughMessageOrdinality}
-          THEN jsonb_set(entry.item, '{readAt}', to_jsonb(${readAt}::text), true)
-          ELSE entry.item
+          WHEN json_extract(entry.value, '$.authorType') = 'VISITOR'
+            AND json_extract(entry.value, '$.readAt') IS NULL
+            AND CAST(entry.key AS INTEGER) <= ${throughMessageIndex}
+          THEN json_set(entry.value, '$.readAt', ${readAt})
+          ELSE json(entry.value)
         END
-        ORDER BY entry.ordinality
-      ),
-      '[]'::jsonb
-    )::text
-    FROM jsonb_array_elements(${messages}) WITH ORDINALITY AS entry(item, ordinality)
-  )`;
+      )
+      FROM (
+        SELECT key, value
+        FROM json_each(${messages})
+        ORDER BY CAST(key AS INTEGER) ASC
+      ) AS entry
+    ), '[]')`;
 
     const updated = await transaction
       .update(conversation)
@@ -611,7 +623,6 @@ export async function setConversationStatus({
       })
       .from(conversation)
       .where(and(eq(conversation.id, conversationId), eq(conversation.workspaceId, workspaceId)))
-      .for("update")
       .limit(1);
     if (!current) return null;
 
@@ -682,7 +693,6 @@ export async function updateConversationState({
       })
       .from(conversation)
       .where(and(eq(conversation.id, conversationId), eq(conversation.workspaceId, workspaceId)))
-      .for("update")
       .limit(1);
     if (!current || (onlyOpen && current.status === "CLOSED")) return null;
 
@@ -790,7 +800,12 @@ export async function startVisitorConversation({
           screenSize: metadata.screenSize ?? existing.screenSize,
           contactId: contactId ?? existing.contactId,
         })
-        .where(eq(visitorSessionTable.id, existing.id))
+        .where(
+          and(
+            eq(visitorSessionTable.id, existing.id),
+            eq(visitorSessionTable.widgetId, widgetContext.id),
+          ),
+        )
         .returning();
       visitorSessionData = results[0];
     } else {
@@ -862,6 +877,7 @@ export async function getVisitorConversationMessages({
 
 export async function recordAiMessage({
   db,
+  workspaceId,
   conversationId,
   text,
   replyToMessageId,
@@ -870,6 +886,7 @@ export async function recordAiMessage({
   rejectInactive = false,
 }: {
   db: Db;
+  workspaceId?: string;
   conversationId: string;
   text: string;
   replyToMessageId: string;
@@ -879,7 +896,10 @@ export async function recordAiMessage({
 }) {
   return runDbWriteOperation(db, async (tx) => {
     const conversationData = await tx.query.conversation.findFirst({
-      where: (convo, { eq }) => eq(convo.id, conversationId),
+      where: (convo, { and: andOp, eq: eqOp }) =>
+        workspaceId
+          ? andOp(eqOp(convo.id, conversationId), eqOp(convo.workspaceId, workspaceId))
+          : eqOp(convo.id, conversationId),
     });
 
     if (!conversationData) {

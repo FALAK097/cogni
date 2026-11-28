@@ -43,7 +43,7 @@ function createAuth() {
     baseURL: env.BETTER_AUTH_URL || "https://cogni.falakgala.dev",
     secret: env.BETTER_AUTH_SECRET || "cogni-build-fixture-secret-not-for-runtime-2026",
     database: drizzleAdapter(db, {
-      provider: "pg",
+      provider: "sqlite",
       schema: schema,
     }),
     emailAndPassword: {

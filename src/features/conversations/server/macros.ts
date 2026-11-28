@@ -3,7 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { and, asc, eq } from "drizzle-orm";
 
-import { getDb, type Db } from "@/lib/db/client";
+import { getDb, isUniqueConstraintError, type Db } from "@/lib/db/client";
 import { inboxMacro } from "@/lib/db/schema";
 
 export interface InboxMacroInput {
@@ -16,12 +16,6 @@ export class InboxMacroNameConflictError extends Error {
     super("A saved reply with that name already exists in this workspace.");
     this.name = "InboxMacroNameConflictError";
   }
-}
-
-function hasErrorCode(error: unknown, code: string, depth = 0): boolean {
-  if (depth > 3 || typeof error !== "object" || error === null) return false;
-  if ("code" in error && error.code === code) return true;
-  return "cause" in error && hasErrorCode(error.cause, code, depth + 1);
 }
 
 export async function listInboxMacros(workspaceId: string, db: Db = getDb()) {
@@ -63,7 +57,7 @@ export async function createInboxMacro(
 
     return macro;
   } catch (error) {
-    if (hasErrorCode(error, "23505")) throw new InboxMacroNameConflictError();
+    if (isUniqueConstraintError(error)) throw new InboxMacroNameConflictError();
     throw error;
   }
 }
@@ -100,7 +94,7 @@ export async function updateInboxMacro(
 
     return macro ?? null;
   } catch (error) {
-    if (hasErrorCode(error, "23505")) throw new InboxMacroNameConflictError();
+    if (isUniqueConstraintError(error)) throw new InboxMacroNameConflictError();
     throw error;
   }
 }

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { deleteR2Object, getR2Object, isR2Configured, putR2Object } from "@/lib/cloudflare/r2";
+import { isWorkersRuntime } from "@/lib/cloudflare/runtime";
 import { env } from "@/lib/env/server";
 import {
   createStorageKey,
@@ -74,7 +75,7 @@ export async function deleteObject(storageKey: string) {
 }
 
 function getUploadStorage() {
-  return env.UPLOAD_STORAGE ?? (env.ENV === "production" ? "r2" : "local");
+  return env.UPLOAD_STORAGE ?? (env.ENV === "production" || isWorkersRuntime() ? "r2" : "local");
 }
 
 export { isAllowedUpload, isAllowedKnowledgeUpload, uploadPublicPath };

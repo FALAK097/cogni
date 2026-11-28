@@ -10,23 +10,9 @@ jobs:
   quality:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    services:
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_HOST_AUTH_METHOD: trust
-          POSTGRES_DB: cogni_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d cogni_test"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
     env:
       SKIP_ENV_VALIDATION: "true"
-      DATABASE_URL: postgres://postgres@127.0.0.1:5432/cogni_test
+      DATABASE_URL: file:./.data/cogni_test.db
 
     steps:
       - uses: actions/checkout@v4
@@ -58,23 +44,56 @@ jobs:
       - run: pnpm test:navigation-routes
       - run: pnpm test:knowledge-source-type
       - run: pnpm test:knowledge-source-sync
+      - run: pnpm test:knowledge-source-health
+      - run: pnpm test:knowledge-retrieval
+      - run: pnpm test:feedback-answer-source
+      - run: pnpm test:analytics-knowledge-gap-review-route
+      - run: pnpm test:analytics-negative-feedback
+      - run: pnpm test:analytics-unanswered-questions
+      - run: pnpm test:analytics-knowledge-gaps
+      - run: pnpm test:analytics-no-source-answers
+      - run: pnpm test:analytics-aggregation
+      - run: pnpm test:analytics-date-range
+      - run: pnpm test:spreadsheet-export
+      - run: pnpm test:insights-url-state
       - run: pnpm test:widget-stream
+      - run: pnpm test:widget-history-route
       - run: pnpm test:widget-documents-route
       - run: pnpm test:widget-message-rendering
+      - run: pnpm test:widget-preview-isolation
+      - run: pnpm test:widget-preview-message
       - run: pnpm test:widget-settings
       - run: pnpm test:widget-settings-state
+      - run: pnpm test:handoff-expectations
       - run: pnpm test:conversation-append
+      - run: pnpm test:conversation-assignment-route
       - run: pnpm test:ticket-lifecycle-route
+      - run: pnpm test:conversation-delete-route
+      - run: pnpm test:conversation-draft
+      - run: pnpm test:conversation-scroll
+      - run: pnpm test:conversation-timeline
+      - run: pnpm test:conversation-events-route
+      - run: pnpm test:inbox-events
+      - run: pnpm test:inbox-state
       - run: pnpm test:inbox-pagination
       - run: pnpm test:inbox-pagination-db
       - run: pnpm test:inbox-saved-views
       - run: pnpm test:inbox-macros
       - run: pnpm test:contact-tags
+      - run: pnpm test:snooze-schedule
       - run: pnpm test:integration-action-recovery
       - run: pnpm test:workspace-permissions
       - run: pnpm test:safe-return-path
+      - run: pnpm test:attachment-access
+      - run: pnpm test:upload-limits
+      - run: pnpm test:workflow-progression
+      - run: pnpm test:dashboard-origin
+      - run: pnpm test:dashboard-session-patch
       - run: pnpm test:workspace-owners
       - run: pnpm test:analytics-response-time
       - run: pnpm test:rate-limit
       - run: pnpm test:safe-fetch
       - run: pnpm fmt:check
+      - run: pnpm cf:check
+      - run: pnpm build
+      - run: pnpm build:cf

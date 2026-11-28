@@ -3,6 +3,7 @@ import "../../../lib/cloudflare/server-only";
 import { createHash } from "node:crypto";
 import * as orm from "drizzle-orm";
 import type { Db } from "@/lib/db/client";
+import { chunkArray } from "@/lib/db/utils";
 import * as schema from "@/lib/db/schema";
 
 const { and, asc, desc, eq, gte, inArray, isNotNull, like, or } = orm;
@@ -310,14 +311,22 @@ export async function getWorkspaceActivationReadiness(
 
   const sessions =
     sessionIds.length > 0
-      ? await db
-          .select({
-            id: visitorSession.id,
-            hostname: visitorSession.hostname,
-            createdAt: visitorSession.createdAt,
-          })
-          .from(visitorSession)
-          .where(and(eq(visitorSession.widgetId, saved.id), inArray(visitorSession.id, sessionIds)))
+      ? (
+          await Promise.all(
+            chunkArray(sessionIds, 80).map((idBatch) =>
+              db
+                .select({
+                  id: visitorSession.id,
+                  hostname: visitorSession.hostname,
+                  createdAt: visitorSession.createdAt,
+                })
+                .from(visitorSession)
+                .where(
+                  and(eq(visitorSession.widgetId, saved.id), inArray(visitorSession.id, idBatch)),
+                ),
+            ),
+          )
+        ).flat()
       : [];
 
   const sessionById = new Map(sessions.map((s) => [s.id, s]));

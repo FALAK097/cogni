@@ -5,6 +5,7 @@ import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 
 import { emitDomainEvent } from "@/lib/events/domain-events";
+import { chunkArray } from "@/lib/db/utils";
 import { notifyWorkspaceMembers } from "@/lib/notifications/create-notification";
 import { logError, logInfo } from "@/lib/logging/logger";
 
@@ -114,21 +115,24 @@ export async function createWorkflowWithSteps({
     return { run, steps: existingSteps, created: false };
   }
 
-  const createdSteps = await db
-    .insert(workflowStep)
-    .values(
-      parsedSteps.map((step, position) => ({
-        id: crypto.randomUUID(),
-        workspaceId,
-        workflowRunId: run.id,
-        position,
-        name: step.name,
-        kind: step.kind,
-        input: JSON.stringify(step.input),
-      })),
-    )
-    .onConflictDoNothing()
-    .returning();
+  const stepRows = parsedSteps.map((step, position) => ({
+    id: crypto.randomUUID(),
+    workspaceId,
+    workflowRunId: run.id,
+    position,
+    name: step.name,
+    kind: step.kind,
+    input: JSON.stringify(step.input),
+  }));
+  const createdSteps: (typeof workflowStep.$inferSelect)[] = [];
+  for (const stepBatch of chunkArray(stepRows, 10)) {
+    const insertedBatch = await db
+      .insert(workflowStep)
+      .values(stepBatch)
+      .onConflictDoNothing()
+      .returning();
+    createdSteps.push(...insertedBatch);
+  }
   const finalSteps =
     createdSteps.length > 0
       ? createdSteps

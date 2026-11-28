@@ -16,13 +16,14 @@ import {
   searchItemCleanupClaimLeaseMs,
 } from "@/features/knowledge/server/search-item-cleanup-policy";
 
-const { and, asc, desc, eq, inArray, isNotNull, isNull, lte, or } = orm;
+const { and, asc, desc, eq, inArray, isNotNull, isNull, like, lte, or } = orm;
 const {
   document: documentTable,
   documentRevision,
   domainEvent,
   searchItemCleanup,
   widget,
+  workflowRun,
 } = schema;
 
 const supportedSourceTypes = new Set(["URL", "SITEMAP", "TXT", "TEXT", "PDF", "DOCX"]);
@@ -64,8 +65,7 @@ export async function lockWorkspaceSourceBasisInTransaction(transaction: Db, wor
     .select({ id: widget.id })
     .from(widget)
     .where(eq(widget.workspaceId, workspaceId))
-    .limit(1)
-    .for("update");
+    .limit(1);
   if (!saved) throw new Error("Agent configuration was not found.");
 }
 
@@ -88,8 +88,7 @@ export async function updateKnowledgeSourceStatus(
           eq(documentTable.id, input.documentId),
           eq(documentTable.workspaceId, input.workspaceId),
         ),
-      )
-      .for("update");
+      );
     if (!source) return false;
 
     const updatedAt = new Date(nextKnowledgeSourceToken(source.updatedAt)).toISOString();
@@ -132,8 +131,7 @@ export async function claimKnowledgeSourceProcessingAttempt(
           eq(documentTable.id, input.documentId),
           eq(documentTable.workspaceId, input.workspaceId),
         ),
-      )
-      .for("update");
+      );
     if (!source) return null;
 
     const processingToken = nextKnowledgeSourceToken(source.updatedAt);
@@ -179,8 +177,7 @@ export async function failKnowledgeSourceProcessingAttempt(
           eq(documentTable.id, input.documentId),
           eq(documentTable.workspaceId, input.workspaceId),
         ),
-      )
-      .for("update");
+      );
     if (
       !source ||
       source.status !== "PROCESSING" ||
@@ -226,8 +223,7 @@ export async function emitKnowledgeSourceReadyIfCurrent(
           eq(documentTable.id, input.documentId),
           eq(documentTable.workspaceId, input.workspaceId),
         ),
-      )
-      .for("update");
+      );
     if (
       !source ||
       source.status !== "READY" ||
@@ -273,8 +269,7 @@ export async function recordDocumentRevisionInTransaction(
   const [source] = await transaction
     .select({ id: documentTable.id, sourceType: documentTable.sourceType })
     .from(documentTable)
-    .where(and(eq(documentTable.id, documentId), eq(documentTable.workspaceId, workspaceId)))
-    .for("update");
+    .where(and(eq(documentTable.id, documentId), eq(documentTable.workspaceId, workspaceId)));
 
   if (!source) throw new SourceRevisionDocumentNotFoundError();
   if (!isSupportedKnowledgeSourceType(source.sourceType)) {
@@ -321,23 +316,9 @@ export async function recordDocumentRevisionInTransaction(
     .limit(1);
 
   const now = new Date().toISOString();
-  if (current) {
-    await transaction
-      .update(documentRevision)
-      .set({ status: "SUPERSEDED", retiredAt: now })
-      .where(
-        and(
-          eq(documentRevision.id, current.id),
-          eq(documentRevision.workspaceId, workspaceId),
-          eq(documentRevision.documentId, documentId),
-          eq(documentRevision.status, "CURRENT"),
-        ),
-      );
-  }
-
   const revisionNumber = (latest?.revisionNumber ?? 0) + 1;
   const revisionId = requestedRevisionId ?? randomUUID();
-  await transaction.insert(documentRevision).values({
+  const insertRevision = transaction.insert(documentRevision).values({
     id: revisionId,
     workspaceId,
     documentId,
@@ -348,11 +329,27 @@ export async function recordDocumentRevisionInTransaction(
     createdAt: now,
   });
 
+  if (current) {
+    const supersedeRevision = transaction
+      .update(documentRevision)
+      .set({ status: "SUPERSEDED", retiredAt: now })
+      .where(
+        and(
+          eq(documentRevision.id, current.id),
+          eq(documentRevision.workspaceId, workspaceId),
+          eq(documentRevision.documentId, documentId),
+          eq(documentRevision.status, "CURRENT"),
+        ),
+      );
+    await transaction.batch([supersedeRevision, insertRevision]);
+  } else {
+    await insertRevision;
+  }
+
   return { status: "created", revisionId, revisionNumber, contentSha256 };
 }
 
-/** Retain identity-only tombstones while source text, chunks, and file objects are deleted. */
-export async function markDocumentRevisionsDeleted(
+async function enqueueDocumentRevisionCleanup(
   transaction: Db,
   workspaceId: string,
   documentId: string,
@@ -361,8 +358,7 @@ export async function markDocumentRevisionsDeleted(
   await transaction
     .select({ id: documentTable.id })
     .from(documentTable)
-    .where(and(eq(documentTable.workspaceId, workspaceId), eq(documentTable.id, documentId)))
-    .for("update");
+    .where(and(eq(documentTable.workspaceId, workspaceId), eq(documentTable.id, documentId)));
 
   const revisions = await transaction
     .select({
@@ -393,16 +389,43 @@ export async function markDocumentRevisionsDeleted(
       });
     }
   }
+}
 
-  await transaction
-    .update(documentRevision)
-    .set({ status: "DELETED", retiredAt: new Date().toISOString() })
-    .where(
-      and(
-        eq(documentRevision.workspaceId, workspaceId),
-        eq(documentRevision.documentId, documentId),
-      ),
-    );
+/** Atomically retires source revisions, cancels queued runs, and deletes the document row. */
+export async function deleteKnowledgeSourceRecord(db: Db, workspaceId: string, documentId: string) {
+  await runDbWriteOperation(db, async (transaction) => {
+    await enqueueDocumentRevisionCleanup(transaction, workspaceId, documentId);
+    const now = new Date().toISOString();
+    await transaction.batch([
+      transaction
+        .update(documentRevision)
+        .set({ status: "DELETED", retiredAt: now })
+        .where(
+          and(
+            eq(documentRevision.workspaceId, workspaceId),
+            eq(documentRevision.documentId, documentId),
+          ),
+        ),
+      transaction
+        .update(workflowRun)
+        .set({
+          status: "CANCELLED",
+          errorMessage: "Knowledge source was deleted.",
+          finishedAt: now,
+        })
+        .where(
+          and(
+            eq(workflowRun.workspaceId, workspaceId),
+            eq(workflowRun.name, "document.process"),
+            like(workflowRun.idempotencyKey, `%${documentId}%`),
+            inArray(workflowRun.status, ["QUEUED", "FAILED"]),
+          ),
+        ),
+      transaction
+        .delete(documentTable)
+        .where(and(eq(documentTable.id, documentId), eq(documentTable.workspaceId, workspaceId))),
+    ]);
+  });
 }
 
 export async function enqueueSearchItemCleanupInTransaction(
@@ -551,8 +574,7 @@ export async function drainSearchItemCleanupWith(
           ),
         )
         .orderBy(asc(searchItemCleanup.nextAttemptAt), asc(searchItemCleanup.createdAt))
-        .limit(getSearchItemCleanupClaimLimit(requestLimit - cleanupCandidates))
-        .for("update", { skipLocked: true });
+        .limit(getSearchItemCleanupClaimLimit(requestLimit - cleanupCandidates));
 
       if (due.length === 0) return [];
       const claimUntil = new Date(now.getTime() + searchItemCleanupClaimLeaseMs).toISOString();
@@ -590,8 +612,7 @@ export async function drainSearchItemCleanupWith(
                 eq(documentTable.id, cleanup.documentId),
                 eq(documentTable.workspaceId, cleanup.workspaceId),
               ),
-            )
-            .for("update");
+            );
 
           const activeIdentity = await transaction
             .select({ id: documentRevision.id })

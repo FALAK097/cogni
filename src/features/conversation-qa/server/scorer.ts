@@ -312,7 +312,6 @@ export async function processConversationQaWorkflow({ db, run, now }: ProcessInp
             eq(conversation.workspaceId, run.workspaceId),
           ),
         )
-        .for("update")
         .limit(1);
       const [latestState] = await transaction
         .select({ version: conversationQaState.version })

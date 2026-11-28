@@ -5,17 +5,11 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { after, before, test } from "node:test";
-import "dotenv/config";
-import { drizzle } from "drizzle-orm/postgres-js";
 import { build } from "esbuild";
-import postgres from "postgres";
+import { createTempSqliteEnvironment } from "./sqlite-test-utils.mjs";
 
 process.env.SKIP_ENV_VALIDATION ??= "true";
-
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl || !["localhost", "127.0.0.1", "::1"].includes(new URL(databaseUrl).hostname)) {
-  throw new Error("Workspace owner invariant tests require a local DATABASE_URL.");
-}
+const { databaseUrl, raw, cleanup } = createTempSqliteEnvironment("cogni-owner-invariant-db-");
 
 const outputDirectory = await mkdtemp(join(tmpdir(), "cogni-owner-invariant-test-"));
 const outputFile = join(outputDirectory, "owner-management.mjs");
@@ -26,8 +20,7 @@ await build({
     contents: `
       export { updateWorkspaceMemberRole, removeWorkspaceMember, transferWorkspaceOwnership } from "@/features/workspaces/server/owner-management";
       export { acceptWorkspaceInviteMembership, listWorkspaceInvites } from "@/features/workspaces/server/members";
-      export { getDb } from "@/lib/db/client";
-      export { workspace, workspaceMember } from "@/lib/db/schema";
+      export { createDbForUrl } from "@/lib/db/client";
     `,
     resolveDir: process.cwd(),
     sourcefile: "workspace-owner-invariant-test-entry.ts",
@@ -56,23 +49,20 @@ await build({
 });
 
 const {
-  getDb,
+  createDbForUrl,
   acceptWorkspaceInviteMembership,
   listWorkspaceInvites,
   removeWorkspaceMember,
   transferWorkspaceOwnership,
   updateWorkspaceMemberRole,
-  workspace,
-  workspaceMember,
 } = await import(`${pathToFileURL(outputFile).href}?run=${randomUUID()}`);
-const primaryDb = getDb();
-const secondClient = postgres(databaseUrl, { max: 1, prepare: false });
-const secondDb = drizzle(secondClient, { schema: { workspace, workspaceMember } });
-const raw = postgres(databaseUrl, { max: 1 });
+const primaryDb = createDbForUrl(databaseUrl);
+const secondDb = createDbForUrl(databaseUrl);
 const workspaceIds = [randomUUID(), randomUUID(), randomUUID()];
 const userIds = Array.from({ length: 6 }, () => randomUUID());
 const membershipIds = Array.from({ length: 6 }, () => randomUUID());
 const now = new Date().toISOString();
+const nowMs = Date.now();
 
 before(async () => {
   await raw`
@@ -84,7 +74,7 @@ before(async () => {
   for (const [index, userId] of userIds.entries()) {
     await raw`
       INSERT INTO "user" ("id", "name", "email", "updatedAt")
-      VALUES (${userId}, ${`Owner lock test ${index}`}, ${`${userId}@example.test`}, ${now})
+      VALUES (${userId}, ${`Owner lock test ${index}`}, ${`${userId}@example.test`}, ${nowMs})
     `;
   }
   await raw`
@@ -101,9 +91,9 @@ before(async () => {
 after(async () => {
   await raw`DELETE FROM "workspace" WHERE "id" IN (${workspaceIds[0]}, ${workspaceIds[1]}, ${workspaceIds[2]})`;
   await raw`DELETE FROM "user" WHERE "id" IN (${userIds[0]}, ${userIds[1]}, ${userIds[2]}, ${userIds[3]}, ${userIds[4]}, ${userIds[5]})`;
-  await primaryDb.$client.end({ timeout: 5 });
-  await secondClient.end({ timeout: 5 });
-  await raw.end({ timeout: 5 });
+  primaryDb.$client.close?.();
+  secondDb.$client.close?.();
+  await cleanup();
   await rm(outputDirectory, { recursive: true, force: true });
 });
 

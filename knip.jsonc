@@ -2,7 +2,6 @@
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "entry": [
     "open-next.config.ts",
-    "drizzle.remote.config.ts",
     "scripts/**/*.{js,mjs,ts}",
     "workers/*/src/index.ts",
     "src/features/**/actions*.ts",

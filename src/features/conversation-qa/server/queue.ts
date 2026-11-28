@@ -3,7 +3,7 @@ import "server-only";
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 
 import type { Db } from "@/lib/db/client";
-import { runDbWriteOperation } from "@/lib/db/client";
+import { chunkArray, runDbWriteOperation } from "@/lib/db/client";
 import {
   conversation,
   conversationQaEvaluation,
@@ -272,7 +272,6 @@ async function enqueueInactiveConversationQa({
       })
       .from(conversation)
       .where(and(eq(conversation.id, conversationId), eq(conversation.workspaceId, workspaceId)))
-      .for("update")
       .limit(1);
     if (!current || current.status === "CLOSED") return false;
 
@@ -413,7 +412,7 @@ async function claimWorkflowRun(db: Db, candidate: ConversationQaWorkflowCandida
         eq(workflowRun.workspaceId, candidate.workspaceId),
         eq(workflowRun.name, CONVERSATION_QA_WORKFLOW_NAME),
         claimableStatus,
-        sql`${workflowRun.attempts} < LEAST(${workflowRun.maxAttempts}, ${CONVERSATION_QA_MAX_ATTEMPTS})`,
+        sql`${workflowRun.attempts} < MIN(${workflowRun.maxAttempts}, ${CONVERSATION_QA_MAX_ATTEMPTS})`,
       ),
     )
     .returning();
@@ -534,33 +533,46 @@ export async function drainConversationQaQueue(db: Db, limit = 4, now = new Date
   if (workspaceScope.length === 0) {
     return { inactivityQueued: 0, processed: 0 };
   }
-  const inactiveCandidates = await db
-    .select({ id: conversation.id, workspaceId: conversation.workspaceId })
-    .from(conversation)
-    .leftJoin(
-      conversationQaState,
-      and(
-        eq(conversationQaState.workspaceId, conversation.workspaceId),
-        eq(conversationQaState.conversationId, conversation.id),
+  const inactiveCandidates = (
+    await Promise.all(
+      chunkArray(workspaceScope, 80).map((scopeBatch) =>
+        db
+          .select({
+            id: conversation.id,
+            workspaceId: conversation.workspaceId,
+            lastMessageAt: conversation.lastMessageAt,
+          })
+          .from(conversation)
+          .leftJoin(
+            conversationQaState,
+            and(
+              eq(conversationQaState.workspaceId, conversation.workspaceId),
+              eq(conversationQaState.conversationId, conversation.id),
+            ),
+          )
+          .where(
+            and(
+              inArray(conversation.workspaceId, scopeBatch),
+              inArray(conversation.status, ["OPEN", "ASSIGNED", "ESCALATED"]),
+              or(
+                isNull(conversationQaState.conversationId),
+                isNull(conversationQaState.lastObservedMessageAt),
+                gt(conversation.lastMessageAt, conversationQaState.lastObservedMessageAt),
+                and(
+                  isNotNull(conversationQaState.nextEligibleAt),
+                  lte(conversationQaState.nextEligibleAt, now.toISOString()),
+                ),
+              ),
+            ),
+          )
+          .orderBy(asc(conversation.lastMessageAt))
+          .limit(100),
       ),
     )
-    .where(
-      and(
-        inArray(conversation.workspaceId, workspaceScope),
-        inArray(conversation.status, ["OPEN", "ASSIGNED", "ESCALATED"]),
-        or(
-          isNull(conversationQaState.conversationId),
-          isNull(conversationQaState.lastObservedMessageAt),
-          gt(conversation.lastMessageAt, conversationQaState.lastObservedMessageAt),
-          and(
-            isNotNull(conversationQaState.nextEligibleAt),
-            lte(conversationQaState.nextEligibleAt, now.toISOString()),
-          ),
-        ),
-      ),
-    )
-    .orderBy(asc(conversation.lastMessageAt))
-    .limit(100);
+  )
+    .flat()
+    .sort((left, right) => left.lastMessageAt.localeCompare(right.lastMessageAt))
+    .slice(0, 100);
 
   let inactivityQueued = 0;
   for (const candidate of inactiveCandidates) {
@@ -576,29 +588,38 @@ export async function drainConversationQaQueue(db: Db, limit = 4, now = new Date
     }
   }
 
-  const candidates: ConversationQaWorkflowCandidate[] = await db
-    .select({
-      id: workflowRun.id,
-      workspaceId: workflowRun.workspaceId,
-      status: workflowRun.status,
-      startedAt: workflowRun.startedAt,
-      attempts: workflowRun.attempts,
-      maxAttempts: workflowRun.maxAttempts,
-      input: workflowRun.input,
-    })
-    .from(workflowRun)
-    .where(
-      and(
-        inArray(workflowRun.workspaceId, workspaceScope),
-        eq(workflowRun.name, CONVERSATION_QA_WORKFLOW_NAME),
-        or(
-          inArray(workflowRun.status, ["QUEUED", "FAILED"]),
-          and(eq(workflowRun.status, "RUNNING"), lt(workflowRun.startedAt, staleBefore)),
-        ),
+  const candidates: ConversationQaWorkflowCandidate[] = (
+    await Promise.all(
+      chunkArray(workspaceScope, 80).map((scopeBatch) =>
+        db
+          .select({
+            id: workflowRun.id,
+            workspaceId: workflowRun.workspaceId,
+            status: workflowRun.status,
+            startedAt: workflowRun.startedAt,
+            attempts: workflowRun.attempts,
+            maxAttempts: workflowRun.maxAttempts,
+            input: workflowRun.input,
+          })
+          .from(workflowRun)
+          .where(
+            and(
+              inArray(workflowRun.workspaceId, scopeBatch),
+              eq(workflowRun.name, CONVERSATION_QA_WORKFLOW_NAME),
+              or(
+                inArray(workflowRun.status, ["QUEUED", "FAILED"]),
+                and(eq(workflowRun.status, "RUNNING"), lt(workflowRun.startedAt, staleBefore)),
+              ),
+            ),
+          )
+          .orderBy(asc(workflowRun.startedAt))
+          .limit(boundedLimit),
       ),
     )
-    .orderBy(asc(workflowRun.startedAt))
-    .limit(boundedLimit);
+  )
+    .flat()
+    .sort((left, right) => left.startedAt.localeCompare(right.startedAt))
+    .slice(0, boundedLimit);
 
   let processed = 0;
   for (const candidate of candidates) {
