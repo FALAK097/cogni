@@ -595,7 +595,7 @@ export async function POST(
       workspaceId: widget.workspace.id,
       widgetId: widget.id,
       conversationId,
-      contactId: contactId ?? "",
+      contactId,
       visitorSessionId: isPreview ? null : (visitorSession?.id ?? null),
       locale: body.metadata.language,
     });
