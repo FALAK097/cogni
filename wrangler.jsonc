@@ -7,7 +7,7 @@
   "compatibility_flags": ["nodejs_compat"],
   "limits": { "cpu_ms": 10000 },
   "workers_dev": false,
-  "minify": true,
+  "minify": false,
   "upload_source_maps": false,
   "assets": {
     "directory": ".open-next/assets",

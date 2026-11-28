@@ -31,6 +31,13 @@ const editorialFont = localFont({
 
 const THEME_INIT_SCRIPT = `(function(){try{var e=document.documentElement,t=localStorage.getItem("theme");if(!t){var d=localStorage.getItem("dashboard-theme");if(d==="dark"||d==="light"){t=d;localStorage.setItem("theme",d);localStorage.removeItem("dashboard-theme");}}if(t==="dark"||(!t&&window.matchMedia("(prefers-color-scheme: dark)").matches)){e.classList.add("dark");e.style.colorScheme="dark";}else{e.classList.remove("dark");e.style.colorScheme="light";}}catch(t){}})();`;
 
+// Wrangler bundles the worker with esbuild `keepNames`, which rewrites functions to call
+// `__name(fn, "label")`. next-themes renders its pre-hydration theme script through
+// `Function.prototype.toString`, so that helper has to exist in the browser before any
+// inline script that was captured from the bundled worker source runs.
+const KEEP_NAMES_SHIM_SCRIPT =
+  'globalThis.__name ??= (target, value) => value === undefined ? target : (Object.defineProperty(target, "name", { value, configurable: true }), target);';
+
 export const viewport: Viewport = {
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },
@@ -85,6 +92,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        <script dangerouslySetInnerHTML={{ __html: KEEP_NAMES_SHIM_SCRIPT }} />
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body className="flex min-h-full flex-col antialiased" suppressHydrationWarning>
