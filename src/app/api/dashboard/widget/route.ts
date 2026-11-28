@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { canManageWorkspace } from "@/lib/auth/permissions";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import {
   normalizeHostname,
@@ -159,7 +159,7 @@ async function saveWidgetConfig(body: Record<string, unknown>) {
       authorizedDomains: JSON.stringify(domains),
       updatedAt: new Date().toISOString(),
     })
-    .where(eq(widgetTable.id, widget.id))
+    .where(and(eq(widgetTable.id, widget.id), eq(widgetTable.workspaceId, workspace.id)))
     .returning();
 
   const updated = results[0];

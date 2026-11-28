@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
+import { inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import { createWorkflowWithSteps } from "@/lib/workflows/runner";
 import { requireDashboardContext } from "@/lib/auth/dashboard-context";
 import { canManageWorkspace } from "@/lib/auth/permissions";
+import { chunkArray } from "@/lib/db/utils";
 
 const stepSchema = z.object({
   name: z.string().trim().min(1).max(120),
@@ -30,17 +32,28 @@ export async function GET(request: Request) {
     orderBy: (fields, { desc }) => [desc(fields.startedAt)],
     limit: 100,
   });
-  const runIds = new Set(runs.map((run) => run.id));
-  const allSteps = await db.query.workflowStep.findMany({
-    where: (fields, { eq }) => eq(fields.workspaceId, workspace.id),
-    orderBy: (fields, { asc }) => [asc(fields.position)],
-  });
+  const runIdList = runs.map((run) => run.id);
+  const allSteps =
+    runIdList.length === 0
+      ? []
+      : (
+          await Promise.all(
+            chunkArray(runIdList, 80).map((runIdBatch) =>
+              db.query.workflowStep.findMany({
+                where: (fields, { and, eq }) =>
+                  and(
+                    eq(fields.workspaceId, workspace.id),
+                    inArray(fields.workflowRunId, runIdBatch),
+                  ),
+                orderBy: (fields, { asc }) => [asc(fields.position)],
+              }),
+            ),
+          )
+        ).flat();
   return NextResponse.json({
     workflows: runs.map((run) => ({
       ...run,
-      steps: allSteps.filter(
-        (step) => runIds.has(step.workflowRunId) && step.workflowRunId === run.id,
-      ),
+      steps: allSteps.filter((step) => step.workflowRunId === run.id),
     })),
   });
 }

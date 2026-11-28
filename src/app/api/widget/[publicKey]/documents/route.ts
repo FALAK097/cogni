@@ -9,7 +9,7 @@ import { validateEmbedOrigin } from "@/features/widget/server/widget-service";
 import { getDb } from "@/lib/db/client";
 import { readBoundedJson } from "@/lib/http/read-bounded-json";
 import { checkRateLimits, getTrustedClientIp } from "@/lib/rate-limit/shared";
-import type { SQL } from "drizzle-orm";
+import { sql, type SQL } from "drizzle-orm";
 
 const searchSchema = z
   .object({ searchQuery: z.string().trim().max(160).nullable().optional() })
@@ -107,10 +107,15 @@ export async function POST(
         eq(fields.status, "READY"),
       ];
       if (query) {
-        const searchCond = or(
-          like(fields.title, `%${query}%`),
-          like(fields.sourceUrl, `%${query}%`),
-        );
+        const searchCond = /[\\%_]/.test(query)
+          ? (() => {
+              const escaped = `%${query.replace(/[\\%_]/g, "\\$&")}%`;
+              return or(
+                sql`${fields.title} like ${escaped} escape '\\'`,
+                sql`${fields.sourceUrl} like ${escaped} escape '\\'`,
+              );
+            })()
+          : or(like(fields.title, `%${query}%`), like(fields.sourceUrl, `%${query}%`));
         if (searchCond) {
           conds.push(searchCond);
         }

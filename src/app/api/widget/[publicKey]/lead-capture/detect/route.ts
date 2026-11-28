@@ -43,6 +43,7 @@ export async function POST(
 
   const result = await detectLeadCaptureTrigger({
     db,
+    widgetId: access.widget.id,
     visitorSessionId: authorized.session.id,
     enableLeadCapture: access.settings.enableLeadCapture,
     leadCaptureKeywords: access.settings.leadCaptureKeywords,

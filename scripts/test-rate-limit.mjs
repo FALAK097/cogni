@@ -1,19 +1,16 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdir } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import test, { after } from "node:test";
 import { build } from "esbuild";
 import { randomBytes, randomUUID } from "node:crypto";
+import { createTempSqliteEnvironment } from "./sqlite-test-utils.mjs";
 
 process.env.SKIP_ENV_VALIDATION ??= "true";
 process.env.BETTER_AUTH_SECRET ??= randomBytes(32).toString("hex");
-
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl || !["localhost", "127.0.0.1", "::1"].includes(new URL(databaseUrl).hostname)) {
-  throw new Error("Rate-limit integration tests require a local DATABASE_URL.");
-}
+const { cleanup } = createTempSqliteEnvironment("cogni-rate-limit-");
 
 const outputDirectory = join(process.cwd(), "node_modules", ".cache", "cogni-rate-limit-test");
 const outputFile = join(outputDirectory, "shared.mjs");
@@ -56,7 +53,9 @@ const { checkRateLimits, getDb, pruneExpiredRateLimitBuckets } = await import(
 );
 
 after(async () => {
-  await getDb().$client.end({ timeout: 5 });
+  getDb().$client.close?.();
+  await cleanup();
+  await rm(outputDirectory, { recursive: true, force: true });
 });
 
 test("parallel requests cannot exceed a shared limit", async () => {
@@ -112,7 +111,7 @@ test("database errors fail closed", () => {
     timeout: 30_000,
     env: {
       ...process.env,
-      DATABASE_URL: "postgres://postgres@127.0.0.1:55433/cogni_test",
+      DATABASE_URL: "http://127.0.0.1:55433/cogni_test",
     },
   });
 

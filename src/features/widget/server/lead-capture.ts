@@ -80,7 +80,12 @@ export async function submitWidgetLeadCapture(input: CaptureInput) {
         leadCapturedAt: capturedAt,
         updatedAt: capturedAt,
       })
-      .where(eq(visitorSession.id, input.visitorSessionId));
+      .where(
+        and(
+          eq(visitorSession.id, input.visitorSessionId),
+          eq(visitorSession.widgetId, session.widgetId),
+        ),
+      );
 
     return { contact: savedContact };
   });
@@ -88,6 +93,7 @@ export async function submitWidgetLeadCapture(input: CaptureInput) {
 
 export async function detectLeadCaptureTrigger({
   db,
+  widgetId,
   visitorSessionId,
   enableLeadCapture,
   leadCaptureKeywords,
@@ -98,6 +104,7 @@ export async function detectLeadCaptureTrigger({
   sessionStartedAt,
 }: {
   db: Db;
+  widgetId: string;
   visitorSessionId: string;
   enableLeadCapture: boolean;
   leadCaptureKeywords: string[];
@@ -109,7 +116,8 @@ export async function detectLeadCaptureTrigger({
 }) {
   if (!enableLeadCapture) return { triggered: false, reason: "Lead capture disabled" };
   const session = await db.query.visitorSession.findFirst({
-    where: (fields, { eq }) => eq(fields.id, visitorSessionId),
+    where: (fields, { and: andOp, eq: eqOp }) =>
+      andOp(eqOp(fields.id, visitorSessionId), eqOp(fields.widgetId, widgetId)),
     columns: { leadCapturedAt: true },
   });
   if (session?.leadCapturedAt) {

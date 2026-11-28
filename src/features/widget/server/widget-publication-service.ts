@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import { widgetModelOptions } from "@/features/widget/domain";
 import {
@@ -10,7 +10,7 @@ import {
   toWidgetDraftStorageValues,
   type WidgetPublicationSnapshot,
 } from "@/features/widget/publication";
-import type { Db } from "@/lib/db/client";
+import { runDbWriteOperation, type Db } from "@/lib/db/client";
 import { widget, widgetPublication } from "@/lib/db/schema";
 import {
   AgentTestPublishCheckError,
@@ -39,13 +39,12 @@ export async function publishWidgetDraft(
   restoreVersion?: number,
   publishCheckId?: string,
 ): Promise<PublishWidgetDraftResult> {
-  const transactionResult: PublishTransactionResult = await db.transaction(async (tx) => {
+  const transactionResult: PublishTransactionResult = await runDbWriteOperation(db, async (tx) => {
     const [saved] = await tx
       .select()
       .from(widget)
       .where(eq(widget.workspaceId, workspaceId))
-      .limit(1)
-      .for("update");
+      .limit(1);
     if (!saved) return { error: "Agent configuration was not found.", status: 404 } as const;
 
     let snapshot: WidgetPublicationSnapshot;
@@ -111,22 +110,38 @@ export async function publishWidgetDraft(
     }
 
     const version = saved.publishedVersion + 1;
-    await tx.insert(widgetPublication).values({
-      id: randomUUID(),
-      widgetId: saved.id,
-      version,
-      config: snapshot,
-      createdByUserId: userId,
-    });
-    await tx
-      .update(widget)
-      .set({
-        publishedVersion: version,
-        ...(restoreVersion !== undefined
-          ? { ...toWidgetDraftStorageValues(snapshot.config), updatedAt: new Date().toISOString() }
-          : {}),
-      })
-      .where(and(eq(widget.id, saved.id), eq(widget.workspaceId, workspaceId)));
+    const publicationId = randomUUID();
+    const publishedAt = new Date().toISOString();
+    const [insertedPublications, updatedWidgets] = await tx.batch([
+      tx
+        .insert(widgetPublication)
+        .select(
+          sql`select ${publicationId}, ${version}, ${JSON.stringify(snapshot)}, ${publishedAt}, ${saved.id}, ${userId} where exists (select 1 from "widget" where "id" = ${saved.id} and "workspaceId" = ${workspaceId} and "publishedVersion" = ${saved.publishedVersion})`,
+        )
+        .returning({ id: widgetPublication.id }),
+      tx
+        .update(widget)
+        .set({
+          publishedVersion: version,
+          ...(restoreVersion !== undefined
+            ? { ...toWidgetDraftStorageValues(snapshot.config), updatedAt: publishedAt }
+            : {}),
+        })
+        .where(
+          and(
+            eq(widget.id, saved.id),
+            eq(widget.workspaceId, workspaceId),
+            eq(widget.publishedVersion, saved.publishedVersion),
+          ),
+        )
+        .returning({ id: widget.id }),
+    ]);
+    if (insertedPublications.length === 0 || updatedWidgets.length === 0) {
+      return {
+        error: "Agent configuration changed while publishing. Try again.",
+        status: 409,
+      } as const;
+    }
     return { widgetId: saved.id, version } as const;
   });
 

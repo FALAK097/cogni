@@ -3,7 +3,7 @@ import "../../../lib/cloudflare/server-only";
 import { createHash, randomUUID } from "node:crypto";
 import * as orm from "drizzle-orm";
 
-import { getDb, type Db } from "@/lib/db/client";
+import { chunkArray, getDb, runDbWriteOperation, type Db } from "@/lib/db/client";
 import { env } from "@/lib/env/server";
 import * as schema from "@/lib/db/schema";
 
@@ -67,8 +67,7 @@ export async function getCurrentSourceBasisDigest(workspaceId: string, db: Db) {
     })
     .from(documentTable)
     .where(eq(documentTable.workspaceId, workspaceId))
-    .orderBy(documentTable.id)
-    .for("share");
+    .orderBy(documentTable.id);
   const revisions = await db
     .select({
       documentId: documentRevision.documentId,
@@ -80,8 +79,7 @@ export async function getCurrentSourceBasisDigest(workspaceId: string, db: Db) {
     .where(
       and(eq(documentRevision.workspaceId, workspaceId), eq(documentRevision.status, "CURRENT")),
     )
-    .orderBy(documentRevision.documentId, documentRevision.revisionNumber)
-    .for("share");
+    .orderBy(documentRevision.documentId, documentRevision.revisionNumber);
   const currentDocumentIds = new Set(revisions.map((revision) => revision.documentId));
   if (documents.some((source) => source.status === "PROCESSING")) {
     throw new AgentTestPublishCheckError(
@@ -140,8 +138,7 @@ async function lockWorkspaceWidget(db: Db, workspaceId: string) {
     .select({ id: widget.id })
     .from(widget)
     .where(eq(widget.workspaceId, workspaceId))
-    .limit(1)
-    .for("update");
+    .limit(1);
   if (!saved) throw new AgentTestPublishCheckError("Agent configuration was not found.");
 }
 
@@ -173,8 +170,7 @@ export async function startAgentTestPublishCheck(
   membershipId: string,
   db: Db = getDb(),
 ) {
-  return db.transaction(async (transaction) => {
-    const tx = transaction as unknown as Db;
+  return runDbWriteOperation(db, async (tx) => {
     await lockWorkspaceWidget(tx, workspaceId);
     const saved = await tx.query.widget.findFirst({ where: eq(widget.workspaceId, workspaceId) });
     if (!saved) throw new AgentTestPublishCheckError("Agent configuration was not found.");
@@ -308,8 +304,8 @@ export async function recordAgentTestPublishCheckResults(
   },
   db: Db = getDb(),
 ) {
-  return db.transaction(async (tx) => {
-    await lockWorkspaceWidget(tx as unknown as Db, input.workspaceId);
+  return runDbWriteOperation(db, async (tx) => {
+    await lockWorkspaceWidget(tx, input.workspaceId);
     const [check] = await tx
       .select()
       .from(agentTestPublishCheck)
@@ -320,8 +316,7 @@ export async function recordAgentTestPublishCheckResults(
           eq(agentTestPublishCheck.createdByMembershipId, input.membershipId),
         ),
       )
-      .limit(1)
-      .for("update");
+      .limit(1);
     if (!check)
       throw new AgentTestPublishCheckError("This suite comparison is unavailable. Start it again.");
     const requestDigest = digestResultRequest(input.variant, input.results);
@@ -442,21 +437,26 @@ export async function recordAgentTestPublishCheckResults(
     const sourceRefs = canonical.flatMap((result) => result.sources);
     const revisionIds = [...new Set(sourceRefs.map((source) => source.revisionId))];
     if (revisionIds.length) {
-      const revisions = await tx
-        .select({
-          id: documentRevision.id,
-          documentId: documentRevision.documentId,
-          revisionNumber: documentRevision.revisionNumber,
-          status: documentRevision.status,
-        })
-        .from(documentRevision)
-        .where(
-          and(
-            eq(documentRevision.workspaceId, input.workspaceId),
-            inArray(documentRevision.id, revisionIds),
+      const revisions = (
+        await Promise.all(
+          chunkArray(revisionIds, 80).map((idBatch) =>
+            tx
+              .select({
+                id: documentRevision.id,
+                documentId: documentRevision.documentId,
+                revisionNumber: documentRevision.revisionNumber,
+                status: documentRevision.status,
+              })
+              .from(documentRevision)
+              .where(
+                and(
+                  eq(documentRevision.workspaceId, input.workspaceId),
+                  inArray(documentRevision.id, idBatch),
+                ),
+              ),
           ),
         )
-        .for("share");
+      ).flat();
       const byId = new Map(revisions.map((revision) => [revision.id, revision]));
       if (
         sourceRefs.some((source) => {
@@ -592,21 +592,26 @@ export async function assertAgentTestPublishCheckCurrent(
   ];
   const revisionIds = [...new Set(sourceRefs.map((source) => source.revisionId))];
   if (revisionIds.length) {
-    const revisions = await db
-      .select({
-        id: documentRevision.id,
-        documentId: documentRevision.documentId,
-        revisionNumber: documentRevision.revisionNumber,
-        status: documentRevision.status,
-      })
-      .from(documentRevision)
-      .where(
-        and(
-          eq(documentRevision.workspaceId, input.workspaceId),
-          inArray(documentRevision.id, revisionIds),
+    const revisions = (
+      await Promise.all(
+        chunkArray(revisionIds, 80).map((idBatch) =>
+          db
+            .select({
+              id: documentRevision.id,
+              documentId: documentRevision.documentId,
+              revisionNumber: documentRevision.revisionNumber,
+              status: documentRevision.status,
+            })
+            .from(documentRevision)
+            .where(
+              and(
+                eq(documentRevision.workspaceId, input.workspaceId),
+                inArray(documentRevision.id, idBatch),
+              ),
+            ),
         ),
       )
-      .for("share");
+    ).flat();
     const byId = new Map(revisions.map((revision) => [revision.id, revision]));
     if (
       sourceRefs.some((source) => {

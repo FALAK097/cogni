@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, ne, gt, like, sql } from "drizzle-orm";
+import { and, eq, ne, gt, sql } from "drizzle-orm";
 import {
   conversation as conversationTable,
   visitorSession as visitorSessionTable,
@@ -11,7 +11,11 @@ export function getHasWidgetConversationCond(
   requireVisitorMessage = true,
 ) {
   const visitorMessageCond = requireVisitorMessage
-    ? sql`and "engaged_conversation"."messages" like '%"authorType":"VISITOR"%'`
+    ? sql`and exists (
+        select 1
+        from json_each(case when json_valid("engaged_conversation"."messages") and json_type("engaged_conversation"."messages") = 'array' then "engaged_conversation"."messages" else '[]' end) as msg
+        where json_extract(msg.value, '$.authorType') = 'VISITOR'
+      )`
     : sql.empty();
 
   return sql`exists (
@@ -50,7 +54,11 @@ export function getWidgetConversationCond(
   return and(
     eq(c.workspaceId, workspaceId),
     eq(c.channel, "WIDGET"),
-    like(c.messages, '%"authorType":"VISITOR"%'),
+    sql`exists (
+      select 1
+      from json_each(case when json_valid(${c.messages}) and json_type(${c.messages}) = 'array' then ${c.messages} else '[]' end) as msg
+      where json_extract(msg.value, '$.authorType') = 'VISITOR'
+    )`,
     sql`exists (
       select 1 from "visitor_session" as "engaged_visitor_session"
       where "engaged_visitor_session"."id" = ${c.visitorSessionId}

@@ -22,27 +22,40 @@ export async function ensureDefaultWorkspace(db: Db, user: { id: string; name: s
     return existingMembership.workspace;
   }
 
-  const slug = workspaceSlug(user.name, user.id);
+  const baseSlug = workspaceSlug(user.name, user.id);
   const now = new Date().toISOString();
+  let createdWorkspace: typeof workspace.$inferSelect | undefined;
 
-  const workspaces = await db
-    .insert(workspace)
-    .values({
-      id: crypto.randomUUID(),
-      name: `${user.name}'s workspace`,
-      slug,
-      updatedAt: now,
-    })
-    .onConflictDoUpdate({
-      target: workspace.slug,
-      set: {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const slug = attempt === 0 ? baseSlug : `${baseSlug}-${crypto.randomUUID().slice(0, 8)}`;
+    const [inserted] = await db
+      .insert(workspace)
+      .values({
+        id: crypto.randomUUID(),
         name: `${user.name}'s workspace`,
+        slug,
         updatedAt: now,
-      },
-    })
-    .returning();
+      })
+      .onConflictDoNothing()
+      .returning();
 
-  const createdWorkspace = workspaces[0];
+    if (inserted) {
+      createdWorkspace = inserted;
+      break;
+    }
+
+    const membershipAfterRace = await db.query.workspaceMember.findFirst({
+      where: (member, { eq }) => eq(member.userId, user.id),
+      with: { workspace: true },
+    });
+    if (membershipAfterRace) {
+      return membershipAfterRace.workspace;
+    }
+  }
+
+  if (!createdWorkspace) {
+    throw new Error("Could not provision default workspace.");
+  }
 
   await db
     .insert(workspaceMember)
@@ -53,13 +66,7 @@ export async function ensureDefaultWorkspace(db: Db, user: { id: string; name: s
       role: "OWNER",
       updatedAt: now,
     })
-    .onConflictDoUpdate({
-      target: [workspaceMember.userId, workspaceMember.workspaceId],
-      set: {
-        role: "OWNER",
-        updatedAt: now,
-      },
-    });
+    .onConflictDoNothing();
 
   return createdWorkspace;
 }

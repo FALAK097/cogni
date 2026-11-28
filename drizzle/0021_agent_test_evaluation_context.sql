@@ -1,1 +1,0 @@
-ALTER TABLE "agent_test_run" ADD COLUMN "evaluationContext" jsonb;

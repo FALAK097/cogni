@@ -1,19 +1,14 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { mkdir } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { after, before, test } from "node:test";
-import "dotenv/config";
 import { build } from "esbuild";
-import postgres from "postgres";
+import { createTempSqliteEnvironment } from "./sqlite-test-utils.mjs";
 
 process.env.SKIP_ENV_VALIDATION ??= "true";
-
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl || !["localhost", "127.0.0.1", "::1"].includes(new URL(databaseUrl).hostname)) {
-  throw new Error("Contact tag integration tests require a local DATABASE_URL.");
-}
+const { databaseUrl, raw, cleanup } = createTempSqliteEnvironment("cogni-contact-tag-");
 
 const outputDirectory = join(process.cwd(), "node_modules", ".cache", "cogni-contact-tag-test");
 const outputFile = join(outputDirectory, "contact-tags.mjs");
@@ -23,10 +18,7 @@ await build({
   stdin: {
     contents: `
       export { changeContactTag, parseContactTags } from "@/features/contacts/server/contact-tags";
-      import { drizzle } from "drizzle-orm/postgres-js";
-      import * as schema from "@/lib/db/schema";
-      import * as relations from "@/lib/db/relations";
-      export const createTestDb = (client) => drizzle(client, { schema: { ...schema, ...relations } });
+      export { createDbForUrl } from "@/lib/db/client";
     `,
     resolveDir: process.cwd(),
     sourcefile: "contact-tag-test-entry.ts",
@@ -54,12 +46,10 @@ await build({
   ],
 });
 
-const { changeContactTag, createTestDb, parseContactTags } = await import(
+const { changeContactTag, createDbForUrl, parseContactTags } = await import(
   `${pathToFileURL(outputFile).href}?run=${randomUUID()}`
 );
-const raw = postgres(databaseUrl, { max: 2 });
-const appClients = Array.from({ length: 3 }, () => postgres(databaseUrl, { max: 1 }));
-const appDatabases = appClients.map((client) => createTestDb(client));
+const appDatabases = Array.from({ length: 3 }, () => createDbForUrl(databaseUrl));
 const workspaceId = randomUUID();
 const otherWorkspaceId = randomUUID();
 const contactId = randomUUID();
@@ -81,8 +71,9 @@ before(async () => {
 
 after(async () => {
   await raw`DELETE FROM "workspace" WHERE "id" IN (${workspaceId}, ${otherWorkspaceId})`;
-  await Promise.all(appClients.map((client) => client.end({ timeout: 5 })));
-  await raw.end({ timeout: 5 });
+  for (const db of appDatabases) db.$client.close?.();
+  await cleanup();
+  await rm(outputDirectory, { recursive: true, force: true });
 });
 
 test("tag parsing tolerates malformed storage, normalizes and caps values", () => {

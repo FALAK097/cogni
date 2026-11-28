@@ -1,4 +1,5 @@
 import type { Db } from "@/lib/db/client";
+import { chunkArray } from "@/lib/db/utils";
 import { notification } from "@/lib/db/schema";
 
 export async function notifyWorkspaceMembers({
@@ -31,14 +32,16 @@ export async function notifyWorkspaceMembers({
 
   if (members.length === 0) return;
 
-  await db.insert(notification).values(
-    members.map((member) => ({
-      id: crypto.randomUUID(),
-      workspaceId,
-      userId: member.userId,
-      type,
-      title,
-      body,
-    })),
-  );
+  for (const memberBatch of chunkArray(members, 12)) {
+    await db.insert(notification).values(
+      memberBatch.map((member) => ({
+        id: crypto.randomUUID(),
+        workspaceId,
+        userId: member.userId,
+        type,
+        title,
+        body,
+      })),
+    );
+  }
 }

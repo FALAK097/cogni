@@ -64,6 +64,12 @@ export function useSwitchWorkspace() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.auth.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.workspaces.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.analytics.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.documents.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeBase.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.widget.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.integrations.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all });
       router.refresh();
     },
   });

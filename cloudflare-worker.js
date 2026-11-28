@@ -10,6 +10,13 @@ function getHost(request) {
   return new URL(request.url).hostname.toLowerCase().replace(/\.$/, "");
 }
 
+function dispatchInternalRequest(env, ctx, request) {
+  if (env.WORKER_SELF_REFERENCE) {
+    return env.WORKER_SELF_REFERENCE.fetch(request);
+  }
+  return nextWorker.fetch(request, env, ctx);
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -34,7 +41,7 @@ export default {
   },
 
   // Cloudflare Queue consumer for background knowledge ingestion jobs.
-  async queue(batch, env) {
+  async queue(batch, env, ctx) {
     const appRoot = String(env.APP_ROOT_DOMAIN || "cogni.falakgala.dev").toLowerCase();
 
     for (const message of batch.messages) {
@@ -92,8 +99,9 @@ export default {
       }
 
       try {
-        const caller = env.WORKER_SELF_REFERENCE ?? globalThis;
-        const response = await caller.fetch(
+        const response = await dispatchInternalRequest(
+          env,
+          ctx,
           new Request(targetUrl, {
             method: "POST",
             headers: {
@@ -129,5 +137,37 @@ export default {
         message.retry({ delaySeconds });
       }
     }
+  },
+
+  async scheduled(_controller, env, ctx) {
+    const appRoot = String(env.APP_ROOT_DOMAIN || "cogni.falakgala.dev").toLowerCase();
+    const cronSecret = String(env.CRON_SECRET || "").trim();
+    if (!cronSecret) {
+      console.error("Missing CRON_SECRET in worker environment; skipping scheduled cron run.");
+      return;
+    }
+
+    const work = (async () => {
+      try {
+        const response = await dispatchInternalRequest(
+          env,
+          ctx,
+          new Request(`https://${appRoot}/api/cron/ingestion`, {
+            method: "GET",
+            headers: {
+              authorization: `Bearer ${cronSecret}`,
+            },
+          }),
+        );
+        if (!response.ok) {
+          console.error("Scheduled cron ingestion returned status:", response.status);
+        }
+      } catch (error) {
+        console.error("Scheduled cron ingestion failed:", error?.message || error);
+      }
+    })();
+
+    ctx.waitUntil(work);
+    await work;
   },
 };

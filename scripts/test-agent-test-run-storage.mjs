@@ -23,6 +23,7 @@ const stubs = {
     export const desc = (field) => ({ op: "desc", field });
   `,
   "@/lib/db/client": `export const getDb = () => globalThis.__agentTestRunStorageState.db;`,
+  "@/lib/env/server": `export const env = { BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET ?? "test-preview-evidence-secret-0123456789abcdef" };`,
   "@/lib/db/schema": `
     export const agentTestCase = { workspaceId: "case.workspaceId", id: "case.id" };
     export const agentTestRun = {

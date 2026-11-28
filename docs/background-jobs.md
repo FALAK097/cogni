@@ -1,18 +1,17 @@
 # Background jobs
 
-Knowledge ingestion uses Cloudflare Queues for durable delivery and the existing PostgreSQL
-`workflow_run` table for tenant-scoped status, idempotency, attempts, audit history, and dashboard
-visibility.
+Knowledge ingestion uses Cloudflare Queues for durable delivery and the D1 `workflow_run` table
+for tenant-scoped status, idempotency, attempts, audit history, and dashboard visibility.
 
 ## Decision
 
-| Option                          | Strength                                                                | Trade-off                                                        | Decision                              |
-| ------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------- |
-| Next.js `after()` + Vercel Cron | No additional service                                                   | Invocation-bound work; Hobby cron recovery is daily              | Local and emergency fallback only     |
-| Vercel Queues                   | Native Vercel delivery and retries                                      | Public beta, 24-hour retention, no built-in DLQ                  | Not selected                          |
-| Vercel Workflow                 | Durable application steps                                               | More useful for long-lived orchestration than one ingestion task | Keep for future evaluation            |
-| Cloudflare Queues               | At-least-once delivery, retries, backoff, DLQ, Cloudflare observability | Requires a small Worker                                          | Selected                              |
-| Cloudflare Workflows            | Durable multi-step state, waits, per-step retries                       | Would move or duplicate Node PDF/DOCX and Neon processing        | Use later for crawl/fan-out pipelines |
+| Option                   | Strength                                                                | Trade-off                                                        | Decision                              |
+| ------------------------ | ----------------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------- |
+| Next.js `after()` + cron | No additional service                                                   | Invocation-bound work; recovery cadence is fixed                 | Local and emergency fallback only     |
+| In-process queue         | No additional service                                                   | No delivery guarantees across restarts                           | Not selected                          |
+| Cloudflare Workflows     | Durable application steps                                               | More useful for long-lived orchestration than one ingestion task | Keep for future evaluation            |
+| Cloudflare Queues        | At-least-once delivery, retries, backoff, DLQ, Cloudflare observability | Requires a small Worker                                          | Selected                              |
+| Cloudflare Workflows     | Durable multi-step state, waits, per-step retries                       | Would move or duplicate Node PDF/DOCX and D1 processing          | Use later for crawl/fan-out pipelines |
 
 Cloudflare Queues fits the current task boundary: one message invokes one idempotent document
 processing operation. Cloudflare Workflows becomes appropriate when website ingestion is split into
@@ -23,13 +22,13 @@ durable crawl, per-page extraction, indexing, and approval/wait steps.
 ```text
 Authenticated Next.js route/action
   -> store source in R2 or validate URL
-  -> insert document + QUEUED workflow_run in Neon
+  -> insert document + QUEUED workflow_run in D1
   -> signed POST to Cloudflare Worker /enqueue
   -> Cloudflare Queue (at-least-once)
   -> Worker consumer signed POST to /api/internal/ingestion
   -> atomically claim workflow_run
   -> extract with the existing Node pipeline
-  -> write chunks to Neon and upload to Cloudflare AI Search
+  -> write chunks to D1 and upload to Cloudflare AI Search
   -> mark document/workflow complete
 ```
 
@@ -50,7 +49,7 @@ Cloudflare resources:
 - Dead-letter queue: `cogni-ingestion-dlq`
 - Worker secret: `INGESTION_SHARED_SECRET`
 
-Vercel and local server variables:
+Worker secrets and local server variables:
 
 - `CLOUDFLARE_INGESTION_QUEUE_URL=https://cogni-ingestion-queue.widget-chat.workers.dev/enqueue`
 - `INGESTION_SHARED_SECRET`: the same random secret installed in the Worker
@@ -69,7 +68,7 @@ transiently. Workflow inputs/outputs, QA rows, and error codes contain IDs, cate
 token usage only; no transcript, answer text, attachments, internal notes, or evaluator explanation
 is persisted.
 
-The Vercel cron currently runs once daily at 03:00 UTC and the QA drain processes at most four
+The Cloudflare cron trigger currently runs once daily at 03:00 UTC and the QA drain processes at most four
 scoring runs per sweep. Thus inactivity eligibility starts at 24 hours, but the bounded scan and
 daily cadence may delay enqueueing by up to roughly one additional daily interval (and longer if the
 durable queue is backlogged). Closed conversations are eligible and enqueued immediately, but their
@@ -90,5 +89,5 @@ pnpm exec wrangler queues list
 pnpm exec wrangler tail cogni-ingestion-queue
 ```
 
-The daily Vercel cron remains a reconciliation safety net for database rows committed immediately
+The daily Cloudflare cron remains a reconciliation safety net for database rows committed immediately
 before an unlikely queue-publish outage. It is not the primary worker.

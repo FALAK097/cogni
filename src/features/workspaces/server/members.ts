@@ -32,8 +32,7 @@ export async function acceptWorkspaceInviteMembership(
     await transaction
       .select({ id: workspaceTable.id })
       .from(workspaceTable)
-      .where(eq(workspaceTable.id, input.workspaceId))
-      .for("update");
+      .where(eq(workspaceTable.id, input.workspaceId));
 
     const [invite] = await transaction
       .select({
@@ -49,8 +48,7 @@ export async function acceptWorkspaceInviteMembership(
           eq(workspaceInvite.id, input.inviteId),
           eq(workspaceInvite.workspaceId, input.workspaceId),
         ),
-      )
-      .for("update");
+      );
 
     if (
       !invite ||
@@ -69,8 +67,7 @@ export async function acceptWorkspaceInviteMembership(
           eq(workspaceMember.userId, input.userId),
           eq(workspaceMember.workspaceId, input.workspaceId),
         ),
-      )
-      .for("update");
+      );
 
     if (!existingMembership) {
       await transaction

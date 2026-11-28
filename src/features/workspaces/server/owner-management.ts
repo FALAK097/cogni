@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import { runDbWriteOperation, type Db } from "@/lib/db/client";
 import {
@@ -12,8 +12,11 @@ async function lockWorkspace(db: Db, workspaceId: string) {
   await db
     .select({ id: workspaceTable.id })
     .from(workspaceTable)
-    .where(eq(workspaceTable.id, workspaceId))
-    .for("update");
+    .where(eq(workspaceTable.id, workspaceId));
+}
+
+function moreThanOneOwnerSql(workspaceId: string) {
+  return sql`(SELECT count(*) FROM "workspace_member" AS "owners" WHERE "owners"."workspaceId" = ${workspaceId} AND "owners"."role" = 'OWNER') > 1`;
 }
 
 async function isCurrentOwner(db: Db, workspaceId: string, membershipId: string) {
@@ -75,17 +78,21 @@ export async function updateWorkspaceMemberRole(
       if ((await countWorkspaceOwners(transaction, workspaceId)) <= 1) return false;
     }
 
-    await transaction
+    const updated = await transaction
       .update(workspaceMemberTable)
       .set({ role, updatedAt: new Date().toISOString() })
       .where(
         and(
           eq(workspaceMemberTable.id, target.id),
           eq(workspaceMemberTable.workspaceId, workspaceId),
+          ...(target.role === "OWNER" && role !== "OWNER"
+            ? [eq(workspaceMemberTable.role, "OWNER"), moreThanOneOwnerSql(workspaceId)]
+            : []),
         ),
-      );
+      )
+      .returning({ id: workspaceMemberTable.id });
 
-    return true;
+    return updated.length > 0;
   });
 }
 
@@ -117,16 +124,20 @@ export async function removeWorkspaceMember(
       return false;
     }
 
-    await transaction
+    const deleted = await transaction
       .delete(workspaceMemberTable)
       .where(
         and(
           eq(workspaceMemberTable.id, target.id),
           eq(workspaceMemberTable.workspaceId, workspaceId),
+          ...(target.role === "OWNER"
+            ? [eq(workspaceMemberTable.role, "OWNER"), moreThanOneOwnerSql(workspaceId)]
+            : []),
         ),
-      );
+      )
+      .returning({ id: workspaceMemberTable.id });
 
-    return true;
+    return deleted.length > 0;
   });
 }
 
@@ -155,26 +166,31 @@ export async function transferWorkspaceOwnership(
     if (!target || target.id === actorMembershipId) return false;
 
     const updatedAt = new Date().toISOString();
-    await transaction
-      .update(workspaceMemberTable)
-      .set({ role: "MEMBER", updatedAt })
-      .where(
-        and(
-          eq(workspaceMemberTable.id, actorMembershipId),
-          eq(workspaceMemberTable.workspaceId, workspaceId),
-        ),
-      );
+    const [demoted, promoted] = await transaction.batch([
+      transaction
+        .update(workspaceMemberTable)
+        .set({ role: "MEMBER", updatedAt })
+        .where(
+          and(
+            eq(workspaceMemberTable.id, actorMembershipId),
+            eq(workspaceMemberTable.workspaceId, workspaceId),
+            eq(workspaceMemberTable.role, "OWNER"),
+            sql`EXISTS (SELECT 1 FROM "workspace_member" AS "target_member" WHERE "target_member"."id" = ${target.id} AND "target_member"."workspaceId" = ${workspaceId})`,
+          ),
+        )
+        .returning({ id: workspaceMemberTable.id }),
+      transaction
+        .update(workspaceMemberTable)
+        .set({ role: "OWNER", updatedAt })
+        .where(
+          and(
+            eq(workspaceMemberTable.id, target.id),
+            eq(workspaceMemberTable.workspaceId, workspaceId),
+          ),
+        )
+        .returning({ id: workspaceMemberTable.id }),
+    ]);
 
-    await transaction
-      .update(workspaceMemberTable)
-      .set({ role: "OWNER", updatedAt })
-      .where(
-        and(
-          eq(workspaceMemberTable.id, target.id),
-          eq(workspaceMemberTable.workspaceId, workspaceId),
-        ),
-      );
-
-    return true;
+    return demoted.length > 0 && promoted.length > 0;
   });
 }

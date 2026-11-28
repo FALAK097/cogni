@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import "dotenv/config";
 import { mkdtemp, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -7,15 +6,11 @@ import { pathToFileURL } from "node:url";
 import { after, before, test } from "node:test";
 import { randomUUID } from "node:crypto";
 import { build } from "esbuild";
-import postgres from "postgres";
 import { readWidgetTextStream } from "../public/widget/sse.js";
+import { createTempSqliteEnvironment } from "./sqlite-test-utils.mjs";
 
 process.env.SKIP_ENV_VALIDATION ??= "true";
-
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl || !["localhost", "127.0.0.1", "::1"].includes(new URL(databaseUrl).hostname)) {
-  throw new Error("Conversation append integration tests require a local DATABASE_URL.");
-}
+const { databaseUrl, raw, cleanup } = createTempSqliteEnvironment("cogni-conversation-db-");
 
 const outputDirectory = await mkdtemp(join(tmpdir(), "cogni-conversation-test-"));
 const outputFile = join(outputDirectory, "conversation.mjs");
@@ -33,13 +28,10 @@ await build({
         recordAiMessage,
         setConversationStatus,
         setAiMessageFeedback,
+        updateConversationState,
       } from "@/features/conversations/server/conversation-service";
       export { createWidgetSseStream } from "@/features/widget/server/widget-utils";
-      export { runDbWriteOperation } from "@/lib/db/client";
-      import { drizzle } from "drizzle-orm/postgres-js";
-      import * as schema from "@/lib/db/schema";
-      import * as relations from "@/lib/db/relations";
-      export const createTestDb = (client) => drizzle(client, { schema: { ...schema, ...relations } });
+      export { createDbForUrl, runDbWriteOperation } from "@/lib/db/client";
     `,
     resolveDir: process.cwd(),
     sourcefile: "conversation-test-entry.ts",
@@ -76,13 +68,12 @@ const {
   recordAiMessage,
   setConversationStatus,
   setAiMessageFeedback,
+  updateConversationState,
   runDbWriteOperation,
   createWidgetSseStream,
-  createTestDb,
+  createDbForUrl,
 } = await import(`${pathToFileURL(outputFile).href}?build=${randomUUID()}`);
-const raw = postgres(databaseUrl, { max: 2 });
-const appClients = Array.from({ length: 3 }, () => postgres(databaseUrl, { max: 1 }));
-const appDatabases = appClients.map((client) => createTestDb(client));
+const appDatabases = Array.from({ length: 3 }, () => createDbForUrl(databaseUrl));
 const workspaceId = randomUUID();
 const contactId = randomUUID();
 const widgetId = randomUUID();
@@ -95,7 +86,7 @@ const now = new Date().toISOString();
 
 before(async () => {
   await raw`INSERT INTO "workspace" ("id", "name", "slug", "updatedAt") VALUES (${workspaceId}, 'Rate test', ${`test-${workspaceId}`}, ${now})`;
-  await raw`INSERT INTO "user" ("id", "name", "email", "updatedAt") VALUES (${userId}, 'Test member', ${`${userId}@example.test`}, ${now})`;
+  await raw`INSERT INTO "user" ("id", "name", "email", "updatedAt") VALUES (${userId}, 'Test member', ${`${userId}@example.test`}, ${Date.now()})`;
   await raw`INSERT INTO "workspace_member" ("id", "userId", "workspaceId", "updatedAt") VALUES (${memberId}, ${userId}, ${workspaceId}, ${now})`;
   await raw`INSERT INTO "contact" ("id", "name", "updatedAt", "workspaceId") VALUES (${contactId}, 'Test visitor', ${now}, ${workspaceId})`;
   await raw`INSERT INTO "widget" ("id", "publicKey", "updatedAt", "workspaceId") VALUES (${widgetId}, ${`test-${widgetId}`}, ${now}, ${workspaceId})`;
@@ -106,8 +97,8 @@ before(async () => {
 after(async () => {
   await raw`DELETE FROM "workspace" WHERE "id" = ${workspaceId}`;
   await raw`DELETE FROM "user" WHERE "id" = ${userId}`;
-  await Promise.all(appClients.map((client) => client.end({ timeout: 5 })));
-  await raw.end({ timeout: 5 });
+  for (const db of appDatabases) db.$client.close?.();
+  await cleanup();
   await rm(outputDirectory, { recursive: true, force: true });
 });
 
@@ -140,7 +131,7 @@ test("concurrent transcript appends preserve every message", async () => {
     new Set(messages.map((message) => message.id)),
   );
   const [eventCount] = await raw`
-    SELECT count(*)::int AS count
+    SELECT count(*) AS count
     FROM "conversation_event"
     WHERE "workspaceId" = ${workspaceId} AND "conversationId" = ${conversationId}
   `;
@@ -174,7 +165,7 @@ test("duplicate webhook deliveries append only once", async () => {
   assert.equal(deliveries.filter((delivery) => delivery?.inserted).length, 1);
   assert.ok(deliveries.every((delivery) => delivery?.message.id === matching[0].id));
   const [eventCount] = await raw`
-    SELECT count(*)::int AS count
+    SELECT count(*) AS count
     FROM "conversation_event"
     WHERE "workspaceId" = ${workspaceId} AND "conversationId" = ${conversationId}
   `;
@@ -184,7 +175,7 @@ test("duplicate webhook deliveries append only once", async () => {
 test("conversation events roll back with their transcript write", async () => {
   const eventCount = async () => {
     const [result] = await raw`
-      SELECT count(*)::int AS count
+      SELECT count(*) AS count
       FROM "conversation_event"
       WHERE "workspaceId" = ${workspaceId} AND "conversationId" = ${conversationId}
     `;
@@ -371,24 +362,16 @@ test("channel AI delivery waits behind an in-flight reply before takeover commit
   });
   await deliveryEntered;
 
-  const takeover =
-    appClients[1]`UPDATE "conversation" SET "aiPaused" = true, "status" = 'ASSIGNED' WHERE "id" = ${conversationId}`.then(
-      () => deliveryOrder.push("takeover-committed"),
-    );
-  const lockDeadline = Date.now() + 3_000;
-  let takeoverBlocked = false;
-  while (!takeoverBlocked && Date.now() < lockDeadline) {
-    const [activity] = await raw`
-      SELECT "wait_event_type"
-      FROM pg_stat_activity
-      WHERE "wait_event_type" = 'Lock'
-        AND "query" LIKE 'UPDATE "conversation" SET "aiPaused"%'
-      LIMIT 1
-    `;
-    takeoverBlocked = Boolean(activity);
-    if (!takeoverBlocked) await new Promise((resolve) => setTimeout(resolve, 10));
-  }
-  assert.equal(takeoverBlocked, true, "takeover update must wait on the outbound send row lock");
+  const takeover = updateConversationState({
+    db: appDatabases[1],
+    workspaceId,
+    conversationId,
+    changes: { aiPaused: true, status: "ASSIGNED" },
+  }).then(() => {
+    deliveryOrder.push("takeover-committed");
+  });
+
+  await new Promise((resolve) => setTimeout(resolve, 25));
   assert.deepEqual(deliveryOrder, ["send-started"]);
 
   releaseDelivery();

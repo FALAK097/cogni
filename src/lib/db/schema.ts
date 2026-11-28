@@ -1,18 +1,13 @@
 import {
-  boolean,
-  bigint,
   check,
   foreignKey,
   index,
   integer,
-  jsonb,
-  pgTable,
-  pgEnum,
   primaryKey,
+  sqliteTable,
   text,
-  timestamp,
   uniqueIndex,
-} from "drizzle-orm/pg-core";
+} from "drizzle-orm/sqlite-core";
 import * as orm from "drizzle-orm";
 
 import { BRAND_COLOR } from "@/lib/widget-accent";
@@ -20,35 +15,34 @@ import type { WidgetPublicationSnapshot } from "@/features/widget/publication";
 
 const { sql } = orm;
 
-const timestampString = () => timestamp({ mode: "string", withTimezone: true });
+const isoNowDefault = sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`;
+const epochMsDefault = sql`(cast((julianday('now') - 2440587.5) * 86400000 as integer))`;
+
+const timestampString = () => text();
 const numeric = timestampString;
 
-export const user = pgTable(
+export const user = sqliteTable(
   "user",
   {
     id: text().primaryKey().notNull(),
     name: text().notNull(),
     email: text().notNull(),
-    emailVerified: boolean().default(false).notNull(),
+    emailVerified: integer({ mode: "boolean" }).default(false).notNull(),
     image: text(),
-    createdAt: timestamp({ mode: "date", withTimezone: true })
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
-    updatedAt: timestamp({ mode: "date", withTimezone: true }).notNull(),
+    createdAt: integer({ mode: "timestamp_ms" }).default(epochMsDefault).notNull(),
+    updatedAt: integer({ mode: "timestamp_ms" }).notNull(),
   },
   (table) => [uniqueIndex("user_email_key").on(table.email)],
 );
 
-export const session = pgTable(
+export const session = sqliteTable(
   "session",
   {
     id: text().primaryKey().notNull(),
-    expiresAt: timestamp({ mode: "date", withTimezone: true }).notNull(),
+    expiresAt: integer({ mode: "timestamp_ms" }).notNull(),
     token: text().notNull(),
-    createdAt: timestamp({ mode: "date", withTimezone: true })
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
-    updatedAt: timestamp({ mode: "date", withTimezone: true }).notNull(),
+    createdAt: integer({ mode: "timestamp_ms" }).default(epochMsDefault).notNull(),
+    updatedAt: integer({ mode: "timestamp_ms" }).notNull(),
     ipAddress: text(),
     userAgent: text(),
     userId: text()
@@ -61,7 +55,7 @@ export const session = pgTable(
   ],
 );
 
-export const account = pgTable(
+export const account = sqliteTable(
   "account",
   {
     id: text().primaryKey().notNull(),
@@ -73,34 +67,30 @@ export const account = pgTable(
     accessToken: text(),
     refreshToken: text(),
     idToken: text(),
-    accessTokenExpiresAt: timestamp({ mode: "date", withTimezone: true }),
-    refreshTokenExpiresAt: timestamp({ mode: "date", withTimezone: true }),
+    accessTokenExpiresAt: integer({ mode: "timestamp_ms" }),
+    refreshTokenExpiresAt: integer({ mode: "timestamp_ms" }),
     scope: text(),
     password: text(),
-    createdAt: timestamp({ mode: "date", withTimezone: true })
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
-    updatedAt: timestamp({ mode: "date", withTimezone: true }).notNull(),
+    createdAt: integer({ mode: "timestamp_ms" }).default(epochMsDefault).notNull(),
+    updatedAt: integer({ mode: "timestamp_ms" }).notNull(),
   },
   (table) => [index("account_userId_idx").on(table.userId)],
 );
 
-export const verification = pgTable(
+export const verification = sqliteTable(
   "verification",
   {
     id: text().primaryKey().notNull(),
     identifier: text().notNull(),
     value: text().notNull(),
-    expiresAt: timestamp({ mode: "date", withTimezone: true }).notNull(),
-    createdAt: timestamp({ mode: "date", withTimezone: true })
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
-    updatedAt: timestamp({ mode: "date", withTimezone: true }).notNull(),
+    expiresAt: integer({ mode: "timestamp_ms" }).notNull(),
+    createdAt: integer({ mode: "timestamp_ms" }).default(epochMsDefault).notNull(),
+    updatedAt: integer({ mode: "timestamp_ms" }).notNull(),
   },
   (table) => [index("verification_identifier_idx").on(table.identifier)],
 );
 
-export const workspace = pgTable(
+export const workspace = sqliteTable(
   "workspace",
   {
     id: text().primaryKey().notNull(),
@@ -109,22 +99,18 @@ export const workspace = pgTable(
     logo: text(),
     brandColor: text().default(BRAND_COLOR).notNull(),
     timezone: text().default("UTC").notNull(),
-    createdAt: timestampString()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    createdAt: timestampString().default(isoNowDefault).notNull(),
     updatedAt: timestampString().notNull(),
   },
   (table) => [uniqueIndex("workspace_slug_key").on(table.slug)],
 );
 
-export const workspaceMember = pgTable(
+export const workspaceMember = sqliteTable(
   "workspace_member",
   {
     id: text().primaryKey().notNull(),
     role: text().default("MEMBER").notNull(),
-    createdAt: timestampString()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    createdAt: timestampString().default(isoNowDefault).notNull(),
     updatedAt: timestampString().notNull(),
     userId: text()
       .notNull()
@@ -139,7 +125,7 @@ export const workspaceMember = pgTable(
   ],
 );
 
-export const contact = pgTable(
+export const contact = sqliteTable(
   "contact",
   {
     id: text().primaryKey().notNull(),
@@ -152,9 +138,7 @@ export const contact = pgTable(
     externalId: text(),
     avatarUrl: text(),
     tags: text().default("[]").notNull(),
-    createdAt: numeric()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    createdAt: numeric().default(isoNowDefault).notNull(),
     updatedAt: numeric().notNull(),
     lastSeenAt: numeric(),
     workspaceId: text()
@@ -169,14 +153,12 @@ export const contact = pgTable(
   ],
 );
 
-export const contactNote = pgTable(
+export const contactNote = sqliteTable(
   "contact_note",
   {
     id: text().primaryKey().notNull(),
     body: text().notNull(),
-    createdAt: numeric()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    createdAt: numeric().default(isoNowDefault).notNull(),
     contactId: text()
       .notNull()
       .references(() => contact.id, { onDelete: "cascade", onUpdate: "cascade" }),
@@ -190,7 +172,7 @@ export const contactNote = pgTable(
   ],
 );
 
-export const conversation = pgTable(
+export const conversation = sqliteTable(
   "conversation",
   {
     id: text().primaryKey().notNull(),
@@ -199,14 +181,10 @@ export const conversation = pgTable(
     snoozedUntil: timestampString(),
     channel: text().default("WIDGET").notNull(),
     externalThreadId: text(),
-    aiPaused: boolean().default(false).notNull(),
-    createdAt: numeric()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    aiPaused: integer({ mode: "boolean" }).default(false).notNull(),
+    createdAt: numeric().default(isoNowDefault).notNull(),
     updatedAt: numeric().notNull(),
-    lastMessageAt: numeric()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    lastMessageAt: numeric().default(isoNowDefault).notNull(),
     messages: text().default("[]").notNull(),
     labels: text().default("[]").notNull(),
     workspaceId: text()
@@ -250,7 +228,7 @@ export const conversation = pgTable(
   ],
 );
 
-export const conversationQaState = pgTable(
+export const conversationQaState = sqliteTable(
   "conversation_qa_state",
   {
     workspaceId: text()
@@ -260,9 +238,7 @@ export const conversationQaState = pgTable(
     version: integer().default(1).notNull(),
     lastObservedMessageAt: timestampString(),
     nextEligibleAt: timestampString(),
-    updatedAt: timestampString()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    updatedAt: timestampString().default(isoNowDefault).notNull(),
   },
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.conversationId] }),
@@ -278,7 +254,7 @@ export const conversationQaState = pgTable(
 );
 
 /** Stores only bounded evaluator labels and usage; never transcript or evaluator prose. */
-export const conversationQaEvaluation = pgTable(
+export const conversationQaEvaluation = sqliteTable(
   "conversation_qa_evaluation",
   {
     id: text().primaryKey().notNull(),
@@ -293,18 +269,16 @@ export const conversationQaEvaluation = pgTable(
     helpfulness: integer(),
     grounding: integer(),
     sentiment: text(),
-    topics: jsonb().$type<string[]>().default([]).notNull(),
+    topics: text({ mode: "json" }).$type<string[]>().default([]).notNull(),
     escalationOutcome: text(),
-    reasonCodes: jsonb().$type<string[]>().default([]).notNull(),
-    lowScore: boolean(),
+    reasonCodes: text({ mode: "json" }).$type<string[]>().default([]).notNull(),
+    lowScore: integer({ mode: "boolean" }),
     modelProvider: text(),
     modelName: text(),
     inputTokens: integer(),
     outputTokens: integer(),
     errorCode: text(),
-    createdAt: timestampString()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    createdAt: timestampString().default(isoNowDefault).notNull(),
     completedAt: timestampString(),
   },
   (table) => [
@@ -344,7 +318,7 @@ export const conversationQaEvaluation = pgTable(
     ),
     check(
       "conversation_qa_evaluation_result_check",
-      sql`(${table.status} <> 'COMPLETED' or (${table.helpfulness} is not null and ${table.grounding} is not null and ${table.sentiment} is not null and ${table.escalationOutcome} is not null and ${table.lowScore} is not null and ${table.lowScore} = (${table.grounding} < 3 or ${table.escalationOutcome} = 'MISSED' or ${table.helpfulness} + ${table.grounding} < 6)))`,
+      sql`(${table.status} <> 'COMPLETED' or (${table.helpfulness} is not null and ${table.grounding} is not null and ${table.sentiment} is not null and ${table.escalationOutcome} is not null and ${table.lowScore} in (0, 1) and ${table.lowScore} = (case when ${table.grounding} < 3 or ${table.escalationOutcome} = 'MISSED' or ${table.helpfulness} + ${table.grounding} < 6 then 1 else 0 end)))`,
     ),
     check(
       "conversation_qa_evaluation_sentiment_check",
@@ -356,11 +330,11 @@ export const conversationQaEvaluation = pgTable(
     ),
     check(
       "conversation_qa_evaluation_topics_check",
-      sql`jsonb_typeof(${table.topics}) = 'array' and jsonb_array_length(${table.topics}) <= 3 and ${table.topics} <@ '["account_access", "billing", "integrations", "pricing", "product_usage", "technical_issue", "cancellation", "other"]'::jsonb`,
+      sql`json_valid(${table.topics}) = 1 and json_type(${table.topics}) = 'array' and json_array_length(${table.topics}) <= 3`,
     ),
     check(
       "conversation_qa_evaluation_reason_codes_check",
-      sql`jsonb_typeof(${table.reasonCodes}) = 'array' and jsonb_array_length(${table.reasonCodes}) <= 4 and ${table.reasonCodes} <@ '["ANSWER_UNCLEAR", "FACT_UNSUPPORTED", "QUESTION_UNANSWERED", "ESCALATION_MISSED", "TONE_MISMATCH", "GOOD_RESOLUTION", "INSUFFICIENT_CONTEXT"]'::jsonb`,
+      sql`json_valid(${table.reasonCodes}) = 1 and json_type(${table.reasonCodes}) = 'array' and json_array_length(${table.reasonCodes}) <= 4`,
     ),
     check(
       "conversation_qa_evaluation_model_check",
@@ -377,10 +351,7 @@ export const conversationQaEvaluation = pgTable(
   ],
 );
 
-export const ticketStatus = pgEnum("ticket_status", ["OPEN", "PENDING", "RESOLVED"]);
-export const ticketPriority = pgEnum("ticket_priority", ["LOW", "NORMAL", "HIGH", "URGENT"]);
-
-export const ticket = pgTable(
+export const ticket = sqliteTable(
   "ticket",
   {
     id: text().primaryKey().notNull(),
@@ -394,8 +365,12 @@ export const ticket = pgTable(
       .notNull()
       .references(() => contact.id, { onDelete: "cascade", onUpdate: "cascade" }),
     title: text().notNull(),
-    status: ticketStatus().default("OPEN").notNull(),
-    priority: ticketPriority().default("NORMAL").notNull(),
+    status: text({ enum: ["OPEN", "PENDING", "RESOLVED"] })
+      .default("OPEN")
+      .notNull(),
+    priority: text({ enum: ["LOW", "NORMAL", "HIGH", "URGENT"] })
+      .default("NORMAL")
+      .notNull(),
     assignedMemberId: text().references(() => workspaceMember.id, {
       onDelete: "set null",
       onUpdate: "cascade",
@@ -405,12 +380,8 @@ export const ticket = pgTable(
       onDelete: "set null",
       onUpdate: "cascade",
     }),
-    createdAt: timestampString()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
-    updatedAt: timestampString()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    createdAt: timestampString().default(isoNowDefault).notNull(),
+    updatedAt: timestampString().default(isoNowDefault).notNull(),
   },
   (table) => [
     foreignKey({
@@ -443,18 +414,16 @@ export const ticket = pgTable(
   ],
 );
 
-export const conversationEvent = pgTable(
+export const conversationEvent = sqliteTable(
   "conversation_event",
   {
-    cursor: bigint({ mode: "bigint" }).generatedAlwaysAsIdentity().primaryKey(),
+    cursor: integer({ mode: "number" }).primaryKey({ autoIncrement: true }),
     workspaceId: text()
       .notNull()
       .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
     conversationId: text().notNull(),
     type: text({ enum: ["message", "state", "read"] }).notNull(),
-    createdAt: timestampString()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    createdAt: timestampString().default(isoNowDefault).notNull(),
   },
   (table) => [
     check("conversation_event_type_check", sql`${table.type} IN ('message', 'state', 'read')`),
@@ -468,7 +437,7 @@ export const conversationEvent = pgTable(
   ],
 );
 
-export const inboxSavedView = pgTable(
+export const inboxSavedView = sqliteTable(
   "inbox_saved_view",
   {
     id: text().primaryKey().notNull(),
@@ -477,9 +446,7 @@ export const inboxSavedView = pgTable(
     channel: text(),
     assigneeFilter: text().default("all").notNull(),
     labelFilter: text(),
-    createdAt: timestampString()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    createdAt: timestampString().default(isoNowDefault).notNull(),
     updatedAt: timestampString().notNull(),
     workspaceId: text()
       .notNull()
@@ -498,15 +465,13 @@ export const inboxSavedView = pgTable(
   ],
 );
 
-export const inboxMacro = pgTable(
+export const inboxMacro = sqliteTable(
   "inbox_macro",
   {
     id: text().primaryKey().notNull(),
     name: text().notNull(),
     content: text().notNull(),
-    createdAt: timestampString()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    createdAt: timestampString().default(isoNowDefault).notNull(),
     updatedAt: timestampString().notNull(),
     workspaceId: text()
       .notNull()
@@ -522,23 +487,15 @@ export const inboxMacro = pgTable(
   ],
 );
 
-export const agentTestExpectedOutcome = pgEnum("agent_test_expected_outcome", [
-  "grounded_answer",
-  "no_evidence",
-  "human_handoff",
-]);
-
-export const agentTestCase = pgTable(
+export const agentTestCase = sqliteTable(
   "agent_test_case",
   {
     id: text().primaryKey().notNull(),
     title: text().notNull(),
     prompt: text().notNull(),
-    expectedOutcome: agentTestExpectedOutcome().notNull(),
-    expectedSourceIds: jsonb().$type<string[]>().default([]).notNull(),
-    createdAt: timestampString()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    expectedOutcome: text({ enum: ["grounded_answer", "no_evidence", "human_handoff"] }).notNull(),
+    expectedSourceIds: text({ mode: "json" }).$type<string[]>().default([]).notNull(),
+    createdAt: timestampString().default(isoNowDefault).notNull(),
     updatedAt: timestampString().notNull(),
     workspaceId: text()
       .notNull()
@@ -558,13 +515,13 @@ export const agentTestCase = pgTable(
   ],
 );
 
-export const agentTestRun = pgTable(
+export const agentTestRun = sqliteTable(
   "agent_test_run",
   {
     id: text().primaryKey().notNull(),
     resultDigest: text().notNull(),
     suiteDigest: text(),
-    evaluationContext: jsonb().$type<{
+    evaluationContext: text({ mode: "json" }).$type<{
       version: 1;
       configFingerprint: string;
       configBasis: "widget-draft-revision-v1";
@@ -582,9 +539,7 @@ export const agentTestRun = pgTable(
     mismatchCount: integer().notNull(),
     errorCount: integer().notNull(),
     notRunCount: integer().notNull(),
-    createdAt: timestampString()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    createdAt: timestampString().default(isoNowDefault).notNull(),
     workspaceId: text()
       .notNull()
       .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
@@ -607,13 +562,7 @@ export const agentTestRun = pgTable(
   ],
 );
 
-export const agentTestImprovementStatus = pgEnum("agent_test_improvement_status", [
-  "OPEN",
-  "RESOLVED",
-  "DISMISSED",
-]);
-
-export const agentTestImprovement = pgTable(
+export const agentTestImprovement = sqliteTable(
   "agent_test_improvement",
   {
     id: text().primaryKey().notNull(),
@@ -622,7 +571,7 @@ export const agentTestImprovement = pgTable(
       .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
     runId: text().notNull(),
     caseId: text().notNull(),
-    caseSnapshot: jsonb()
+    caseSnapshot: text({ mode: "json" })
       .$type<{
         title: string;
         prompt: string;
@@ -630,7 +579,7 @@ export const agentTestImprovement = pgTable(
         expectedSourceIds: string[];
       }>()
       .notNull(),
-    evaluationReferences: jsonb()
+    evaluationReferences: text({ mode: "json" })
       .$type<{
         configBasis: "widget-draft-revision-v1";
         configFingerprint: string;
@@ -639,25 +588,23 @@ export const agentTestImprovement = pgTable(
         sources: { documentId: string; revisionId: string | null; revisionNumber: number | null }[];
       }>()
       .notNull(),
-    failureSourceIds: jsonb().$type<string[]>().default([]).notNull(),
+    failureSourceIds: text({ mode: "json" }).$type<string[]>().default([]).notNull(),
     rationale: text().notNull(),
-    status: agentTestImprovementStatus().default("OPEN").notNull(),
+    status: text({ enum: ["OPEN", "RESOLVED", "DISMISSED"] })
+      .default("OPEN")
+      .notNull(),
     createdByMembershipId: text().references(() => workspaceMember.id, {
       onDelete: "set null",
       onUpdate: "cascade",
     }),
-    createdAt: timestampString()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    createdAt: timestampString().default(isoNowDefault).notNull(),
     reviewedByMembershipId: text().references(() => workspaceMember.id, {
       onDelete: "set null",
       onUpdate: "cascade",
     }),
     reviewedAt: timestampString(),
     reviewNote: text(),
-    updatedAt: timestampString()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    updatedAt: timestampString().default(isoNowDefault).notNull(),
   },
   (table) => [
     uniqueIndex("agent_test_improvement_workspace_id_key").on(table.workspaceId, table.id),
@@ -685,13 +632,7 @@ export const agentTestImprovement = pgTable(
   ],
 );
 
-export const agentTestComparisonStatus = pgEnum("agent_test_comparison_status", [
-  "PENDING",
-  "COMPLETE",
-  "ERROR",
-]);
-
-export const agentTestComparison = pgTable(
+export const agentTestComparison = sqliteTable(
   "agent_test_comparison",
   {
     id: text().primaryKey().notNull(),
@@ -700,7 +641,7 @@ export const agentTestComparison = pgTable(
       .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
     improvementId: text().notNull(),
     idempotencyKey: text().notNull(),
-    caseSnapshot: jsonb()
+    caseSnapshot: text({ mode: "json" })
       .$type<{
         title: string;
         prompt: string;
@@ -708,14 +649,14 @@ export const agentTestComparison = pgTable(
         expectedSourceIds: string[];
       }>()
       .notNull(),
-    baselineReferences: jsonb().$type<{
+    baselineReferences: text({ mode: "json" }).$type<{
       configBasis: "widget-draft-revision-v1";
       configFingerprint: string;
       modelProvider: "OPENAI" | "GOOGLE";
       modelName: string;
       sources: { documentId: string; revisionId: string | null; revisionNumber: number | null }[];
     } | null>(),
-    replayReferences: jsonb().$type<{
+    replayReferences: text({ mode: "json" }).$type<{
       configFingerprint: string;
       modelProvider: "OPENAI" | "GOOGLE";
       modelName: string;
@@ -724,15 +665,15 @@ export const agentTestComparison = pgTable(
     baselineOutcome: text(),
     replayOutcome: text(),
     replayStatus: text(),
-    status: agentTestComparisonStatus().default("PENDING").notNull(),
+    status: text({ enum: ["PENDING", "COMPLETE", "ERROR"] })
+      .default("PENDING")
+      .notNull(),
     errorCode: text(),
     createdByMembershipId: text().references(() => workspaceMember.id, {
       onDelete: "set null",
       onUpdate: "cascade",
     }),
-    createdAt: timestampString()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    createdAt: timestampString().default(isoNowDefault).notNull(),
     completedAt: timestampString(),
   },
   (table) => [
@@ -756,15 +697,8 @@ export const agentTestComparison = pgTable(
   ],
 );
 
-export const agentTestPublishCheckStatus = pgEnum("agent_test_publish_check_status", [
-  "PENDING_BASELINE",
-  "PENDING_DRAFT",
-  "COMPLETE",
-  "ERROR",
-]);
-
 /** A text-free, owner-created receipt binding full-suite outcomes to exact publish inputs. */
-export const agentTestPublishCheck = pgTable(
+export const agentTestPublishCheck = sqliteTable(
   "agent_test_publish_check",
   {
     id: text().primaryKey().notNull(),
@@ -784,7 +718,7 @@ export const agentTestPublishCheck = pgTable(
     candidateFingerprint: text().notNull(),
     baselineRequestDigest: text(),
     candidateRequestDigest: text(),
-    baselineReferences: jsonb().$type<{
+    baselineReferences: text({ mode: "json" }).$type<{
       configFingerprint: string;
       modelProvider: "OPENAI" | "GOOGLE";
       modelName: string;
@@ -794,7 +728,7 @@ export const agentTestPublishCheck = pgTable(
         sources: { documentId: string; revisionId: string; revisionNumber: number }[];
       }[];
     } | null>(),
-    candidateReferences: jsonb().$type<{
+    candidateReferences: text({ mode: "json" }).$type<{
       configFingerprint: string;
       modelProvider: "OPENAI" | "GOOGLE";
       modelName: string;
@@ -804,10 +738,8 @@ export const agentTestPublishCheck = pgTable(
         sources: { documentId: string; revisionId: string; revisionNumber: number }[];
       }[];
     } | null>(),
-    status: agentTestPublishCheckStatus().notNull(),
-    createdAt: timestampString()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    status: text({ enum: ["PENDING_BASELINE", "PENDING_DRAFT", "COMPLETE", "ERROR"] }).notNull(),
+    createdAt: timestampString().default(isoNowDefault).notNull(),
     completedAt: timestampString(),
   },
   (table) => [
@@ -818,19 +750,19 @@ export const agentTestPublishCheck = pgTable(
     ),
     check(
       "agent_test_publish_check_suite_digest_check",
-      sql`${table.suiteDigest} ~ '^[0-9a-f]{64}$'`,
+      sql`typeof(${table.suiteDigest}) = 'text' and length(${table.suiteDigest}) = 64 and ${table.suiteDigest} not glob '*[^0-9a-f]*'`,
     ),
     check(
       "agent_test_publish_check_candidate_fingerprint_check",
-      sql`${table.candidateFingerprint} ~ '^[0-9a-f]{64}$'`,
+      sql`typeof(${table.candidateFingerprint}) = 'text' and length(${table.candidateFingerprint}) = 64 and ${table.candidateFingerprint} not glob '*[^0-9a-f]*'`,
     ),
     check(
       "agent_test_publish_check_source_basis_digest_check",
-      sql`${table.sourceBasisDigest} ~ '^[0-9a-f]{64}$'`,
+      sql`typeof(${table.sourceBasisDigest}) = 'text' and length(${table.sourceBasisDigest}) = 64 and ${table.sourceBasisDigest} not glob '*[^0-9a-f]*'`,
     ),
     check(
       "agent_test_publish_check_request_digest_check",
-      sql`(${table.baselineRequestDigest} is null or ${table.baselineRequestDigest} ~ '^[0-9a-f]{64}$') and (${table.candidateRequestDigest} is null or ${table.candidateRequestDigest} ~ '^[0-9a-f]{64}$')`,
+      sql`(${table.baselineRequestDigest} is null or (typeof(${table.baselineRequestDigest}) = 'text' and length(${table.baselineRequestDigest}) = 64 and ${table.baselineRequestDigest} not glob '*[^0-9a-f]*')) and (${table.candidateRequestDigest} is null or (typeof(${table.candidateRequestDigest}) = 'text' and length(${table.candidateRequestDigest}) = 64 and ${table.candidateRequestDigest} not glob '*[^0-9a-f]*'))`,
     ),
     check(
       "agent_test_publish_check_version_nonnegative_check",
@@ -843,34 +775,29 @@ export const agentTestPublishCheck = pgTable(
   ],
 );
 
-export const knowledgeGapReviewStatus = pgEnum("knowledge_gap_review_status", [
-  "OPEN",
-  "RESOLVED",
-  "IGNORED",
-]);
-
-export const knowledgeGapReview = pgTable(
+export const knowledgeGapReview = sqliteTable(
   "knowledge_gap_review",
   {
     workspaceId: text()
       .notNull()
       .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
     questionHash: text().notNull(),
-    status: knowledgeGapReviewStatus().default("OPEN").notNull(),
+    status: text({ enum: ["OPEN", "RESOLVED", "IGNORED"] })
+      .default("OPEN")
+      .notNull(),
     reviewedByUserId: text().references(() => user.id, {
       onDelete: "set null",
       onUpdate: "cascade",
     }),
-    createdAt: timestampString()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
-    updatedAt: timestampString()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    createdAt: timestampString().default(isoNowDefault).notNull(),
+    updatedAt: timestampString().default(isoNowDefault).notNull(),
   },
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.questionHash] }),
-    check("knowledge_gap_review_questionHash_check", sql`${table.questionHash} ~ '^[a-f0-9]{64}$'`),
+    check(
+      "knowledge_gap_review_questionHash_check",
+      sql`typeof(${table.questionHash}) = 'text' and length(${table.questionHash}) = 64 and ${table.questionHash} not glob '*[^0-9a-f]*'`,
+    ),
     index("knowledge_gap_review_workspace_status_updatedAt_idx").on(
       table.workspaceId,
       table.status,
@@ -879,7 +806,7 @@ export const knowledgeGapReview = pgTable(
   ],
 );
 
-export const widget = pgTable(
+export const widget = sqliteTable(
   "widget",
   {
     id: text().primaryKey().notNull(),
@@ -908,14 +835,14 @@ export const widget = pgTable(
     escalationKeywords: text().default("human,agent,person,representative,support team").notNull(),
     modelProvider: text().default("OPENAI").notNull(),
     modelName: text().default("gpt-4o-mini").notNull(),
-    bookingEnabled: boolean().default(false).notNull(),
+    bookingEnabled: integer({ mode: "boolean" }).default(false).notNull(),
     bookingTimezone: text().default("UTC").notNull(),
     bookingDurationMinutes: integer().default(30).notNull(),
     bookingMinimumNoticeMinutes: integer().default(60).notNull(),
     bookingWorkingHours: text()
       .default('{"start":"09:00","end":"17:00","weekdays":[1,2,3,4,5]}')
       .notNull(),
-    isEnabled: boolean().default(true).notNull(),
+    isEnabled: integer({ mode: "boolean" }).default(true).notNull(),
     theme: text().default("light").notNull(),
     userBubbleColor: text().default(BRAND_COLOR).notNull(),
     userBubbleTextColor: text().default("#ffffff").notNull(),
@@ -929,24 +856,22 @@ export const widget = pgTable(
         '["What services do you offer?","How can I get started?","Tell me more about pricing"]',
       )
       .notNull(),
-    hideSuggestionsOnInteract: boolean().default(true).notNull(),
+    hideSuggestionsOnInteract: integer({ mode: "boolean" }).default(true).notNull(),
     previewMessages: text().default('["Hi there! 👋","Need help with anything?"]').notNull(),
     autoShowPreviewDelay: integer().default(3000).notNull(),
-    showBranding: boolean().default(true).notNull(),
+    showBranding: integer({ mode: "boolean" }).default(true).notNull(),
     privacyPolicyUrl: text().default("/privacy-policy").notNull(),
-    enableLeadCapture: boolean().default(false).notNull(),
+    enableLeadCapture: integer({ mode: "boolean" }).default(false).notNull(),
     leadCaptureKeywords: text()
       .default('["contact","contact me","call me","reach me","get in touch"]')
       .notNull(),
     leadCaptureMinutesThreshold: integer().default(5).notNull(),
     leadCaptureMessageThreshold: integer().default(4).notNull(),
-    enableBrochure: boolean().default(false).notNull(),
+    enableBrochure: integer({ mode: "boolean" }).default(false).notNull(),
     brochureSuggestionText: text().default("Receive Brochure").notNull(),
     authorizedDomains: text().default("[]").notNull(),
     publishedVersion: integer().default(0).notNull(),
-    createdAt: numeric()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    createdAt: numeric().default(isoNowDefault).notNull(),
     updatedAt: numeric().notNull(),
     workspaceId: text()
       .notNull()
@@ -958,15 +883,13 @@ export const widget = pgTable(
   ],
 );
 
-export const widgetPublication = pgTable(
+export const widgetPublication = sqliteTable(
   "widget_publication",
   {
     id: text().primaryKey().notNull(),
     version: integer().notNull(),
-    config: jsonb().$type<WidgetPublicationSnapshot>().notNull(),
-    publishedAt: timestampString()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    config: text({ mode: "json" }).$type<WidgetPublicationSnapshot>().notNull(),
+    publishedAt: timestampString().default(isoNowDefault).notNull(),
     widgetId: text()
       .notNull()
       .references(() => widget.id, { onDelete: "cascade", onUpdate: "cascade" }),
@@ -981,7 +904,7 @@ export const widgetPublication = pgTable(
   ],
 );
 
-export const visitorSession = pgTable(
+export const visitorSession = sqliteTable(
   "visitor_session",
   {
     id: text().primaryKey().notNull(),
@@ -1007,13 +930,9 @@ export const visitorSession = pgTable(
     email: text(),
     phone: text(),
     leadCapturedAt: numeric(),
-    createdAt: numeric()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    createdAt: numeric().default(isoNowDefault).notNull(),
     updatedAt: numeric().notNull(),
-    lastSeenAt: numeric()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    lastSeenAt: numeric().default(isoNowDefault).notNull(),
     expiresAt: numeric().notNull(),
     widgetId: text()
       .notNull()
@@ -1032,7 +951,7 @@ export const visitorSession = pgTable(
   ],
 );
 
-export const attachment = pgTable(
+export const attachment = sqliteTable(
   "attachment",
   {
     id: text().primaryKey().notNull(),
@@ -1040,9 +959,7 @@ export const attachment = pgTable(
     mimeType: text().notNull(),
     size: integer().notNull(),
     storageKey: text().notNull(),
-    createdAt: numeric()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    createdAt: numeric().default(isoNowDefault).notNull(),
     workspaceId: text()
       .notNull()
       .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
@@ -1057,7 +974,7 @@ export const attachment = pgTable(
   ],
 );
 
-export const document = pgTable(
+export const document = sqliteTable(
   "document",
   {
     id: text().primaryKey().notNull(),
@@ -1068,9 +985,7 @@ export const document = pgTable(
     mimeType: text(),
     status: text().default("PROCESSING").notNull(),
     errorMessage: text(),
-    createdAt: numeric()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    createdAt: numeric().default(isoNowDefault).notNull(),
     updatedAt: numeric().notNull(),
     workspaceId: text()
       .notNull()
@@ -1091,7 +1006,7 @@ export const document = pgTable(
  * but retains a minimal tombstone so later evaluations can report that a cited revision was
  * deleted. No source text, URL, filename, or provider response is stored here.
  */
-export const documentRevision = pgTable(
+export const documentRevision = sqliteTable(
   "document_revision",
   {
     id: text().primaryKey().notNull(),
@@ -1102,9 +1017,7 @@ export const documentRevision = pgTable(
     providerItemId: text(),
     providerItemKey: text(),
     status: text().default("CURRENT").notNull(),
-    createdAt: numeric()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    createdAt: numeric().default(isoNowDefault).notNull(),
     retiredAt: numeric(),
     workspaceId: text()
       .notNull()
@@ -1125,7 +1038,10 @@ export const documentRevision = pgTable(
       table.createdAt,
     ),
     check("document_revision_number_positive_check", sql`${table.revisionNumber} > 0`),
-    check("document_revision_hash_sha256_check", sql`${table.contentSha256} ~ '^[0-9a-f]{64}$'`),
+    check(
+      "document_revision_hash_sha256_check",
+      sql`typeof(${table.contentSha256}) = 'text' and length(${table.contentSha256}) = 64 and ${table.contentSha256} not glob '*[^0-9a-f]*'`,
+    ),
     check(
       "document_revision_status_check",
       sql`${table.status} in ('CURRENT', 'SUPERSEDED', 'DELETED')`,
@@ -1134,7 +1050,7 @@ export const documentRevision = pgTable(
 );
 
 /** Retryable provider erasure records; these contain item identity only, never indexed content. */
-export const searchItemCleanup = pgTable(
+export const searchItemCleanup = sqliteTable(
   "search_item_cleanup",
   {
     id: text().primaryKey().notNull(),
@@ -1142,13 +1058,9 @@ export const searchItemCleanup = pgTable(
     itemKey: text().notNull(),
     documentId: text().notNull(),
     attempts: integer().default(0).notNull(),
-    nextAttemptAt: numeric()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    nextAttemptAt: numeric().default(isoNowDefault).notNull(),
     claimedUntil: numeric(),
-    createdAt: numeric()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    createdAt: numeric().default(isoNowDefault).notNull(),
     updatedAt: numeric().notNull(),
     workspaceId: text()
       .notNull()
@@ -1164,15 +1076,13 @@ export const searchItemCleanup = pgTable(
   ],
 );
 
-export const documentChunk = pgTable(
+export const documentChunk = sqliteTable(
   "document_chunk",
   {
     id: text().primaryKey().notNull(),
     content: text().notNull(),
     position: integer().notNull(),
-    createdAt: numeric()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    createdAt: numeric().default(isoNowDefault).notNull(),
     documentId: text()
       .notNull()
       .references(() => document.id, { onDelete: "cascade", onUpdate: "cascade" }),
@@ -1180,7 +1090,7 @@ export const documentChunk = pgTable(
   (table) => [index("document_chunk_documentId_position_idx").on(table.documentId, table.position)],
 );
 
-export const workspaceInvite = pgTable(
+export const workspaceInvite = sqliteTable(
   "workspace_invite",
   {
     id: text().primaryKey().notNull(),
@@ -1189,9 +1099,7 @@ export const workspaceInvite = pgTable(
     token: text().notNull(),
     expiresAt: numeric().notNull(),
     acceptedAt: numeric(),
-    createdAt: numeric()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    createdAt: numeric().default(isoNowDefault).notNull(),
     workspaceId: text()
       .notNull()
       .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
@@ -1203,7 +1111,7 @@ export const workspaceInvite = pgTable(
   ],
 );
 
-export const integration = pgTable(
+export const integration = sqliteTable(
   "integration",
   {
     id: text().primaryKey().notNull(),
@@ -1217,9 +1125,7 @@ export const integration = pgTable(
     credentials: text(),
     lastHealthCheckAt: numeric(),
     lastError: text(),
-    createdAt: numeric()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    createdAt: numeric().default(isoNowDefault).notNull(),
     updatedAt: numeric().notNull(),
     workspaceId: text()
       .notNull()
@@ -1230,7 +1136,7 @@ export const integration = pgTable(
   ],
 );
 
-export const notification = pgTable(
+export const notification = sqliteTable(
   "notification",
   {
     id: text().primaryKey().notNull(),
@@ -1238,9 +1144,7 @@ export const notification = pgTable(
     title: text().notNull(),
     body: text().notNull(),
     readAt: numeric(),
-    createdAt: numeric()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    createdAt: numeric().default(isoNowDefault).notNull(),
     workspaceId: text()
       .notNull()
       .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
@@ -1258,16 +1162,14 @@ export const notification = pgTable(
   ],
 );
 
-export const domainEvent = pgTable(
+export const domainEvent = sqliteTable(
   "domain_event",
   {
     id: text().primaryKey().notNull(),
     type: text().notNull(),
     entityId: text(),
     payload: text().default("{}").notNull(),
-    createdAt: numeric()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    createdAt: numeric().default(isoNowDefault).notNull(),
     workspaceId: text()
       .notNull()
       .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
@@ -1281,7 +1183,7 @@ export const domainEvent = pgTable(
   ],
 );
 
-export const workflowRun = pgTable(
+export const workflowRun = sqliteTable(
   "workflow_run",
   {
     id: text().primaryKey().notNull(),
@@ -1295,9 +1197,7 @@ export const workflowRun = pgTable(
     maxAttempts: integer().default(3).notNull(),
     leaseToken: text(),
     leaseExpiresAt: numeric(),
-    startedAt: numeric()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    startedAt: numeric().default(isoNowDefault).notNull(),
     finishedAt: numeric(),
     conversationId: text().references(() => conversation.id, {
       onDelete: "set null",
@@ -1320,7 +1220,7 @@ export const workflowRun = pgTable(
   ],
 );
 
-export const agentRun = pgTable(
+export const agentRun = sqliteTable(
   "agent_run",
   {
     id: text().primaryKey().notNull(),
@@ -1338,9 +1238,7 @@ export const agentRun = pgTable(
     latencyMs: integer(),
     finishReason: text(),
     errorMessage: text(),
-    startedAt: numeric()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    startedAt: numeric().default(isoNowDefault).notNull(),
     finishedAt: numeric(),
     workspaceId: text()
       .notNull()
@@ -1366,7 +1264,7 @@ export const agentRun = pgTable(
   ],
 );
 
-export const integrationAction = pgTable(
+export const integrationAction = sqliteTable(
   "integration_action",
   {
     id: text().primaryKey().notNull(),
@@ -1377,9 +1275,7 @@ export const integrationAction = pgTable(
     payload: text().default("{}").notNull(),
     result: text(),
     errorMessage: text(),
-    createdAt: numeric()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    createdAt: numeric().default(isoNowDefault).notNull(),
     updatedAt: numeric().notNull(),
     workspaceId: text()
       .notNull()
@@ -1399,7 +1295,7 @@ export const integrationAction = pgTable(
   ],
 );
 
-export const workflowStep = pgTable(
+export const workflowStep = sqliteTable(
   "workflow_step",
   {
     id: text().primaryKey().notNull(),
@@ -1425,7 +1321,7 @@ export const workflowStep = pgTable(
   ],
 );
 
-export const approvalRequest = pgTable(
+export const approvalRequest = sqliteTable(
   "approval_request",
   {
     id: text().primaryKey().notNull(),
@@ -1437,9 +1333,7 @@ export const approvalRequest = pgTable(
     tokenHash: text().notNull(),
     expiresAt: numeric().notNull(),
     decidedAt: numeric(),
-    createdAt: numeric()
-      .default(sql`(CURRENT_TIMESTAMP)`)
-      .notNull(),
+    createdAt: numeric().default(isoNowDefault).notNull(),
     workspaceId: text()
       .notNull()
       .references(() => workspace.id, { onDelete: "cascade", onUpdate: "cascade" }),
@@ -1475,7 +1369,7 @@ export const approvalRequest = pgTable(
   ],
 );
 
-export const rateLimitBucket = pgTable(
+export const rateLimitBucket = sqliteTable(
   "rate_limit_bucket",
   {
     keyHash: text().primaryKey().notNull(),
@@ -1483,4 +1377,85 @@ export const rateLimitBucket = pgTable(
     resetAt: timestampString().notNull(),
   },
   (table) => [index("rate_limit_bucket_resetAt_idx").on(table.resetAt)],
+);
+
+export const documentLock = sqliteTable(
+  "document_lock",
+  {
+    lockKey: text().primaryKey().notNull(),
+    ownerToken: text().notNull(),
+    expiresAt: timestampString().notNull(),
+    updatedAt: timestampString().notNull(),
+  },
+  (table) => [index("document_lock_expiresAt_idx").on(table.expiresAt)],
+);
+
+export const chatStateSubscription = sqliteTable(
+  "chat_state_subscriptions",
+  {
+    keyPrefix: text("key_prefix").notNull(),
+    threadId: text("thread_id").notNull(),
+    createdAt: text("created_at").default(isoNowDefault).notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.keyPrefix, table.threadId] })],
+);
+
+export const chatStateLock = sqliteTable(
+  "chat_state_locks",
+  {
+    keyPrefix: text("key_prefix").notNull(),
+    threadId: text("thread_id").notNull(),
+    token: text("token").notNull(),
+    expiresAt: integer("expires_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.keyPrefix, table.threadId] }),
+    index("chat_state_locks_expires_idx").on(table.expiresAt),
+  ],
+);
+
+export const chatStateCache = sqliteTable(
+  "chat_state_cache",
+  {
+    keyPrefix: text("key_prefix").notNull(),
+    cacheKey: text("cache_key").notNull(),
+    value: text("value").notNull(),
+    expiresAt: integer("expires_at"),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.keyPrefix, table.cacheKey] }),
+    index("chat_state_cache_expires_idx").on(table.expiresAt),
+  ],
+);
+
+export const chatStateList = sqliteTable(
+  "chat_state_lists",
+  {
+    seq: integer("seq").primaryKey({ autoIncrement: true }),
+    keyPrefix: text("key_prefix").notNull(),
+    listKey: text("list_key").notNull(),
+    value: text("value").notNull(),
+    expiresAt: integer("expires_at"),
+  },
+  (table) => [
+    index("chat_state_lists_key_seq_idx").on(table.keyPrefix, table.listKey, table.seq),
+    index("chat_state_lists_expires_idx").on(table.expiresAt),
+  ],
+);
+
+export const chatStateQueue = sqliteTable(
+  "chat_state_queues",
+  {
+    seq: integer("seq").primaryKey({ autoIncrement: true }),
+    keyPrefix: text("key_prefix").notNull(),
+    threadId: text("thread_id").notNull(),
+    value: text("value").notNull(),
+    expiresAt: integer("expires_at").notNull(),
+  },
+  (table) => [
+    index("chat_state_queues_key_seq_idx").on(table.keyPrefix, table.threadId, table.seq),
+    index("chat_state_queues_expires_idx").on(table.expiresAt),
+  ],
 );

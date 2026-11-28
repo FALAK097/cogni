@@ -1,14 +1,19 @@
 import { randomUUID } from "node:crypto";
 import type { Db } from "@/lib/db/client";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import {
   document as documentTable,
   documentChunk as documentChunkTable,
   documentRevision,
   searchItemCleanup,
 } from "@/lib/db/schema";
-import { runDbWriteOperation } from "@/lib/db/client";
+import {
+  chunkArray,
+  isInteractiveTransactionSupported,
+  runDbWriteOperation,
+} from "@/lib/db/client";
 import { readObject } from "@/lib/storage/index";
+import { isWorkersRuntime } from "@/lib/cloudflare/runtime";
 import { chunkText, stripHtml } from "@/features/knowledge/server/chunk";
 import { extractPdfText } from "@/features/knowledge/server/extract-pdf";
 import { crawlSitemapText } from "@/features/knowledge/server/crawl";
@@ -118,8 +123,7 @@ export async function indexDocumentContent(
           updatedAt: documentTable.updatedAt,
         })
         .from(documentTable)
-        .where(and(eq(documentTable.id, documentId), eq(documentTable.workspaceId, workspaceId)))
-        .for("update");
+        .where(and(eq(documentTable.id, documentId), eq(documentTable.workspaceId, workspaceId)));
       if (!source) throw new Error("Knowledge source was not found in this workspace.");
       if (
         source.status !== "PROCESSING" ||
@@ -184,25 +188,28 @@ export async function indexDocumentContent(
 
       let renewalFailed = false;
       let renewalWork = Promise.resolve();
-      const renewalTimer = setInterval(
-        () => {
-          renewalWork = renewalWork
-            .then(async () => {
-              const stillReserved = await runDbWriteOperation(db, (transaction) =>
-                renewSearchItemCleanupReservationInTransaction(transaction, {
-                  workspaceId,
-                  documentId,
-                  reservationId: activeReservationId,
-                }),
-              );
-              if (!stillReserved) renewalFailed = true;
-            })
-            .catch(() => {
-              renewalFailed = true;
-            });
-        },
-        Math.max(1_000, Math.floor(searchItemCleanupClaimLeaseMs / 3)),
-      );
+      const renewalTimer = isWorkersRuntime()
+        ? undefined
+        : setInterval(
+            () => {
+              renewalWork = renewalWork
+                .then(async () => {
+                  const stillReserved = await runDbWriteOperation(db, (transaction) =>
+                    renewSearchItemCleanupReservationInTransaction(transaction, {
+                      workspaceId,
+                      documentId,
+                      reservationId: activeReservationId,
+                    }),
+                  );
+                  if (!stillReserved) renewalFailed = true;
+                })
+                .catch(() => {
+                  renewalFailed = true;
+                });
+            },
+            Math.max(1_000, Math.floor(searchItemCleanupClaimLeaseMs / 3)),
+          );
+      renewalTimer?.unref?.();
 
       try {
         uploadAttempted = true;
@@ -218,7 +225,7 @@ export async function indexDocumentContent(
           throw new Error("Search item upload reservation expired during upload.");
         }
       } finally {
-        clearInterval(renewalTimer);
+        if (renewalTimer) clearInterval(renewalTimer);
         await renewalWork;
       }
     }
@@ -232,8 +239,7 @@ export async function indexDocumentContent(
           updatedAt: documentTable.updatedAt,
         })
         .from(documentTable)
-        .where(and(eq(documentTable.id, documentId), eq(documentTable.workspaceId, workspaceId)))
-        .for("update");
+        .where(and(eq(documentTable.id, documentId), eq(documentTable.workspaceId, workspaceId)));
       if (!source) throw new Error("Knowledge source was not found in this workspace.");
 
       if (
@@ -259,6 +265,44 @@ export async function indexDocumentContent(
             );
         }
         return { status: "stale" as const };
+      }
+
+      const existingChunks = await transaction
+        .select({ id: documentChunkTable.id })
+        .from(documentChunkTable)
+        .where(eq(documentChunkTable.documentId, documentId));
+      const existingChunkIds = existingChunks.map((row) => row.id);
+
+      const chunkValues = chunks.map((content, position) => ({
+        id: randomUUID(),
+        documentId,
+        content,
+        position,
+      }));
+      const insertedChunkIds: string[] = [];
+      try {
+        for (const chunkBatch of chunkArray(chunkValues, 20)) {
+          await transaction.insert(documentChunkTable).values(chunkBatch);
+          for (const row of chunkBatch) {
+            insertedChunkIds.push(row.id);
+          }
+        }
+      } catch (insertError) {
+        if (!isInteractiveTransactionSupported(transaction) && insertedChunkIds.length > 0) {
+          for (const idBatch of chunkArray(insertedChunkIds, 80)) {
+            await transaction
+              .delete(documentChunkTable)
+              .where(inArray(documentChunkTable.id, idBatch))
+              .catch(() => {});
+          }
+        }
+        throw insertError;
+      }
+
+      for (const oldIdBatch of chunkArray(existingChunkIds, 80)) {
+        await transaction
+          .delete(documentChunkTable)
+          .where(inArray(documentChunkTable.id, oldIdBatch));
       }
 
       const [previous] = await transaction
@@ -376,17 +420,6 @@ export async function indexDocumentContent(
           );
       }
 
-      await transaction
-        .delete(documentChunkTable)
-        .where(eq(documentChunkTable.documentId, documentId));
-
-      const chunkValues = chunks.map((content, position) => ({
-        id: randomUUID(),
-        documentId,
-        content,
-        position,
-      }));
-      await transaction.insert(documentChunkTable).values(chunkValues);
       const readyToken = Math.max(Date.now(), processingToken + 1);
       await transaction
         .update(documentTable)

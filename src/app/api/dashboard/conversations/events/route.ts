@@ -48,8 +48,14 @@ export async function GET(request: Request) {
       .orderBy(asc(conversationEvent.cursor))
       .limit(1),
   ]);
-  const latestCursor = latestRows[0]?.cursor ?? BigInt(0);
-  const oldestCursor = oldestRows[0]?.cursor ?? null;
+  const latestCursor =
+    latestRows[0]?.cursor !== undefined && latestRows[0]?.cursor !== null
+      ? BigInt(latestRows[0].cursor)
+      : BigInt(0);
+  const oldestCursor =
+    oldestRows[0]?.cursor !== undefined && oldestRows[0]?.cursor !== null
+      ? BigInt(oldestRows[0].cursor)
+      : null;
   const afterCursor = parsedCursor.value;
   const hasGap =
     afterCursor !== null && oldestCursor !== null && afterCursor < oldestCursor - BigInt(1);
@@ -61,23 +67,30 @@ export async function GET(request: Request) {
     );
   }
 
+  const afterCursorNumber =
+    afterCursor > BigInt(Number.MAX_SAFE_INTEGER) ? Number.MAX_SAFE_INTEGER : Number(afterCursor);
+
   const events = await db
     .select({ cursor: conversationEvent.cursor, conversationId: conversationEvent.conversationId })
     .from(conversationEvent)
     .where(
       and(
         eq(conversationEvent.workspaceId, workspace.id),
-        gt(conversationEvent.cursor, afterCursor),
+        gt(conversationEvent.cursor, afterCursorNumber),
       ),
     )
     .orderBy(asc(conversationEvent.cursor))
     .limit(100);
 
-  const cursor = events.at(-1)?.cursor ?? afterCursor;
+  const lastEventCursor = events.at(-1)?.cursor;
+  const cursor =
+    lastEventCursor !== undefined && lastEventCursor !== null
+      ? BigInt(lastEventCursor)
+      : afterCursor;
   return NextResponse.json(
     {
       events: events.map((event) => ({
-        cursor: event.cursor.toString(),
+        cursor: BigInt(event.cursor).toString(),
         conversationId: event.conversationId,
       })),
       cursor: cursor.toString(),

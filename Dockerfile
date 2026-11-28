@@ -1,4 +1,4 @@
-FROM node:22-alpine AS base
+FROM node:24-alpine AS base
 WORKDIR /app
 RUN corepack enable
 
@@ -9,7 +9,7 @@ RUN pnpm install --frozen-lockfile
 FROM dependencies AS build
 COPY . .
 ENV ENV=production \
-    DATABASE_URL=postgresql://build:build@127.0.0.1:5432/cogni \
+    DATABASE_URL=file:/tmp/cogni-build.db \
     BETTER_AUTH_SECRET=build-only-secret-value-with-at-least-32-characters \
     BETTER_AUTH_URL=https://build.invalid \
     GOOGLE_CLIENT_ID=build-only \
@@ -34,7 +34,7 @@ COPY --from=build /app/drizzle.config.ts ./drizzle.config.ts
 COPY --from=build /app/next.config.ts ./next.config.ts
 COPY --from=build /app/tsconfig.json ./tsconfig.json
 COPY --from=build /app/postcss.config.mjs ./postcss.config.mjs
-RUN mkdir -p /app/.uploads && chown -R cogni:cogni /app/.next /app/.uploads
+RUN mkdir -p /app/.next /app/.uploads /app/.data && chown -R cogni:cogni /app/.next /app/.uploads /app/.data
 USER cogni
 EXPOSE 3000
 CMD ["node", "node_modules/next/dist/bin/next", "start"]

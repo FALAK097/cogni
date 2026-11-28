@@ -18,7 +18,7 @@ export async function buildAgentMemoryContext({
       columns: { name: true, email: true, tags: true },
     }),
     db.query.conversation.findFirst({
-      where: (c, { eq }) => eq(c.id, conversationId),
+      where: (c, { and, eq }) => and(eq(c.id, conversationId), eq(c.workspaceId, workspaceId)),
       columns: { messages: true },
     }),
   ]);

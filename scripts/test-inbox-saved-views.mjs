@@ -1,19 +1,14 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { mkdir } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { after, before, test } from "node:test";
-import "dotenv/config";
 import { build } from "esbuild";
-import postgres from "postgres";
+import { createTempSqliteEnvironment } from "./sqlite-test-utils.mjs";
 
 process.env.SKIP_ENV_VALIDATION ??= "true";
-
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl || !["localhost", "127.0.0.1", "::1"].includes(new URL(databaseUrl).hostname)) {
-  throw new Error("Inbox saved-view integration tests require a local DATABASE_URL.");
-}
+const { raw, cleanup } = createTempSqliteEnvironment("cogni-saved-view-");
 
 const outputDirectory = join(process.cwd(), "node_modules", ".cache", "cogni-saved-view-test");
 const outputFile = join(outputDirectory, "saved-views.mjs");
@@ -65,12 +60,12 @@ const {
   InboxSavedViewNameConflictError,
   listInboxSavedViews,
 } = await import(`${pathToFileURL(outputFile).href}?run=${randomUUID()}`);
-const raw = postgres(databaseUrl, { max: 1 });
 const workspaceId = randomUUID();
 const otherWorkspaceId = randomUUID();
 const userIds = [randomUUID(), randomUUID(), randomUUID()];
 const memberIds = [randomUUID(), randomUUID(), randomUUID()];
 const now = new Date().toISOString();
+const nowMs = Date.now();
 
 before(async () => {
   await raw`
@@ -81,7 +76,7 @@ before(async () => {
   for (const [index, userId] of userIds.entries()) {
     await raw`
       INSERT INTO "user" ("id", "name", "email", "updatedAt")
-      VALUES (${userId}, ${`Saved view user ${index}`}, ${`${userId}@example.test`}, ${now})
+      VALUES (${userId}, ${`Saved view user ${index}`}, ${`${userId}@example.test`}, ${nowMs})
     `;
   }
   await raw`
@@ -95,8 +90,9 @@ before(async () => {
 after(async () => {
   await raw`DELETE FROM "workspace" WHERE "id" IN (${workspaceId}, ${otherWorkspaceId})`;
   await raw`DELETE FROM "user" WHERE "id" IN (${userIds[0]}, ${userIds[1]}, ${userIds[2]})`;
-  await getDb().$client.end({ timeout: 5 });
-  await raw.end({ timeout: 5 });
+  getDb().$client.close?.();
+  await cleanup();
+  await rm(outputDirectory, { recursive: true, force: true });
 });
 
 test("saved inbox views are workspace scoped and names are unique without case sensitivity", async () => {

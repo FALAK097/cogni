@@ -1,19 +1,22 @@
 import "server-only";
 
-import { createRequire } from "node:module";
+import { extractText, getDocumentProxy } from "unpdf";
 
-const require = createRequire(import.meta.url);
+const MAX_PDF_IMAGE_SIZE = 16_777_216;
+const MAX_PDF_PAGES = 500;
 
-type PdfParseModule = typeof import("pdf-parse");
-
-export async function extractPdfText(bytes: Buffer) {
-  const { PDFParse } = require("pdf-parse") as PdfParseModule;
-  const parser = new PDFParse({ data: bytes });
+export async function extractPdfText(bytes: Buffer): Promise<string> {
+  const pdf = await getDocumentProxy(new Uint8Array(bytes), {
+    maxImageSize: MAX_PDF_IMAGE_SIZE,
+  });
 
   try {
-    const parsed = await parser.getText();
-    return parsed.text.trim();
+    if (pdf.numPages > MAX_PDF_PAGES) {
+      throw new Error(`PDF exceeds the ${MAX_PDF_PAGES}-page limit.`);
+    }
+    const { text } = await extractText(pdf, { mergePages: true });
+    return text.trim();
   } finally {
-    await parser.destroy();
+    await pdf.loadingTask.destroy();
   }
 }

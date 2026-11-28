@@ -1,20 +1,17 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 
-import { getDb, type Db } from "@/lib/db/client";
-import { agentTestCase, document, widget } from "@/lib/db/schema";
+import {
+  chunkArray,
+  getDb,
+  isUniqueConstraintError,
+  runDbWriteOperation,
+  type Db,
+} from "@/lib/db/client";
+import { agentTestCase, document } from "@/lib/db/schema";
 import type { AgentTestCaseInput } from "../input";
-
-async function lockWorkspaceWidget(db: Db, workspaceId: string) {
-  await db
-    .select({ id: widget.id })
-    .from(widget)
-    .where(eq(widget.workspaceId, workspaceId))
-    .limit(1)
-    .for("update");
-}
 
 export class AgentTestCaseTitleConflictError extends Error {
   constructor() {
@@ -32,23 +29,23 @@ export class AgentTestSourceUnavailableError extends Error {
 
 async function validateExpectedSources(workspaceId: string, ids: string[], db: Db) {
   if (ids.length === 0) return;
-  const sources = await db
-    .select({ id: document.id })
-    .from(document)
-    .where(
-      and(
-        eq(document.workspaceId, workspaceId),
-        eq(document.status, "READY"),
-        inArray(document.id, ids),
+  const sources = (
+    await Promise.all(
+      chunkArray(ids, 80).map((idBatch) =>
+        db
+          .select({ id: document.id })
+          .from(document)
+          .where(
+            and(
+              eq(document.workspaceId, workspaceId),
+              eq(document.status, "READY"),
+              inArray(document.id, idBatch),
+            ),
+          ),
       ),
-    );
+    )
+  ).flat();
   if (sources.length !== ids.length) throw new AgentTestSourceUnavailableError();
-}
-
-function hasErrorCode(error: unknown, code: string, depth = 0): boolean {
-  if (depth > 3 || typeof error !== "object" || error === null) return false;
-  if ("code" in error && error.code === code) return true;
-  return "cause" in error && hasErrorCode(error.cause, code, depth + 1);
 }
 
 export async function listAgentTestCases(workspaceId: string, db: Db = getDb()) {
@@ -73,9 +70,7 @@ export async function createAgentTestCase(
   input: AgentTestCaseInput,
   db: Db = getDb(),
 ) {
-  return db.transaction(async (transaction) => {
-    const tx = transaction as unknown as Db;
-    await lockWorkspaceWidget(tx, workspaceId);
+  return runDbWriteOperation(db, async (tx) => {
     await validateExpectedSources(workspaceId, input.expectedSourceIds ?? [], tx);
     try {
       const [testCase] = await tx
@@ -88,7 +83,7 @@ export async function createAgentTestCase(
           expectedSourceIds: input.expectedSourceIds ?? [],
           workspaceId,
           createdByMembershipId: membershipId,
-          updatedAt: sql`CURRENT_TIMESTAMP`,
+          updatedAt: new Date().toISOString(),
         })
         .returning({
           id: agentTestCase.id,
@@ -101,7 +96,7 @@ export async function createAgentTestCase(
         });
       return testCase;
     } catch (error) {
-      if (hasErrorCode(error, "23505")) throw new AgentTestCaseTitleConflictError();
+      if (isUniqueConstraintError(error)) throw new AgentTestCaseTitleConflictError();
       throw error;
     }
   });
@@ -113,23 +108,25 @@ export async function updateAgentTestCase(
   input: AgentTestCaseInput,
   db: Db = getDb(),
 ) {
-  return db.transaction(async (transaction) => {
-    const tx = transaction as unknown as Db;
+  return runDbWriteOperation(db, async (tx) => {
     const [existing] = await tx
-      .select({ id: agentTestCase.id })
+      .select({ id: agentTestCase.id, updatedAt: agentTestCase.updatedAt })
       .from(agentTestCase)
       .where(and(eq(agentTestCase.id, caseId), eq(agentTestCase.workspaceId, workspaceId)))
       .limit(1);
     if (!existing) return null;
-    await lockWorkspaceWidget(tx, workspaceId);
     await validateExpectedSources(workspaceId, input.expectedSourceIds ?? [], tx);
+    const previousUpdatedMs = Date.parse(existing.updatedAt);
+    const nextUpdatedAt = new Date(
+      Math.max(Date.now(), Number.isFinite(previousUpdatedMs) ? previousUpdatedMs + 1 : 0),
+    ).toISOString();
     try {
       const [testCase] = await tx
         .update(agentTestCase)
         .set({
           ...input,
           expectedSourceIds: input.expectedSourceIds ?? [],
-          updatedAt: sql`GREATEST(${agentTestCase.updatedAt} + INTERVAL '1 microsecond', CURRENT_TIMESTAMP)`,
+          updatedAt: nextUpdatedAt,
         })
         .where(and(eq(agentTestCase.id, caseId), eq(agentTestCase.workspaceId, workspaceId)))
         .returning({
@@ -143,22 +140,20 @@ export async function updateAgentTestCase(
         });
       return testCase ?? null;
     } catch (error) {
-      if (hasErrorCode(error, "23505")) throw new AgentTestCaseTitleConflictError();
+      if (isUniqueConstraintError(error)) throw new AgentTestCaseTitleConflictError();
       throw error;
     }
   });
 }
 
 export async function deleteAgentTestCase(workspaceId: string, caseId: string, db: Db = getDb()) {
-  return db.transaction(async (transaction) => {
-    const tx = transaction as unknown as Db;
+  return runDbWriteOperation(db, async (tx) => {
     const [existing] = await tx
       .select({ id: agentTestCase.id })
       .from(agentTestCase)
       .where(and(eq(agentTestCase.id, caseId), eq(agentTestCase.workspaceId, workspaceId)))
       .limit(1);
     if (!existing) return false;
-    await lockWorkspaceWidget(tx, workspaceId);
     const deleted = await tx
       .delete(agentTestCase)
       .where(and(eq(agentTestCase.id, caseId), eq(agentTestCase.workspaceId, workspaceId)))

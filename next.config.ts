@@ -7,11 +7,10 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1"],
   serverExternalPackages: [
     "chat",
-    "pdf-parse",
+    "unpdf",
     "@chat-adapter/discord",
     "@chat-adapter/gchat",
     "@chat-adapter/slack",
-    "@chat-adapter/state-pg",
     "@chat-adapter/teams",
     "@chat-adapter/whatsapp",
   ],

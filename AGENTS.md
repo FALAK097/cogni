@@ -17,7 +17,7 @@ Customer website
 
 ## Relational Database Schema Invariants
 
-- Local development uses **PostgreSQL**. Production uses **Neon Postgres** through Vercel's Neon integration.
+- Local development uses **SQLite** via Node's built-in `node:sqlite`. Production uses **Cloudflare D1** (SQLite) bound as `env.DB`.
 - **WorkspaceMember**: Connects users to workspaces (replacing legacy `Membership`).
 - **Widget**: Authorized domains are stored as a JSON string array directly in `Widget.authorizedDomains` (no separate relation model).
 - **Conversation**: Message history is stored as a JSON string array in `Conversation.messages` (no separate `Message` table).
@@ -26,9 +26,9 @@ Customer website
 ### Changing the Schema
 
 1. Edit `src/lib/db/schema.ts`.
-2. Run `pnpm db:generate -- --name <name>` to generate SQL in `drizzle/`.
-3. Run `pnpm db:migrate` to apply to local PostgreSQL.
-4. Run `pnpm db:migrate:remote` with `DATABASE_URL_UNPOOLED` set to apply migrations to production Neon. Application traffic uses the pooled `DATABASE_URL`.
+2. Run `pnpm db:generate --name <name>` to generate SQL in `drizzle/`.
+3. Run `pnpm db:migrate` to apply to local SQLite.
+4. Run `pnpm db:migrate:local` for local Wrangler D1 state and `pnpm db:migrate:remote` to apply migrations to production Cloudflare D1 (`cogni-db`).
 
 ## Repository Structure
 

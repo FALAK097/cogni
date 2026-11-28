@@ -377,21 +377,31 @@ export async function DELETE(_request: Request, context: RouteContext) {
           eq(conversationTable.workspaceId, workspace.id),
         ),
       );
-    await transaction.delete(visitorSessionTable).where(eq(visitorSessionTable.id, session.id));
+    await transaction
+      .delete(visitorSessionTable)
+      .where(
+        and(eq(visitorSessionTable.id, session.id), eq(visitorSessionTable.widgetId, widget.id)),
+      );
   });
 
   if (session.contactId) {
     const hasConvos = await db.query.conversation.findFirst({
-      where: (fields, { eq }) => eq(fields.contactId, session.contactId!),
+      where: (fields, { and, eq }) =>
+        and(eq(fields.contactId, session.contactId!), eq(fields.workspaceId, workspace.id)),
       columns: { id: true },
     });
     const hasSessions = await db.query.visitorSession.findFirst({
-      where: (fields, { eq }) => eq(fields.contactId, session.contactId!),
+      where: (fields, { and, eq }) =>
+        and(eq(fields.contactId, session.contactId!), eq(fields.widgetId, widget.id)),
       columns: { id: true },
     });
 
     if (!hasConvos && !hasSessions) {
-      await db.delete(contactTable).where(eq(contactTable.id, session.contactId));
+      await db
+        .delete(contactTable)
+        .where(
+          and(eq(contactTable.id, session.contactId), eq(contactTable.workspaceId, workspace.id)),
+        );
     }
   }
   return NextResponse.json({ ok: true });

@@ -1,10 +1,11 @@
 import { createDiscordAdapter } from "@chat-adapter/discord";
 import { createGoogleChatAdapter } from "@chat-adapter/gchat";
 import { createSlackAdapter } from "@chat-adapter/slack";
-import { createPostgresState } from "@chat-adapter/state-pg";
 import { createTeamsAdapter } from "@chat-adapter/teams";
 import { createWhatsAppAdapter } from "@chat-adapter/whatsapp";
 import { Chat, type Adapter, type Message, type Thread } from "chat";
+
+import { createSqliteChatState } from "@/features/integrations/server/chat-state-sqlite";
 
 import {
   answerOmnichannelMessage,
@@ -56,8 +57,8 @@ export function createChannelBot({
   const bot = new Chat({
     userName: "cogni",
     adapters: { [channel]: adapter },
-    state: createPostgresState({
-      url: env.DATABASE_URL,
+    state: createSqliteChatState({
+      db,
       keyPrefix: `cogni:${workspaceId}:${integrationId}`,
     }),
     concurrency: "queue",

@@ -324,12 +324,80 @@ async function fetchPublicTextWithDependencies(
   }
 }
 
+function isWorkersRuntime() {
+  return (
+    typeof globalThis.navigator?.userAgent === "string" &&
+    globalThis.navigator.userAgent === "Cloudflare-Workers"
+  );
+}
+
+async function fetchPublicTextInWorker(
+  sourceUrl: string,
+  acceptedTypes: readonly string[],
+  maxBytes: number,
+  timeoutMs: number,
+): Promise<string | null> {
+  let currentUrl = assertPublicHttpUrl(sourceUrl);
+  const deadline = Date.now() + timeoutMs;
+
+  for (let redirectCount = 0; ; redirectCount += 1) {
+    const remainingMs = deadline - Date.now();
+    if (remainingMs <= 0) throw new Error("Website request timed out.");
+
+    const response = await fetch(currentUrl.toString(), {
+      method: "GET",
+      redirect: "manual",
+      signal: AbortSignal.timeout(remainingMs),
+      headers: {
+        accept: acceptedTypes.join(", "),
+        "accept-encoding": "identity",
+        "user-agent": "CogniKnowledgeImporter/1.0",
+      },
+    });
+
+    const location = response.headers.get("location");
+    if (response.status >= 300 && response.status < 400 && location) {
+      await response.body?.cancel();
+      if (redirectCount >= maxRedirects) return null;
+      try {
+        currentUrl = resolveRedirectUrl(currentUrl, location);
+      } catch {
+        return null;
+      }
+      continue;
+    }
+
+    if (response.status < 200 || response.status >= 300) {
+      await response.body?.cancel();
+      return null;
+    }
+
+    const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+    if (!acceptedTypes.some((acceptedType) => contentType.includes(acceptedType))) {
+      await response.body?.cancel();
+      return null;
+    }
+
+    const contentLength = Number(response.headers.get("content-length") ?? "0");
+    if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+      await response.body?.cancel();
+      return null;
+    }
+
+    if (!response.body) return "";
+    return readLimitedBody(response.body as AsyncIterable<Uint8Array>, maxBytes);
+  }
+}
+
 export function fetchPublicText(
   sourceUrl: string,
   acceptedTypes: readonly string[],
   maxBytes: number,
   timeoutMs = defaultTimeoutMs,
 ) {
+  if (isWorkersRuntime()) {
+    return fetchPublicTextInWorker(sourceUrl, acceptedTypes, maxBytes, timeoutMs);
+  }
   return fetchPublicTextWithDependencies(sourceUrl, acceptedTypes, maxBytes, timeoutMs, {
     lookupAddress: lookupPublicAddress,
     requestText,

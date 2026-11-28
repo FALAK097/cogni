@@ -1,1 +1,0 @@
-ALTER TABLE "conversation" ADD COLUMN "labels" text DEFAULT '[]' NOT NULL;

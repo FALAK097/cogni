@@ -1,9 +1,10 @@
 import "server-only";
 
-import { and, asc, eq, ilike, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
 import type { Db } from "@/lib/db/client";
 import { getDb } from "@/lib/db/client";
+import { chunkArray, escapeLikePattern } from "@/lib/db/utils";
 import {
   document as documentTable,
   documentChunk as documentChunkTable,
@@ -27,10 +28,6 @@ type SearchKnowledge = typeof searchCloudflareIndex;
 function readSearchMetadataString(metadata: Record<string, unknown> | undefined, key: string) {
   const value = metadata?.[key] ?? metadata?.[key.toLowerCase()];
   return typeof value === "string" && value.length > 0 ? value : null;
-}
-
-function escapeLikePattern(value: string) {
-  return value.replace(/[\\%_]/g, "\\$&");
 }
 
 export async function retrieveKnowledgeContextWith({
@@ -70,34 +67,42 @@ export async function retrieveKnowledgeContextWith({
     ),
   ];
 
-  if (searchDocumentIds.length > 0) {
-    const documentConditions = [
-      eq(documentTable.workspaceId, workspaceId),
-      eq(documentTable.status, "READY"),
-      inArray(documentTable.id, searchDocumentIds),
-    ];
-    if (requestedDocumentIds) {
-      documentConditions.push(inArray(documentTable.id, requestedDocumentIds));
-    }
+  const requestedSet = requestedDocumentIds ? new Set(requestedDocumentIds) : null;
+  const candidateDocumentIds = requestedSet
+    ? searchDocumentIds.filter((id) => requestedSet.has(id))
+    : searchDocumentIds;
 
-    const documents = await db
-      .select({
-        id: documentTable.id,
-        title: documentTable.title,
-        providerItemKey: documentRevision.providerItemKey,
-        revisionId: documentRevision.id,
-        revisionNumber: documentRevision.revisionNumber,
-      })
-      .from(documentTable)
-      .leftJoin(
-        documentRevision,
-        and(
-          eq(documentRevision.documentId, documentTable.id),
-          eq(documentRevision.workspaceId, documentTable.workspaceId),
-          eq(documentRevision.status, "CURRENT"),
+  if (candidateDocumentIds.length > 0) {
+    const documents = (
+      await Promise.all(
+        chunkArray(candidateDocumentIds, 80).map((idBatch) =>
+          db
+            .select({
+              id: documentTable.id,
+              title: documentTable.title,
+              providerItemKey: documentRevision.providerItemKey,
+              revisionId: documentRevision.id,
+              revisionNumber: documentRevision.revisionNumber,
+            })
+            .from(documentTable)
+            .leftJoin(
+              documentRevision,
+              and(
+                eq(documentRevision.documentId, documentTable.id),
+                eq(documentRevision.workspaceId, documentTable.workspaceId),
+                eq(documentRevision.status, "CURRENT"),
+              ),
+            )
+            .where(
+              and(
+                eq(documentTable.workspaceId, workspaceId),
+                eq(documentTable.status, "READY"),
+                inArray(documentTable.id, idBatch),
+              ),
+            ),
         ),
       )
-      .where(and(...documentConditions));
+    ).flat();
     const titlesByDocumentId = new Map(
       documents.map((document) => [document.id, document.title] as const),
     );
@@ -140,36 +145,47 @@ export async function retrieveKnowledgeContextWith({
     if (contexts.length > 0) return contexts.slice(0, safeLimit);
   }
 
-  const lexicalConditions = [
-    eq(documentTable.workspaceId, workspaceId),
-    eq(documentTable.status, "READY"),
-    ilike(documentChunkTable.content, `%${escapeLikePattern(normalized.slice(0, 120))}%`),
-  ];
-  if (requestedDocumentIds) {
-    lexicalConditions.push(inArray(documentTable.id, requestedDocumentIds));
-  }
+  const fetchExactMatches = (documentIdBatch: string[] | null) =>
+    db
+      .select({
+        documentId: documentTable.id,
+        title: documentTable.title,
+        content: documentChunkTable.content,
+        position: documentChunkTable.position,
+        revisionId: documentRevision.id,
+        revisionNumber: documentRevision.revisionNumber,
+      })
+      .from(documentChunkTable)
+      .innerJoin(documentTable, eq(documentChunkTable.documentId, documentTable.id))
+      .leftJoin(
+        documentRevision,
+        and(
+          eq(documentRevision.documentId, documentTable.id),
+          eq(documentRevision.workspaceId, documentTable.workspaceId),
+          eq(documentRevision.status, "CURRENT"),
+        ),
+      )
+      .where(
+        and(
+          eq(documentTable.workspaceId, workspaceId),
+          eq(documentTable.status, "READY"),
+          sql`lower(${documentChunkTable.content}) like ${`%${escapeLikePattern(normalized.slice(0, 120).toLowerCase())}%`} escape '\\'`,
+          ...(documentIdBatch ? [inArray(documentTable.id, documentIdBatch)] : []),
+        ),
+      )
+      .orderBy(asc(documentChunkTable.position))
+      .limit(safeLimit);
 
-  const exactMatches = await db
-    .select({
-      documentId: documentTable.id,
-      title: documentTable.title,
-      content: documentChunkTable.content,
-      revisionId: documentRevision.id,
-      revisionNumber: documentRevision.revisionNumber,
-    })
-    .from(documentChunkTable)
-    .innerJoin(documentTable, eq(documentChunkTable.documentId, documentTable.id))
-    .leftJoin(
-      documentRevision,
-      and(
-        eq(documentRevision.documentId, documentTable.id),
-        eq(documentRevision.workspaceId, documentTable.workspaceId),
-        eq(documentRevision.status, "CURRENT"),
-      ),
-    )
-    .where(and(...lexicalConditions))
-    .orderBy(asc(documentChunkTable.position))
-    .limit(safeLimit);
+  const exactMatches = requestedDocumentIds
+    ? (
+        await Promise.all(
+          chunkArray(requestedDocumentIds, 80).map((idBatch) => fetchExactMatches(idBatch)),
+        )
+      )
+        .flat()
+        .sort((left, right) => left.position - right.position)
+        .slice(0, safeLimit)
+    : await fetchExactMatches(null);
 
   return exactMatches.map((match) => {
     const hasCurrentRevision =
